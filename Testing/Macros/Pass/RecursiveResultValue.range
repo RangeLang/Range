@@ -8,7 +8,7 @@ construct ResultTree {
     let leaf: ResultLeaf
 }
 
-macro resultTree(): Construct -> ResultTree { environment in
+macro resultTree(): Construct -> ResultTree {
     return ResultTree(
         count: 4,
         leaf: ResultLeaf(flag: true)

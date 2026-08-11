@@ -1,0 +1,31 @@
+@builtin(.storage)
+construct Buffer<Element> {
+    derived count: Int {
+        rawBufferCount(buffer: self)
+    }
+
+    function append(element: Element): Int {
+        return rawBufferAppendInt(buffer: self, value: element)
+    }
+
+    function element(index: Int): Element {
+        return rawBufferLoadInt(buffer: self, index: index)
+    }
+
+    function update(element: Element, index: Int): Int {
+        return rawBufferStoreInt(buffer: self, index: index, value: element)
+    }
+
+    function destroy(): Int {
+        return rawBufferDestroy(buffer: self)
+    }
+}
+
+@builtin(.create)
+function bufferCreateInt(capacity: Int): Buffer<Int>
+
+@builtin(.create)
+function bufferCreateUnsigned8(capacity: Int): Buffer<Int<.unsigned, 8>>
+
+@builtin(.write)
+function bufferTruncateInt(buffer: Buffer<Int>, count: Int): Int

@@ -38,12 +38,12 @@ range_build_select_producer() {
     validated_key="$(/usr/bin/sed -n '1p' "$RANGE_BUILD_VALIDATED_DEVELOPMENT_PRODUCER" 2>/dev/null || true)"
     validated_capability="$(/usr/bin/sed -n '2p' "$RANGE_BUILD_VALIDATED_DEVELOPMENT_PRODUCER" 2>/dev/null || true)"
     [[ "$validated_key" =~ ^[0-9a-f]{64}$ ]] || return 0
-    [[ "$validated_capability" == "developmentEffectValidation=per-function-artifacts-v1" ]] || return 0
+    [[ "$validated_capability" == "developmentDerivationValidation=function-derivations-v2" ]] || return 0
     validated_directory="$RANGE_BUILD_CACHE_ROOT/$validated_key"
-    if range_build_validated_producer_is_valid "$validated_directory" "$validated_key" "${validated_capability#developmentEffectValidation=}"; then
+    if range_build_validated_producer_is_valid "$validated_directory" "$validated_key" "${validated_capability#developmentDerivationValidation=}"; then
         RANGE_BUILD_PRODUCER_KIND="validated-development"
         RANGE_BUILD_PRODUCER_PATH="$validated_directory/RangeCompilerProducer"
-        RANGE_BUILD_PRODUCER_CAPABILITY="${validated_capability#developmentEffectValidation=}"
+        RANGE_BUILD_PRODUCER_CAPABILITY="${validated_capability#developmentDerivationValidation=}"
     fi
 }
 
@@ -77,11 +77,11 @@ range_build_mark_development_producer_validated() {
         COMPILER_LTO="$saved_lto"
         /bin/mv "$temporary_producer" "$producer"
     fi
-    /usr/bin/printf 'sourceCacheKey=%s\ncapability=per-function-artifacts-v1\nexecutableHash=%s\nexecutableBytes=%s\n' \
+    /usr/bin/printf 'sourceCacheKey=%s\ncapability=function-derivations-v2\nexecutableHash=%s\nexecutableBytes=%s\n' \
         "$BUILD_CACHE_KEY" "$(sha256 "$producer")" "$(bytes "$producer")" > "$producer_metadata"
     /bin/mkdir -p "$RANGE_BUILD_CACHE_ROOT"
     temporary="$RANGE_BUILD_VALIDATED_DEVELOPMENT_PRODUCER.$$"
-    /usr/bin/printf '%s\ndevelopmentEffectValidation=per-function-artifacts-v1\n' "$BUILD_CACHE_KEY" > "$temporary"
+    /usr/bin/printf '%s\ndevelopmentDerivationValidation=function-derivations-v2\n' "$BUILD_CACHE_KEY" > "$temporary"
     /bin/mv "$temporary" "$RANGE_BUILD_VALIDATED_DEVELOPMENT_PRODUCER"
 }
 
@@ -213,7 +213,7 @@ range_build_cache_entry_is_valid() {
 range_build_validated_producer_is_valid() {
     local directory="$1"
     local expected_key="$2"
-    local expected_capability="${3:-per-function-artifacts-v1}"
+    local expected_capability="${3:-function-derivations-v2}"
     local producer="$directory/RangeCompilerProducer"
     local metadata="$directory/ProducerMetadata.txt"
     local expected_hash expected_bytes
@@ -295,7 +295,7 @@ resolve_compiler_build() {
     local legacy_cache_key legacy_cache_directory
     local build_directory bootstrap bootstrap_executable candidate_source_bundle candidate_llvm candidate_executable
     local lock_directory publish_directory invalid_directory
-    local function_artifact_directory function_artifact_cache function_artifact_next function_artifact_source_key
+    local function_artifact_directory function_artifact_cache function_artifact_next function_artifact_producer_key
     local lock_status build_status publish_status
     local range_build_phase_started range_build_build_started
 
@@ -367,18 +367,18 @@ resolve_compiler_build() {
     candidate_executable="$build_directory/RangeCompiler"
     if [[ "$RANGE_BUILD_PROFILE" == "development" ]]; then
         candidate_source_bundle="$build_directory/RangeCompilerDevelopmentSourceSet.range"
-        # Artifact edges still carry positional function IDs. Keep cross-run
-        # reuse for an identical source graph, but never apply those edges to
-        # a declaration inventory whose rows may have shifted.
-        function_artifact_source_key="$(sha256 "$SOURCE_BUNDLE")"
-        function_artifact_directory="$RANGE_BUILD_CACHE_ROOT/function-artifacts/$RANGE_BUILD_PRODUCER_CAPABILITY/$function_artifact_source_key"
+        # Derivation schema v9 identifies call boundaries and Behavior closure
+        # independently of declaration rows. Keep one rolling checkpoint per
+        # exact producer so a source edit can reuse unaffected derivations.
+        function_artifact_producer_key="$(sha256 "$RANGE_BUILD_PRODUCER_PATH")"
+        function_artifact_directory="$RANGE_BUILD_CACHE_ROOT/function-derivations/$RANGE_BUILD_PRODUCER_CAPABILITY/$function_artifact_producer_key"
         function_artifact_cache="$function_artifact_directory/FunctionArtifacts.cache"
         function_artifact_next="$build_directory/FunctionArtifacts.next"
         /bin/mkdir -p "$function_artifact_directory"
         {
             /usr/bin/head -n 1 "$SOURCE_BUNDLE"
             /usr/bin/printf '%s\n' '// range-development-compiler'
-            if [[ "$RANGE_BUILD_PRODUCER_CAPABILITY" == "per-function-artifacts-v1" ]]; then
+            if [[ "$RANGE_BUILD_PRODUCER_CAPABILITY" == "function-derivations-v2" ]]; then
                 if [[ -f "$function_artifact_cache" ]]; then
                     /usr/bin/printf '// range-function-artifact-input %s\n' "$function_artifact_cache"
                 fi
@@ -404,7 +404,7 @@ resolve_compiler_build() {
         echo "buildTiming profile=$RANGE_BUILD_PROFILE phase=llvm-emission seconds=$(($(date +%s) - range_build_phase_started))"
         range_build_phase_started="$(date +%s)"
         validate_llvm "$candidate_llvm"
-        if [[ "$RANGE_BUILD_PRODUCER_CAPABILITY" == "per-function-artifacts-v1" ]]; then
+        if [[ "$RANGE_BUILD_PRODUCER_CAPABILITY" == "function-derivations-v2" ]]; then
             [[ -f "$function_artifact_next" ]]
             echo "candidateArtifacts reused=$(/usr/bin/grep -ac '|reused=1$' "$function_artifact_next") rebuilt=$(/usr/bin/grep -ac '|reused=0$' "$function_artifact_next")"
             /bin/mv "$function_artifact_next" "$function_artifact_cache"

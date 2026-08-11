@@ -129,9 +129,9 @@ export const posts: Post[] = [
     category: "Introduction",
     cardTitle: "Intro to Range: The Concrete",
     cardDescription:
-      "One plotted graph. Values carry the metadata for their relationships.",
+      "Core becomes the Range compiler. The Range compiler becomes every project.",
     description:
-      "How the Range compiler uses typed relationship values to describe multiplicity, order, separators, and enclosure.",
+      "How Range grows from its smallest compiler authority into a self-hosted compiler and the projects it compiles.",
     palette: 6,
     draft: true,
     cardPalette: {
@@ -194,6 +194,42 @@ export const posts: Post[] = [
       mutedForeground: "rgb(67 70 109)",
       background: "rgb(214 228 255)",
       contrast: 10.4,
+    },
+  },
+  {
+    slug: "programming-language-design-knots",
+    href: "/posts/programming-language-design-knots",
+    category: "Language design",
+    cardTitle: "Programming Language Design Knots",
+    cardDescription:
+      "When every local rule changes the shape of the language beneath it.",
+    description:
+      "What it feels like to reason about syntax and semantics while the substrate itself keeps changing shape.",
+    palette: 10,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(37 25 69)",
+      mutedForeground: "rgb(82 67 112)",
+      background: "rgb(229 214 255)",
+      contrast: 12.1,
+    },
+  },
+  {
+    slug: "optionality-vs-existentiality",
+    href: "/posts/optionality-vs-existentiality",
+    category: "Language design",
+    cardTitle: "Optionality v. Existentiality",
+    cardDescription:
+      "Maybe a relationship. Somewhere a type. Two different kinds of unknown.",
+    description:
+      "Range separates the question of whether a value occurs from the question of which type a value is.",
+    palette: 11,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(18 39 48)",
+      mutedForeground: "rgb(56 78 86)",
+      background: "rgb(201 240 235)",
+      contrast: 10.8,
     },
   },
   {

@@ -1,0 +1,585 @@
+construct CompilerBuildPlanField {
+    let start: Int
+    let end: Int
+    let isValid: Bool
+}
+
+construct CompilerBuildPlanRecordValidation {
+    let reason: String
+    let idStart: Int
+    let idEnd: Int
+    let index: Int
+}
+
+function compilerBuildPlanLoadSourceBundle(source: String, repoRoot: String, candidateRoot: String): String {
+    let planSnapshot: String(compilerBuildPlanSnapshot(source: source))
+    if hasRangePrefix(source: planSnapshot, start: 0, prefix: String("compilerError")) {
+        return planSnapshot
+    }
+
+    let sourceLength: Int(stringLength(value: source))
+    let newline: String(compilerCoreNewlineCharacter())
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    state bundle: String("compilerNativeSourceSetLLVMText\(newline)")
+    state lineStart: Int(0)
+    state lineNumber: Int(1)
+    state fileID: Int(0)
+
+    while lineStart < sourceLength {
+        let lineEnd: Int(compilerBuildPlanLineEnd(source: source, start: lineStart))
+        let recordType: String(compilerBuildPlanFieldText(source: source, start: lineStart, end: lineEnd, ordinal: 0))
+        if recordType == String("source") {
+            let role: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 4))
+            let root: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 5))
+            let path: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 6))
+            let expectedBytesText: String(compilerBuildPlanFieldValue(source: source, start: lineStart, end: lineEnd, ordinal: 8))
+            let expectedBytes: Int(compilerCoreParseDecimalInt(value: expectedBytesText))
+            state rootPath: String(repoRoot)
+            if root == String("candidate") {
+                rootPath: candidateRoot
+            }
+            if stringLength(value: rootPath) == 0 {
+                return compilerBuildPlanError(reason: String("missingSourceRoot"), line: lineNumber)
+            }
+            let resolvedPath: String(compilerBuildPlanResolvedPath(root: rootPath, path: path))
+            let fileSource: String(readFile(path: resolvedPath))
+            if stringLength(value: fileSource) != expectedBytes {
+                return compilerBuildPlanError(reason: String("sourceBytesMismatch"), line: lineNumber)
+            }
+            bundle: "\(bundle)compilerSourceFile\(slash)trole=\(role)\(slash)tpath=\(path)\(newline)\(fileSource)"
+            if stringByteAt(source: fileSource, index: expectedBytes - 1) != 10 {
+                bundle: "\(bundle)\(newline)"
+            }
+            fileID: fileID + 1
+        }
+        lineStart: lineEnd + 1
+        lineNumber: lineNumber + 1
+    }
+
+    if fileID == 0 {
+        return compilerBuildPlanError(reason: String("sourceCount"), line: lineNumber)
+    }
+    return bundle
+}
+
+function compilerBuildPlanResolvedPath(root: String, path: String): String {
+    let rootLength: Int(stringLength(value: root))
+    if rootLength > 0 && stringByteAt(source: root, index: rootLength - 1) == 47 {
+        return "\(root)\(path)"
+    }
+    return "\(root)/\(path)"
+}
+
+function compilerBuildPlanSnapshot(source: String): String {
+    let sourceLength: Int(stringLength(value: source))
+    if sourceLength == 0 {
+        return compilerBuildPlanError(reason: String("missingHeader"), line: 1)
+    }
+
+    state byteIndex: Int(0)
+    while byteIndex < sourceLength {
+        if stringByteAt(source: source, index: byteIndex) == 13 {
+            return compilerBuildPlanError(reason: String("carriageReturn"), line: compilerBuildPlanLineAt(source: source, index: byteIndex))
+        }
+        byteIndex: byteIndex + 1
+    }
+    if stringByteAt(source: source, index: sourceLength - 1) != 10 {
+        return compilerBuildPlanError(reason: String("missingFinalLF"), line: compilerBuildPlanLineAt(source: source, index: sourceLength - 1))
+    }
+
+    let newline: String(compilerCoreNewlineCharacter())
+    state recordSnapshot: String("")
+    state reason: String("")
+    state reasonLine: Int(0)
+    state lineNumber: Int(1)
+    state lineStart: Int(0)
+    state headerCount: Int(0)
+    state targetCount: Int(0)
+    state toolCount: Int(0)
+    state inputCount: Int(0)
+    state runtimeCount: Int(0)
+    state sourceSetCount: Int(0)
+    state sourceCount: Int(0)
+    state artifactCount: Int(0)
+    state applicationCount: Int(0)
+    state gateCount: Int(0)
+    state assertCount: Int(0)
+    state nextRuntimeIndex: Int(0)
+    state nextSourceIndex: Int(0)
+    state nextApplicationIndex: Int(0)
+
+    while lineStart < sourceLength && reason == String("") {
+        let lineEnd: Int(compilerBuildPlanLineEnd(source: source, start: lineStart))
+        if lineEnd == lineStart {
+            reason: String("blankRecord")
+            reasonLine: lineNumber
+        } else if lineNumber == 1 {
+            headerCount: headerCount + 1
+            if source.substring(start: lineStart, end: lineEnd) != String("rangeBuildPlan\tversion=1") {
+                if compilerBuildPlanFieldCount(source: source, start: lineStart, end: lineEnd) == 2
+                    && compilerBuildPlanFieldText(source: source, start: lineStart, end: lineEnd, ordinal: 0) == String("rangeBuildPlan") {
+                    reason: String("unsupportedVersion")
+                } else {
+                    reason: String("malformedHeader")
+                }
+                reasonLine: lineNumber
+            }
+        } else {
+            let recordType: String(compilerBuildPlanFieldText(source: source, start: lineStart, end: lineEnd, ordinal: 0))
+            let recordKind: Int(compilerBuildPlanRecordKind(name: recordType))
+            if recordKind == 0 {
+                if recordType == String("rangeBuildPlan") {
+                    reason: String("duplicateHeader")
+                } else {
+                    reason: String("unsupportedRecordType")
+                }
+                reasonLine: lineNumber
+            } else {
+                let validation: CompilerBuildPlanRecordValidation(compilerBuildPlanValidateRecord(source: source, start: lineStart, end: lineEnd, kind: recordKind))
+                if validation.reason != String("") {
+                    reason: validation.reason
+                    reasonLine: lineNumber
+                } else if validation.idStart >= 0
+                    && compilerBuildPlanIDExistsBefore(source: source, kind: recordKind, start: validation.idStart, end: validation.idEnd, before: lineStart) {
+                    reason: String("duplicateLogicalID")
+                    reasonLine: lineNumber
+                } else {
+                    if recordKind == 1 {
+                        targetCount: targetCount + 1
+                    }
+                    if recordKind == 2 {
+                        toolCount: toolCount + 1
+                    }
+                    if recordKind == 3 {
+                        inputCount: inputCount + 1
+                    }
+                    if recordKind == 4 {
+                        if validation.index != nextRuntimeIndex {
+                            reason: String("noncontiguousRuntimeIndex")
+                            reasonLine: lineNumber
+                        }
+                        nextRuntimeIndex: nextRuntimeIndex + 1
+                        runtimeCount: runtimeCount + 1
+                    }
+                    if recordKind == 5 {
+                        sourceSetCount: sourceSetCount + 1
+                    }
+                    if recordKind == 6 {
+                        if validation.index != nextSourceIndex {
+                            reason: String("noncontiguousSourceIndex")
+                            reasonLine: lineNumber
+                        }
+                        nextSourceIndex: nextSourceIndex + 1
+                        sourceCount: sourceCount + 1
+                    }
+                    if recordKind == 7 {
+                        artifactCount: artifactCount + 1
+                    }
+                    if recordKind == 8 {
+                        if validation.index != nextApplicationIndex {
+                            reason: String("noncontiguousApplicationIndex")
+                            reasonLine: lineNumber
+                        }
+                        nextApplicationIndex: nextApplicationIndex + 1
+                        applicationCount: applicationCount + 1
+                    }
+                    if recordKind == 9 {
+                        gateCount: gateCount + 1
+                    }
+                    if recordKind == 10 {
+                        assertCount: assertCount + 1
+                    }
+                    if reason == String("") {
+                        let record: String(source.substring(start: lineStart, end: lineEnd))
+                        recordSnapshot: "\(recordSnapshot)\(record)\(newline)"
+                    }
+                }
+            }
+        }
+        lineStart: lineEnd + 1
+        lineNumber: lineNumber + 1
+    }
+
+    if reason == String("") && headerCount != 1 {
+        reason: String("headerCount")
+        reasonLine: 1
+    }
+    if reason == String("") && targetCount != 1 {
+        reason: String("targetCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && toolCount != 1 {
+        reason: String("toolCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && inputCount != 1 {
+        reason: String("inputCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && sourceSetCount != 1 {
+        reason: String("sourceSetCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && runtimeCount == 0 {
+        reason: String("runtimeCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && sourceCount == 0 {
+        reason: String("sourceCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && artifactCount == 0 {
+        reason: String("artifactCount")
+        reasonLine: lineNumber
+    }
+    if reason == String("") && applicationCount == 0 {
+        reason: String("applicationCount")
+        reasonLine: lineNumber
+    }
+
+    if reason != String("") {
+        return compilerBuildPlanError(reason: reason, line: reasonLine)
+    }
+    return compilerBuildPlanRenderSnapshot(records: recordSnapshot, targetCount: targetCount, toolCount: toolCount, inputCount: inputCount, runtimeCount: runtimeCount, sourceSetCount: sourceSetCount, sourceCount: sourceCount, artifactCount: artifactCount, applicationCount: applicationCount, gateCount: gateCount, assertCount: assertCount)
+}
+
+function compilerBuildPlanValidateRecord(source: String, start: Int, end: Int, kind: Int): CompilerBuildPlanRecordValidation {
+    let expectedCount: Int(compilerBuildPlanExpectedFieldCount(kind: kind))
+    if compilerBuildPlanFieldCount(source: source, start: start, end: end) != expectedCount {
+        return CompilerBuildPlanRecordValidation(reason: String("malformedFieldCount"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+    }
+    state ordinal: Int(1)
+    while ordinal < expectedCount {
+        let field: CompilerBuildPlanField(compilerBuildPlanField(source: source, start: start, end: end, ordinal: ordinal))
+        let key: String(compilerBuildPlanFieldKey(kind: kind, ordinal: ordinal))
+        if !field.isValid || !hasRangePrefix(source: source, start: field.start, prefix: "\(key)=") {
+            return CompilerBuildPlanRecordValidation(reason: String("malformedFieldOrder"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+        let valueStart: Int(field.start + stringLength(value: key) + 1)
+        if valueStart >= field.end {
+            return CompilerBuildPlanRecordValidation(reason: String("emptyField"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+        ordinal: ordinal + 1
+    }
+
+    if kind == 1 {
+        if !compilerBuildPlanPositiveDecimalField(source: source, start: start, end: end, ordinal: 3)
+            || !compilerBuildPlanPositiveDecimalField(source: source, start: start, end: end, ordinal: 4) {
+            return CompilerBuildPlanRecordValidation(reason: String("invalidDecimal"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+    }
+    if kind == 2 || kind == 3 || kind == 4 || kind == 5 || kind == 6 || kind == 7 {
+        let hashOrdinal: Int(compilerBuildPlanHashOrdinal(kind: kind))
+        let bytesOrdinal: Int(hashOrdinal + 1)
+        if !compilerBuildPlanHashField(source: source, start: start, end: end, ordinal: hashOrdinal) {
+            return CompilerBuildPlanRecordValidation(reason: String("invalidHash"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+        if !compilerBuildPlanPositiveDecimalField(source: source, start: start, end: end, ordinal: bytesOrdinal) {
+            return CompilerBuildPlanRecordValidation(reason: String("invalidBytes"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+    }
+    let pathOrdinal: Int(compilerBuildPlanPathOrdinal(kind: kind))
+    if pathOrdinal >= 0 {
+        let path: String(compilerBuildPlanFieldValue(source: source, start: start, end: end, ordinal: pathOrdinal))
+        if !compilerBuildPlanPathIsSafe(path: path) {
+            return CompilerBuildPlanRecordValidation(reason: String("invalidPath"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+    }
+    if kind == 6 {
+        let role: String(compilerBuildPlanFieldValue(source: source, start: start, end: end, ordinal: 4))
+        let root: String(compilerBuildPlanFieldValue(source: source, start: start, end: end, ordinal: 5))
+        if role != String("core") && role != String("project") {
+            return CompilerBuildPlanRecordValidation(reason: String("unsupportedSourceRole"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+        if root != String("repo") && root != String("candidate") {
+            return CompilerBuildPlanRecordValidation(reason: String("unsupportedSourceRoot"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+    }
+
+    state index: Int(0 - 1)
+    let indexOrdinal: Int(compilerBuildPlanIndexOrdinal(kind: kind))
+    if indexOrdinal >= 0 {
+        let indexField: CompilerBuildPlanField(compilerBuildPlanField(source: source, start: start, end: end, ordinal: indexOrdinal))
+        let indexKey: String(compilerBuildPlanFieldKey(kind: kind, ordinal: indexOrdinal))
+        let indexStart: Int(indexField.start + stringLength(value: indexKey) + 1)
+        state indexCursor: Int(indexStart)
+        state parsedIndex: Int(0)
+        if !indexField.isValid || indexStart >= indexField.end {
+            return CompilerBuildPlanRecordValidation(reason: String("invalidIndex"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+        if indexField.end - indexStart > 1 && stringByteAt(source: source, index: indexStart) == 48 {
+            return CompilerBuildPlanRecordValidation(reason: String("invalidIndex"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+        }
+        while indexCursor < indexField.end {
+            let indexByte: Int(stringByteAt(source: source, index: indexCursor))
+            if indexByte < 48 || indexByte > 57 {
+                return CompilerBuildPlanRecordValidation(reason: String("invalidIndex"), idStart: 0 - 1, idEnd: 0 - 1, index: 0 - 1)
+            }
+            parsedIndex: parsedIndex * 10 + indexByte - 48
+            indexCursor: indexCursor + 1
+        }
+        index: parsedIndex
+    }
+
+    let idOrdinal: Int(compilerBuildPlanIDOrdinal(kind: kind))
+    if idOrdinal < 0 {
+        return CompilerBuildPlanRecordValidation(reason: String(""), idStart: 0 - 1, idEnd: 0 - 1, index: index)
+    }
+    let idField: CompilerBuildPlanField(compilerBuildPlanField(source: source, start: start, end: end, ordinal: idOrdinal))
+    let idStart: Int(idField.start + stringLength(value: compilerBuildPlanFieldKey(kind: kind, ordinal: idOrdinal)) + 1)
+    return CompilerBuildPlanRecordValidation(reason: String(""), idStart: idStart, idEnd: idField.end, index: index)
+}
+
+function compilerBuildPlanRecordKind(name: String): Int {
+    if name == String("target") { return 1 }
+    if name == String("tool") { return 2 }
+    if name == String("input") { return 3 }
+    if name == String("runtime") { return 4 }
+    if name == String("sourceSet") { return 5 }
+    if name == String("source") { return 6 }
+    if name == String("artifact") { return 7 }
+    if name == String("application") { return 8 }
+    if name == String("gate") { return 9 }
+    if name == String("assert") { return 10 }
+    return 0
+}
+
+function compilerBuildPlanExpectedFieldCount(kind: Int): Int {
+    if kind == 1 { return 5 }
+    if kind == 4 { return 6 }
+    if kind == 6 { return 9 }
+    if kind == 8 { return 6 }
+    return 5
+}
+
+function compilerBuildPlanFieldKey(kind: Int, ordinal: Int): String {
+    if kind == 1 {
+        if ordinal == 1 { return String("platform") }
+        if ordinal == 2 { return String("architecture") }
+        if ordinal == 3 { return String("pointerBits") }
+        return String("runtimeABI")
+    }
+    if kind == 4 {
+        if ordinal == 1 { return String("index") }
+        if ordinal == 2 { return String("id") }
+        if ordinal == 3 { return String("path") }
+        if ordinal == 4 { return String("sha256") }
+        return String("bytes")
+    }
+    if kind == 6 {
+        if ordinal == 1 { return String("index") }
+        if ordinal == 2 { return String("id") }
+        if ordinal == 3 { return String("sourceSet") }
+        if ordinal == 4 { return String("role") }
+        if ordinal == 5 { return String("root") }
+        if ordinal == 6 { return String("path") }
+        if ordinal == 7 { return String("sha256") }
+        return String("bytes")
+    }
+    if kind == 8 {
+        if ordinal == 1 { return String("index") }
+        if ordinal == 2 { return String("id") }
+        if ordinal == 3 { return String("kind") }
+        if ordinal == 4 { return String("input") }
+        return String("artifact")
+    }
+    if kind == 9 {
+        if ordinal == 1 { return String("id") }
+        if ordinal == 2 { return String("kind") }
+        if ordinal == 3 { return String("left") }
+        return String("right")
+    }
+    if kind == 10 {
+        if ordinal == 1 { return String("id") }
+        if ordinal == 2 { return String("kind") }
+        if ordinal == 3 { return String("subject") }
+        return String("expected")
+    }
+    if ordinal == 1 { return String("id") }
+    if ordinal == 2 { return String("path") }
+    if ordinal == 3 { return String("sha256") }
+    return String("bytes")
+}
+
+function compilerBuildPlanHashOrdinal(kind: Int): Int {
+    if kind == 4 { return 4 }
+    if kind == 6 { return 7 }
+    return 3
+}
+
+function compilerBuildPlanIndexOrdinal(kind: Int): Int {
+    if kind == 4 || kind == 6 || kind == 8 { return 1 }
+    return 0 - 1
+}
+
+function compilerBuildPlanPathOrdinal(kind: Int): Int {
+    if kind == 4 { return 3 }
+    if kind == 6 { return 6 }
+    if kind == 2 || kind == 3 || kind == 5 || kind == 7 { return 2 }
+    return 0 - 1
+}
+
+function compilerBuildPlanIDOrdinal(kind: Int): Int {
+    if kind == 1 { return 0 - 1 }
+    if kind == 4 || kind == 6 || kind == 8 { return 2 }
+    return 1
+}
+
+function compilerBuildPlanFieldCount(source: String, start: Int, end: Int): Int {
+    state count: Int(1)
+    state index: Int(start)
+    while index < end {
+        if stringByteAt(source: source, index: index) == 9 { count: count + 1 }
+        index: index + 1
+    }
+    return count
+}
+
+function compilerBuildPlanField(source: String, start: Int, end: Int, ordinal: Int): CompilerBuildPlanField {
+    state fieldStart: Int(start)
+    state currentOrdinal: Int(0)
+    state index: Int(start)
+    while index <= end {
+        if index == end || stringByteAt(source: source, index: index) == 9 {
+            if currentOrdinal == ordinal { return CompilerBuildPlanField(start: fieldStart, end: index, isValid: true) }
+            currentOrdinal: currentOrdinal + 1
+            fieldStart: index + 1
+        }
+        index: index + 1
+    }
+    return CompilerBuildPlanField(start: 0, end: 0, isValid: false)
+}
+
+function compilerBuildPlanFieldText(source: String, start: Int, end: Int, ordinal: Int): String {
+    let field: CompilerBuildPlanField(compilerBuildPlanField(source: source, start: start, end: end, ordinal: ordinal))
+    if !field.isValid { return String("") }
+    return source.substring(start: field.start, end: field.end)
+}
+
+function compilerBuildPlanFieldValue(source: String, start: Int, end: Int, ordinal: Int): String {
+    let field: String(compilerBuildPlanFieldText(source: source, start: start, end: end, ordinal: ordinal))
+    state equals: Int(0)
+    while equals < stringLength(value: field) && stringByteAt(source: field, index: equals) != 61 { equals: equals + 1 }
+    if equals >= stringLength(value: field) { return String("") }
+    return field.substring(start: equals + 1, end: stringLength(value: field))
+}
+
+function compilerBuildPlanHashField(source: String, start: Int, end: Int, ordinal: Int): Bool {
+    let value: String(compilerBuildPlanFieldValue(source: source, start: start, end: end, ordinal: ordinal))
+    if stringLength(value: value) != 64 { return false }
+    state index: Int(0)
+    while index < 64 {
+        let byte: Int(stringByteAt(source: value, index: index))
+        if !((byte >= 48 && byte <= 57) || (byte >= 97 && byte <= 102)) { return false }
+        index: index + 1
+    }
+    return true
+}
+
+function compilerBuildPlanPositiveDecimalField(source: String, start: Int, end: Int, ordinal: Int): Bool {
+    let value: String(compilerBuildPlanFieldValue(source: source, start: start, end: end, ordinal: ordinal))
+    if !compilerBuildPlanIsDecimal(value: value) { return false }
+    return compilerCoreParseDecimalInt(value: value) > 0
+}
+
+function compilerBuildPlanIsDecimal(value: String): Bool {
+    let length: Int(stringLength(value: value))
+    if length == 0 { return false }
+    if length > 1 && stringByteAt(source: value, index: 0) == 48 { return false }
+    state index: Int(0)
+    while index < length {
+        let byte: Int(stringByteAt(source: value, index: index))
+        if byte < 48 || byte > 57 { return false }
+        index: index + 1
+    }
+    return true
+}
+
+function compilerBuildPlanPathIsSafe(path: String): Bool {
+    let length: Int(stringLength(value: path))
+    if length == 0 {
+        return false
+    }
+    if stringByteAt(source: path, index: 0) == 47 {
+        return false
+    }
+    state index: Int(0)
+    while index < length {
+        let atSegmentStart: Bool(index == 0 || stringByteAt(source: path, index: index - 1) == 47)
+        if atSegmentStart
+            && index + 1 < length
+            && stringByteAt(source: path, index: index) == 46
+            && stringByteAt(source: path, index: index + 1) == 46
+            && (index + 2 == length || stringByteAt(source: path, index: index + 2) == 47) {
+            return false
+        }
+        index: index + 1
+    }
+    return true
+}
+
+function compilerBuildPlanIDExistsBefore(source: String, kind: Int, start: Int, end: Int, before: Int): Bool {
+    let idOrdinal: Int(compilerBuildPlanIDOrdinal(kind: kind))
+    if idOrdinal < 0 {
+        return false
+    }
+    let idKey: String(compilerBuildPlanFieldKey(kind: kind, ordinal: idOrdinal))
+    state lineStart: Int(0)
+    while lineStart < before {
+        let lineEnd: Int(compilerBuildPlanLineEnd(source: source, start: lineStart))
+        let recordType: String(compilerBuildPlanFieldText(source: source, start: lineStart, end: lineEnd, ordinal: 0))
+        if compilerBuildPlanRecordKind(name: recordType) == kind {
+            let idField: CompilerBuildPlanField(compilerBuildPlanField(source: source, start: lineStart, end: lineEnd, ordinal: idOrdinal))
+            if idField.isValid {
+                let previousStart: Int(idField.start + stringLength(value: idKey) + 1)
+                if end - start == idField.end - previousStart
+                    && source.substring(start: start, end: end) == source.substring(start: previousStart, end: idField.end) {
+                    return true
+                }
+            }
+        }
+        lineStart: lineEnd + 1
+    }
+    return false
+}
+
+function compilerBuildPlanRenderSnapshot(records: String, targetCount: Int, toolCount: Int, inputCount: Int, runtimeCount: Int, sourceSetCount: Int, sourceCount: Int, artifactCount: Int, applicationCount: Int, gateCount: Int, assertCount: Int): String {
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    state output: String("buildPlan\(tab)version=1\(tab)valid=true")
+    output: "\(output)\(tab)targetCount=\(targetCount)"
+    output: "\(output)\(tab)toolCount=\(toolCount)"
+    output: "\(output)\(tab)inputCount=\(inputCount)"
+    output: "\(output)\(tab)runtimeCount=\(runtimeCount)"
+    output: "\(output)\(tab)sourceSetCount=\(sourceSetCount)"
+    output: "\(output)\(tab)sourceCount=\(sourceCount)"
+    output: "\(output)\(tab)artifactCount=\(artifactCount)"
+    output: "\(output)\(tab)applicationCount=\(applicationCount)"
+    output: "\(output)\(tab)gateCount=\(gateCount)"
+    output: "\(output)\(tab)assertCount=\(assertCount)"
+    return "\(output)\(newline)\(records)"
+}
+
+function compilerBuildPlanLineEnd(source: String, start: Int): Int {
+    state index: Int(start)
+    let length: Int(stringLength(value: source))
+    while index < length && stringByteAt(source: source, index: index) != 10 { index: index + 1 }
+    return index
+}
+
+function compilerBuildPlanLineAt(source: String, index: Int): Int {
+    state line: Int(1)
+    state cursor: Int(0)
+    while cursor < index {
+        if stringByteAt(source: source, index: cursor) == 10 { line: line + 1 }
+        cursor: cursor + 1
+    }
+    return line
+}
+
+function compilerBuildPlanError(reason: String, line: Int): String {
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    return "compilerError\(tab)kind=invalidBuildPlan\(tab)reason=\(reason)\(tab)line=\(line)\(newline)"
+}

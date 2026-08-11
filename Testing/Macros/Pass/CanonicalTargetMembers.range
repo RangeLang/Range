@@ -24,8 +24,8 @@ construct State {}
 
 construct Binding {}
 
-macro canonicalTargetMembers(): Construct { environment in
-    let memberCount: Int(environment.target.Declaration.members.filter(all: @stored).count)
+macro canonicalTargetMembers(): Construct {
+    let memberCount: Int(#environment.target.Declaration.members.filter(all: @stored).count)
     if memberCount == 3 {
         #environment {
             extension #environment.target.Declaration.identifier {

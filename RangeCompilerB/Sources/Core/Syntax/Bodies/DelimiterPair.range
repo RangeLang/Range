@@ -1,0 +1,6 @@
+enum DelimiterPair {
+    case parentheses
+    case braces
+    case brackets
+    case angles
+}

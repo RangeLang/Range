@@ -1,0 +1,22 @@
+function ready(): Bool {
+    return true
+}
+
+function draw(): Int {
+    return 3
+}
+
+function present(): Int {
+    return 7
+}
+
+function render(): Int {
+    if ready() {
+        draw()
+    }
+    return present()
+}
+
+@main {
+    return render()
+}

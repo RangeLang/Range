@@ -1,0 +1,26 @@
+macro test(): Function {}
+
+macro testGroup(): Construct {
+    let tests: Array<@test>(
+        #environment.target.Declaration.members.filter(all: @test)
+    )
+
+    if tests.count == 0 {
+        #environment.error("@testGroup requires at least one @test function.")
+    }
+
+    #environment {
+        extension #environment.target.Declaration.identity {
+            enum Command {
+                case invalid
+                #tests.map { testDeclaration in
+                    case #testDeclaration.identity
+                }
+            }
+
+            function runCommandLine(): Int {
+                return 0
+            }
+        }
+    }
+}

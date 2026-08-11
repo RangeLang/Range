@@ -23,24 +23,24 @@ construct Let {
     let identity: Identity
 }
 
-macro collectionClosureExecution(): Construct { environment in
+macro collectionClosureExecution(): Construct {
     let expected: String("first")
     let lets: Array<Let>(
-        environment.target.Declaration.members.filter(all: Let)
+        #environment.target.Declaration.members.filter(all: Let)
     )
     let selected: Array<Let>(
         lets.filter { property in
-            return property.identifier.name == expected
+            return property.identity.name == expected
         }
     )
     let names: Array<String>(
         selected.map { property in
-            return property.identifier.name
+            return property.identity.name
         }
     )
     if names.count == 1 {
         #environment {
-            extension #environment.target.Declaration.identifier {
+            extension #environment.target.Declaration.identity {
                 let collectionClosureExecutionWorked: Int
             }
         }

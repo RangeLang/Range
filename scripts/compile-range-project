@@ -61,6 +61,76 @@ revision_digest() {
     ' "$source"
 }
 
+graph_delta_head_matches_checkpoint() {
+    local head="$1"
+    local revision="$2"
+    local head_identity revision_identity
+
+    [[ -f "$head" && -f "$revision" ]] || return 1
+    head_identity="$(revision_field "$head" identity)"
+    revision_identity="$(revision_field "$revision" identity)"
+    [[ "$head_identity" =~ ^[0-9a-f]{64}$ && "$head_identity" == "$revision_identity" ]]
+}
+
+# Persist an immutable accepted delta before atomically advancing the head.
+# revision.tsv remains a compatibility checkpoint; delta-head.tsv plus the
+# parent-linked records under deltas/ are the durable history.
+prepare_graph_delta_commit() {
+    local revision="$1"
+    local previous="$2"
+    local directory="$3"
+    local head="$4"
+    local head_candidate="$5"
+    local identity parent expected_parent ordinal existing_identity record temporary
+
+    identity="$(revision_field "$revision" identity)"
+    parent="$(revision_field "$revision" parent)"
+    [[ "$identity" =~ ^[0-9a-f]{64}$ ]] || compile_project_fail "candidate graph delta omitted its identity"
+    [[ "$parent" == "absent" || "$parent" =~ ^[0-9a-f]{64}$ ]] \
+        || compile_project_fail "candidate graph delta omitted its parent"
+    /bin/mkdir -p "$directory"
+
+    # One-time migration: seed immutable history from the accepted checkpoint
+    # before appending its child.
+    if [[ ! -f "$head" && -f "$previous" ]]; then
+        existing_identity="$(revision_field "$previous" identity)"
+        [[ "$existing_identity" =~ ^[0-9a-f]{64}$ && "$parent" == "$existing_identity" ]] \
+            || compile_project_fail "graph delta migration does not extend the accepted checkpoint"
+        record="$directory/$existing_identity.tsv"
+        if [[ ! -f "$record" ]]; then
+            temporary="$record.tmp.$$"
+            /usr/bin/printf 'rangeGraphDelta\tversion=1\tidentity=%s\tparent=%s\tordinal=0\n' \
+                "$existing_identity" "$(revision_field "$previous" parent)" > "$temporary"
+            /bin/cat "$previous" >> "$temporary"
+            /bin/mv "$temporary" "$record"
+        fi
+        /usr/bin/printf 'rangeGraphHead\tversion=1\tidentity=%s\tordinal=0\n' "$existing_identity" > "$head"
+    fi
+
+    if [[ -f "$head" ]]; then
+        expected_parent="$(revision_field "$head" identity)"
+        [[ "$parent" == "$expected_parent" ]] \
+            || compile_project_fail "candidate graph delta does not extend the accepted head"
+        ordinal=$(( $(revision_field "$head" ordinal) + 1 ))
+    else
+        [[ "$parent" == "absent" ]] || compile_project_fail "first graph delta has a non-absent parent"
+        ordinal=0
+    fi
+
+    record="$directory/$identity.tsv"
+    if [[ -f "$record" ]]; then
+        /usr/bin/grep -Fqx $'rangeGraphDelta\tversion=1\tidentity='"$identity"$'\tparent='"$parent"$'\tordinal='"$ordinal" "$record" \
+            || compile_project_fail "immutable graph delta identity collision"
+    else
+        temporary="$record.tmp.$$"
+        /usr/bin/printf 'rangeGraphDelta\tversion=1\tidentity=%s\tparent=%s\tordinal=%s\n' \
+            "$identity" "$parent" "$ordinal" > "$temporary"
+        /bin/cat "$revision" >> "$temporary"
+        /bin/mv "$temporary" "$record"
+    fi
+    /usr/bin/printf 'rangeGraphHead\tversion=1\tidentity=%s\tordinal=%s\n' "$identity" "$ordinal" > "$head_candidate"
+}
+
 syntax_artifact_matches_revision() {
     local artifact="$1"
     local revision="$2"
@@ -291,13 +361,35 @@ fi
 
 input="${1:-}"
 [[ -n "$input" ]] || compile_project_fail "expected a .range file or project directory"
-[[ $# -eq 1 ]] || compile_project_fail "expected one .range file or project directory"
+shift
 [[ -e "$input" ]] || compile_project_fail "input does not exist: $input"
+
+additional_inputs=()
+while [[ $# -gt 0 ]]; do
+    [[ "$1" == "--source" ]] || compile_project_fail "expected --source followed by a .range file or project directory"
+    shift
+    [[ $# -gt 0 ]] || compile_project_fail "--source requires a .range file or project directory"
+    [[ -e "$1" ]] || compile_project_fail "source input does not exist: $1"
+    additional_inputs+=("$1")
+    shift
+done
 
 if [[ -d "$input" ]]; then
     input_identity="$(cd "$input" && pwd)"
 else
     input_identity="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
+fi
+if [[ "${#additional_inputs[@]}" -gt 0 ]]; then
+    input_identity_material="$input_identity"
+    for additional_input in "${additional_inputs[@]}"; do
+        if [[ -d "$additional_input" ]]; then
+            additional_identity="$(cd "$additional_input" && pwd)"
+        else
+            additional_identity="$(cd "$(dirname "$additional_input")" && pwd)/$(basename "$additional_input")"
+        fi
+        input_identity_material="$input_identity_material"$'\n'"$additional_identity"
+    done
+    input_identity="source-set:$(/usr/bin/printf '%s' "$input_identity_material" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 fi
 if [[ "$shape_mode" -eq 1 ]]; then
     source_profile="shape-local"
@@ -313,7 +405,15 @@ source_revision_artifact="$source_cache_directory/revision.tsv"
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compile.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 
-verify_manifest
+development_compiler="${RANGE_DEVELOPMENT_COMPILER:-}"
+if [[ -z "$development_compiler" ]]; then
+    verify_manifest
+else
+    [[ -x "$development_compiler" ]] \
+        || compile_project_fail "RANGE_DEVELOPMENT_COMPILER is not executable: $development_compiler"
+    development_compiler="$(cd "$(dirname "$development_compiler")" && pwd)/$(basename "$development_compiler")"
+    /usr/bin/printf 'range: using unpromoted development compiler %s\n' "$development_compiler" >&2
+fi
 
 canonical_core_source_path="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
 [[ -f "$canonical_core_source_path" ]] || compile_project_fail "missing canonical Core source"
@@ -322,14 +422,21 @@ CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
 /bin/cp "$canonical_core_source_path" "$CORE_SOURCE_PATH"
 
 accepted_compiler="$REPO_ROOT/$(manifest_value executable.path)"
-[[ -x "$accepted_compiler" ]] || compile_project_fail "accepted compiler is not executable"
+if [[ -z "$development_compiler" ]]; then
+    [[ -x "$accepted_compiler" ]] || compile_project_fail "accepted compiler is not executable"
+fi
 
 # Compiler V1 owns the graph and Shape lines, while ordinary compilation stays
 # on the accepted bootstrap oracle. The source-set marker is an explicit
 # Source artifact: it records the complete Core/project inventory rather than
 # pretending that the marker text is already a canonical Shape.
 compiler="$accepted_compiler"
+if [[ -n "$development_compiler" ]]; then
+    compiler="$development_compiler"
+fi
 if [[ "$graph_mode" -eq 1 || "$shape_mode" -eq 1 ]]; then
+    [[ -z "$development_compiler" ]] \
+        || compile_project_fail "RANGE_DEVELOPMENT_COMPILER is only supported for ordinary compile and run commands"
     # Resolve the Range-authored candidate producer, rather than using
     # the promoted bootstrap executable. This keeps the graph line on the
     # candidate source while the ordinary line remains the accepted
@@ -370,17 +477,25 @@ append_source() {
 # manifest through the recipe finalizer. Source-set Shape composition is a
 # later cutover once those Core syntax declarations have a complete package.
 if [[ "$shape_mode" -eq 0 ]]; then
-    compiler_source_count="$(manifest_value compilerSources)"
-    for ((index = 0; index < compiler_source_count; index += 1)); do
-        role="$(manifest_value "compilerSources.$index.role")"
-        [[ "$role" == core ]] || continue
-        relative="$(manifest_value "compilerSources.$index.path")"
+    [[ -f "$COMPILER_CORE_INVENTORY" ]] || compile_project_fail "missing compiler Core inventory: $COMPILER_CORE_INVENTORY"
+    while IFS= read -r relative; do
+        [[ -n "$relative" ]] || continue
         source_path="$REPO_ROOT/$relative"
-        [[ -f "$source_path" ]] || compile_project_fail "missing accepted Core source: $relative"
+        [[ -f "$source_path" ]] || compile_project_fail "missing inventoried Core source: $relative"
         append_source core "$relative" "$source_path"
-    done
+    done < "$COMPILER_CORE_INVENTORY"
+
+    # Until the declaration-reflection Core surface itself is part of the
+    # accepted source manifest, give the executable Core macros the same
+    # minimal typed targets used by their focused native proofs.
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/NativeReflection.range' \
+        'construct Function {}' \
+        'construct Construct {}' >> "$project_bundle"
 
     for relative in \
+        RangeCompiler/Sources/Core/Macro/Link.range \
+        RangeCompiler/Sources/Core/Macro/Opaque.range \
         RangeCompiler/Sources/Core/System/Optional/Nil.range \
         RangeCompiler/Sources/Core/System/Optional/Optional.range; do
         source_path="$REPO_ROOT/$relative"
@@ -388,6 +503,42 @@ if [[ "$shape_mode" -eq 0 ]]; then
         append_source core "$relative" "$source_path"
     done
 fi
+
+append_project_input() {
+    local project_input="$1"
+    local logical_prefix="$2"
+
+    if [[ -d "$project_input" ]]; then
+        project_root="$(cd "$project_input" && pwd)"
+        project_paths_raw="$WORK_ROOT/project-paths-$logical_prefix.raw"
+        project_paths="$WORK_ROOT/project-paths-$logical_prefix"
+        /usr/bin/find "$project_root" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print \
+            > "$project_paths_raw"
+        while IFS= read -r source_path; do
+            [[ "$source_path" != *$'\n'* ]] \
+                || compile_project_fail "Range source paths may not contain newlines: $source_path"
+        done < "$project_paths_raw"
+        LC_ALL=C /usr/bin/sort "$project_paths_raw" > "$project_paths"
+        input_project_count=0
+        while IFS= read -r source_path; do
+            relative="${source_path#"$project_root/"}"
+            if [[ -n "$logical_prefix" ]]; then
+                relative="$logical_prefix/$relative"
+            fi
+            append_source project "$relative" "$source_path"
+            input_project_count=$((input_project_count + 1))
+        done < "$project_paths"
+        [[ "$input_project_count" -gt 0 ]] || compile_project_fail "no .range sources found in: $project_input"
+    else
+        [[ "$project_input" == *.range ]] || compile_project_fail "input file must end in .range: $project_input"
+        source_path="$(cd "$(dirname "$project_input")" && pwd)/$(basename "$project_input")"
+        relative="$(basename "$source_path")"
+        if [[ -n "$logical_prefix" ]]; then
+            relative="$logical_prefix/$relative"
+        fi
+        append_source project "$relative" "$source_path"
+    fi
+}
 
 if [[ -d "$input" ]]; then
     project_root="$(cd "$input" && pwd)"
@@ -411,6 +562,14 @@ else
     [[ "$input" == *.range ]] || compile_project_fail "input file must end in .range: $input"
     source_path="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
     append_source project "$(basename "$source_path")" "$source_path"
+fi
+
+if [[ "${#additional_inputs[@]}" -gt 0 ]]; then
+    additional_index=0
+    for additional_input in "${additional_inputs[@]}"; do
+        append_project_input "$additional_input" "source-$additional_index"
+        additional_index=$((additional_index + 1))
+    done
 fi
 
 persist_source_revision() {
@@ -513,13 +672,21 @@ elif [[ "$graph_mode" -eq 1 ]]; then
     graph_legacy_execution="$graph_cache_directory/execution.tsv"
     graph_output="$graph_cache_directory/compiled.ll"
     graph_revision="$graph_cache_directory/revision.tsv"
+    graph_delta_directory="$graph_cache_directory/deltas"
+    graph_delta_head="$graph_cache_directory/delta-head.tsv"
     graph_syntax="$graph_cache_directory/syntax-facts.tsv"
     graph_bundle_backup="$WORK_ROOT/ProjectSourceSet.previous.range"
     graph_transient_execution="$WORK_ROOT/execution.tsv"
     graph_syntax_binding="$WORK_ROOT/syntax-binding.tsv"
     graph_output_candidate="$WORK_ROOT/compiled.candidate.ll"
     graph_revision_candidate="$WORK_ROOT/revision.candidate.tsv"
+    graph_delta_head_candidate="$WORK_ROOT/delta-head.candidate.tsv"
     graph_syntax_candidate="$WORK_ROOT/syntax-facts.candidate.tsv"
+
+    if [[ -f "$graph_delta_head" ]] \
+        && ! graph_delta_head_matches_checkpoint "$graph_delta_head" "$graph_revision"; then
+        compile_project_fail "graph checkpoint does not materialize the accepted delta head"
+    fi
 
     # Source stage: the candidate File -> Source bundle is consumed from the
     # persisted artifact when its revision provenance matches this input and
@@ -643,7 +810,10 @@ elif [[ "$graph_mode" -eq 1 ]]; then
             /bin/mv "$graph_syntax_candidate" "$graph_syntax"
         fi
         /bin/mv "$graph_output_candidate" "$graph_output"
+        prepare_graph_delta_commit "$graph_revision_candidate" "$graph_revision" \
+            "$graph_delta_directory" "$graph_delta_head" "$graph_delta_head_candidate"
         /bin/mv "$graph_revision_candidate" "$graph_revision"
+        /bin/mv "$graph_delta_head_candidate" "$graph_delta_head"
         graph_committed=1
     fi
     /bin/rm -f "$graph_cache_directory/source.tsv" "$graph_legacy_execution"

@@ -1,0 +1,7 @@
+@opaque
+construct DirectOpaqueHandle {}
+
+@main {
+    let handle: DirectOpaqueHandle()
+    return 0
+}

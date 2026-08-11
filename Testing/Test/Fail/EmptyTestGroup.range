@@ -1,0 +1,8 @@
+@testGroup
+construct EmptyTests {
+    let testGroupStorage: Int
+}
+
+@main {
+    return 0
+}

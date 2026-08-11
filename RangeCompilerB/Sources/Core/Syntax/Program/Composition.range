@@ -1,0 +1,5 @@
+@builtin
+construct Composition {
+    let identity: Identity
+    let components: Array<Identity>
+}

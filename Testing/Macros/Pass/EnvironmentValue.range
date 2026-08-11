@@ -1,0 +1,15 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/EnvironmentValue.range
+function retainEnvironment(value: @syntax): @syntax {
+    return value
+}
+
+macro environmentValue(): Construct {
+    let retained: @syntax(retainEnvironment(value: #environment))
+    if retained == #environment {
+        #environment.information("environment retained")
+    }
+}
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@environmentValue
+construct Value {}

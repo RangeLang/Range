@@ -1,0 +1,151 @@
+construct SyntaxTemplate {
+    let source: String
+    let members: Array<Let>
+    let captureMember: Let
+    let secondCaptureMember: Let
+    let captureCount: Int
+    let prefixCount: Int
+    let separatorStart: Int
+    let separatorCount: Int
+    let suffixCount: Int
+
+    construct Capture {
+        let member: Let
+        let values: Array<@syntax>
+    }
+
+    construct Match {
+        let template: SyntaxTemplate
+        let source: @syntax
+        let capture: Capture
+    }
+
+    function matchRequired(source: @syntax): Match {
+        let sourceText: String(syntaxText(source: source))
+        let captureValueEnd: Int(sourceText.count - suffixCount)
+        let capture: @syntax(
+            syntaxSlice(
+                source: source,
+                start: prefixCount,
+                end: captureValueEnd
+            )
+        )
+        return Match(
+            template: self,
+            source: source,
+            capture: Capture(
+                member: captureMember,
+                values: [capture]
+            )
+        )
+    }
+
+    function match(source: @syntax): Parsed<Match> {
+        let sourceText: String(syntaxText(source: source))
+        state captureStart: Int(0 - 1)
+        state captureEnd: Int(0 - 1)
+        state recipeIndex: Int(0)
+        state hasMultipleCaptures: Bool(false)
+        while recipeIndex < source.count {
+            if source.byte(index: recipeIndex) == 36
+                && recipeIndex + 1 < source.count
+                && identifierAcceptsContinuation(
+                    byte: source.byte(index: recipeIndex + 1)
+                ) {
+                if captureStart >= 0 {
+                    hasMultipleCaptures: true
+                } else {
+                    captureStart: recipeIndex + 1
+                    recipeIndex: captureStart + 1
+                    while recipeIndex < source.count
+                        && identifierAcceptsContinuation(
+                            byte: source.byte(index: recipeIndex)
+                        ) {
+                        recipeIndex: recipeIndex + 1
+                    }
+                    captureEnd: recipeIndex
+                }
+            } else {
+                recipeIndex: recipeIndex + 1
+            }
+        }
+        if hasMultipleCaptures {
+            return Parsed(
+                value: nil,
+                diagnostics: [
+                    "SyntaxTemplate.match currently supports at most one capture."
+                ]
+            )
+        }
+        if captureStart < 0 {
+            return Parsed(
+                value: nil,
+                diagnostics: [
+                    "SyntaxTemplate.match currently requires one capture."
+                ]
+            )
+        }
+        let prefixCount: Int(captureStart - 1)
+        let suffixCount: Int(source.count - captureEnd)
+        if sourceText.count < prefixCount + suffixCount {
+            return Parsed(
+                value: nil,
+                diagnostics: ["Syntax template literal did not match source."]
+            )
+        }
+        let captureValueEnd: Int(sourceText.count - suffixCount)
+        if captureValueEnd <= prefixCount {
+            return Parsed(
+                value: nil,
+                diagnostics: ["Syntax template capture was empty."]
+            )
+        }
+        state literalsMatch: Bool(true)
+        state literalIndex: Int(0)
+        while literalIndex < prefixCount && literalsMatch {
+            if source.byte(index: literalIndex)
+                != sourceText.byte(index: literalIndex) {
+                literalsMatch: false
+            }
+            literalIndex: literalIndex + 1
+        }
+        literalIndex: 0
+        while literalIndex < suffixCount && literalsMatch {
+            if source.byte(index: captureEnd + literalIndex)
+                != sourceText.byte(index: captureValueEnd + literalIndex) {
+                literalsMatch: false
+            }
+            literalIndex: literalIndex + 1
+        }
+        if literalsMatch == false {
+            return Parsed(
+                value: nil,
+                diagnostics: ["Syntax template literal did not match source."]
+            )
+        }
+        return Parsed(
+            value: Match(
+                template: self,
+                source: source,
+                capture: Capture(
+                    member: captureMember,
+                    values: [
+                        syntaxSlice(
+                            source: source,
+                            start: prefixCount,
+                            end: captureValueEnd
+                        )
+                    ]
+                )
+            ),
+            diagnostics: []
+        )
+    }
+
+    function isMatch(source: @syntax): Bool {
+        return match(source: source).diagnostics.count == 0
+    }
+
+    function render(match: Match): @syntax
+
+}

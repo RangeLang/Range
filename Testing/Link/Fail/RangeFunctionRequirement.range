@@ -1,0 +1,4 @@
+@link(.sqlite3)
+function rangeFunctionWithLinkRequirement(): Int {
+    return 1
+}

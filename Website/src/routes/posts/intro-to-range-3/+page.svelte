@@ -3,12 +3,12 @@
   import EssayPage from "$lib/components/EssayPage.svelte";
   import FibonacciSphereShader from "$lib/components/FibonacciSphereShader.svelte";
 
-  const macroShape = `macro value(): Member -> RelationshipRegistration { environment in
+  const macroShape = `macro value(): Member -> RelationshipRegistration {
     return scalarValueRelationship()
 }
 
 @value
-macro codable(): Construct { environment in
+macro codable(): Construct {
     #environment {
         extension #environment.target.Declaration.identifier {
             function encode() { ... }

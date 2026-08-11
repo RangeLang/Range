@@ -1,6 +1,6 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/ParenthesizedBoundaryValue.range
-macro parenthesizedBoundaryValue(): Construct { environment in
+macro parenthesizedBoundaryValue(): Construct {
     let enabled: Bool(true)
 
     #environment {

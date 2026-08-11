@@ -1,0 +1,415 @@
+function compilerSourceFileTableColumnCount(): Int {
+    return 5
+}
+
+function compilerSourceRoleCore(): Int {
+    return 0
+}
+
+function compilerSourceRoleFoundation(): Int {
+    return 1
+}
+
+function compilerSourceRoleGenerated(): Int {
+    return 2
+}
+
+function compilerSourceRoleProject(): Int {
+    return 3
+}
+
+function compilerSourceRoleFramework(): Int {
+    return 4
+}
+
+function compilerSourceRoleName(role: Int): String {
+    if role == compilerSourceRoleCore() {
+        return String("core")
+    }
+    if role == compilerSourceRoleFoundation() {
+        return String("foundation")
+    }
+    if role == compilerSourceRoleGenerated() {
+        return String("generated")
+    }
+    if role == compilerSourceRoleProject() {
+        return String("project")
+    }
+    if role == compilerSourceRoleFramework() {
+        return String("framework")
+    }
+    return String("unknown")
+}
+
+function compilerSourceRoleFromName(name: String): Int {
+    if name == String("core") {
+        return compilerSourceRoleCore()
+    }
+    if name == String("foundation") {
+        return compilerSourceRoleFoundation()
+    }
+    if name == String("generated") {
+        return compilerSourceRoleGenerated()
+    }
+    if name == String("project") {
+        return compilerSourceRoleProject()
+    }
+    if name == String("framework") {
+        return compilerSourceRoleFramework()
+    }
+    return 0 - 1
+}
+
+function compilerSourceFileTableAppend(files: CompilerIntTable, role: Int, pathStart: Int, pathEnd: Int, contentStart: Int, contentEnd: Int): Int {
+    if files.columnCount != compilerSourceFileTableColumnCount() {
+        return 0 - 1
+    }
+    if compilerIntTableAppend(table: files, value: role) != 0 {
+        return 0 - 1
+    }
+    if compilerIntTableAppend(table: files, value: pathStart) != 0 {
+        return 0 - 1
+    }
+    if compilerIntTableAppend(table: files, value: pathEnd) != 0 {
+        return 0 - 1
+    }
+    if compilerIntTableAppend(table: files, value: contentStart) != 0 {
+        return 0 - 1
+    }
+    return compilerIntTableAppend(table: files, value: contentEnd)
+}
+
+function compilerSourceStoreCreate(source: String): CompilerSourceStore {
+    let sourceLength: Int(stringLength(value: source))
+    let markerCount: Int(compilerSourceInventoryFileCount(source: source))
+    state estimatedRowCount: Int(1)
+    if markerCount > 0 {
+        estimatedRowCount: markerCount
+    }
+    let files: CompilerIntTable(compilerIntTableCreate(columnCount: compilerSourceFileTableColumnCount(), estimatedRowCount: estimatedRowCount))
+    let firstMarker: CompilerSourceMarker(compilerSourceDecodeNextMarker(source: source, start: 0))
+    state status: Int(0 - 1)
+    if firstMarker.isValid {
+        if !firstMarker.found {
+            status: compilerSourceFileTableAppend(files: files, role: compilerSourceRoleProject(), pathStart: 0, pathEnd: 0, contentStart: 0, contentEnd: sourceLength)
+        } else {
+            status: compilerSourceStoreAppendBundledFiles(source: source, files: files, firstMarker: firstMarker)
+        }
+    }
+    return CompilerSourceStore(source: $source, files: files, isValid: status == 0)
+}
+
+function compilerSourceStoreAppendBundledFiles(source: String, files: CompilerIntTable, firstMarker: CompilerSourceMarker): Int {
+    let sourceLength: Int(stringLength(value: source))
+    state markerStart: Int(0)
+    markerStart: firstMarker.markerStart
+    while markerStart < sourceLength {
+        let marker: CompilerSourceMarker(compilerSourceDecodeNextMarker(source: source, start: markerStart))
+        if !marker.found {
+            return 0
+        }
+        if !marker.isValid || marker.pathEnd <= marker.pathStart || marker.contentEnd < marker.contentStart {
+            return 0 - 1
+        }
+        if compilerSourceFileTableAppend(files: files, role: marker.role, pathStart: marker.pathStart, pathEnd: marker.pathEnd, contentStart: marker.contentStart, contentEnd: marker.contentEnd) != 0 {
+            return 0 - 1
+        }
+        markerStart: marker.contentStart
+    }
+    return 0
+}
+
+function compilerSourceStoreFileCount(store: CompilerSourceStore): Int {
+    return compilerIntTableRowCount(table: store.files)
+}
+
+function compilerSourceStoreAppendGeneratedFile(store: CompilerSourceStore, path: String, content: String): Int {
+    if !store.isValid || stringLength(value: path) == 0 { return 0 - 1 }
+    let oldLength: Int(stringLength(value: store.source))
+    let pathStart: Int(oldLength + 1)
+    let pathEnd: Int(pathStart + stringLength(value: path))
+    let contentStart: Int(pathEnd + 1)
+    let contentEnd: Int(contentStart + stringLength(value: content))
+    let buffer: RawBuffer(rawBufferCreate(capacity: contentEnd - oldLength, stride: 1))
+    if rawBufferAppendText(buffer: buffer, text: compilerCoreNewlineCharacter()) != 0
+        || rawBufferAppendText(buffer: buffer, text: path) != 0
+        || rawBufferAppendText(buffer: buffer, text: compilerCoreNewlineCharacter()) != 0
+        || rawBufferAppendText(buffer: buffer, text: content) != 0 {
+        rawBufferDestroy(buffer: buffer)
+        return 0 - 1
+    }
+    let suffix: String(compilerCoreRawBufferMaterializeAndDestroy(buffer: buffer))
+    if stringAppendStorage(destination: store.source, text: suffix) != 0
+        || compilerSourceFileTableAppend(files: store.files, role: compilerSourceRoleGenerated(), pathStart: pathStart, pathEnd: pathEnd, contentStart: contentStart, contentEnd: contentEnd) != 0 {
+        return 0 - 1
+    }
+    return compilerSourceStoreFileCount(store: store) - 1
+}
+
+function compilerSourceStoreFileRole(store: CompilerSourceStore, fileID: Int): Int {
+    return compilerIntTableValue(table: store.files, row: fileID, column: 0)
+}
+
+function compilerSourceStoreFilePathStart(store: CompilerSourceStore, fileID: Int): Int {
+    return compilerIntTableValue(table: store.files, row: fileID, column: 1)
+}
+
+function compilerSourceStoreFilePathEnd(store: CompilerSourceStore, fileID: Int): Int {
+    return compilerIntTableValue(table: store.files, row: fileID, column: 2)
+}
+
+function compilerSourceStoreFileContentStart(store: CompilerSourceStore, fileID: Int): Int {
+    return compilerIntTableValue(table: store.files, row: fileID, column: 3)
+}
+
+function compilerSourceStoreFileContentEnd(store: CompilerSourceStore, fileID: Int): Int {
+    return compilerIntTableValue(table: store.files, row: fileID, column: 4)
+}
+
+function compilerSourceStoreFileIDAtGlobalOffset(store: CompilerSourceStore, globalOffset: Int): Int {
+    state fileID: Int(0)
+    let fileCount: Int(compilerSourceStoreFileCount(store: store))
+    while fileID < fileCount {
+        let contentStart: Int(compilerSourceStoreFileContentStart(store: store, fileID: fileID))
+        let contentEnd: Int(compilerSourceStoreFileContentEnd(store: store, fileID: fileID))
+        if globalOffset >= contentStart && globalOffset < contentEnd {
+            return fileID
+        }
+        fileID: fileID + 1
+    }
+    return 0 - 1
+}
+
+function compilerSourceStoreFileLocalOffset(store: CompilerSourceStore, globalOffset: Int): Int {
+    let fileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: store, globalOffset: globalOffset))
+    if fileID < 0 {
+        return 0 - 1
+    }
+    return globalOffset - compilerSourceStoreFileContentStart(store: store, fileID: fileID)
+}
+
+function compilerSourceStoreFileLocalOffsetForFileID(store: CompilerSourceStore, fileID: Int, globalOffset: Int): Int {
+    let contentStart: Int(compilerSourceStoreFileContentStart(store: store, fileID: fileID))
+    let contentEnd: Int(compilerSourceStoreFileContentEnd(store: store, fileID: fileID))
+    if globalOffset < contentStart || globalOffset > contentEnd {
+        return 0 - 1
+    }
+    return globalOffset - contentStart
+}
+
+function compilerSourceStoreGlobalOffset(store: CompilerSourceStore, fileID: Int, localOffset: Int): Int {
+    let contentStart: Int(compilerSourceStoreFileContentStart(store: store, fileID: fileID))
+    let contentEnd: Int(compilerSourceStoreFileContentEnd(store: store, fileID: fileID))
+    let globalOffset: Int(contentStart + localOffset)
+    if localOffset < 0 || globalOffset > contentEnd {
+        return 0 - 1
+    }
+    return globalOffset
+}
+
+function compilerSourceStoreDestroy(store: CompilerSourceStore): Int {
+    return compilerIntTableDestroy(table: store.files)
+}
+
+function compilerSourceIdentitySummaryForValidStore(source: String, store: CompilerSourceStore): String {
+    let outputBuffer: RawBuffer(rawBufferCreate(capacity: 1024, stride: 1))
+    let tab: String(compilerCoreTabCharacter())
+    let newline: String(compilerCoreNewlineCharacter())
+    let fileCount: Int(compilerSourceStoreFileCount(store: store))
+    rawBufferAppendText(buffer: outputBuffer, text: "sourceIdentity\(tab)fileCount=\(fileCount)\(newline)")
+    state fileID: Int(0)
+    while fileID < fileCount {
+        let role: Int(compilerSourceStoreFileRole(store: store, fileID: fileID))
+        let pathStart: Int(compilerSourceStoreFilePathStart(store: store, fileID: fileID))
+        let pathEnd: Int(compilerSourceStoreFilePathEnd(store: store, fileID: fileID))
+        let contentStart: Int(compilerSourceStoreFileContentStart(store: store, fileID: fileID))
+        let contentEnd: Int(compilerSourceStoreFileContentEnd(store: store, fileID: fileID))
+        state path: String("")
+        if pathEnd > pathStart {
+            path: stringSubstring(source: source, start: pathStart, end: pathEnd)
+        }
+        let mappedFileID: Int(compilerSourceStoreFileIDAtGlobalOffset(store: store, globalOffset: contentStart))
+        let localOffset: Int(compilerSourceStoreFileLocalOffset(store: store, globalOffset: contentStart))
+        rawBufferAppendText(buffer: outputBuffer, text: "sourceFile\(tab)id=\(fileID)\(tab)role=\(compilerSourceRoleName(role: role))\(tab)path=\(path)\(tab)pathStart=\(pathStart)\(tab)pathEnd=\(pathEnd)\(tab)contentStart=\(contentStart)\(tab)contentEnd=\(contentEnd)\(newline)")
+        rawBufferAppendText(buffer: outputBuffer, text: "sourceMap\(tab)global=\(contentStart)\(tab)fileID=\(mappedFileID)\(tab)local=\(localOffset)\(newline)")
+        fileID: fileID + 1
+    }
+
+    return compilerCoreRawBufferMaterializeAndDestroy(buffer: outputBuffer)
+}
+
+function compilerSourceIdentitySummary(source: String): String {
+    let store: CompilerSourceStore(compilerSourceStoreCreate(source: source))
+    if !store.isValid || !compilerIntTableIsComplete(table: store.files) {
+        compilerSourceStoreDestroy(store: store)
+        return String("compilerError\tkind=invalidSourceFileTable\n")
+    }
+
+    let summary: String(compilerSourceIdentitySummaryForValidStore(source: source, store: store))
+    compilerSourceStoreDestroy(store: store)
+    return summary
+}
+
+function compilerSourceInventorySummary(source: String): String {
+    let files: String(compilerSourceInventoryFileRecords(source: source))
+    if hasRangePrefix(source: files, start: 0, prefix: String("compilerError")) {
+        return files
+    }
+    let count: Int(compilerSourceInventoryFileCount(source: source))
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    let tab: String("\(slash)t")
+    let newline: String("\(slash)n")
+    return "sourceInventory\(tab)program\(newline)\(files)sourceFileCount\(tab)\(count)\(newline)"
+}
+
+function compilerSourceInventoryFileRecords(source: String): String {
+    let store: CompilerSourceStore(compilerSourceStoreCreate(source: source))
+    if !store.isValid || !compilerIntTableIsComplete(table: store.files) {
+        compilerSourceStoreDestroy(store: store)
+        return compilerNativeDiagnostic(kind: String("invalidSourceFileTable"))
+    }
+
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    let tab: String("\(slash)t")
+    let newline: String("\(slash)n")
+    state output: String("")
+    state fileID: Int(0)
+    let fileCount: Int(compilerSourceStoreFileCount(store: store))
+    while fileID < fileCount {
+        let pathStart: Int(compilerSourceStoreFilePathStart(store: store, fileID: fileID))
+        let pathEnd: Int(compilerSourceStoreFilePathEnd(store: store, fileID: fileID))
+        state path: String("")
+        if pathEnd > pathStart {
+            path: stringSubstring(source: source, start: pathStart, end: pathEnd)
+        }
+        output: "\(output)sourceFile\(tab)index=\(fileID)\(tab)role=\(compilerSourceRoleName(role: compilerSourceStoreFileRole(store: store, fileID: fileID)))\(tab)path=\(path)\(newline)"
+        fileID: fileID + 1
+    }
+    compilerSourceStoreDestroy(store: store)
+    return output
+}
+
+function compilerSourceInventoryFileCount(source: String): Int {
+    let markerCount: Int(compilerSourceInventoryFileCountFromMarker(source: source, marker: compilerSourceDecodeNextMarker(source: source, start: 0), fileCount: 0))
+    if markerCount == 0 {
+        return 1
+    }
+    return markerCount
+}
+
+function compilerSourceInventoryFileCountFromMarker(source: String, marker: CompilerSourceMarker, fileCount: Int): Int {
+    if !marker.isValid {
+        return 0 - 1
+    }
+    if !marker.found {
+        return fileCount
+    }
+    let nextMarker: CompilerSourceMarker(compilerSourceDecodeNextMarker(source: source, start: marker.contentStart))
+    return compilerSourceInventoryFileCountFromMarker(source: source, marker: nextMarker, fileCount: fileCount + 1)
+}
+
+function compilerSourceFileMarker(): String {
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    return "compilerSourceFile\(slash)t"
+}
+
+function compilerSourceMarkerNotFound(sourceLength: Int): CompilerSourceMarker {
+    return CompilerSourceMarker(found: false, isValid: true, markerStart: sourceLength, markerEnd: sourceLength, role: compilerSourceRoleProject(), pathStart: 0, pathEnd: 0, contentStart: sourceLength, contentEnd: sourceLength)
+}
+
+function compilerSourceMarkerInvalid(markerStart: Int): CompilerSourceMarker {
+    return CompilerSourceMarker(found: true, isValid: false, markerStart: markerStart, markerEnd: markerStart, role: 0 - 1, pathStart: markerStart, pathEnd: markerStart, contentStart: markerStart, contentEnd: markerStart)
+}
+
+function compilerSourceMarkerPathIsValid(source: String, start: Int, end: Int): Bool {
+    if end <= start {
+        return false
+    }
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    let encodedTab: String("\(slash)t")
+    let path: String(stringSubstring(source: source, start: start, end: end))
+    return stringIndexOf(source: path, needle: encodedTab, start: 0) >= stringLength(value: path)
+        && stringIndexOf(source: path, needle: compilerCoreTabCharacter(), start: 0) >= stringLength(value: path)
+}
+
+function compilerSourceMarkerContentEnd(source: String, start: Int): Int {
+    let sourceLength: Int(stringLength(value: source))
+    let nextCandidate: Int(compilerSourceNextMarkerCandidate(source: source, start: start))
+    if nextCandidate < sourceLength {
+        return nextCandidate
+    }
+    return sourceLength
+}
+
+function compilerSourceMarkerValid(source: String, markerStart: Int, markerEnd: Int, role: Int, pathStart: Int): CompilerSourceMarker {
+    let contentStart: Int(markerEnd + 1)
+    let contentEnd: Int(compilerSourceMarkerContentEnd(source: source, start: contentStart))
+    return CompilerSourceMarker(found: true, isValid: true, markerStart: markerStart, markerEnd: markerEnd, role: role, pathStart: pathStart, pathEnd: markerEnd, contentStart: contentStart, contentEnd: contentEnd)
+}
+
+function compilerSourceDecodeNextMarker(source: String, start: Int): CompilerSourceMarker {
+    let sourceLength: Int(stringLength(value: source))
+    let candidate: Int(compilerSourceNextMarkerCandidate(source: source, start: start))
+    if candidate >= sourceLength {
+        return compilerSourceMarkerNotFound(sourceLength: sourceLength)
+    }
+
+    let newline: String(compilerCoreNewlineCharacter())
+    let lineEnd: Int(stringIndexOf(source: source, needle: newline, start: candidate))
+    if lineEnd >= sourceLength {
+        return compilerSourceMarkerInvalid(markerStart: candidate)
+    }
+
+    if candidate + 20 >= lineEnd {
+        return compilerSourceMarkerInvalid(markerStart: candidate)
+    }
+
+    let slashPair: String("\\")
+    let slash: String(slashPair.substring(start: 0, end: 1))
+    let encodedTab: String("\(slash)t")
+    let rolePrefix: String("role=")
+    let rolePathSeparator: String("\(encodedTab)path=")
+    if hasRangePrefix(source: source, start: candidate + 20, prefix: rolePrefix) {
+        let separator: Int(stringIndexOf(source: source, needle: rolePathSeparator, start: candidate + 20))
+        let roleNameStart: Int(candidate + 25)
+        if separator >= lineEnd || separator <= roleNameStart {
+            return compilerSourceMarkerInvalid(markerStart: candidate)
+        }
+        let roleName: String(stringSubstring(source: source, start: roleNameStart, end: separator))
+        let role: Int(compilerSourceRoleFromName(name: roleName))
+        if role < 0 {
+            return compilerSourceMarkerInvalid(markerStart: candidate)
+        }
+        let pathStart: Int(separator + 7)
+        if !compilerSourceMarkerPathIsValid(source: source, start: pathStart, end: lineEnd) {
+            return compilerSourceMarkerInvalid(markerStart: candidate)
+        }
+        return compilerSourceMarkerValid(source: source, markerStart: candidate, markerEnd: lineEnd, role: role, pathStart: pathStart)
+    }
+    if stringIndexOf(source: source, needle: encodedTab, start: candidate + 20) < lineEnd
+        || !compilerSourceMarkerPathIsValid(source: source, start: candidate + 20, end: lineEnd) {
+        return compilerSourceMarkerInvalid(markerStart: candidate)
+    }
+    return compilerSourceMarkerValid(source: source, markerStart: candidate, markerEnd: lineEnd, role: compilerSourceRoleProject(), pathStart: candidate + 20)
+}
+
+function compilerSourceNextMarkerCandidate(source: String, start: Int): Int {
+    let marker: String(compilerSourceFileMarker())
+    let candidate: Int(stringIndexOf(source: source, needle: marker, start: start))
+    return compilerSourceNextMarkerCandidateFromCandidate(source: source, marker: marker, candidate: candidate)
+}
+
+function compilerSourceNextMarkerCandidateFromCandidate(source: String, marker: String, candidate: Int): Int {
+    let sourceLength: Int(stringLength(value: source))
+    if candidate >= sourceLength {
+        return sourceLength
+    }
+    if candidate == 0 || source.character(index: candidate - 1) == compilerCoreNewlineCharacter() {
+        return candidate
+    }
+    return compilerSourceNextMarkerCandidateFromCandidate(source: source, marker: marker, candidate: stringIndexOf(source: source, needle: marker, start: candidate + 1))
+}

@@ -1,7 +1,7 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/ProjectMacro.range
 construct ProjectDefaults {}
-macro project(): Construct -> ProjectDefaults { environment in
+macro project(): Construct -> ProjectDefaults {
     return ProjectDefaults()
 }
 compilerSourceFile\trole=project\tpath=Project.range

@@ -1,0 +1,7 @@
+construct IterationRegistration {
+    let construct: Construct
+}
+
+macro iterable(): Construct -> IterationRegistration {
+    return IterationRegistration(construct: #environment.target)
+}

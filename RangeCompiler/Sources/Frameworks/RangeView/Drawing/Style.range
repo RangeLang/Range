@@ -1,0 +1,27 @@
+@color
+construct RGBA {
+    let red: Int<.unsigned, 8>
+    let green: Int<.unsigned, 8>
+    let blue: Int<.unsigned, 8>
+    let alpha: Int<.unsigned, 8>
+}
+
+@color
+construct OKLCH {
+    let lightness: Float
+    let chroma: Float
+    let hue: Float
+    let alpha: Float
+}
+
+function toRGBA(color: OKLCH): RGBA {
+    return RGBA(
+        red: rangeViewOKLCHChannel(lightness: color.lightness, chroma: color.chroma, hue: color.hue, alpha: color.alpha, channel: 0),
+        green: rangeViewOKLCHChannel(lightness: color.lightness, chroma: color.chroma, hue: color.hue, alpha: color.alpha, channel: 1),
+        blue: rangeViewOKLCHChannel(lightness: color.lightness, chroma: color.chroma, hue: color.hue, alpha: color.alpha, channel: 2),
+        alpha: rangeViewOKLCHChannel(lightness: color.lightness, chroma: color.chroma, hue: color.hue, alpha: color.alpha, channel: 3))
+}
+
+function rgbaToRGBA(color: RGBA): RGBA {
+    return color
+}

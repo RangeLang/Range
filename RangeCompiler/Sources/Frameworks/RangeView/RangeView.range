@@ -4,22 +4,19 @@ construct Route {
     binding _ children: () -> [Route]
 }
 
+enum Axis {
+    case horizontal
+    case vertical
+}
+
 @entry
 @component
-construct VStack {
+construct Stack {
+    state axis: Axis
     state spacing: Float
-    binding _ children: () -> [@component]
-
-    derived body: [@component] {
-        children()
-    }
-
-    function emit(): Fragment {
-        return Fragment(
-            html: "<div class=\"range-view-v-stack\" style=\"--range-view-v-stack-spacing: \(spacing)px\">\n",
-            css: ".range-view-v-stack { display: flex; flex-direction: column; gap: var(--range-view-v-stack-spacing); }\n",
-            children: children()
-        )
+    state alignment: LayoutAlignment
+    derived view: [@component] {
+        // The component body is the view field.
     }
 }
 
@@ -32,17 +29,6 @@ construct Fragment {
     derived body: [@component] {
         children()
     }
-}
-
-function rangeViewVStackBegin(spacing: Int, html: String, css: String): Int {
-    if html.append(text: "<div class=\"range-view-v-stack\" style=\"--range-view-v-stack-spacing: \(spacing)px\">\n") != 0 {
-        return 1
-    }
-    return css.append(text: ".range-view-v-stack { display: flex; flex-direction: column; gap: var(--range-view-v-stack-spacing); }\n")
-}
-
-function rangeViewVStackEnd(html: String): Int {
-    return html.append(text: "</div>\n")
 }
 
 function rangeViewEmit(

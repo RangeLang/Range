@@ -82,7 +82,7 @@ construct RelationshipRegistration {
 
 construct BlockRegistration {}
 
-macro contents(_ shape: DelimiterPair): Member -> RelationshipRegistration { environment in
+macro contents(_ shape: DelimiterPair): Member -> RelationshipRegistration {
     return RelationshipRegistration(
         multiplicity: RelationshipMultiplicity(
             minimum: 0,
@@ -95,7 +95,7 @@ macro contents(_ shape: DelimiterPair): Member -> RelationshipRegistration { env
     )
 }
 
-macro block(): Member -> BlockRegistration { environment in
+macro block(): Member -> BlockRegistration {
     return BlockRegistration()
 }
 

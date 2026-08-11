@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
+INPUT="${1:-$REPO_ROOT/Testing/CompilerB/Pass/SourceGraphFunction.range}"
+PRODUCER="${RANGE_COMPILER_B_PRODUCER:-}"
+
+fail() {
+    echo "range compiler b: $*" >&2
+    exit 1
+}
+
+now_ms() {
+    /usr/bin/python3 -c 'import time; print(int(time.time() * 1000))'
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+[[ -f "$INPUT" ]] || fail "missing source input: $INPUT"
+if [[ -z "$PRODUCER" ]]; then
+    producer_relative="$(/usr/bin/plutil -extract executable.path raw -o - "$MANIFEST")"
+    PRODUCER="$REPO_ROOT/$producer_relative"
+fi
+[[ -x "$PRODUCER" ]] || fail "producer is not executable: $PRODUCER"
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b.XXXXXX")"
+trap '/bin/rm -rf "$work_root"' EXIT
+product="$work_root/CompilerB.product.tsv"
+started_ms="$(now_ms)"
+product_started_ms="$started_ms"
+product_status=0
+RANGE_DEVELOPMENT_COMPILER="$PRODUCER" \
+    "$REPO_ROOT/scripts/range" run "$REPO_ROOT/Examples/RangeCompilerB" \
+    --source "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler" \
+    -- "$INPUT" > "$product" || product_status=$?
+product_finished_ms="$(now_ms)"
+
+producer_hash="$(sha256 "$PRODUCER")"
+input_hash="$(sha256 "$INPUT")"
+product_hash="$(sha256 "$product")"
+compiler_b_source_hash="$({
+    sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/Native.range"
+    sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/Lexer.range"
+    sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/Graph.range"
+    sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/RangeCompiler.range"
+    sha256 "$REPO_ROOT/Examples/RangeCompilerB/CompilerBApp.range"
+} | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+application_identity="$(/usr/bin/printf 'producer=%s\ncompilerB=%s\ninput=%s\nproduct=%s\n' \
+    "$producer_hash" "$compiler_b_source_hash" "$input_hash" "$product_hash" \
+    | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+application_directory="$REPO_ROOT/.range/CompilerB/Applications/$application_identity"
+/bin/mkdir -p "$application_directory"
+/bin/cp "$product" "$application_directory/CompilerB.product.tsv"
+/usr/bin/printf 'rangeCompilerApplication\tversion=2\tidentity=%s\tproducer=%s\tcompilerB=%s\tinput=%s\tproduct=%s\tstatus=%s\tbootstrapAndProductMilliseconds=%s\n' \
+    "$application_identity" "$producer_hash" "$compiler_b_source_hash" "$input_hash" "$product_hash" \
+    "$product_status" "$((product_finished_ms - product_started_ms))" \
+    > "$application_directory/application.tsv"
+
+/bin/cat "$product"
+/bin/cat "$application_directory/application.tsv"
+exit "$product_status"

@@ -16,6 +16,7 @@ manifest_value() {
 }
 
 profile_keep="${RANGE_COMPILER_PROFILE_KEEP:-0}"
+profile_verbose_phases="${RANGE_COMPILER_PROFILE_VERBOSE_PHASES:-0}"
 profile_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-profile.XXXXXX")"
 cleanup() {
     if [[ "$profile_keep" != 1 ]]; then
@@ -64,6 +65,21 @@ for ((index = 0; index < runtime_count; index += 1)); do
         clang -O2 -flto=thin \
             -DcompilerMetricsFunctionBegin=compilerMetricsFunctionBeginBase \
             -DcompilerMetricsFunctionEnd=compilerMetricsFunctionEndBase \
+            -DcompilerTelemetryProbeBegin=compilerTelemetryProbeBeginBase \
+            -DcompilerTelemetryProbeEnd=compilerTelemetryProbeEndBase \
+            -DcompilerMetricsObserveRawBufferAppend=compilerMetricsObserveRawBufferAppendBase \
+            -DcompilerMetricsObserveRawBufferMaterialize=compilerMetricsObserveRawBufferMaterializeBase \
+            -DcompilerMetricsObserveRawBufferReallocation=compilerMetricsObserveRawBufferReallocationBase \
+            -DcompilerMetricsObserveStringConcat=compilerMetricsObserveStringConcatBase \
+            -DcompilerMetricsObserveStringSubstring=compilerMetricsObserveStringSubstringBase \
+            -DcompilerMetricsObserveConstructObject=compilerMetricsObserveConstructObjectBase \
+            -DcompilerMetricsObserveConstructField=compilerMetricsObserveConstructFieldBase \
+            -DcompilerMetricsObserveConstructLookupProbe=compilerMetricsObserveConstructLookupProbeBase \
+            -DcompilerMetricsObserveRawBufferLiveBytes=compilerMetricsObserveRawBufferLiveBytesBase \
+            -DcompilerMetricsObserveTransientLiveBytes=compilerMetricsObserveTransientLiveBytesBase \
+            -c "$runtime_source" -o "$runtime_object"
+    elif [[ "$runtime_source" == "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" ]]; then
+        clang -O2 -flto=thin -DRANGE_IDENTITY_ENABLE_STATS \
             -c "$runtime_source" -o "$runtime_object"
     else
         clang -O2 -flto=thin -c "$runtime_source" -o "$runtime_object"
@@ -135,7 +151,234 @@ fi
     /peak memory footprint/ { peak = $1 }
     END { printf "compilerResources\tmaximumResidentBytes=%s\tpeakFootprintBytes=%s\n", maximum, peak }
 ' "$resource_output"
-/usr/bin/grep $'^compilerPhase\t' "$trace_output" || true
+if [[ "$profile_verbose_phases" == 1 ]]; then
+    /usr/bin/grep $'^compilerPhase\t' "$trace_output" || true
+    /usr/bin/grep $'^compilerPhaseMemory\t' "$trace_output" || true
+else
+    /usr/bin/awk -F '\t' '
+        $1 == "compilerPhase" || $1 == "compilerPhaseMemory" {
+            name = $2
+            sub(/^name=/, "", name)
+            if (name == "sourceSet.begin" || name == "declarationCapture.end" || name == "macroLink.end" || name == "macroExecution.begin" || name == "reachabilityDiscovery.end" || name == "functionArtifactCandidates.end" || name == "behaviorGraphClosure.end" || name == "functionEmission.end" || name == "llvmPipeline.end" || name == "sourceSet.end") print
+        }
+    ' "$trace_output"
+fi
+if [[ "$profile_keep" == 1 ]]; then
+    /usr/bin/printf 'compilerProbeTrace\tpath=%s\n' "$trace_output"
+fi
+/usr/bin/awk -F '\t' '
+    BEGIN { openDepth = 0 }
+    function value(fieldName,    field, result) {
+        for (field = 1; field <= NF; field += 1) {
+            if ($field ~ ("^" fieldName "=")) {
+                result = $field
+                sub("^" fieldName "=", "", result)
+                return result
+            }
+        }
+        return ""
+    }
+    $1 == "compilerProbeBegin" {
+        probeID = value("probeID")
+        depth = value("depth") + 0
+        if (depth != openDepth) malformed += 1
+        stack[openDepth] = probeID
+        openDepth += 1
+        begins += 1
+    }
+    $1 == "compilerProbeEnd" {
+        probeID = value("probeID")
+        depth = value("depth") + 0
+        if (openDepth < 1 || depth != openDepth - 1 || stack[depth] != probeID) malformed += 1
+        if (openDepth > 0) {
+            openDepth -= 1
+            delete stack[openDepth]
+        }
+        ends += 1
+        name = value("name")
+        duration = value("durationNanoseconds") + 0
+        status = value("status") + 0
+        count[name] += 1
+        durationTotal[name] += duration
+        if (status != 0) failures[name] += 1
+        appendCalls[name] += value("appendCalls")
+        appendBytes[name] += value("appendBytes")
+        materializeCalls[name] += value("materializeCalls")
+        materializeBytes[name] += value("materializeBytes")
+        reallocations[name] += value("reallocations")
+        reallocationBytes[name] += value("reallocationBytes")
+        stringConcatCalls[name] += value("stringConcatCalls")
+        stringConcatBytes[name] += value("stringConcatBytes")
+        substringCalls[name] += value("stringSubstringCalls")
+        substringSourceBytes[name] += value("stringSubstringSourceBytes")
+        substringResultBytes[name] += value("stringSubstringResultBytes")
+        constructObjects[name] += value("constructObjects")
+        constructFields[name] += value("constructFields")
+        constructNameBytes[name] += value("constructNameBytes")
+        constructLookupProbes[name] += value("constructLookupProbes")
+        rawPeakDelta = value("localPeakRawBufferDeltaBytes") + 0
+        transientPeakDelta = value("localPeakTransientDeltaBytes") + 0
+        if (duration > maximumDuration[name]) {
+            maximumDuration[name] = duration
+            maximumFunctionID[name] = value("functionID")
+            maximumInstanceID[name] = value("instanceID")
+            maximumBlockID[name] = value("blockID")
+            maximumNodeID[name] = value("nodeID")
+            maximumOrdinal[name] = value("ordinal")
+            maximumItemCount[name] = value("itemCount")
+            maximumProbeID[name] = probeID
+        }
+        if (rawPeakDelta > maximumRawPeakDelta[name]) maximumRawPeakDelta[name] = rawPeakDelta
+        if (transientPeakDelta > maximumTransientPeakDelta[name]) maximumTransientPeakDelta[name] = transientPeakDelta
+    }
+    END {
+        balanced = malformed == 0 && begins == ends && openDepth == 0
+        printf "compilerProbeIntegrity\tbegins=%d\tends=%d\topen=%d\tmalformed=%d\tbalanced=%d\n", begins, ends, openDepth, malformed, balanced
+        for (name in count) {
+            printf "compilerProbeSummary\tname=%s\tcount=%.0f\tfailures=%.0f\tdurationNanoseconds=%.0f\tmaximumDurationNanoseconds=%.0f\tmaximumProbeID=%s\tmaximumFunctionID=%s\tmaximumInstanceID=%s\tmaximumBlockID=%s\tmaximumNodeID=%s\tmaximumOrdinal=%s\tmaximumItemCount=%s\tappendCalls=%.0f\tappendBytes=%.0f\tmaterializeCalls=%.0f\tmaterializeBytes=%.0f\treallocations=%.0f\treallocationBytes=%.0f\tstringConcatCalls=%.0f\tstringConcatBytes=%.0f\tstringSubstringCalls=%.0f\tstringSubstringSourceBytes=%.0f\tstringSubstringResultBytes=%.0f\tconstructObjects=%.0f\tconstructFields=%.0f\tconstructNameBytes=%.0f\tconstructLookupProbes=%.0f\tmaximumLocalRawBufferDeltaBytes=%.0f\tmaximumLocalTransientDeltaBytes=%.0f\n", name, count[name], failures[name], durationTotal[name], maximumDuration[name], maximumProbeID[name], maximumFunctionID[name], maximumInstanceID[name], maximumBlockID[name], maximumNodeID[name], maximumOrdinal[name], maximumItemCount[name], appendCalls[name], appendBytes[name], materializeCalls[name], materializeBytes[name], reallocations[name], reallocationBytes[name], stringConcatCalls[name], stringConcatBytes[name], substringCalls[name], substringSourceBytes[name], substringResultBytes[name], constructObjects[name], constructFields[name], constructNameBytes[name], constructLookupProbes[name], maximumRawPeakDelta[name], maximumTransientPeakDelta[name]
+        }
+        if (!balanced) exit 2
+    }
+' "$trace_output" | LC_ALL=C /usr/bin/sort
+/usr/bin/grep $'^compilerFunctionMemoryPeak\t' "$trace_output" || true
+/usr/bin/grep $'^compilerFunctionTransientPeak\t' "$trace_output" || true
+/usr/bin/grep $'^compilerEmitterStagePeak\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            name = ""
+            bytes = 0
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ /^name=/) { name = $field; sub(/^name=/, "", name) }
+                if ($field ~ /^bytes=/) { bytes = $field; sub(/^bytes=/, "", bytes) }
+            }
+            if (bytes > maximum[name]) maximum[name] = bytes
+        }
+        END {
+            for (name in maximum) printf "compilerEmitterStageSummary\tname=%s\tmaximumBytes=%d\n", name, maximum[name]
+        }
+    ' || true
+/usr/bin/grep $'^compilerLoweringStagePeak\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            name = $2
+            sub(/^name=/, "", name)
+            bytes = $3
+            sub(/^bytes=/, "", bytes)
+            if (bytes > maximum[name]) maximum[name] = bytes
+        }
+        END {
+            for (name in maximum) printf "compilerLoweringStageSummary\tname=%s\tmaximumBytes=%d\n", name, maximum[name]
+        }
+    ' || true
+/usr/bin/grep $'^compilerLoweringStageBuffer\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        function value(fieldName,    field, result) {
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ ("^" fieldName "=")) {
+                    result = $field
+                    sub("^" fieldName "=", "", result)
+                    return result
+                }
+            }
+            return 0
+        }
+        {
+            name = value("name")
+            sub(/^loweringStage.end./, "", name)
+            stageDuration = value("durationMicroseconds")
+            stageTransient = value("liveTransientDeltaBytes")
+            count[name] += 1
+            duration[name] += stageDuration
+            appendCalls[name] += value("appendCalls")
+            appendBytes[name] += value("appendBytes")
+            materializeCalls[name] += value("materializeCalls")
+            materializeBytes[name] += value("materializeBytes")
+            reallocations[name] += value("reallocations")
+            reallocationBytes[name] += value("reallocationBytes")
+            rawDelta[name] += value("liveRawBufferDeltaBytes")
+            transientDelta[name] += stageTransient
+            if (stageDuration > maximumDuration[name]) {
+                maximumDuration[name] = stageDuration
+                durationFunctionID[name] = value("functionID")
+                durationFunctionName[name] = value("functionName")
+            }
+            if (stageTransient > maximumTransient[name]) {
+                maximumTransient[name] = stageTransient
+                transientFunctionID[name] = value("functionID")
+                transientFunctionName[name] = value("functionName")
+            }
+        }
+        END {
+            split("parse memory mir mirValidate emit edges destroy result", order, " ")
+            for (ordinal = 1; ordinal <= 8; ordinal += 1) {
+                name = order[ordinal]
+                printf "compilerLoweringBufferStage\tname=%s\tcount=%.0f\tdurationMicroseconds=%.0f\tappendCalls=%.0f\tappendBytes=%.0f\tmaterializeCalls=%.0f\tmaterializeBytes=%.0f\treallocations=%.0f\treallocationBytes=%.0f\tliveRawBufferDeltaBytes=%.0f\tliveTransientDeltaBytes=%.0f\n", name, count[name], duration[name], appendCalls[name], appendBytes[name], materializeCalls[name], materializeBytes[name], reallocations[name], reallocationBytes[name], rawDelta[name], transientDelta[name]
+                printf "compilerLoweringBufferHotspot\tname=%s\tmaximumDurationMicroseconds=%.0f\tdurationFunctionID=%s\tdurationFunctionName=%s\tmaximumTransientDeltaBytes=%.0f\ttransientFunctionID=%s\ttransientFunctionName=%s\n", name, maximumDuration[name], durationFunctionID[name], durationFunctionName[name], maximumTransient[name], transientFunctionID[name], transientFunctionName[name]
+            }
+        }
+    ' || true
+/usr/bin/grep $'^compilerEmitterStageBuffer\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        function value(fieldName,    field, result) {
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ ("^" fieldName "=")) {
+                    result = $field
+                    sub("^" fieldName "=", "", result)
+                    return result
+                }
+            }
+            return 0
+        }
+        {
+            name = value("name")
+            sub(/^emitterStage.end./, "", name)
+            count[name] += 1
+            duration[name] += value("durationMicroseconds")
+            appendCalls[name] += value("appendCalls")
+            appendBytes[name] += value("appendBytes")
+            materializeCalls[name] += value("materializeCalls")
+            materializeBytes[name] += value("materializeBytes")
+            reallocations[name] += value("reallocations")
+            reallocationBytes[name] += value("reallocationBytes")
+            rawDelta[name] += value("liveRawBufferDeltaBytes")
+            transientDelta[name] += value("liveTransientDeltaBytes")
+        }
+        END {
+            split("seed plan render materialize globals destroy", order, " ")
+            for (ordinal = 1; ordinal <= 6; ordinal += 1) {
+                name = order[ordinal]
+                printf "compilerEmitterBufferStage\tname=%s\tcount=%.0f\tdurationMicroseconds=%.0f\tappendCalls=%.0f\tappendBytes=%.0f\tmaterializeCalls=%.0f\tmaterializeBytes=%.0f\treallocations=%.0f\treallocationBytes=%.0f\tliveRawBufferDeltaBytes=%.0f\tliveTransientDeltaBytes=%.0f\n", name, count[name], duration[name], appendCalls[name], appendBytes[name], materializeCalls[name], materializeBytes[name], reallocations[name], reallocationBytes[name], rawDelta[name], transientDelta[name]
+            }
+        }
+    ' || true
+/usr/bin/grep $'^compilerMemoryStagePeak\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            name = $2
+            sub(/^name=/, "", name)
+            bytes = $3
+            sub(/^bytes=/, "", bytes)
+            if (bytes > maximum[name]) maximum[name] = bytes
+        }
+        END {
+            for (name in maximum) printf "compilerMemoryStageSummary\tname=%s\tmaximumBytes=%d\n", name, maximum[name]
+        }
+    ' || true
+/usr/bin/grep $'^compilerTransientWorkItemPeak\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            name = ""
+            bytes = 0
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ /^name=/) { name = $field; sub(/^name=/, "", name) }
+                if ($field ~ /^bytes=/) { bytes = $field; sub(/^bytes=/, "", bytes) }
+            }
+            count += 1
+            if (bytes > maximum) { maximum = bytes; maximumName = name }
+        }
+        END { printf "compilerTransientWorkItemSummary\tcount=%d\tmaximumBytes=%d\tmaximumName=%s\n", count, maximum, maximumName }
+    ' || true
+/usr/bin/grep $'^rangeIdentityAllocator ' "$trace_output" || true
 /usr/bin/grep $'^compilerFunctionEnd\t' "$trace_output" \
     | /usr/bin/awk -F '\t' '
         {
@@ -162,6 +405,57 @@ fi
                 name = order[ordinal]
                 printf "compilerABIStage\tname=%s\tcount=%d\tdurationMicroseconds=%d\n", name, count[name], microseconds[name]
             }
+        }
+    ' || true
+/usr/bin/grep $'^compilerFunctionEnd\t' "$trace_output" \
+    | /usr/bin/awk -F '\t' '
+        {
+            functionID = ""
+            name = ""
+            for (field = 1; field <= NF; field += 1) {
+                if ($field ~ /^functionID=/) {
+                    functionID = $field
+                    sub(/^functionID=/, "", functionID)
+                } else if ($field ~ /^name=/) {
+                    name = $field
+                    sub(/^name=/, "", name)
+                }
+            }
+            if (name ~ /^abi\.parse\./) {
+                probePasses += 1
+                probeByFunction[functionID] += 1
+                if (!(functionID in probeNames)) {
+                    probeName = name
+                    sub(/^abi\.parse\./, "", probeName)
+                    probeNames[functionID] = probeName
+                    probedFunctions += 1
+                }
+            } else if (name == "bodyProduct.directEffects") {
+                discoveryPasses += 1
+            } else if (name !~ /^abi\./) {
+                emissionPasses += 1
+                emittedByFunction[functionID] += 1
+            }
+        }
+        END {
+            extraProbePasses = probePasses - emissionPasses
+            if (extraProbePasses < 0) extraProbePasses = 0
+            ratioMilli = emissionPasses > 0 ? int((probePasses * 1000) / emissionPasses) : 0
+            repeatedFunctions = 0
+            maxProbePasses = 0
+            maxFunctionID = ""
+            for (functionID in probeByFunction) {
+                if (probeByFunction[functionID] > 1) repeatedFunctions += 1
+                if (probeByFunction[functionID] > maxProbePasses) {
+                    maxProbePasses = probeByFunction[functionID]
+                    maxFunctionID = functionID
+                }
+            }
+            maxFunctionName = maxFunctionID in probeNames ? probeNames[maxFunctionID] : ""
+            printf "compilerABIReconstruction\tprobePasses=%d\temissionPasses=%d\textraProbePasses=%d\tprobedFunctions=%d\trepeatedFunctions=%d\tprobeToEmissionMilli=%d\tmaxProbePasses=%d\tmaxFunctionID=%s\tmaxFunctionName=%s\n", probePasses, emissionPasses, extraProbePasses, probedFunctions, repeatedFunctions, ratioMilli, maxProbePasses, maxFunctionID, maxFunctionName
+            typedPasses = discoveryPasses + emissionPasses
+            discoveryToEmissionMilli = emissionPasses > 0 ? int((discoveryPasses * 1000) / emissionPasses) : 0
+            printf "compilerTypedFunctionPasses\tdiscoveryPasses=%d\temissionPasses=%d\ttotalPasses=%d\tdiscoveryToEmissionMilli=%d\n", discoveryPasses, emissionPasses, typedPasses, discoveryToEmissionMilli
         }
     ' || true
 /usr/bin/grep $'^compilerFunctionEnd\t' "$trace_output" \

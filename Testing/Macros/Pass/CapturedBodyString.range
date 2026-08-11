@@ -1,4 +1,4 @@
-macro capturedTemplate(@capture template: String): Construct -> Bool { environment in
+macro capturedTemplate(@capture template: String): Construct -> Bool {
     return template == "construct $identifier { $members }"
         && template.count == 34
         && template.byte(index: 0) == 99

@@ -1,0 +1,4 @@
+@syntax
+construct ArrayTypeReference {
+    let element: TypeReference
+}

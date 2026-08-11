@@ -24,9 +24,9 @@ construct State {
     let identity: Identity
 }
 
-macro project(): Construct -> ProjectDefaults { environment in
+macro project(): Construct -> ProjectDefaults {
     let members: Array<State>(
-        environment.target.Declaration.members.filter(all: State)
+        #environment.target.Declaration.members.filter(all: State)
     )
     let integerCount: Int(
         members.filter { member in

@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/LegacyEnvironmentBinder.range
+macro legacyEnvironmentBinder(): Construct { environment in
+    return environment.diagnostics.information("legacy binder executed")
+}
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@legacyEnvironmentBinder
+construct Value {}

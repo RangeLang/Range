@@ -8,8 +8,8 @@ construct Construct {
     }
 }
 
-macro lowercaseInlineConstructProjection(): Construct { environment in
-    environment.target.declaration.identifier
+macro lowercaseInlineConstructProjection(): Construct {
+    #environment.target.declaration.identifier
 }
 
 compilerSourceFile\trole=project\tpath=Project/Value.range

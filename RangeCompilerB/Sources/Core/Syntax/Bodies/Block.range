@@ -1,0 +1,6 @@
+@syntax
+construct Block<Value = @syntax, shape: DelimiterPair = .braces> {
+    @contents(.braces)
+    @block
+    let contents: Array<Value>
+}

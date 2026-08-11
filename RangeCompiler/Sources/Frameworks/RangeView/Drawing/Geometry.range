@@ -1,0 +1,13 @@
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+construct Size {
+    let width: Int
+    let height: Int
+}
+
+construct DrawingSpace {
+    let size: Size
+}

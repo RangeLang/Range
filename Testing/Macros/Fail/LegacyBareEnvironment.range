@@ -1,0 +1,8 @@
+compilerMacroSnapshot
+compilerSourceFile\trole=core\tpath=Core/Macro/LegacyBareEnvironment.range
+macro legacyBareEnvironment(): Construct {
+    return environment.diagnostics.information("legacy environment executed")
+}
+compilerSourceFile\trole=project\tpath=Project/Value.range
+@legacyBareEnvironment
+construct Value {}

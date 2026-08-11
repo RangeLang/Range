@@ -1,0 +1,18 @@
+@color
+enum Color {
+    case transparent: RGBA(red: 0, green: 0, blue: 0, alpha: 0)
+    case black: OKLCH(lightness: 0, chroma: 0, hue: 0, alpha: 1)
+    case white: OKLCH(lightness: 1, chroma: 0, hue: 0, alpha: 1)
+    case magenta: OKLCH(lightness: 0.701673856, chroma: 0.322490965, hue: 328.363418, alpha: 1)
+    case rose: OKLCH(lightness: 0.645349338, chroma: 0.260343084, hue: 2.470760753, alpha: 1)
+    case red: OKLCH(lightness: 0.627955361, chroma: 0.257683308, hue: 29.233885192, alpha: 1)
+    case orange: OKLCH(lightness: 0.731894843, chroma: 0.185803216, hue: 52.984679594, alpha: 1)
+    case yellow: OKLCH(lightness: 0.967982720, chroma: 0.211005908, hue: 109.769232, alpha: 1)
+    case lime: OKLCH(lightness: 0.890657071, chroma: 0.264361396, hue: 135.892351661, alpha: 1)
+    case green: OKLCH(lightness: 0.866439612, chroma: 0.294827240, hue: 142.495338889, alpha: 1)
+    case springGreen: OKLCH(lightness: 0.875074237, chroma: 0.234440371, hue: 151.184826985, alpha: 1)
+    case cyan: OKLCH(lightness: 0.905399230, chroma: 0.154550011, hue: 194.768948, alpha: 1)
+    case azure: OKLCH(lightness: 0.615165359, chroma: 0.210818910, hue: 256.098957652, alpha: 1)
+    case blue: OKLCH(lightness: 0.452013718, chroma: 0.313214372, hue: 264.052020638, alpha: 1)
+    case violet: OKLCH(lightness: 0.530457023, chroma: 0.293118558, hue: 293.937640814, alpha: 1)
+}

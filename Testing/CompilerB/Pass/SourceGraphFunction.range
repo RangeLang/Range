@@ -1,0 +1,10 @@
+function sourceGraphChoice(input: Int): Int {
+    if input > 0 {
+        return input
+    }
+    return 0
+}
+
+@main {
+    return sourceGraphChoice(1)
+}

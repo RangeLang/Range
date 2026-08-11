@@ -8,12 +8,14 @@ READER="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerBuildPlan.range
 CORE_BUFFER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/Buffer.range"
 CORE_BYTE_SPAN="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/ByteSpan.range"
 CORE_MANY="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Many.range"
+CORE_EXTERN="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range"
 CORE_RELATIONSHIP="$REPO_ROOT/RangeCompiler/Sources/Core/Syntax/Program/Relationship.range"
 CORE_UNICODE_SCALAR="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/UnicodeScalar.range"
 CORE_CHARACTER="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/Character.range"
 CORE_STRING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/String.range"
 CORE_TEXT_ENCODING="$REPO_ROOT/RangeCompiler/Sources/Core/System/Text/TextEncoding.range"
-SCHEMA_VERSION="focused-build-plan-harness-v4"
+CORE_PROCESS="$REPO_ROOT/RangeCompiler/Sources/Core/System/Process.range"
+SCHEMA_VERSION="focused-build-plan-harness-v5"
 CACHE_ROOT="${RANGE_BUILD_PLAN_CACHE_DIR:-$REPO_ROOT/.range/Compiler/BuildCache/build-plan}"
 
 fail() {
@@ -68,11 +70,13 @@ verify_manifest() {
     [[ -f "$CORE_BUFFER" ]] || fail "missing Buffer storage witness"
     [[ -f "$CORE_BYTE_SPAN" ]] || fail "missing ByteSpan model"
     [[ -f "$CORE_MANY" ]] || fail "missing many relationship macro"
+    [[ -f "$CORE_EXTERN" ]] || fail "missing extern registration macro"
     [[ -f "$CORE_RELATIONSHIP" ]] || fail "missing relationship model"
     [[ -f "$CORE_UNICODE_SCALAR" ]] || fail "missing UnicodeScalar model"
     [[ -f "$CORE_CHARACTER" ]] || fail "missing Character model"
     [[ -f "$CORE_STRING" ]] || fail "missing String storage witness"
     [[ -f "$CORE_TEXT_ENCODING" ]] || fail "missing TextEncoding model"
+    [[ -f "$CORE_PROCESS" ]] || fail "missing Process system boundary"
 }
 
 write_harness() {
@@ -141,7 +145,7 @@ write_bundle() {
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_BYTE_SPAN")" ]] || /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=FocusedRelationshipPrerequisites.range' \
-        'construct Identifier {}' \
+        'construct Identity {}' \
         '' \
         'enum DelimiterPair {' \
         '    case parentheses' \
@@ -155,6 +159,12 @@ write_bundle() {
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/Macro/Many.range\n' >> "$output"
     /bin/cat "$CORE_MANY" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_MANY")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/ExternReflection.range' \
+        'construct Function {}' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/Macro/Extern.range\n' >> "$output"
+    /bin/cat "$CORE_EXTERN" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_EXTERN")" ]] || /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/UnicodeScalar.range\n' >> "$output"
     /bin/cat "$CORE_UNICODE_SCALAR" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_UNICODE_SCALAR")" ]] || /usr/bin/printf '\n' >> "$output"
@@ -167,6 +177,9 @@ write_bundle() {
     /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Text/String.range\n' >> "$output"
     /bin/cat "$CORE_STRING" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$CORE_STRING")" ]] || /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=core\\tpath=RangeCompiler/Sources/Core/System/Process.range\n' >> "$output"
+    /bin/cat "$CORE_PROCESS" >> "$output"
+    [[ -z "$(/usr/bin/tail -c 1 "$CORE_PROCESS")" ]] || /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=CompilerBuildPlan.range\n' >> "$output"
     /bin/cat "$READER" >> "$output"
     [[ -z "$(/usr/bin/tail -c 1 "$READER")" ]] || /usr/bin/printf '\n' >> "$output"
@@ -250,7 +263,11 @@ main() {
     echo "checkpoint build-plan:manifest: pass"
 
     WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-build-plan.XXXXXX")"
-    trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+    if [[ "${RANGE_KEEP_BUILD_PLAN_WORK_ROOT:-0}" == 1 ]]; then
+        echo "build-plan work root: $WORK_ROOT"
+    else
+        trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+    fi
     local harness="$WORK_ROOT/BuildPlanHarness.range"
     local bundle="$WORK_ROOT/FocusedBuildPlanSourceSet.range"
     write_harness "$harness"

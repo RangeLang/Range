@@ -1,0 +1,18 @@
+@graph(.declaration, .application)
+construct Parameter {
+    @syntax
+    construct Declaration {
+        let macros: Array<Macro.Application>
+        let externalName: String?
+        let identity: Identity
+        let type: TypeReference?
+        let defaultValue: @syntax?
+    }
+
+    @syntax
+    construct Application {
+        let label: String?
+        let type: TypeReference
+        let expression: Expression
+    }
+}

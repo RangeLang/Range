@@ -1,9 +1,9 @@
 macro rejectLiteralMismatch(
     @capture expected: String
-): Construct -> String { environment in
-    let source: String(syntaxText(source: environment.target))
+): Construct -> String {
+    let source: String(syntaxText(source: #environment.target))
     if source != expected {
-        environment.diagnostics.error(
+        #environment.error(
             "Syntax template literal did not match source."
         )
     }

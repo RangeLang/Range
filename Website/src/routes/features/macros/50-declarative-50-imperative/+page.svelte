@@ -2,7 +2,7 @@
   import CodeBlock from "$lib/components/CodeBlock.svelte";
   import EssayPage from "$lib/components/EssayPage.svelte";
 
-  const projectMacro = `macro project(): Construct { environment in
+  const projectMacro = `macro project(): Construct {
     #environment {
         construct ProjectDefaults {
             #environment.system.defaults.map { default in
@@ -12,9 +12,9 @@
     }
 }`;
 
-  const equatableSynthesis = `macro equatable(): Construct { environment in
+  const equatableSynthesis = `macro equatable(): Construct {
     let properties: [@property](
-        environment.target.Declaration.members.filter(all: @property)
+        #environment.target.Declaration.members.filter(all: @property)
     )
     let values: [@stored](
         properties.filter(all: @stored)
@@ -34,9 +34,9 @@
     }
 }`;
 
-  const caseIterable = `macro caseIterable(): Enum { environment in
+  const caseIterable = `macro caseIterable(): Enum {
     let cases: [Enum.Case](
-        environment.target.Declaration.cases
+        #environment.target.Declaration.cases
     )
     let payloadCases: [Enum.Case](
         cases.filter { item in
@@ -45,7 +45,7 @@
     )
 
     if payloadCases.count != 0 {
-        environment.diagnostics.error(
+        #environment.error(
             "@caseIterable requires cases without associated values"
         )
     }
@@ -87,7 +87,7 @@
     <h2>The declarative half</h2>
     <p>
       Inside <code>#environment</code>, the macro describes a piece of the
-      program’s environment. It says that a <code>ProjectDefaults</code>
+      program’s #environment. It says that a <code>ProjectDefaults</code>
       construct exists and shows the members that belong inside it. There is no
       builder to push into, no syntax tree to assemble, and no sequence of
       mutation calls pretending to be a language.

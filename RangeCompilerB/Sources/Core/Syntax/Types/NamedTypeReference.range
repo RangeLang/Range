@@ -1,0 +1,4 @@
+@syntax
+construct NamedTypeReference {
+    let name: String
+}

@@ -1,0 +1,4 @@
+enum Result<Value, Failure> {
+    case success(result: Value)
+    case failure(cause: Failure)
+}

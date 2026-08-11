@@ -1,0 +1,5 @@
+@syntax
+construct GenericTypeReference {
+    let base: TypeReference
+    let arguments: Array<TypeReference>
+}

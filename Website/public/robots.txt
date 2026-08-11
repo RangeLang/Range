@@ -1,0 +1,20 @@
+User-agent: *
+Disallow: /posts/programming-language-design-knots
+
+User-agent: GPTBot
+Disallow: /posts/programming-language-design-knots
+
+User-agent: ChatGPT-User
+Disallow: /posts/programming-language-design-knots
+
+User-agent: ClaudeBot
+Disallow: /posts/programming-language-design-knots
+
+User-agent: Claude-User
+Disallow: /posts/programming-language-design-knots
+
+User-agent: Google-Extended
+Disallow: /posts/programming-language-design-knots
+
+User-agent: CCBot
+Disallow: /posts/programming-language-design-knots

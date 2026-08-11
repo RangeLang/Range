@@ -1,52 +1,86 @@
-macro app(): Construct -> Void { environment in
+macro app(): Construct -> Void {
     let namedRoutes: [Derived](
-        environment.target.Declaration.members.filter(all: Derived) { property in
+        #environment.target.Declaration.members.filter(all: Derived) { property in
             property.identifier.name == "routes"
         }
     )
     let routeTrees: [Derived<Route>](
-        environment.target.Declaration.members.filter(all: Derived<Route>) { property in
+        #environment.target.Declaration.members.filter(all: Derived<Route>) { property in
             property.identifier.name == "routes"
         }
     )
 
     if namedRoutes.count == 0 {
-        environment.diagnostics.error("@app requires one derived routes declaration.")
+        #environment.error("@app requires one derived routes declaration.")
     }
     if namedRoutes.count > 1 {
-        environment.diagnostics.error("@app routes declaration must not be duplicated.")
+        #environment.error("@app routes declaration must not be duplicated.")
     }
     if namedRoutes.count == 1 && routeTrees.count != 1 {
-        environment.diagnostics.error("@app routes must have type Route.")
+        #environment.error("@app routes must have type Route.")
+    }
+
+    #environment {
+        @main {
+            return rangeViewRunApplication()
+        }
     }
 }
 
 
-macro component(): Construct -> Void { environment in
-    @requireBody(owner: "component")
+macro component(): Construct -> Void {
+    @requireView(owner: "component")
+
+    #environment {
+        extension #environment.target.Declaration.identity {
+            @many
+            let modifiers: @modifier
+        }
+    }
 }
 
-macro page(): Construct -> Void { environment in
+macro page(): Construct -> Void {
     @requireBody(owner: "page")
 }
 
 
-macro requireBody(owner: String): Construct { environment in
+macro requireView(owner: String): Construct {
+    let namedViews: [Derived](
+        #environment.target.Declaration.members.filter(all: Derived) { property in
+            property.identifier.name == "view"
+        }
+    )
+    let componentViews: [Derived<[@component]>](
+        #environment.target.Declaration.members.filter(all: Derived<[@component]>) { property in
+            property.identifier.name == "view"
+        }
+    )
+
+    if namedViews.count != 1 {
+        #environment.error("@\(owner) requires exactly one derived view.")
+    }
+    if namedViews.count == 1 && componentViews.count != 1 {
+        #environment.error("@\(owner) view must have type [@component].")
+    }
+}
+
+
+macro requireBody(owner: String): Construct {
     let namedBodies: [Derived](
-        environment.target.Declaration.members.filter(all: Derived) { property in
+        #environment.target.Declaration.members.filter(all: Derived) { property in
             property.identifier.name == "body"
         }
     )
     let componentBodies: [Derived<[@component]>](
-        environment.target.Declaration.members.filter(all: Derived<[@component]>) { property in
+        #environment.target.Declaration.members.filter(all: Derived<[@component]>) { property in
             property.identifier.name == "body"
         }
     )
 
     if namedBodies.count != 1 {
-        environment.diagnostics.error("@\(owner) requires exactly one derived body.")
+        #environment.error("@\(owner) requires exactly one derived body.")
     }
     if namedBodies.count == 1 && componentBodies.count != 1 {
-        environment.diagnostics.error("@\(owner) body must have type [@component].")
+        #environment.error("@\(owner) body must have type [@component].")
     }
 }

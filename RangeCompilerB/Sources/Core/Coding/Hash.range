@@ -1,0 +1,4 @@
+@encoding
+construct Hash {
+    let bytes: Buffer<Int<.unsigned, 8>>
+}

@@ -1,0 +1,29 @@
+@builtin
+construct Array<Element> {}
+
+@builtin
+construct Identity {
+    let marker: Int
+}
+
+@main {
+    let first: Identity(marker: 1)
+    let second: Identity(marker: 2)
+    let leftAnchor: Identity(marker: 3)
+    let rightAnchor: Identity(marker: 4)
+    let nestedAnchor: Identity(marker: 5)
+    let tail: Identity(marker: 6)
+
+    let left: Composition(identity: leftAnchor, components: [first, second])
+    let right: Composition(identity: rightAnchor, components: [first, second])
+    let nested: Composition(identity: nestedAnchor, components: [left.identity, tail])
+
+    if left.identity.marker != right.identity.marker
+        && left.components[0].marker == right.components[0].marker
+        && left.components[1].marker == right.components[1].marker
+        && nested.components[0].marker == left.identity.marker
+        && nested.components[1].marker == tail.marker {
+        return 7
+    }
+    return 0
+}

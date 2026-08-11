@@ -4,7 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
-DEFAULT_COMPILER_DIR="$REPO_ROOT/RangeCompiler/Sources/Compiler"
+COMPILER_PROJECT_ROOT="${RANGE_COMPILER_PROJECT_ROOT:-$REPO_ROOT/RangeCompiler}"
+COMPILER_CORE_INVENTORY="$COMPILER_PROJECT_ROOT/CompilerCoreSources.txt"
+DEFAULT_COMPILER_DIR="$COMPILER_PROJECT_ROOT/Sources/Compiler"
 COMPILER_OPTIMIZATION="-O2"
 COMPILER_LTO="-flto=thin"
 source "$SCRIPT_DIR/resolve-range-compiler-build"
@@ -13,18 +15,34 @@ usage() {
     cat <<'USAGE'
 Usage:
   scripts/check-range-compiler-candidate [DIR]
+  scripts/check-range-compiler-candidate --allow-runtime-roll [DIR]
   scripts/check-range-compiler-candidate --checkpoint candidate-plan [DIR]
+  scripts/check-range-compiler-candidate --checkpoint candidate-audit [DIR]
+  scripts/check-range-compiler-candidate --allow-runtime-roll --checkpoint candidate-plan [DIR]
+  scripts/check-range-compiler-candidate --allow-runtime-roll --checkpoint candidate-audit [DIR]
   scripts/check-range-compiler-candidate --bootstrap-bridge-source PHASE1_DIR FINAL_DIR
+  scripts/check-range-compiler-candidate --bootstrap-bridge-artifact ARTIFACT_DIR PHASE1_DIR FINAL_DIR
   scripts/check-range-compiler-candidate --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The candidate-plan checkpoint
 resolves the shared immutable development candidate artifact (-O0, no LTO),
 then proves that it can read the canonical candidate build plan and source set.
+The candidate-audit checkpoint reuses that development artifact, runs the full
+candidate semantic audit, and stops before reproduction and fixed-point checks.
 The full candidate/reproduction path remains optimized with ThinLTO.
 
 The bootstrap bridge mode uses the manifested bootstrap to compile an immutable
 old-syntax Phase1 source bundle, audits that one-shot bridge, and uses it only
 to produce the final compiler candidate. It never modifies or accepts the bootstrap.
+
+The bootstrap bridge artifact mode reuses a preserved bridge proof only after
+the current Phase1 source bundle matches its recorded source bundle byte for byte,
+its two LLVM emissions match each other byte for byte, and both emissions validate.
+The bridge executable is relinked and its capability audits are rerun.
+
+The runtime-roll mode is reserved for the explicitly approved promotion path.
+It still verifies the accepted LLVM and executable, but permits current runtime
+sources to differ so the candidate/reproduction proof can authorize their rollover.
 USAGE
 }
 
@@ -67,6 +85,7 @@ verify_manifest_file() {
 }
 
 verify_manifest() {
+    local allow_runtime_roll="${1:-false}"
     [[ "$(manifest_value formatVersion)" == "1" ]] || fail "unsupported bootstrap manifest format"
     [[ "$(manifest_value target.platform)" == "macOS" ]] || fail "unsupported bootstrap target platform"
     [[ "$(manifest_value target.pointerBits)" == "64" ]] || fail "unsupported bootstrap pointer width"
@@ -94,15 +113,23 @@ verify_manifest() {
     local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
-        verify_manifest_file "runtimeSources.$index" "runtime input $index"
+        if [[ "$allow_runtime_roll" == true ]]; then
+            local runtime_relative
+            runtime_relative="$(manifest_value "runtimeSources.$index.path")"
+            [[ -f "$REPO_ROOT/$runtime_relative" ]] || fail "missing runtime input $index: $runtime_relative"
+        else
+            verify_manifest_file "runtimeSources.$index" "runtime input $index"
+        fi
     done
 }
 
 runtime_inputs() {
-    local index runtime_count
+    local index runtime_count runtime_relative runtime_suffix
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
-        /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value "runtimeSources.$index.path")"
+        runtime_relative="$(manifest_value "runtimeSources.$index.path")"
+        runtime_suffix="${runtime_relative#RangeCompiler/}"
+        /usr/bin/printf '%s\n' "$COMPILER_PROJECT_ROOT/$runtime_suffix"
     done
 }
 
@@ -137,19 +164,19 @@ discover_sources() {
         SOURCE_MARKERS+=("compilerSourceFile")
     else
         [[ "$core_mode" == manifest ]] || fail "unsupported source discovery core mode: $core_mode"
-        compiler_source_count="$(manifest_value compilerSources)"
-        for ((index = 0; index < compiler_source_count; index += 1)); do
-            role="$(manifest_value "compilerSources.$index.role")"
-            [[ "$role" == core ]] || continue
-            relative="$(manifest_value "compilerSources.$index.path")"
+        [[ -f "$COMPILER_CORE_INVENTORY" ]] || fail "missing compiler Core inventory: $COMPILER_CORE_INVENTORY"
+        while IFS= read -r relative; do
+            [[ -n "$relative" ]] || continue
+            [[ "$relative" != *$' '* && "$relative" != *$'\t'* && "$relative" != *$'\n'* ]] \
+                || fail "compiler Core source paths may not contain whitespace: $relative"
             absolute="$REPO_ROOT/$relative"
-            [[ -f "$absolute" ]] || fail "missing manifested compiler Core source: $relative"
+            [[ -f "$absolute" ]] || fail "missing inventoried compiler Core source: $relative"
             SOURCE_FILES+=("$absolute")
             SOURCE_RELATIVE_PATHS+=("$relative")
             SOURCE_ROLES+=("core")
             SOURCE_ROOTS+=("repo")
             SOURCE_MARKERS+=("compilerSourceFile")
-        done
+        done < "$COMPILER_CORE_INVENTORY"
     fi
 
     /usr/bin/find "$directory" -type d \( -name .git -o -name .range -o -name .build \) -prune -o -type f -name '*.range' -print0 > "$raw_list"
@@ -1198,16 +1225,42 @@ compare_placement_symbol_guard_builds() {
     local left_directory="$2"
     local right_label="$3"
     local right_directory="$4"
+    local llvm_comparison_mode="${5:-exact}"
 
-    /usr/bin/cmp -s "$WORK_ROOT/$left_label.placement-symbol-guard.first.ll" "$WORK_ROOT/$right_label.placement-symbol-guard.first.ll" \
-        || fail "$left_label and $right_label placement symbol guard LLVM differs"
-    /usr/bin/cmp -s "$WORK_ROOT/$left_label.placement-symbol-guard.repeat.ll" "$WORK_ROOT/$right_label.placement-symbol-guard.repeat.ll" \
-        || fail "$left_label and $right_label repeated placement symbol guard LLVM differs"
-    /usr/bin/cmp -s "$left_directory/PlacementSymbolGuard.ll" "$right_directory/PlacementSymbolGuard.ll" \
-        || fail "$left_label and $right_label placement symbol guard artifacts differ"
+    compare_compiler_llvm "$WORK_ROOT/$left_label.placement-symbol-guard.first.ll" "$WORK_ROOT/$right_label.placement-symbol-guard.first.ll" \
+        "$left_label and $right_label placement symbol guard LLVM differs" "$llvm_comparison_mode"
+    compare_compiler_llvm "$WORK_ROOT/$left_label.placement-symbol-guard.repeat.ll" "$WORK_ROOT/$right_label.placement-symbol-guard.repeat.ll" \
+        "$left_label and $right_label repeated placement symbol guard LLVM differs" "$llvm_comparison_mode"
+    compare_compiler_llvm "$left_directory/PlacementSymbolGuard.ll" "$right_directory/PlacementSymbolGuard.ll" \
+        "$left_label and $right_label placement symbol guard artifacts differ" "$llvm_comparison_mode"
     /usr/bin/cmp -s "$left_directory/PlacementSymbolGuard" "$right_directory/PlacementSymbolGuard" \
         || fail "$left_label and $right_label placement symbol guard executables differ"
-    echo "$left_label/$right_label placement symbol guard: byte-identical LLVM/executable"
+    if [[ "$llvm_comparison_mode" == exact ]]; then
+        echo "$left_label/$right_label placement symbol guard: byte-identical LLVM/executable"
+    else
+        echo "$left_label/$right_label placement symbol guard: equivalent after retired extern declarations, byte-identical executable"
+    fi
+}
+
+compare_compiler_llvm() {
+    local left="$1"
+    local right="$2"
+    local failure="$3"
+    local comparison_mode="${4:-exact}"
+    if [[ "$comparison_mode" == exact ]]; then
+        /usr/bin/cmp -s "$left" "$right" || fail "$failure"
+        return 0
+    fi
+    [[ "$comparison_mode" == retired-extern-declarations ]] \
+        || fail "unsupported compiler LLVM comparison mode: $comparison_mode"
+    local left_normalized="$WORK_ROOT/$(basename "$left").left-normalized.$RANDOM"
+    local right_normalized="$WORK_ROOT/$(basename "$right").right-normalized.$RANDOM"
+    /usr/bin/sed -E '/^declare .* @(targetPointerBits|commandLineArgumentCount|stringTransientRegionMark|stringTransientRegionReset|compilerMetricsReset|compilerMetricsFunctionEnd)\(/d' \
+        "$left" > "$left_normalized"
+    /usr/bin/sed -E '/^declare .* @(targetPointerBits|commandLineArgumentCount|stringTransientRegionMark|stringTransientRegionReset|compilerMetricsReset|compilerMetricsFunctionEnd)\(/d' \
+        "$right" > "$right_normalized"
+    /usr/bin/cmp -s "$left_normalized" "$right_normalized" || fail "$failure"
+    /bin/rm -f "$left_normalized" "$right_normalized"
 }
 
 audit_mixed_abi() {
@@ -1378,11 +1431,11 @@ audit_builtin_marker() {
     local error="$WORK_ROOT/$build_label.builtin.legacy.err"
 
     run_capture "$executable" "$LEGACY_LANGUAGE_SOURCE" "$output" "$error"
-    [[ "$RUN_STATUS" -eq 65 ]] || fail "$build_label legacy language marker exited $RUN_STATUS"
+    [[ "$RUN_STATUS" -eq 0 ]] || fail "$build_label ordinary language macro exited $RUN_STATUS"
     [[ ! -s "$error" ]] || fail "$build_label legacy language marker wrote stderr"
-    /usr/bin/grep -Fq $'compilerError\tkind=invalidTypedSyntaxSnapshot' "$output" \
-        || fail "$build_label legacy language marker granted builtin provenance"
-    echo "$build_label builtin marker: pass (legacy spelling rejected)"
+    /usr/bin/grep -Eq '^declaration\t.*name=legacyExternal\t.*builtinABI=0$' "$output" \
+        || fail "$build_label ordinary language macro granted builtin provenance"
+    echo "$build_label builtin marker: pass (@language remains an ordinary macro with builtinABI=0)"
 }
 
 write_role_bundle() {
@@ -3021,6 +3074,7 @@ compare_binding_reference_builds() {
     local left_directory="$2"
     local right_label="$3"
     local right_directory="$4"
+    local llvm_comparison_mode="${5:-exact}"
     local specification kind artifact
 
     for specification in \
@@ -3035,12 +3089,12 @@ compare_binding_reference_builds() {
         nested-binding:BindingNested; do
         kind="${specification%%:*}"
         artifact="${specification#*:}"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.first.ll" "$WORK_ROOT/$right_label.binding.$kind.first.ll" \
-            || fail "$left_label and $right_label binding $kind LLVM differs"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.repeat.ll" "$WORK_ROOT/$right_label.binding.$kind.repeat.ll" \
-            || fail "$left_label and $right_label repeated binding $kind LLVM differs"
-        /usr/bin/cmp -s "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
-            || fail "$left_label and $right_label binding $kind artifacts differ"
+        compare_compiler_llvm "$WORK_ROOT/$left_label.binding.$kind.first.ll" "$WORK_ROOT/$right_label.binding.$kind.first.ll" \
+            "$left_label and $right_label binding $kind LLVM differs" "$llvm_comparison_mode"
+        compare_compiler_llvm "$WORK_ROOT/$left_label.binding.$kind.repeat.ll" "$WORK_ROOT/$right_label.binding.$kind.repeat.ll" \
+            "$left_label and $right_label repeated binding $kind LLVM differs" "$llvm_comparison_mode"
+        compare_compiler_llvm "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
+            "$left_label and $right_label binding $kind artifacts differ" "$llvm_comparison_mode"
         /usr/bin/cmp -s "$left_directory/$artifact" "$right_directory/$artifact" \
             || fail "$left_label and $right_label binding $kind executables differ"
     done
@@ -3062,7 +3116,11 @@ compare_binding_reference_builds() {
         /usr/bin/cmp -s "$WORK_ROOT/$left_label.binding.$kind.repeat.out" "$WORK_ROOT/$right_label.binding.$kind.repeat.out" \
             || fail "$left_label and $right_label repeated binding $kind diagnostics differ"
     done
-    echo "$left_label/$right_label binding references: byte-identical LLVM/executables/diagnostics"
+    if [[ "$llvm_comparison_mode" == exact ]]; then
+        echo "$left_label/$right_label binding references: byte-identical LLVM/executables/diagnostics"
+    else
+        echo "$left_label/$right_label binding references: equivalent after retired extern declarations, byte-identical executables/diagnostics"
+    fi
 }
 
 audit_value_ownership_positive() {
@@ -3455,6 +3513,7 @@ compare_value_ownership_builds() {
     local left_directory="$2"
     local right_label="$3"
     local right_directory="$4"
+    local llvm_comparison_mode="${5:-exact}"
     local specification kind artifact
 
     for specification in \
@@ -3476,12 +3535,12 @@ compare_value_ownership_builds() {
         boundary-consume:ValueOwnershipBoundaryConsume; do
         kind="${specification%%:*}"
         artifact="${specification#*:}"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.first.ll" "$WORK_ROOT/$right_label.value-ownership.$kind.first.ll" \
-            || fail "$left_label and $right_label value ownership $kind LLVM differs"
-        /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.repeat.ll" "$WORK_ROOT/$right_label.value-ownership.$kind.repeat.ll" \
-            || fail "$left_label and $right_label repeated value ownership $kind LLVM differs"
-        /usr/bin/cmp -s "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
-            || fail "$left_label and $right_label value ownership $kind artifacts differ"
+        compare_compiler_llvm "$WORK_ROOT/$left_label.value-ownership.$kind.first.ll" "$WORK_ROOT/$right_label.value-ownership.$kind.first.ll" \
+            "$left_label and $right_label value ownership $kind LLVM differs" "$llvm_comparison_mode"
+        compare_compiler_llvm "$WORK_ROOT/$left_label.value-ownership.$kind.repeat.ll" "$WORK_ROOT/$right_label.value-ownership.$kind.repeat.ll" \
+            "$left_label and $right_label repeated value ownership $kind LLVM differs" "$llvm_comparison_mode"
+        compare_compiler_llvm "$left_directory/$artifact.ll" "$right_directory/$artifact.ll" \
+            "$left_label and $right_label value ownership $kind artifacts differ" "$llvm_comparison_mode"
         /usr/bin/cmp -s "$left_directory/$artifact" "$right_directory/$artifact" \
             || fail "$left_label and $right_label value ownership $kind executables differ"
     done
@@ -3513,7 +3572,11 @@ compare_value_ownership_builds() {
         /usr/bin/cmp -s "$WORK_ROOT/$left_label.value-ownership.$kind.repeat.out" "$WORK_ROOT/$right_label.value-ownership.$kind.repeat.out" \
             || fail "$left_label and $right_label repeated value ownership $kind diagnostics differ"
     done
-    echo "$left_label/$right_label value ownership ownership: byte-identical LLVM/executables/diagnostics"
+    if [[ "$llvm_comparison_mode" == exact ]]; then
+        echo "$left_label/$right_label value ownership ownership: byte-identical LLVM/executables/diagnostics"
+    else
+        echo "$left_label/$right_label value ownership ownership: equivalent after retired extern declarations, byte-identical executables/diagnostics"
+    fi
 }
 
 write_macro_positive_bundle() {
@@ -3683,8 +3746,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Diagnostic.range' \
-                'macro Signal(): Construct -> Void { environment in' \
-                '    return environment.diagnostics.information("checked")' \
+                'macro Signal(): Construct -> Void {' \
+                '    return #environment.diagnostics.information("checked")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DiagnosticUse.range' \
                 '@Signal' \
@@ -3694,11 +3757,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Diagnostics.range' \
-                'macro Signal(): Construct -> Void { environment in' \
-                '    return environment.diagnostics.information("checked")' \
+                'macro Signal(): Construct -> Void {' \
+                '    return #environment.diagnostics.information("checked")' \
                 '}' \
-                'macro Notice(): Construct -> Void { environment in' \
-                '    return environment.diagnostics.warning("noticed")' \
+                'macro Notice(): Construct -> Void {' \
+                '    return #environment.diagnostics.warning("noticed")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DiagnosticsUse.range' \
                 '@Signal' \
@@ -3710,9 +3773,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQuery.range' \
-                'macro Observe(): Construct -> Void { environment in' \
-                '    environment.graph.declarationCount("Construct", "Observed")' \
-                '    return environment.diagnostics.information("observed")' \
+                'macro Observe(): Construct -> Void {' \
+                '    #environment.graph.declarationCount("Construct", "Observed")' \
+                '    return #environment.diagnostics.information("observed")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryUse.range' \
                 '@Observe' \
@@ -3725,9 +3788,9 @@ write_macro_execution_bundle() {
                 'compilerSourceFile\trole=foundation\tpath=Foundation/Unrelated.range' \
                 'construct Unrelated {}' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQuery.range' \
-                'macro Observe(): Construct -> Void { environment in' \
-                '    environment.graph.declarationCount("Construct", "Observed")' \
-                '    return environment.diagnostics.information("observed")' \
+                'macro Observe(): Construct -> Void {' \
+                '    #environment.graph.declarationCount("Construct", "Observed")' \
+                '    return #environment.diagnostics.information("observed")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryUse.range' \
                 '@Observe' \
@@ -3738,9 +3801,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQueryZero.range' \
-                'macro ObserveMissing(): Construct -> Void { environment in' \
-                '    environment.graph.declarationCount("Construct", "Missing")' \
-                '    return environment.diagnostics.information("observed zero")' \
+                'macro ObserveMissing(): Construct -> Void {' \
+                '    #environment.graph.declarationCount("Construct", "Missing")' \
+                '    return #environment.diagnostics.information("observed zero")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryZeroUse.range' \
                 '@ObserveMissing' \
@@ -3750,11 +3813,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQuery.range' \
-                'macro RequireMember(): Construct -> Void { environment in' \
-                '    if environment.target.memberCount("required") == 0 {' \
-                '        return environment.diagnostics.error("missing required member")' \
+                'macro RequireMember(): Construct -> Void {' \
+                '    if #environment.target.memberCount("required") == 0 {' \
+                '        return #environment.diagnostics.error("missing required member")' \
                 '    }' \
-                '    return environment.diagnostics.information("validated")' \
+                '    return #environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryUse.range' \
                 '@RequireMember' \
@@ -3768,11 +3831,11 @@ write_macro_execution_bundle() {
                 'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedMemberQuery.range' \
                 'construct Unrelated {}' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQuery.range' \
-                'macro RequireMember(): Construct -> Void { environment in' \
-                '    if environment.target.memberCount("required") == 0 {' \
-                '        return environment.diagnostics.error("missing required member")' \
+                'macro RequireMember(): Construct -> Void {' \
+                '    if #environment.target.memberCount("required") == 0 {' \
+                '        return #environment.diagnostics.error("missing required member")' \
                 '    }' \
-                '    return environment.diagnostics.information("validated")' \
+                '    return #environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryUse.range' \
                 '@RequireMember' \
@@ -3784,11 +3847,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryMissing.range' \
-                'macro RequireMember(): Construct -> Void { environment in' \
-                '    if environment.target.memberCount("required") == 0 {' \
-                '        return environment.diagnostics.error("missing required member")' \
+                'macro RequireMember(): Construct -> Void {' \
+                '    if #environment.target.memberCount("required") == 0 {' \
+                '        return #environment.diagnostics.error("missing required member")' \
                 '    }' \
-                '    return environment.diagnostics.information("validated")' \
+                '    return #environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryMissingUse.range' \
                 '@RequireMember' \
@@ -3798,11 +3861,11 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryPath.range' \
-                'macro RequireMemberPath(): Construct -> Void { environment in' \
-                '    if environment.target.memberCount("required") == 0 {' \
-                '        return environment.target.replace()' \
+                'macro RequireMemberPath(): Construct -> Void {' \
+                '    if #environment.target.memberCount("required") == 0 {' \
+                '        return #environment.target.replace()' \
                 '    }' \
-                '    return environment.diagnostics.information("validated")' \
+                '    return #environment.diagnostics.information("validated")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryPathUse.range' \
                 '@RequireMemberPath' \
@@ -3814,9 +3877,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryInvalid.range' \
-                'macro RequireMemberInvalid(): Construct -> Void { environment in' \
-                '    environment.target.memberCount()' \
-                '    return environment.diagnostics.information("unreachable")' \
+                'macro RequireMemberInvalid(): Construct -> Void {' \
+                '    #environment.target.memberCount()' \
+                '    return #environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryInvalidUse.range' \
                 '@RequireMemberInvalid' \
@@ -3826,9 +3889,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryInvalidType.range' \
-                'macro RequireMemberInvalidType(): Construct -> Void { environment in' \
-                '    environment.target.memberCount(1)' \
-                '    return environment.diagnostics.information("unreachable")' \
+                'macro RequireMemberInvalidType(): Construct -> Void {' \
+                '    #environment.target.memberCount(1)' \
+                '    return #environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryInvalidTypeUse.range' \
                 '@RequireMemberInvalidType' \
@@ -3838,9 +3901,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MemberQueryNonConstruct.range' \
-                'macro RequireMemberNonConstruct(): Function -> Void { environment in' \
-                '    environment.target.memberCount("required")' \
-                '    return environment.diagnostics.information("unreachable")' \
+                'macro RequireMemberNonConstruct(): Function -> Void {' \
+                '    #environment.target.memberCount("required")' \
+                '    return #environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MemberQueryNonConstructUse.range' \
                 '@RequireMemberNonConstruct' \
@@ -3850,9 +3913,9 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/GraphQueryInvalid.range' \
-                'macro ObserveInvalid(): Construct -> Void { environment in' \
-                '    environment.graph.declarationCount("Unknown", "Missing")' \
-                '    return environment.diagnostics.information("unreachable")' \
+                'macro ObserveInvalid(): Construct -> Void {' \
+                '    #environment.graph.declarationCount("Unknown", "Missing")' \
+                '    return #environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/GraphQueryInvalidUse.range' \
                 '@ObserveInvalid' \
@@ -3862,10 +3925,10 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Expansion.range' \
-                'macro OmitObserved(): Construct -> Void { environment in' \
-                '    environment.graph.declarationCount("Construct", "Observed")' \
-                '    environment.omit()' \
-                '    return environment.diagnostics.information("omitted")' \
+                'macro OmitObserved(): Construct -> Void {' \
+                '    #environment.graph.declarationCount("Construct", "Observed")' \
+                '    #environment.omit()' \
+                '    return #environment.diagnostics.information("omitted")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/ExpansionUse.range' \
                 '@OmitObserved' \
@@ -3876,10 +3939,10 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/DuplicateExpansion.range' \
-                'macro OmitTwice(): Construct -> Void { environment in' \
-                '    environment.omit()' \
-                '    environment.omit()' \
-                '    return environment.diagnostics.information("unreachable")' \
+                'macro OmitTwice(): Construct -> Void {' \
+                '    #environment.omit()' \
+                '    #environment.omit()' \
+                '    return #environment.diagnostics.information("unreachable")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DuplicateExpansionUse.range' \
                 '@OmitTwice' \
@@ -3889,8 +3952,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/TargetDenied.range' \
-                'macro ReplaceDenied(): Construct -> Void { environment in' \
-                '    return environment.target.replace()' \
+                'macro ReplaceDenied(): Construct -> Void {' \
+                '    return #environment.target.replace()' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/TargetDeniedUse.range' \
                 '@ReplaceDenied' \
@@ -3900,8 +3963,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Reject.range' \
-                'macro Reject(): Construct -> Void { environment in' \
-                '    return environment.diagnostics.error("rejected")' \
+                'macro Reject(): Construct -> Void {' \
+                '    return #environment.diagnostics.error("rejected")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/RejectUse.range' \
                 '@Reject' \
@@ -3911,8 +3974,8 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Denied.range' \
-                'macro Probe(): Construct -> Void { environment in' \
-                '    return environment.graph.macros()' \
+                'macro Probe(): Construct -> Void {' \
+                '    return #environment.graph.macros()' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DeniedUse.range' \
                 '@Probe' \
@@ -3922,14 +3985,14 @@ write_macro_execution_bundle() {
             /usr/bin/printf '%b\n' \
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/Fuel.range' \
-                'macro Exhaust(): Construct -> Void { environment in' > "$output"
+                'macro Exhaust(): Construct -> Void {' > "$output"
             local index=0
             while [[ "$index" -lt 70 ]]; do
-                /usr/bin/printf '    environment.diagnostics.information("step%s")\n' "$index" >> "$output"
+                /usr/bin/printf '    #environment.diagnostics.information("step%s")\n' "$index" >> "$output"
                 index=$((index + 1))
             done
             /usr/bin/printf '%b\n' \
-                '    return environment.diagnostics.information("tail")' \
+                '    return #environment.diagnostics.information("tail")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/FuelUse.range' \
                 '@Exhaust' \
@@ -3940,7 +4003,7 @@ write_macro_execution_bundle() {
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/MalformedHeader.range' \
                 'macro Broken(): Construct -> Void { target, diagnostics in' \
-                '    return environment.diagnostics.information("bad")' \
+                '    return #environment.diagnostics.information("bad")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/MalformedHeaderUse.range' \
                 '@Broken' \
@@ -3951,7 +4014,7 @@ write_macro_execution_bundle() {
                 'compilerMacroSnapshot' \
                 'compilerSourceFile\trole=core\tpath=Core/DuplicateHeader.range' \
                 'macro Duplicate(): Construct -> Void { environment, environment in' \
-                '    return environment.diagnostics.information("bad")' \
+                '    return #environment.diagnostics.information("bad")' \
                 '}' \
                 'compilerSourceFile\trole=project\tpath=Project/DuplicateHeaderUse.range' \
                 '@Duplicate' \
@@ -3978,9 +4041,9 @@ write_macro_execution_native_integration_bundle() {
 
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/DiagnosticNative.range' \
-        'macro Signal(): Construct -> Void { environment in' \
-        '    environment.graph.declarationCount("Construct", "Target")' \
-        '    return environment.diagnostics.information("checked")' \
+        'macro Signal(): Construct -> Void {' \
+        '    #environment.graph.declarationCount("Construct", "Target")' \
+        '    return #environment.diagnostics.information("checked")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/DiagnosticNativeUse.range' \
         '@Signal' \
@@ -3997,11 +4060,11 @@ write_macro_execution_native_member_bundle() {
 
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/MemberQueryNative.range' \
-        'macro RequireMember(): Construct -> Void { environment in' \
-        '    if environment.target.memberCount("required") == 0 {' \
-        '        return environment.diagnostics.error("missing required member")' \
+        'macro RequireMember(): Construct -> Void {' \
+        '    if #environment.target.memberCount("required") == 0 {' \
+        '        return #environment.diagnostics.error("missing required member")' \
         '    }' \
-        '    return environment.diagnostics.information("validated")' \
+        '    return #environment.diagnostics.information("validated")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/MemberQueryNativeUse.range' \
         '@RequireMember' \
@@ -4029,14 +4092,14 @@ write_macro_expansion_commit_bundle() {
 
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/ExpansionCommit.range' \
-        'macro OmitConstruct(): Construct -> Void { environment in' \
-        '    environment.graph.declarationCount("Construct", "Hidden")' \
-        '    environment.omit()' \
-        '    return environment.diagnostics.information("omitted construct")' \
+        'macro OmitConstruct(): Construct -> Void {' \
+        '    #environment.graph.declarationCount("Construct", "Hidden")' \
+        '    #environment.omit()' \
+        '    return #environment.diagnostics.information("omitted construct")' \
         '}' \
-        'macro OmitMember(): Member -> Void { environment in' \
-        '    environment.omit()' \
-        '    return environment.diagnostics.information("omitted member")' \
+        'macro OmitMember(): Member -> Void {' \
+        '    #environment.omit()' \
+        '    return #environment.diagnostics.information("omitted member")' \
         '}' \
         'compilerSourceFile\trole=project\tpath=Project/ExpansionCommitUse.range' \
         '@OmitConstruct' \
@@ -4067,7 +4130,7 @@ write_macro_generated_function_bundle() {
     if [[ "$order" == reordered ]]; then
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedGenerated.range' \
-            'macro unrelatedGenerated(): Construct { environment in' \
+            'macro unrelatedGenerated(): Construct {' \
             '    #environment {' \
             '        function unrelatedFunction(): Int {' \
             '            return 11' \
@@ -4079,7 +4142,7 @@ write_macro_generated_function_bundle() {
     fi
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/Registrable.range' \
-        'macro registrable(): Construct { environment in' \
+        'macro registrable(): Construct {' \
         '    #environment {' \
         '        function globalFunction(input: Int): Int {' \
         '            let adjusted: Int(input + 2)' \
@@ -4149,7 +4212,7 @@ write_macro_registrable_bundle() {
     if [[ "$order" == reordered ]]; then
         /usr/bin/printf '%b\n' \
             'compilerSourceFile\trole=foundation\tpath=Foundation/UnrelatedRegistrable.range' \
-            'macro unrelatedRegistrable(): Construct { environment in' \
+            'macro unrelatedRegistrable(): Construct {' \
             '    #environment {' \
             '        function unrelatedRegistrableFunction(): Int {' \
             '            return 11' \
@@ -4161,8 +4224,8 @@ write_macro_registrable_bundle() {
     fi
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=foundation\tpath=Foundation/Macros/Registrable.range' >> "$output"
-    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Foundation/Macros/Registrable.range" >> "$output"
-    if [[ -n "$(/usr/bin/tail -c 1 "$REPO_ROOT/RangeCompiler/Sources/Foundation/Macros/Registrable.range")" ]]; then
+    /bin/cat "$COMPILER_PROJECT_ROOT/Sources/Foundation/Macros/Registrable.range" >> "$output"
+    if [[ -n "$(/usr/bin/tail -c 1 "$COMPILER_PROJECT_ROOT/Sources/Foundation/Macros/Registrable.range")" ]]; then
         /usr/bin/printf '\n' >> "$output"
     fi
     /usr/bin/printf '%b\n' \
@@ -4212,7 +4275,7 @@ write_macro_registrable_root_storage_bundle() {
     fi
     /usr/bin/printf '%b\n' \
         'compilerSourceFile\trole=core\tpath=Core/RootStorage.range' \
-        'macro rootStorage(): Construct { environment in' \
+        'macro rootStorage(): Construct {' \
         '    #environment {' \
         '        let value: Int' \
         '    }' \
@@ -4231,9 +4294,9 @@ write_macro_registrable_malformed_splice_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedMemberSplice.range' \
-        'macro malformedMember(): Construct { environment in' \
+        'macro malformedMember(): Construct {' \
         '    #environment {' \
-        '        extension #(environment.target.Declaration.bad) {' \
+        '        extension #(#environment.target.Declaration.bad) {' \
         '            let registrationSeed: Int' \
         '        }' \
         '    }' \
@@ -4384,9 +4447,9 @@ write_macro_generated_function_malformed_extension_bundle() {
     /usr/bin/printf '%b\n' \
         'compilerMacroSnapshot' \
         'compilerSourceFile\trole=core\tpath=Core/MalformedGeneratedExtension.range' \
-        'macro malformed(): Construct { environment in' \
+        'macro malformed(): Construct {' \
         '    #environment {' \
-        '        extension #(environment.target.Declaration.bad) {' \
+        '        extension #(#environment.target.Declaration.bad) {' \
         '            function memberFunction(): Int {' \
         '                return 7' \
         '            }' \
@@ -5176,7 +5239,7 @@ audit_no_legacy_record_lowering() {
 }
 
 audit_raw_buffer_substrate() {
-    local raw="$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c"
+    local raw="$COMPILER_PROJECT_ROOT/Runtime/RangeRawBuffer.c"
     [[ -f "$raw" ]] || fail "missing shared RawBuffer runtime substrate"
     rg -n -F 'typedef struct RangeRawBuffer' "$raw" >/dev/null \
         || fail "RawBuffer runtime does not own its storage record"
@@ -5186,7 +5249,7 @@ audit_raw_buffer_substrate() {
         rg -n -F "$symbol" "$raw" >/dev/null || fail "RawBuffer runtime is missing $symbol"
     done
     for typed in RangeIntBuffer.c RangeTextBuffer.c; do
-        [[ ! -e "$REPO_ROOT/RangeCompiler/Runtime/$typed" ]] \
+        [[ ! -e "$COMPILER_PROJECT_ROOT/Runtime/$typed" ]] \
             || fail "$typed remains after the RawBuffer cutover"
     done
 }
@@ -5194,7 +5257,9 @@ audit_raw_buffer_substrate() {
 main() {
     local compiler_input="$DEFAULT_COMPILER_DIR"
     local bootstrap_bridge_input=""
+    local bootstrap_bridge_artifact_input=""
     local checkpoint_mode=""
+    local allow_runtime_roll=false
     if [[ "$#" -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
         usage
         return 0
@@ -5203,20 +5268,37 @@ main() {
         :
     elif [[ "$#" -eq 1 && "$1" != -* ]]; then
         compiler_input="$1"
-    elif [[ ( "$#" -eq 2 || "$#" -eq 3 ) && "$1" == "--checkpoint" && "$2" == "candidate-plan" ]]; then
-        checkpoint_mode=candidate-plan
+    elif [[ ( "$#" -eq 3 || "$#" -eq 4 ) && "$1" == "--allow-runtime-roll" && "$2" == "--checkpoint" && ( "$3" == "candidate-plan" || "$3" == "candidate-audit" ) ]]; then
+        allow_runtime_roll=true
+        checkpoint_mode="$3"
+        if [[ "$#" -eq 4 ]]; then
+            [[ "$4" != -* ]] || { usage >&2; exit 64; }
+            compiler_input="$4"
+        fi
+    elif [[ ( "$#" -eq 1 || "$#" -eq 2 ) && "$1" == "--allow-runtime-roll" ]]; then
+        allow_runtime_roll=true
+        if [[ "$#" -eq 2 ]]; then
+            [[ "$2" != -* ]] || { usage >&2; exit 64; }
+            compiler_input="$2"
+        fi
+    elif [[ ( "$#" -eq 2 || "$#" -eq 3 ) && "$1" == "--checkpoint" && ( "$2" == "candidate-plan" || "$2" == "candidate-audit" ) ]]; then
+        checkpoint_mode="$2"
         if [[ "$#" -eq 3 ]]; then
             compiler_input="$3"
         fi
     elif [[ "$#" -eq 3 && "$1" == "--bootstrap-bridge-source" ]]; then
         bootstrap_bridge_input="$2"
         compiler_input="$3"
+    elif [[ "$#" -eq 4 && "$1" == "--bootstrap-bridge-artifact" ]]; then
+        bootstrap_bridge_artifact_input="$2"
+        bootstrap_bridge_input="$3"
+        compiler_input="$4"
     else
         usage >&2
         exit 64
     fi
 
-    if [[ "$checkpoint_mode" == candidate-plan ]]; then
+    if [[ "$checkpoint_mode" == candidate-plan || "$checkpoint_mode" == candidate-audit ]]; then
         RANGE_BUILD_PROFILE="development"
         COMPILER_OPTIMIZATION="-O0"
         COMPILER_LTO="-fno-lto"
@@ -5226,14 +5308,20 @@ main() {
     local compiler_directory
     compiler_directory="$(cd "$compiler_input" && pwd)"
     local bootstrap_bridge_source_directory=""
+    local bootstrap_bridge_artifact_directory_input=""
     if [[ -n "$bootstrap_bridge_input" ]]; then
         [[ -d "$bootstrap_bridge_input" ]] || fail "missing bootstrap bridge source directory: $bootstrap_bridge_input"
         bootstrap_bridge_source_directory="$(cd "$bootstrap_bridge_input" && pwd)"
         [[ "$bootstrap_bridge_source_directory" != "$compiler_directory" ]] \
             || fail "bootstrap bridge source and final compiler directories must be distinct immutable snapshots"
     fi
+    if [[ -n "$bootstrap_bridge_artifact_input" ]]; then
+        [[ -d "$bootstrap_bridge_artifact_input" ]] \
+            || fail "missing bootstrap bridge artifact directory: $bootstrap_bridge_artifact_input"
+        bootstrap_bridge_artifact_directory_input="$(cd "$bootstrap_bridge_artifact_input" && pwd)"
+    fi
 
-    verify_manifest
+    verify_manifest "$allow_runtime_roll"
     if [[ "$checkpoint_mode" != candidate-plan ]]; then
         audit_no_temporary_debug_probes "$compiler_directory/Driver/CompilerCore.range" "final compiler"
         audit_no_body_syntax_sink "$compiler_directory/Driver/CompilerCore.range" "final compiler"
@@ -5243,8 +5331,12 @@ main() {
         audit_canonical_construct_initialization "$REPO_ROOT/scripts" "generated proof fixture"
         audit_no_legacy_record_lowering "$compiler_directory"
         if [[ -n "$bootstrap_bridge_source_directory" ]]; then
-            audit_no_temporary_debug_probes "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
-            audit_no_body_syntax_sink "$bootstrap_bridge_source_directory/CompilerCore.range" "bootstrap bridge"
+            local bootstrap_bridge_core="$bootstrap_bridge_source_directory/CompilerCore.range"
+            if [[ ! -f "$bootstrap_bridge_core" ]]; then
+                bootstrap_bridge_core="$bootstrap_bridge_source_directory/Driver/CompilerCore.range"
+            fi
+            audit_no_temporary_debug_probes "$bootstrap_bridge_core" "bootstrap bridge"
+            audit_no_body_syntax_sink "$bootstrap_bridge_core" "bootstrap bridge"
         fi
         audit_raw_buffer_substrate
     fi
@@ -5255,7 +5347,7 @@ main() {
     else
         trap '/bin/rm -rf "$WORK_ROOT"' EXIT
     fi
-    local canonical_core_source_path="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
+    local canonical_core_source_path="$COMPILER_PROJECT_ROOT/Sources/Core/System/Memory/RawBuffer.range"
     [[ -f "$canonical_core_source_path" ]] || fail "missing canonical Core proof input: $canonical_core_source_path"
     CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
     CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
@@ -5618,22 +5710,38 @@ main() {
     local bootstrap_bridge_second_llvm=""
     local bootstrap_bridge_executable=""
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
-        local bootstrap bootstrap_executable
-        bootstrap="$REPO_ROOT/$(manifest_value bootstrap.path)"
-        bootstrap_executable="$WORK_ROOT/RangeCompilerBootstrap"
-        clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
-            -x ir "$bootstrap" -x c "${RUNTIME_INPUTS[@]}" -o "$bootstrap_executable"
-        echo "checkpoint compiler-candidate:bootstrap-linked: pass"
-        echo "bootstrap executable link: pass"
-
         bootstrap_bridge_artifact_directory="$WORK_ROOT/bootstrap-bridge"
         bootstrap_bridge_first_llvm="$bootstrap_bridge_artifact_directory/RangeCompilerBridge.first.ll"
         bootstrap_bridge_second_llvm="$bootstrap_bridge_artifact_directory/RangeCompilerBridge.second.ll"
         bootstrap_bridge_executable="$bootstrap_bridge_artifact_directory/RangeCompilerBridge"
         /bin/mkdir -p "$bootstrap_bridge_artifact_directory"
 
-        emit_candidate_llvm "$bootstrap_executable" "$bootstrap_bridge_source_bundle" "$bootstrap_bridge_first_llvm" bootstrap-bridge-first
-        emit_candidate_llvm "$bootstrap_executable" "$bootstrap_bridge_source_bundle" "$bootstrap_bridge_second_llvm" bootstrap-bridge-second
+        if [[ -n "$bootstrap_bridge_artifact_directory_input" ]]; then
+            local cached_bridge_source cached_bridge_first cached_bridge_second
+            cached_bridge_source="$bootstrap_bridge_artifact_directory_input/BootstrapBridgeSourceSet.range"
+            cached_bridge_first="$bootstrap_bridge_artifact_directory_input/bootstrap-bridge/RangeCompilerBridge.first.ll"
+            cached_bridge_second="$bootstrap_bridge_artifact_directory_input/bootstrap-bridge/RangeCompilerBridge.second.ll"
+            [[ -f "$cached_bridge_source" ]] || fail "missing cached bootstrap bridge source bundle"
+            [[ -f "$cached_bridge_first" ]] || fail "missing cached bootstrap bridge first LLVM"
+            [[ -f "$cached_bridge_second" ]] || fail "missing cached bootstrap bridge second LLVM"
+            /usr/bin/cmp -s "$bootstrap_bridge_source_bundle" "$cached_bridge_source" \
+                || fail "cached bootstrap bridge source bundle does not match current immutable Phase1 source"
+            /usr/bin/cmp -s "$cached_bridge_first" "$cached_bridge_second" \
+                || fail "cached bootstrap bridge LLVM pair does not match byte for byte"
+            /bin/cp "$cached_bridge_first" "$bootstrap_bridge_first_llvm"
+            /bin/cp "$cached_bridge_second" "$bootstrap_bridge_second_llvm"
+            echo "bootstrap bridge proven artifact reuse: pass (source and LLVM pair byte-identical)"
+        else
+            local bootstrap bootstrap_executable
+            bootstrap="$REPO_ROOT/$(manifest_value bootstrap.path)"
+            bootstrap_executable="$WORK_ROOT/RangeCompilerBootstrap"
+            clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module \
+                -x ir "$bootstrap" -x c "${RUNTIME_INPUTS[@]}" -o "$bootstrap_executable"
+            echo "checkpoint compiler-candidate:bootstrap-linked: pass"
+            echo "bootstrap executable link: pass"
+            emit_candidate_llvm "$bootstrap_executable" "$bootstrap_bridge_source_bundle" "$bootstrap_bridge_first_llvm" bootstrap-bridge-first
+            emit_candidate_llvm "$bootstrap_executable" "$bootstrap_bridge_source_bundle" "$bootstrap_bridge_second_llvm" bootstrap-bridge-second
+        fi
         /usr/bin/cmp -s "$bootstrap_bridge_first_llvm" "$bootstrap_bridge_second_llvm" \
             || fail "bootstrap bridge LLVM was not deterministic"
         validate_llvm "$bootstrap_bridge_first_llvm"
@@ -5656,7 +5764,7 @@ main() {
         echo "compiler candidate validate/link: pass"
     else
         local require_candidate_llvm=1
-        if [[ "$checkpoint_mode" == candidate-plan ]]; then
+        if [[ "$checkpoint_mode" == candidate-plan || "$checkpoint_mode" == candidate-audit ]]; then
             require_candidate_llvm=0
         fi
         resolve_compiler_build "$require_candidate_llvm"
@@ -5695,6 +5803,17 @@ main() {
     audit_build Candidate "$candidate_executable" "$candidate_directory"
     echo "checkpoint compiler-candidate:candidate-audited: pass"
     assert_candidate_build_plan_unchanged
+    if [[ "$checkpoint_mode" == candidate-audit ]]; then
+        echo "Range compiler candidate semantic audit checkpoint succeeded."
+        printf 'compiler_directory=%s\n' "$compiler_directory"
+        printf 'source_inventory_count=%s\n' "${#SOURCE_FILES[@]}"
+        printf 'build_cache_key=%s\n' "${BUILD_CACHE_KEY:-bootstrap-bridge}"
+        report_artifact candidate_build_plan "$CANDIDATE_BUILD_PLAN"
+        report_artifact candidate_llvm "$candidate_llvm"
+        report_artifact candidate_executable "$candidate_executable"
+        echo "checkpoint compiler-candidate:candidate-audit-complete: pass"
+        return 0
+    fi
 
     emit_candidate_llvm "$candidate_executable" "$candidate_loaded_source_bundle" "$reproduction_llvm" reproduction
     echo "checkpoint compiler-candidate:reproduction-emitted: pass"
@@ -5726,9 +5845,9 @@ main() {
     compare_body_syntax_split_builds Candidate "$candidate_directory" Reproduction "$reproduction_directory"
     compare_placement_symbol_guard_builds Candidate "$candidate_directory" Reproduction "$reproduction_directory"
     if [[ -n "$bootstrap_bridge_source_directory" ]]; then
-        compare_binding_reference_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory"
-        compare_value_ownership_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory"
-        compare_placement_symbol_guard_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory"
+        compare_binding_reference_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory" retired-extern-declarations
+        compare_value_ownership_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory" retired-extern-declarations
+        compare_placement_symbol_guard_builds BootstrapBridge "$bootstrap_bridge_artifact_directory" Candidate "$candidate_directory" retired-extern-declarations
     fi
 
     /usr/bin/cmp -s "$WORK_ROOT/Candidate.macro.execution-native.first.ll" "$WORK_ROOT/Reproduction.macro.execution-native.first.ll" \
@@ -5779,7 +5898,7 @@ main() {
 
     /usr/bin/cmp -s "$WORK_ROOT/Candidate.builtin.legacy.out" "$WORK_ROOT/Reproduction.builtin.legacy.out" \
         || fail "candidate and reproduction legacy builtin-marker rejection differs"
-    echo "candidate/reproduction builtin marker rejection: byte-identical"
+    echo "candidate/reproduction ordinary @language macro provenance: byte-identical"
     assert_candidate_build_plan_unchanged
     validate_candidate_build_plan "$CANDIDATE_BUILD_PLAN" "$candidate_producer_id"
 

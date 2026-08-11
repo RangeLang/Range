@@ -1,0 +1,122 @@
+@builtin
+construct Array<Element> {}
+
+@builtin
+construct Identity {
+    let first: Int
+    let second: Int
+}
+
+function appendIdentityWords(words: Buffer<Int>, first: Int, second: Int): Int {
+    if words.append(element: first) != 0 { return 0 - 1 }
+    return words.append(element: second)
+}
+
+function buildRelationshipRows(count: Int): Buffer<Int> {
+    let rows: Buffer<Int>(bufferCreateInt(capacity: count * 8))
+    state row: Int(0)
+    while row < count {
+        appendIdentityWords(words: rows, first: row + 1, second: row + 101)
+        appendIdentityWords(words: rows, first: 1001, second: 1003)
+        appendIdentityWords(words: rows, first: row + 2001, second: row + 3001)
+        appendIdentityWords(words: rows, first: row + 4001, second: row + 5001)
+        row: row + 1
+    }
+    return rows
+}
+
+function buildCompositionQueryIndex(count: Int): CompilerCompositionExactIndex {
+    let index: CompilerCompositionExactIndex(compilerCompositionExactIndexCreate(estimatedCompositionCount: count))
+    state row: Int(0)
+    while row < count {
+        let words: Buffer<Int>(bufferCreateInt(capacity: 6))
+        appendIdentityWords(words: words, first: row + 1, second: row + 101)
+        appendIdentityWords(words: words, first: 1001, second: 1003)
+        appendIdentityWords(words: words, first: row + 2001, second: row + 3001)
+        compilerCompositionExactIndexAppend(
+            index: index,
+            identityFirst: row + 4001,
+            identitySecond: row + 5001,
+            componentWords: words
+        )
+        words.destroy()
+        row: row + 1
+    }
+    return index
+}
+
+function relationshipScan(rows: Buffer<Int>, count: Int, iterations: Int): Int {
+    state iteration: Int(0)
+    state matches: Int(0)
+    while iteration < iterations {
+        state row: Int(0)
+        while row < count {
+            let start: Int(row * 8)
+            if rows.element(index: start) == count
+                && rows.element(index: start + 1) == count + 100
+                && rows.element(index: start + 2) == 1001
+                && rows.element(index: start + 3) == 1003
+                && rows.element(index: start + 4) == count + 2000
+                && rows.element(index: start + 5) == count + 3000 {
+                matches: matches + 1
+            }
+            row: row + 1
+        }
+        iteration: iteration + 1
+    }
+    return matches
+}
+
+function compositionScan(index: CompilerCompositionExactIndex, queryWords: Buffer<Int>, iterations: Int): Int {
+    state iteration: Int(0)
+    state matches: Int(0)
+    while iteration < iterations {
+        state row: Int(0)
+        while row < index.componentCounts.count {
+            if compilerCompositionExactIndexRowMatches(index: index, row: row, queryWords: queryWords) {
+                matches: matches + 1
+            }
+            row: row + 1
+        }
+        iteration: iteration + 1
+    }
+    return matches
+}
+
+function compositionIndexedLookup(index: CompilerCompositionExactIndex, queryWords: Buffer<Int>, iterations: Int): Int {
+    state iteration: Int(0)
+    state matches: Int(0)
+    while iteration < iterations {
+        if compilerCompositionExactIndexCount(index: index, queryWords: queryWords) == 1 {
+            matches: matches + 1
+        }
+        iteration: iteration + 1
+    }
+    return matches
+}
+
+@main {
+    let count: Int(64)
+    let iterations: Int(500000 + commandLineArgumentCount() - 1)
+    let rows: Buffer<Int>(buildRelationshipRows(count: count))
+    let index: CompilerCompositionExactIndex(buildCompositionQueryIndex(count: count))
+    let queryWords: Buffer<Int>(bufferCreateInt(capacity: 6))
+    appendIdentityWords(words: queryWords, first: count, second: count + 100)
+    appendIdentityWords(words: queryWords, first: 1001, second: 1003)
+    appendIdentityWords(words: queryWords, first: count + 2000, second: count + 3000)
+
+    state result: Int(0)
+    if commandLineArgument(index: 0) == "direct" {
+        result: relationshipScan(rows: rows, count: count, iterations: iterations)
+    } else if commandLineArgument(index: 0) == "composition" {
+        result: compositionScan(index: index, queryWords: queryWords, iterations: iterations)
+    } else if commandLineArgument(index: 0) == "indexed" {
+        result: compositionIndexedLookup(index: index, queryWords: queryWords, iterations: iterations)
+    }
+
+    rows.destroy()
+    queryWords.destroy()
+    compilerCompositionExactIndexDestroy(index: index)
+    if result == iterations { return 7 }
+    return 0
+}

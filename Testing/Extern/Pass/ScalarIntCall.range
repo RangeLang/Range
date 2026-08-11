@@ -1,0 +1,13 @@
+@extern
+function rangeExternAdd(left: Int, right: Int): Int
+
+macro nativeBinding(): Function -> ExternRegistration {
+    return ExternRegistration(function: #environment.target)
+}
+
+@nativeBinding
+function rangeNativeMultiply(left: Int, right: Int): Int
+
+@main {
+    return rangeExternAdd(left: rangeNativeMultiply(left: 6, right: 7), right: 0)
+}

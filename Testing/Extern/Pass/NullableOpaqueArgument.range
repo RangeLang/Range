@@ -1,0 +1,10 @@
+@opaque
+construct ForeignAllocation {}
+
+@extern
+function free(pointer: ForeignAllocation): Void
+
+@main {
+    free(pointer: nil)
+    return 42
+}

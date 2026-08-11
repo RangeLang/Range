@@ -1,0 +1,36 @@
+enum HorizontalAlignment {
+    case leading
+    case center
+    case trailing
+}
+
+enum VerticalAlignment {
+    case top
+    case center
+    case bottom
+}
+
+construct LayoutAlignment {
+    let vertical: VerticalAlignment
+    let horizontal: HorizontalAlignment
+}
+
+construct Viewport {
+    let size: Size
+}
+
+construct LayoutSize {
+    let width: Int
+    let height: Int
+}
+
+construct LayoutRect {
+    let origin: Point
+    let size: LayoutSize
+}
+
+enum LayoutTransform {
+    case alignment(value: LayoutAlignment)
+    case position(value: Point)
+    case offset(value: Point)
+}

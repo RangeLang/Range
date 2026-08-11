@@ -1,0 +1,8 @@
+@statement
+@syntax
+construct LocalBinding {
+    let mutable: Bool
+    let identity: Identity
+    let type: TypeReference
+    let expression: Expression
+}

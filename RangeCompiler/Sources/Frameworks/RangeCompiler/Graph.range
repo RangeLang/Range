@@ -1,0 +1,237 @@
+// One physical matrix retains every source-graph fact. The first column is the
+// table tag; the remaining columns are interpreted by the typed append/query
+// functions below. This keeps bootstrap storage to one owned Buffer while B
+// preserves distinct Token, Node, and Relationship value shapes.
+function rangeCompilerFactMatrixRowCount(matrix: Buffer<Int>): Int {
+    return matrix.count / 8
+}
+
+function rangeCompilerFactMatrixAppend(matrix: Buffer<Int>, table: Int, identity: Int, kind: Int, first: Int, second: Int, parent: Int, ordinal: Int, flags: Int): Int {
+    if matrix.append(element: table) != 0 { return 0 - 1 }
+    if matrix.append(element: identity) != 0 { return 0 - 1 }
+    if matrix.append(element: kind) != 0 { return 0 - 1 }
+    if matrix.append(element: first) != 0 { return 0 - 1 }
+    if matrix.append(element: second) != 0 { return 0 - 1 }
+    if matrix.append(element: parent) != 0 { return 0 - 1 }
+    if matrix.append(element: ordinal) != 0 { return 0 - 1 }
+    return matrix.append(element: flags)
+}
+
+function rangeCompilerFactMatrixAppendToken(matrix: Buffer<Int>, token: RangeCompilerToken, identity: Int, ordinal: Int): Int {
+    return rangeCompilerFactMatrixAppend(
+        matrix: matrix,
+        table: 1,
+        identity: identity,
+        kind: rangeCompilerTokenKindTag(kind: token.kind),
+        first: token.start,
+        second: token.end,
+        parent: 0 - 1,
+        ordinal: ordinal,
+        flags: 0)
+}
+
+function rangeCompilerFactMatrixAppendNode(matrix: Buffer<Int>, identity: Int, kind: Int, start: Int, end: Int, parent: Int, ordinal: Int): Int {
+    return rangeCompilerFactMatrixAppend(
+        matrix: matrix,
+        table: 2,
+        identity: identity,
+        kind: kind,
+        first: start,
+        second: end,
+        parent: parent,
+        ordinal: ordinal,
+        flags: 0)
+}
+
+function rangeCompilerFactMatrixAppendRelationship(matrix: Buffer<Int>, origin: Int, role: Int, destination: Int, ordinal: Int): Int {
+    let identity: Int(origin * 131 + role * 8191 + destination * 17 + ordinal)
+    return rangeCompilerFactMatrixAppend(
+        matrix: matrix,
+        table: 3,
+        identity: identity,
+        kind: role,
+        first: origin,
+        second: destination,
+        parent: 0 - 1,
+        ordinal: ordinal,
+        flags: 0)
+}
+
+function rangeCompilerFactMatrixAppendResolution(matrix: Buffer<Int>, application: Int, declaration: Int, ordinal: Int): Int {
+    let identity: Int(application * 131 + declaration * 17 + ordinal)
+    return rangeCompilerFactMatrixAppend(
+        matrix: matrix,
+        table: 4,
+        identity: identity,
+        kind: 1,
+        first: application,
+        second: declaration,
+        parent: 0 - 1,
+        ordinal: ordinal,
+        flags: 0)
+}
+
+function rangeCompilerFactMatrixContainsNode(matrix: Buffer<Int>, identity: Int): Bool {
+    state row: Int(0)
+    let rowCount: Int(rangeCompilerFactMatrixRowCount(matrix: matrix))
+    while row < rowCount {
+        let base: Int(row * 8)
+        if matrix.element(index: base) == 2
+            && matrix.element(index: base + 1) == identity {
+            return true
+        }
+        row: row + 1
+    }
+    return false
+}
+
+function rangeCompilerFactMatrixContainsNodeKind(matrix: Buffer<Int>, identity: Int, kind: Int): Bool {
+    state row: Int(0)
+    let rowCount: Int(rangeCompilerFactMatrixRowCount(matrix: matrix))
+    while row < rowCount {
+        let base: Int(row * 8)
+        if matrix.element(index: base) == 2
+            && matrix.element(index: base + 1) == identity
+            && matrix.element(index: base + 2) == kind {
+            return true
+        }
+        row: row + 1
+    }
+    return false
+}
+
+function rangeCompilerFactMatrixResolveApplications(matrix: Buffer<Int>, source: String): Int {
+    let sourceGraphRowCount: Int(rangeCompilerFactMatrixRowCount(matrix: matrix))
+    state applicationRow: Int(0)
+    state resolutionCount: Int(0)
+    while applicationRow < sourceGraphRowCount {
+        let applicationBase: Int(applicationRow * 8)
+        if matrix.element(index: applicationBase) == 2
+            && matrix.element(index: applicationBase + 2) == rangeCompilerNodeKindApplication() {
+            let applicationIdentity: Int(matrix.element(index: applicationBase + 1))
+            let applicationStart: Int(matrix.element(index: applicationBase + 3))
+            let applicationEnd: Int(matrix.element(index: applicationBase + 4))
+            let applicationName: String(stringSubstring(source: source, start: applicationStart, end: applicationEnd))
+            state declarationRow: Int(0)
+            state resolved: Bool(false)
+            while declarationRow < sourceGraphRowCount && !resolved {
+                let declarationBase: Int(declarationRow * 8)
+                if matrix.element(index: declarationBase) == 2
+                    && matrix.element(index: declarationBase + 2) == rangeCompilerNodeKindDeclaration() {
+                    let declarationStart: Int(matrix.element(index: declarationBase + 3))
+                    let declarationEnd: Int(matrix.element(index: declarationBase + 4))
+                    let declarationName: String(stringSubstring(source: source, start: declarationStart, end: declarationEnd))
+                    if applicationName == declarationName {
+                        let declarationIdentity: Int(matrix.element(index: declarationBase + 1))
+                        if rangeCompilerFactMatrixAppendResolution(
+                            matrix: matrix,
+                            application: applicationIdentity,
+                            declaration: declarationIdentity,
+                            ordinal: resolutionCount) != 0 { return 0 - 1 }
+                        resolutionCount: resolutionCount + 1
+                        resolved: true
+                    }
+                }
+                declarationRow: declarationRow + 1
+            }
+        }
+        applicationRow: applicationRow + 1
+    }
+    return resolutionCount
+}
+
+function rangeCompilerFactMatrixIsValid(matrix: Buffer<Int>, expectedTokens: Int, expectedNodes: Int, expectedRelationships: Int, expectedResolutions: Int): Bool {
+    if matrix.count % 8 != 0 { return false }
+    state row: Int(0)
+    state tokenCount: Int(0)
+    state nodeCount: Int(0)
+    state relationshipCount: Int(0)
+    state resolutionCount: Int(0)
+    let rowCount: Int(rangeCompilerFactMatrixRowCount(matrix: matrix))
+    while row < rowCount {
+        let base: Int(row * 8)
+        let table: Int(matrix.element(index: base))
+        let kind: Int(matrix.element(index: base + 2))
+        let first: Int(matrix.element(index: base + 3))
+        let second: Int(matrix.element(index: base + 4))
+        let ordinal: Int(matrix.element(index: base + 6))
+        if table == 1 {
+            if kind < 0 || first < 0 || second < first || ordinal != tokenCount { return false }
+            tokenCount: tokenCount + 1
+        } else if table == 2 {
+            if kind < rangeCompilerNodeKindDeclaration()
+                || kind > rangeCompilerNodeKindLiteral()
+                || first < 0
+                || second < first
+                || ordinal < 0 { return false }
+            nodeCount: nodeCount + 1
+        } else if table == 3 {
+            if kind < rangeCompilerRoleBody()
+                || kind > rangeCompilerRoleLiteral()
+                || ordinal != relationshipCount
+                || !rangeCompilerFactMatrixContainsNode(matrix: matrix, identity: first)
+                || !rangeCompilerFactMatrixContainsNode(matrix: matrix, identity: second) { return false }
+            relationshipCount: relationshipCount + 1
+        } else if table == 4 {
+            if kind != 1
+                || ordinal != resolutionCount
+                || !rangeCompilerFactMatrixContainsNodeKind(matrix: matrix, identity: first, kind: rangeCompilerNodeKindApplication())
+                || !rangeCompilerFactMatrixContainsNodeKind(matrix: matrix, identity: second, kind: rangeCompilerNodeKindDeclaration()) { return false }
+            resolutionCount: resolutionCount + 1
+        } else {
+            return false
+        }
+        row: row + 1
+    }
+    return tokenCount == expectedTokens
+        && nodeCount == expectedNodes
+        && relationshipCount == expectedRelationships
+        && resolutionCount == expectedResolutions
+}
+
+function rangeCompilerFactMatrixFingerprint(matrix: Buffer<Int>): Int {
+    state index: Int(0)
+    state fingerprint: Int(23)
+    while index < matrix.count {
+        fingerprint: fingerprint * 31 + matrix.element(index: index)
+        index: index + 1
+    }
+    return fingerprint
+}
+
+function rangeCompilerIdentityStackSet(stack: Buffer<Int>, depth: Int, identity: Int): Int {
+    if depth < stack.count {
+        return stack.update(element: identity, index: depth)
+    }
+    return stack.append(element: identity)
+}
+
+function rangeCompilerIdentityStackTop(stack: Buffer<Int>, depth: Int): Int {
+    if depth <= 0 || depth > stack.count { return 0 - 1 }
+    return stack.element(index: depth - 1)
+}
+
+function rangeCompilerPathIdentity(path: String): Int {
+    state cursor: Int(0)
+    state identity: Int(17)
+    while cursor < stringLength(value: path) {
+        identity: identity * 31 + stringByteAt(source: path, index: cursor)
+        cursor: cursor + 1
+    }
+    return identity
+}
+
+function rangeCompilerSyntaxIdentity(fileIdentity: Int, kind: Int, start: Int, end: Int): Int {
+    return fileIdentity * 131 + kind * 8191 + (start + 1) * 4099 + end + 1
+}
+
+function rangeCompilerNodeKindDeclaration(): Int { return 1 }
+function rangeCompilerNodeKindApplication(): Int { return 2 }
+function rangeCompilerNodeKindBlock(): Int { return 3 }
+function rangeCompilerNodeKindControl(): Int { return 4 }
+function rangeCompilerNodeKindLiteral(): Int { return 5 }
+
+function rangeCompilerRoleBody(): Int { return 1 }
+function rangeCompilerRoleNested(): Int { return 2 }
+function rangeCompilerRoleApplication(): Int { return 3 }
+function rangeCompilerRoleLiteral(): Int { return 4 }

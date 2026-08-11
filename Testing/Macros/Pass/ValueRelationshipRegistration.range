@@ -95,12 +95,12 @@ construct Observation {
     let admission: RelationshipAdmission
 }
 
-macro value(): Member -> RelationshipRegistration { environment in
+macro value(): Member -> RelationshipRegistration {
     return scalarValueRelationship()
 }
 
-macro observeValue(): Member -> Observation { environment in
-    let application: MacroApplication(environment.target.macros[0])
+macro observeValue(): Member -> Observation {
+    let application: MacroApplication(#environment.target.macros[0])
     let registration: RelationshipRegistration(application.value)
     return Observation(
         minimum: registration.multiplicity.minimum,

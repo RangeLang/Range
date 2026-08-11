@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
+COMPILER_CORE_INVENTORY="$REPO_ROOT/RangeCompiler/CompilerCoreSources.txt"
 
 usage() {
     cat >&2 <<'USAGE'
@@ -118,14 +119,19 @@ compiler_version="bootstrap-${bootstrap_hash:0:12}"
 
 compiler_source_paths=()
 compiler_source_roles=()
-compiler_source_count="$(manifest_value compilerSources)"
-for ((source_index = 0; source_index < compiler_source_count; source_index += 1)); do
-    source_role="$(/usr/bin/plutil -extract "compilerSources.$source_index.role" raw -o - "$next_manifest")"
-    [[ "$source_role" == core ]] || continue
-    source_relative="$(/usr/bin/plutil -extract "compilerSources.$source_index.path" raw -o - "$next_manifest")"
+[[ -f "$COMPILER_CORE_INVENTORY" ]] || {
+    echo "Missing compiler Core inventory: $COMPILER_CORE_INVENTORY" >&2
+    exit 66
+}
+while IFS= read -r source_relative; do
+    [[ -n "$source_relative" ]] || continue
+    if [[ "$source_relative" == *$' '* || "$source_relative" == *$'\t'* || "$source_relative" == *$'\n'* ]]; then
+        echo "Range compiler Core source paths may not contain whitespace: $source_relative" >&2
+        exit 66
+    fi
     compiler_source_paths+=("$source_relative")
     compiler_source_roles+=("core")
-done
+done < "$COMPILER_CORE_INVENTORY"
 
 compiler_directory="$REPO_ROOT/RangeCompiler/Sources/Compiler"
 compiler_source_list="$promotion_root/compiler-sources.txt"

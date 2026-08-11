@@ -1,0 +1,14 @@
+@opaque
+construct InferredForeignPointer {}
+
+@extern
+function rangeExternOpaqueIdentity(value: InferredForeignPointer): InferredForeignPointer
+
+@extern
+function free(pointer: InferredForeignPointer): Void
+
+@main {
+    let pointer: rangeExternOpaqueIdentity(value: nil)
+    free(pointer: pointer)
+    return 42
+}

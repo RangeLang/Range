@@ -2,7 +2,7 @@
   import CodeBlock from "$lib/components/CodeBlock.svelte";
   import EssayPage from "$lib/components/EssayPage.svelte";
 
-  const environmentBoundary = `macro project(): Construct { environment in
+  const environmentBoundary = `macro project(): Construct {
     #environment {
         construct ProjectDefaults {
             // declarations projected into this environment
@@ -23,7 +23,7 @@
 }`;
 
   const filteredCollection = `let collection: [Let](
-    environment.target.Declaration.members.filter(all: Let)
+    #environment.target.Declaration.members.filter(all: Let)
 )
 
 #environment {

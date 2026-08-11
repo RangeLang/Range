@@ -1,0 +1,7 @@
+@main {
+    let missingArgument: String(commandLineArgument(index: 1000000))
+    if missingArgument != String("") { return 1 }
+    if runProcess(executable: String("/usr/bin/true"), argumentRecords: String("")) != 0 { return 2 }
+    if runProcessBatch(planRecords: String(""), maximumParallelism: 1) != 0 { return 3 }
+    return 42
+}

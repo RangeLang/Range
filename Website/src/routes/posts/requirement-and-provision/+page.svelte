@@ -2,9 +2,9 @@
   import CodeBlock from "$lib/components/CodeBlock.svelte";
   import EssayPage from "$lib/components/EssayPage.svelte";
 
-  const macroSketch = `macro myMacro(): Construct { environment in
+  const macroSketch = `macro myMacro(): Construct {
     let addFunctions: Array<Function>(
-        environment.target.Declaration.members.filter(all: Function)
+        #environment.target.Declaration.members.filter(all: Function)
             .filter { member in member.identity.name == "add" }
     )
     if addFunctions.count == 0 {
@@ -50,7 +50,7 @@ construct MyConstruct {
       <code>extension</code>. This is the requirement side — the macro
       <em>requires</em> <code>add</code> to be meaningful. But instead of
       forcing the user to write it, it supplies one. The macro also
-      unconditionally emits <code>count</code> into the environment. That
+      unconditionally emits <code>count</code> into the #environment. That
       is the provision side.
     </p>
 
@@ -67,7 +67,7 @@ construct MyConstruct {
       A static property on a construct was a provision — a value attached
       to the type itself. But <code>#environment</code> inside a function
       body does the same thing. A macro emits into the environment,
-      a function's body emits into the environment. There is no need for
+      a function's body emits into the #environment. There is no need for
       a separate static declaration site.
     </p>
 
@@ -92,7 +92,7 @@ construct MyConstruct {
 
     <p>
       This is the complete replacement. A macro queries
-      <code>environment.target.Declaration.members</code> to inspect what
+      <code>#environment.target.Declaration.members</code> to inspect what
       a construct provides, then conditionally emits what it needs via
       <code>#environment</code>. The "requirement" half is the filter check.
       The "provision" half is the emit. Both live in the same declaration,

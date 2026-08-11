@@ -1,0 +1,264 @@
+// Compiler B owns the complete product-input pipeline. Compiler A compiles
+// this framework, but never reads, lexes, parses, or interprets B's input.
+
+construct RangeCompilerGraph {
+    let fileCount: Int
+    let sourceByteCount: Int
+    let tokenCount: Int
+    let syntaxCount: Int
+    let declarationCount: Int
+    let applicationCount: Int
+    let blockCount: Int
+    let controlCount: Int
+    let literalCount: Int
+    let relationshipCount: Int
+    let resolutionCount: Int
+    let invalidTokenCount: Int
+    let unclosedBlockCount: Int
+    let retainedFactCount: Int
+    let retainedGraphValid: Bool
+    let factFingerprint: Int
+    let identityChecksum: Int
+    let isValid: Bool
+}
+
+construct RangeCompiler {
+    function compile(path: String, source: String): RangeCompilerGraph {
+        return rangeCompilerBuildSource(path: path, source: source)
+    }
+}
+
+function rangeCompilerBuildSource(path: String, source: String): RangeCompilerGraph {
+    let capacity: Int(stringLength(value: source) + 1)
+    state facts: Buffer<Int>(capacity: capacity * 8)
+    state blockStack: Buffer<Int>(capacity: capacity)
+    let fileIdentity: Int(rangeCompilerPathIdentity(path: path))
+    state cursor: Int(0)
+    state tokenCount: Int(0)
+    state declarationCount: Int(0)
+    state applicationCount: Int(0)
+    state blockCount: Int(0)
+    state controlCount: Int(0)
+    state literalCount: Int(0)
+    state relationshipCount: Int(0)
+    state invalidTokenCount: Int(0)
+    state identityChecksum: Int(0)
+    state braceDepth: Int(0)
+    state expectsDeclarationName: Bool(false)
+    state expectsDeclarationBody: Bool(false)
+    state expectsControlBody: Bool(false)
+    state previousCanApply: Bool(false)
+    state previousStart: Int(0)
+    state previousEnd: Int(0)
+    state pendingDeclarationIdentity: Int(0 - 1)
+    state pendingControlIdentity: Int(0 - 1)
+
+    while cursor < stringLength(value: source) {
+        let token: RangeCompilerToken(rangeCompilerLexNext(source: source, start: cursor))
+        if token.kind == .eof {
+            cursor: stringLength(value: source)
+        } else if token.end <= cursor {
+            invalidTokenCount: invalidTokenCount + 1
+            cursor: cursor + 1
+        } else {
+            cursor: token.end
+            if token.kind != .comment {
+                tokenCount: tokenCount + 1
+                let tokenIdentity: Int(rangeCompilerSyntaxIdentity(
+                    fileIdentity: fileIdentity,
+                    kind: rangeCompilerTokenKindTag(kind: token.kind),
+                    start: token.start,
+                    end: token.end))
+                if rangeCompilerFactMatrixAppendToken(matrix: facts, token: token, identity: tokenIdentity, ordinal: tokenCount - 1) != 0 {
+                    invalidTokenCount: invalidTokenCount + 1
+                }
+                identityChecksum: identityChecksum + tokenIdentity
+
+                if token.kind == .invalid {
+                    invalidTokenCount: invalidTokenCount + 1
+                    previousCanApply: false
+                } else if token.kind == .declarationKeyword {
+                    expectsDeclarationName: true
+                    previousCanApply: false
+                } else if token.kind == .identifier {
+                    if expectsDeclarationName {
+                        let declarationIdentity: Int(rangeCompilerSyntaxIdentity(
+                            fileIdentity: fileIdentity,
+                            kind: rangeCompilerNodeKindDeclaration(),
+                            start: token.start,
+                            end: token.end))
+                        let declarationParent: Int(rangeCompilerIdentityStackTop(stack: blockStack, depth: braceDepth))
+                        if rangeCompilerFactMatrixAppendNode(matrix: facts, identity: declarationIdentity, kind: rangeCompilerNodeKindDeclaration(), start: token.start, end: token.end, parent: declarationParent, ordinal: declarationCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        declarationCount: declarationCount + 1
+                        pendingDeclarationIdentity: declarationIdentity
+                        expectsDeclarationName: false
+                        expectsDeclarationBody: true
+                        previousCanApply: false
+                    } else {
+                        previousCanApply: true
+                    }
+                } else if token.kind == .macroAttribute {
+                    if token.text == String("@main") {
+                        let declarationIdentity: Int(rangeCompilerSyntaxIdentity(
+                            fileIdentity: fileIdentity,
+                            kind: rangeCompilerNodeKindDeclaration(),
+                            start: token.start,
+                            end: token.end))
+                        if rangeCompilerFactMatrixAppendNode(matrix: facts, identity: declarationIdentity, kind: rangeCompilerNodeKindDeclaration(), start: token.start, end: token.end, parent: 0 - 1, ordinal: declarationCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        declarationCount: declarationCount + 1
+                        pendingDeclarationIdentity: declarationIdentity
+                        expectsDeclarationBody: true
+                    }
+                    previousCanApply: false
+                } else if token.kind == .leftParen {
+                    if previousCanApply {
+                        let applicationIdentity: Int(rangeCompilerSyntaxIdentity(
+                            fileIdentity: fileIdentity,
+                            kind: rangeCompilerNodeKindApplication(),
+                            start: previousStart,
+                            end: previousEnd))
+                        let applicationParent: Int(rangeCompilerIdentityStackTop(stack: blockStack, depth: braceDepth))
+                        if rangeCompilerFactMatrixAppendNode(matrix: facts, identity: applicationIdentity, kind: rangeCompilerNodeKindApplication(), start: previousStart, end: previousEnd, parent: applicationParent, ordinal: applicationCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        if applicationParent != 0 - 1 {
+                            if rangeCompilerFactMatrixAppendRelationship(matrix: facts, origin: applicationParent, role: rangeCompilerRoleApplication(), destination: applicationIdentity, ordinal: relationshipCount) != 0 {
+                                invalidTokenCount: invalidTokenCount + 1
+                            }
+                            relationshipCount: relationshipCount + 1
+                        }
+                        applicationCount: applicationCount + 1
+                    }
+                    previousCanApply: false
+                } else if token.kind == .controlKeyword {
+                    let controlIdentity: Int(rangeCompilerSyntaxIdentity(
+                        fileIdentity: fileIdentity,
+                        kind: rangeCompilerNodeKindControl(),
+                        start: token.start,
+                        end: token.end))
+                    let controlParent: Int(rangeCompilerIdentityStackTop(stack: blockStack, depth: braceDepth))
+                    if rangeCompilerFactMatrixAppendNode(matrix: facts, identity: controlIdentity, kind: rangeCompilerNodeKindControl(), start: token.start, end: token.end, parent: controlParent, ordinal: controlCount) != 0 {
+                        invalidTokenCount: invalidTokenCount + 1
+                    }
+                    controlCount: controlCount + 1
+                    pendingControlIdentity: controlIdentity
+                    expectsControlBody: true
+                    previousCanApply: false
+                } else if token.kind == .leftBrace {
+                    let blockIdentity: Int(rangeCompilerSyntaxIdentity(
+                        fileIdentity: fileIdentity,
+                        kind: rangeCompilerNodeKindBlock(),
+                        start: token.start,
+                        end: token.end))
+                    let blockParent: Int(rangeCompilerIdentityStackTop(stack: blockStack, depth: braceDepth))
+                    if rangeCompilerFactMatrixAppendNode(matrix: facts, identity: blockIdentity, kind: rangeCompilerNodeKindBlock(), start: token.start, end: token.end, parent: blockParent, ordinal: blockCount) != 0 {
+                        invalidTokenCount: invalidTokenCount + 1
+                    }
+                    blockCount: blockCount + 1
+                    if braceDepth > 0 {
+                        if rangeCompilerFactMatrixAppendRelationship(matrix: facts, origin: blockParent, role: rangeCompilerRoleNested(), destination: blockIdentity, ordinal: relationshipCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        relationshipCount: relationshipCount + 1
+                    }
+                    if expectsDeclarationBody {
+                        if rangeCompilerFactMatrixAppendRelationship(matrix: facts, origin: pendingDeclarationIdentity, role: rangeCompilerRoleBody(), destination: blockIdentity, ordinal: relationshipCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        relationshipCount: relationshipCount + 1
+                        expectsDeclarationBody: false
+                        pendingDeclarationIdentity: 0 - 1
+                    }
+                    if expectsControlBody {
+                        if rangeCompilerFactMatrixAppendRelationship(matrix: facts, origin: pendingControlIdentity, role: rangeCompilerRoleBody(), destination: blockIdentity, ordinal: relationshipCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        relationshipCount: relationshipCount + 1
+                        expectsControlBody: false
+                        pendingControlIdentity: 0 - 1
+                    }
+                    if rangeCompilerIdentityStackSet(stack: blockStack, depth: braceDepth, identity: blockIdentity) != 0 {
+                        invalidTokenCount: invalidTokenCount + 1
+                    }
+                    braceDepth: braceDepth + 1
+                    previousCanApply: false
+                } else if token.kind == .rightBrace {
+                    braceDepth: braceDepth - 1
+                    if braceDepth < 0 {
+                        invalidTokenCount: invalidTokenCount + 1
+                        braceDepth: 0
+                    }
+                    previousCanApply: false
+                } else if token.kind == .integer || token.kind == .stringLiteral {
+                    let literalIdentity: Int(rangeCompilerSyntaxIdentity(
+                        fileIdentity: fileIdentity,
+                        kind: rangeCompilerNodeKindLiteral(),
+                        start: token.start,
+                        end: token.end))
+                    let literalParent: Int(rangeCompilerIdentityStackTop(stack: blockStack, depth: braceDepth))
+                    if rangeCompilerFactMatrixAppendNode(matrix: facts, identity: literalIdentity, kind: rangeCompilerNodeKindLiteral(), start: token.start, end: token.end, parent: literalParent, ordinal: literalCount) != 0 {
+                        invalidTokenCount: invalidTokenCount + 1
+                    }
+                    if literalParent != 0 - 1 {
+                        if rangeCompilerFactMatrixAppendRelationship(matrix: facts, origin: literalParent, role: rangeCompilerRoleLiteral(), destination: literalIdentity, ordinal: relationshipCount) != 0 {
+                            invalidTokenCount: invalidTokenCount + 1
+                        }
+                        relationshipCount: relationshipCount + 1
+                    }
+                    literalCount: literalCount + 1
+                    previousCanApply: false
+                } else {
+                    previousCanApply: false
+                }
+                previousStart: token.start
+                previousEnd: token.end
+            }
+        }
+    }
+
+    let syntaxCount: Int(declarationCount + applicationCount + blockCount + controlCount + literalCount)
+    let resolutionCount: Int(rangeCompilerFactMatrixResolveApplications(matrix: facts, source: source))
+    if resolutionCount < 0 { invalidTokenCount: invalidTokenCount + 1 }
+    let retainedFactCount: Int(rangeCompilerFactMatrixRowCount(matrix: facts))
+    let expectedFactCount: Int(tokenCount + syntaxCount + relationshipCount + resolutionCount)
+    let retainedGraphValid: Bool(rangeCompilerFactMatrixIsValid(
+        matrix: facts,
+        expectedTokens: tokenCount,
+        expectedNodes: syntaxCount,
+        expectedRelationships: relationshipCount,
+        expectedResolutions: resolutionCount))
+    let factFingerprint: Int(rangeCompilerFactMatrixFingerprint(matrix: facts))
+    if retainedFactCount != expectedFactCount || !retainedGraphValid {
+        invalidTokenCount: invalidTokenCount + 1
+    }
+    if blockStack.destroy() != 0 { invalidTokenCount: invalidTokenCount + 1 }
+    if facts.destroy() != 0 { invalidTokenCount: invalidTokenCount + 1 }
+    return RangeCompilerGraph(
+        fileCount: 1,
+        sourceByteCount: stringLength(value: source),
+        tokenCount: tokenCount,
+        syntaxCount: syntaxCount,
+        declarationCount: declarationCount,
+        applicationCount: applicationCount,
+        blockCount: blockCount,
+        controlCount: controlCount,
+        literalCount: literalCount,
+        relationshipCount: relationshipCount,
+        resolutionCount: resolutionCount,
+        invalidTokenCount: invalidTokenCount,
+        unclosedBlockCount: braceDepth,
+        retainedFactCount: retainedFactCount,
+        retainedGraphValid: retainedGraphValid,
+        factFingerprint: factFingerprint,
+        identityChecksum: identityChecksum,
+        isValid: stringLength(value: source) > 0
+            && declarationCount > 0
+            && invalidTokenCount == 0
+            && retainedFactCount == expectedFactCount
+            && retainedGraphValid
+            && braceDepth == 0)
+}

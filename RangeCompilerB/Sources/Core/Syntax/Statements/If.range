@@ -1,0 +1,7 @@
+@statement
+@syntax(if $condition $thenBody else $elseBody)
+construct If {
+    let condition: Expression
+    let thenBody: Block
+    let elseBody: Block?
+}

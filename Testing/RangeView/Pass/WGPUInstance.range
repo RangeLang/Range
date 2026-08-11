@@ -1,0 +1,24 @@
+@opaque
+construct RangeViewWGPUInstanceDescriptor {}
+
+@opaque
+construct RangeViewWGPUInstance {}
+
+@extern
+@link(.wgpuNative)
+function wgpuCreateInstance(descriptor: RangeViewWGPUInstanceDescriptor): RangeViewWGPUInstance
+
+@extern
+function wgpuInstanceRelease(instance: RangeViewWGPUInstance): Void
+
+@extern
+function wgpuGetVersion(): Int
+
+@main {
+    let instance: wgpuCreateInstance(descriptor: nil)
+    wgpuInstanceRelease(instance: instance)
+    if wgpuGetVersion() <= 0 {
+        return 1
+    }
+    return 42
+}

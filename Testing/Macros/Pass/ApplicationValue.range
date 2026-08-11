@@ -39,12 +39,12 @@ construct Observation {
     let number: Int
 }
 
-macro metadata(): Member -> Metadata { environment in
+macro metadata(): Member -> Metadata {
     return Metadata(number: 7)
 }
 
-macro observeMetadata(): Member -> Observation { environment in
-    let application: MacroApplication(environment.target.macros[0])
+macro observeMetadata(): Member -> Observation {
+    let application: MacroApplication(#environment.target.macros[0])
     let metadata: Metadata(application.value)
     return Observation(number: metadata.number)
 }

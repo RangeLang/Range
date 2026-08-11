@@ -1,0 +1,11 @@
+@color
+construct SampleColor {}
+
+@color
+enum SampleColorField {
+    case sample
+}
+
+@main {
+    return 42
+}

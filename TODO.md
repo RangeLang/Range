@@ -3,8 +3,260 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+- [ ] Finish the RangeView app-to-window entry hook.
+  - [x] Make `@app` emit the single top-level `@main` block through
+    `#environment`, with root-graph duplicate-main rejection.
+  - [x] Have the emitted main call the application backend, which performs
+    SDL setup, window creation, the event loop, and SDL teardown.
+  - [ ] Hand the resolved route/page tree to the window runtime instead of
+    rendering the current fixed Stack example.
+  - [ ] Prove `@component` modifier accumulation with focused macro fixtures.
+    - `@component` now emits one ordered `@many modifiers: @modifier`
+      relationship in the idealized RangeView source; compiler-backed proof
+      still needs positive member-access accumulation and duplicate-slot
+      rejection fixtures.
+
+- [ ] Replace name-keyed compiler runtime bridges with authored Core `@extern`
+  declarations while keeping `@builtin` roles as independent semantic tags.
+  - [x] Make `@extern @builtin(.target)` classify as an external implementation
+    with target-role metadata, and suppress the legacy LLVM declaration when
+    the same foreign declaration was authored in source.
+    - Verify one `targetPointerBits` declaration, one call, linked exit `42`,
+      plus the unmigrated fallback fixture linked exit `64`.
+  - [x] Prove the generalized legacy-declaration filter, which now removes any
+    runtime-prelude or metrics declaration already supplied by authored source
+    instead of accumulating one suppression special case per foreign symbol.
+  - [x] Promote the declaration-filter checkpoint before admitting any authored
+    compiler extern into the accepted compiler's own source inventory.
+    - The first promotion attempt correctly refused the checkpoint because the
+      candidate and reproduction LLVM differed; candidate auditing and both
+      LLVM validations passed, and the accepted bootstrap remained unchanged.
+    - The retained artifacts differ only in placement of the single identical
+      `targetPointerBits` declaration: removing that line from each makes the
+      LLVM byte-identical. The generalized filter preserves legacy declaration
+      order while no authored replacement exists, so promote it alone first;
+      do not include the first authored compiler extern in this checkpoint.
+    - Accepted as `bootstrap-34a59bd53f2b` after byte-identical LLVM and
+      executable reproduction plus accepted-bootstrap integrity verification.
+  - [x] Add `Core/Macro/Extern.range` and `Core/System/Target.range` to the
+    canonical live compiler Core inventory without rewriting accepted-bootstrap
+    provenance, author `targetPointerBits` there, and delete its legacy runtime
+    declaration fallback after the migrated fixed-point proof.
+  - [ ] Migrate the remaining scalar bridges in small proven slices; defer
+    ownership-sensitive Buffer and String pointer APIs until their foreign ABI
+    representations are explicit.
+    - [x] Author and focused-link `targetPointerBits`,
+      `commandLineArgumentCount`, `stringTransientRegionMark`,
+      `stringTransientRegionReset`, `compilerMetricsReset`, and
+      `compilerMetricsFunctionEnd` as external implementations with independent
+      builtin roles: one canonical declaration and call each, native exit `42`.
+    - [x] Canonicalize foreign parameter declarations as ABI types without
+      declaration-local LLVM names, matching the legacy runtime signatures and
+      preserving names only at call/definition sites where they carry values.
+    - [x] Remove all six migrated spellings, intrinsic IDs, and ABI special
+      cases from the runtime-builtin model while preserving its numeric slots
+      as sparse compatibility holes; the extern declarations now own identity.
+    - [x] Move target, process, and String declarations to their natural Core
+      owners after admitting `Core/Macro/Extern.range`; keep compiler metrics
+      declarations project-owned because they are not general Core APIs.
+    - [x] Delete the six migrated legacy LLVM declaration fallbacks only after
+      the Core-owned intermediate source passed byte-identical candidate and
+      reproduction LLVM/executable proof.
+    - [x] Promote the fallback-free extern checkpoint as
+      `bootstrap-4f46e685e0e2` and verify the single accepted bootstrap LLVM,
+      executable, and manifest authority.
+    - [x] Teach authored extern signatures and MIR calls that `String` has a
+      pointer-shaped foreign ABI; prove one declared/direct String identity
+      call through native C linking and exit `42`, then prove byte-identical
+      candidate/reproduction LLVM `6abddedb0bb6` and executables `35f067e1abcf`.
+    - [x] Promote the String extern ABI checkpoint as
+      `bootstrap-6abddedb0bb6`.
+    - [x] Promote the general transient extern-`String` ownership checkpoint as
+      `bootstrap-344d8be76525`, then move `commandLineArgument`, `runProcess`,
+      and `runProcessBatch` into `Core/System/Process.range` and delete their
+      runtime-builtin identities and legacy LLVM declarations.
+      - Candidate/reproduction LLVM are byte-identical at `344d8be76525`,
+        executables at `683f072b3b56`, accepted-bootstrap integrity passes,
+        and the fallback-free focused extern suite links and exits `42`.
+      - The Process-owned cleanup now also passes the focused build plan after
+        admitting `Core/System/Process.range` to that source bundle, plus the
+        compiler smoke gate and a fresh candidate/reproduction fixed point:
+        LLVM `247cbafa8a1a`, executable `b6b99fb1700f`. This source checkpoint
+        is proven but has not replaced the accepted bootstrap.
+
+- [ ] Reduce full compiler checkpoint latency before using it as an inner edit
+  loop.
+  - [x] Allow a retry to reuse a preserved bootstrap-bridge proof only when its
+    immutable Phase1 source bundle and two LLVM emissions compare byte for byte;
+    revalidate both LLVM files, relink the bridge, and rerun its capability
+    audits before candidate production.
+  - [ ] Profile the measured optimized LLVM-emission phase, now 737 seconds for
+    the Process-cleanup candidate, and make
+    focused extern bundles the ordinary development proof; reserve one full
+    candidate/reproduction comparison for a completed migration checkpoint.
+    - [x] Attribute lowering and emitter buffer work without changing compiler
+      semantics or accepted runtime inputs. The full compiler profile completed
+      in 553,983 ms with a 5.41 GB peak footprint: memory derivation consumed
+      89.9 seconds, MIR construction 61.0 seconds, and LLVM emission 93.7
+      seconds. Emitter rendering consumed 49.5 seconds and planning 26.3
+      seconds, while final buffer materialization consumed only 0.034 seconds.
+    - [ ] Reduce the owned-path validation cost of
+      `compilerCoreLLVMLowerHelperFunctionTypedObserved` as one bounded slice.
+      - Its 4.209-second lowering spends 3.497 seconds in memory derivation and
+        3.023 seconds in owned-path validation, where live transient storage
+        grows by about 1.96 GB. Its entire emitter path appends only 43,468
+        bytes and materializes 43,070 bytes, so do not optimize the final LLVM
+        buffer copy as the cause of this hotspot.
+      - [x] Test an explicit inline `CompilerOwnedPathTopology` construct as
+        the prerequisite to owned-path validation. Compiler V1 passed. One
+        controlled profile took 560,804 ms versus the 553,983 ms baseline and
+        maximum resident memory rose from 3.75 GB to 4.00 GB, while memory
+        derivation fell from 89.9 to 82.6 seconds and peak transient allocation
+        fell from 2.80 to 2.65 GB. The mixed single-run result is inconclusive;
+        the prototype was removed pending a repeated controlled comparison.
+      - [ ] Compare the inline construct witness against a direct arena phase
+        invariant over repeated identical profiles. Do not replace the value
+        with witness tables unless the prerequisite itself becomes variable-
+        sized graph data.
+        - [x] Implement the stronger inline preparation witness with issued and
+          consumed arena generations. All four validation paths require it,
+          returned-alias preparation has one producer, Compiler V1 passes, and
+          the first retained profile completed in 547,671 ms. Versus the
+          553,983 ms restored baseline, memory derivation fell from 89.9 to
+          81.3 seconds, peak transient allocation fell from 2.80 to 2.65 GB,
+          and maximum resident memory remained effectively flat at 3.75 GB.
+        - [ ] Confirm the retained witness profile once before treating the
+          measured improvement as a promotion-quality performance result.
+        - [x] Add first-class nested probe telemetry to owned-path validation.
+          Every probe carries a unique token plus parent/depth, function,
+          instance, block, node, ordinal, item-count, status, and result
+          context; the profiling runtime records true nanosecond duration,
+          operation deltas, resident snapshots, and allocation-event-driven
+          local raw/transient peaks. The full candidate profile completed in
+          724,644 ms with 311,479 balanced probe pairs, zero malformed or open
+          probes, and zero failed probe results. The retained authority is
+          `range-compiler-profile.jW9S2k/Trace.tsv` (454,121,822 bytes).
+        - [x] Split block evaluation at its semantic helper boundaries before
+          changing storage. The balanced profile attributed the dominant work
+          to local binding, construct moves, optional branches, assignment,
+          and return transfer; application lookup and reference checks were
+          not the substring source.
+        - [x] Cache transparent-storage bases, opaque-representation status,
+          and recursive tracked-storage status by arena-local type identity.
+          Compiler V1 passes. On the same instrumented candidate workload,
+          compilation fell from 1,122,239 to 484,553 ms, maximum RSS from
+          3.23 to 2.04 GB, and peak footprint from 5.22 to 2.40 GB. The former
+          semantic knots fell from 25-73 aggregate seconds apiece to at most
+          1.29 seconds; local binding, optional branches, assignment, and
+          return transfer performed zero substring operations.
+        - [x] Make block merge consume an arena-scoped CFG relationship
+          product. Forward adjacency now stores exact `cfgEdges` row identities
+          and selection, merge, and backedge validation query those identities
+          instead of carrying a second loose copy of predecessor block IDs.
+          Cache Optional classification by arena-local type identity. Compiler
+          V1 passes; block merge fell from 2.33 to 1.17 aggregate seconds and
+          from 955,116 to 171,400 substring calls. The relationship product
+          itself costs 40.5 ms across 3,910 arenas.
+        - [ ] Replace block merge's remaining Optional name checks with one
+          canonical declaration-identity relationship per source graph. Do not
+          generalize local CFG edge row IDs into global identities: their exact
+          identity is the owning function instance plus edge row. Confirm the
+          complete profile separately; the first relationship profile reduced
+          maximum RSS from 2.04 to 1.81 GB but regressed total instrumented
+          time from 484,553 to 640,057 ms because of broad MIR/emitter variance
+          and a 49.2-second `compilerBodyArenaResolveExpression` outlier.
+
 - [ ] Recognize source shape from Core-authored, queryable syntax rules before
   usage, type, ownership, and representation analysis.
+  - [x] Establish the smallest declared/applied control-flow graph baseline.
+    `DeclaredAppliedIf.range` retains four declared functions, the outer and
+    nested `render` blocks, one `If`, and the `ready`, `draw`, and `present`
+    applications as exact typed nodes and role edges; the paired runtime
+    fixture retains one conditional branch and exits 7. The source-miss
+    candidate measured 575 seconds in Range LLVM emission versus 2 seconds in
+    LLVM validation.
+  - [x] Derive the same fixture's CFG from its typed body-node/body-edge
+    artifact in shadow mode and compare block membership, successor edges,
+    statement order, and call identities against the legacy body arena.
+    `compilerTypedSyntaxCFGSnapshot` proves three syntax-identified blocks,
+    true/false/fallthrough edges, six scheduled operations, and
+    `legacyMatch=true`; lowering authority remains on the legacy arena.
+  - [ ] Replace `CompilerBodyArena` through Compiler B rather than migrating
+    phases in place inside Compiler A; follow
+    `Development/CompilerForkArchitecture.md`. Compiler A remains the frozen
+    `Source -> typed syntax graph` producer while the Range-authored Compiler B
+    owns every later product.
+    - [x] Inventory the arena's copied syntax, resolution, CFG, ownership, MIR,
+      and diagnostic state; identify all twelve direct body-parse call sites and
+      assign every field group to its graph-native product owner.
+    - [x] Remove the duplicate `CompilerFunctionBody` wrapper and use the
+      existing function or entry declaration syntax identity plus its `body`
+      edge as the source fact. Keep function-instance, receiver, and type-key
+      specialization context separate from that source identity.
+      - All twelve former parse callers now enter explicit declaration,
+        function-instance, entry, macro, or closure legacy adapters; every
+        `CompilerBodyArena` constructor and the sole remaining body parse call
+        are behind that boundary.
+      - Early typed declaration capture now always records the declaration's
+        Block root while full statement capture remains an explicit policy. A
+        development candidate passed the complete binding-reference and value
+        ownership suites, macro linking/execution/integration, generated
+        functions, Registrable, committed expansion, macro arrays, exact typed
+        body replay, and native smoke. The broader audit then reached the
+        checkout's existing direct-`@many` unresolved-macro boundary. No
+        reproduction or fixed point ran.
+      - Function derivation now accepts only the `Function.Declaration` syntax
+        identity, resolves its disposable function-table row internally, and
+        fails closed when that identity has no function facet. Positional row,
+        function-instance, receiver, and type-key context no longer compete
+        with the declaration as source identity.
+    - [x] Freeze the interrupted in-place parser-emission experiment in
+      Compiler A. Compiler A is now the bootstrap producer rather than the
+      active surface for arrays, closures, switches, jumps, or body migration.
+    - [x] Create the complete `RangeCompilerB/` compiler node by copying the
+      authored Project, Core inventory, Core, Foundation, Compiler, and Runtime
+      sources while excluding `Bootstrap/`, `.range/`, and `.build/` products.
+      Compiler B is the sole mutable compiler source tree.
+    - [x] Wire `scripts/range compiler b` and
+      `scripts/range check-compiler-b` to the complete A -> B -> B
+      candidate/reproduction proof. Keep the earlier one-file lexer/fact-matrix
+      work only as `scripts/range check-compiler-b-source-graph`, a component
+      probe rather than the compiler architecture.
+    - [ ] Make the complete Compiler B fork pass its first self-compilation
+      fixed point: accepted A builds B, B builds the identical source revision,
+      and candidate/reproduction LLVM and executables compare byte for byte.
+      - The first complete B run built and linked candidate B from 35
+        inventoried files, with 880 seconds in LLVM emission and 929 seconds
+        total candidate production. Source loading, role ordering, canonical
+        Core, binding, ownership, macro execution/linking, generated functions,
+        Registrable, committed expansion, macro arrays, body replay, and native
+        smoke passed. The candidate then reached the checkout's existing direct
+        `@many` boundary and rejected `UUIDManyDirectLayout.range` with exit 65
+        and `diagnosticKind=unresolvedMacro`; reproduction did not run.
+    - [ ] Move project and file gathering from shell source bundles into
+      Compiler B's Range-authored driver. A selects and builds B but never
+      discovers or interprets B's product inputs.
+    - [ ] Replace B's inherited source, declaration, application, Block, and
+      relationship tables with typed graph values carrying stable identities.
+    - [ ] Derive Compiler B Resolution, CFG, Ownership, and MIR as whole Range
+      products from those identities, deleting reparsing and `CompilerBodyArena`
+      adapters as each vertical replacement passes self-compilation.
+    - [ ] Measure complete B self-compilation and individual product phases;
+      report wall time, maximum RSS, graph counts, and per-phase totals.
+    - [ ] After the B fixed point, compile and run RangeView with the exact
+      reproduced B artifact as the first independent product gate.
+    - [ ] Delete Compiler A's body reparsing and `CompilerBodyArena` only after
+      Compiler B owns the required product and the accepted authority is moved
+      at a deliberate fixed-point checkpoint.
+    - [x] Research the Bend/HVM lineage, including Bend2's move from HVM2's
+      ultra-eager reducer to HVM4's optimal lazy model, and record the
+      transferable mechanisms, evidence boundaries, and limitations in
+      `Development/BendHVMRangeResearch.md`.
+      - [ ] Build one sequential demand-driven reducer over an existing typed
+        compiler product: start from the requested product identity, derive only
+        its dependency closure, prove exact product equality, and measure avoided
+        plus executed semantic work before parallel frontier scheduling. Do not
+        add another parser, IR authority, or evaluator.
   - [x] Define identifier start and alphanumeric continuation rules beside
     `Identity` in Core and make Range-authored syntax-template derivation
     and matching query them; no separate `IdentifierShape` wrapper exists.
@@ -214,7 +466,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       members in the Range-authored `syntax` macro.
       - The macro scans the captured recipe once, compares each capture with
         `member.identifier.name`, and reports an error through
-        `environment.diagnostics` when any capture is unknown.
+        `#environment.diagnostics` when any capture is unknown.
       - Macro syntax identifiers now materialize their names as byte-backed
         `String` values instead of hash-only placeholders, so Range-authored
         matching can use ordinary `String` reads.
@@ -294,8 +546,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 ## 2026-07-29 Inline Representation Handoff
 
 - [x] Migrate Core macro paths and focused fixtures from
-  `environment.target.declaration...` to
-  `environment.target.Declaration...`; expansion target splices now use
+  `#environment.target.declaration...` to
+  `#environment.target.Declaration...`; expansion target splices now use
   `#environment.target.Declaration.identifier`.
 - [ ] Finish the general uppercase inline-construct projection without
   regressing bounded candidate production.
@@ -371,7 +623,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     compiler data path.
 - [ ] Execute the Range-authored graph body directly.
   - `Graph.range` now authors
-    `environment.graph.addNode(role:additionalRole:)` and uses implicit `nil`
+    `#environment.graph.addNode(role:additionalRole:)` and uses implicit `nil`
     for the optional second role.
   - The unimplemented `@shared` macro-on-macro marker and its unused
     shared/private value model were removed; reintroduce sharing only with a
@@ -581,9 +833,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       attributes, violet macro splices, and differentiated punctuation.
     - [x] Generate named light and dark Codability variants and point the Range
       Zed extension at the renamed theme artifact.
-    - [x] Parse current `{ environment in` macro bodies before applying syntax
-      captures, so keyword and string highlighting does not depend on
-      Tree-sitter error recovery.
+    - [x] Parse executable macro bodies before applying syntax captures, so
+      keyword and string highlighting does not depend on Tree-sitter error
+      recovery.
 
 ## RangeView
 
@@ -987,11 +1239,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Execute typed views such as
       `members.filter(all: Let) { lets in ... }` over those same values without
       copying them into a second representation.
-      - [x] Standardize executable macro bodies on one authored
-        `{ environment in }` binding. `Macro.Environment<Target>` owns the
-        target and diagnostics/graph query views; the compiler records one
+      - [x] Standardize executable macro bodies on the implicit
+        `#environment` context. `Macro.Environment<Target>` owns the target and
+        diagnostics/graph query views; the compiler records one hidden
         capability handle and models each view as an explicit environment
         projection rather than an ordinary local symbol.
+        - [x] Make every nonempty macro body executable, reject the retired
+          `{ environment in ... }` binder as a malformed header, and require
+          context access through `#environment.target`, direct forwarded
+          diagnostics such as `#environment.error(...)`, or
+          `#environment.graph`.
         - [x] Make `#environment { ... }` the only tracked authored
           expansion boundary and lower it through the environment's expansion
           authority into the existing transactional graph-delta operation.
@@ -1004,6 +1261,18 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - Verification: the root environment and canonical-target-members
             fixtures pass, and the compiler candidate remains a byte-identical
             candidate/reproduction fixed point.
+        - [x] Retain the complete environment aggregate through an ordinary
+          compile-time Range call and compare the returned value with the
+          current `#environment` by execution identity.
+          - Verification: `Testing/Macros/Pass/EnvironmentValue.range` emits
+            `environment retained` only after the value survives the call and
+            the equality branch succeeds.
+        - [ ] Define recursive structural equality and diff values for
+          `@syntax`, environment snapshots, and graph deltas.
+          - Current compile-time equality compares the stored syntax or
+            capability identity. It does not recursively compare children or
+            produce a typed change set, so do not describe it as a structural
+            diff yet.
         - [x] Route every direct call on the environment's `target`, `graph`,
           and `diagnostics` projections through capability resolution,
           including denied operations, while leaving deeper source-backed
@@ -1071,7 +1340,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         the complete conforming child set before synthesizing its physical
         storage.
         - [x] Intern macro-family member types as deferred `Array` views and
-          execute `environment.target.Declaration.members.count` through lazy,
+          execute `#environment.target.Declaration.members.count` through lazy,
           source-backed syntax handles in original member order.
         - [x] Store the canonical syntax ID in every source-backed syntax
           handle and resolve compact member-table rows only at the internal
@@ -1119,7 +1388,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           - [ ] Move the bootstrap nested-role validation from
             `compilerFormulaExecuteApplication` into execution of the
             Range-authored shared `graph` body, which now authors
-            `environment.graph.addNode(role:additionalRole:)`; then delete
+            `#environment.graph.addNode(role:additionalRole:)`; then delete
             the name-based compiler bridge.
         - [x] Remove the remaining parallel declaration/application fields
           from `Function`, `Parameter`, and `Enum`; normalize function calls as
@@ -1263,7 +1532,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           inert `HashableRegistration` value.
           - `@hashable` discovers `id` through the target's typed
             `Declaration.members` rather than the legacy
-            `environment.target.memberCount(name)` shortcut.
+            `#environment.target.memberCount(name)` shortcut.
           - The focused positive proof observes exactly one generated `hash`
             function returning `Int`; the negative proof rejects a target
             without exactly one `id` declaration. The broader value-ownership
@@ -1821,7 +2090,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       follow-up value-ownership run reused the immutable artifact and completed in
       about 4 seconds.
     - [x] Add a validated rolling development producer and skip the duplicate
-      ownership/effect reconstruction only for marked development source sets.
+      ownership/Behavior-fact derivation only for marked development source sets.
       - value-ownership publishes a development compiler as a future producer only
         after all focused proofs pass. Optimized candidate, fixed-point, and
         promotion gates continue from the accepted bootstrap and retain the full
@@ -1897,8 +2166,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         - Normal successful development gates no longer advance the producer.
           `RANGE_BUILD_ADVANCE_DEVELOPMENT_PRODUCER=1` is required after a
           focused validation pass.
-        - `per-function-artifacts-v1` requires a bundle on every source-key
-          miss; missing or malformed artifact state is a hard failure.
+        - The original `per-function-artifacts-v1` producer required a bundle
+          on every source-key miss; missing or malformed artifact state was a
+          hard failure. `function-derivations-v2` replaces that source-keyed
+          layout with a producer-keyed rolling checkpoint after schema v9
+          proved stable call-boundary identity across declaration-row shifts.
       - [ ] Persist typed phase products and use the graph only for observation
         identity and reverse invalidation.
         - Fingerprint each syntax value independently, including blocks,
@@ -1941,6 +2213,17 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Make compiler generation N produce the candidate executable for
     generation N+1, then promote only after the fixed-point and candidate
     gates pass.
+    - [x] Separate accepted compiler artifact verification from child
+      compiler/runtime inputs in the development generation path.
+      - `compiler next` and the producer side of `compiler progression` now
+        execute the manifest-verified accepted executable directly. Changed
+        compiler and runtime sources remain content-addressed child inputs;
+        ordinary accepted-compiler commands retain full manifested-runtime
+        verification.
+    - [ ] Record the child compiler source revision, producing compiler
+      artifact, and compilation application as identified Composition values.
+    - [ ] Make the exact child compiler compile RangeView as the normal product
+      proof without requiring a candidate/reproduction fixed point.
   - [ ] Reuse the same content-addressed executable in the public command and
     all proof gates without reusing proof results.
 - [ ] Remove Clang as a compiler-semantic dependency.
@@ -1999,676 +2282,421 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Collapse Foundation only if the dependency distinction no longer
     represents a real compilation or package boundary.
 
-## Compiler Simplification Execution Plan
+## Composition and Flow Compiler Plan
 
-- [ ] Simplify the compiler in dependency order from one reproducible
-  checkpoint.
-  - `CompilerIntTable` already stores its values in `Buffer<Int>`; do not
-    replace dense integer storage merely to rename it.
-  - Keep `RawBuffer` as a private Core/runtime allocation substrate until
-    authored Buffer and String own allocation, growth, and destruction.
-  - Require each deletion or representation slice to remove its superseded
-    path in the same checkpoint instead of retaining parallel compiler models.
-  - [ ] Phase 0: restore a reproducible current compiler baseline.
-    - `scripts/range check-build-plan` passes, but the current accepted-bootstrap
-      verifier reports changed compiler inputs across Syntax, Body, Driver,
-      and LLVM; the accepted artifact is not proof of the current source tree.
-    - [x] Re-run the manifest integrity check and record the exact current
-      mismatched input set before changing compiler semantics.
-      - The accepted manifest differs from 13 current compiler inputs:
-        `CompilerBodyCFG`, `CompilerBodyMIR`, `CompilerBodyModel`,
-        `CompilerBodyOwnership`, `CompilerBodyParsing`, `CompilerBodyTypes`,
-        `CompilerCore`, `CompilerDirectives`, `CompilerBodyLLVM`,
-        `CompilerLLVMPlan`, `CompilerFrontend`, `CompilerParsing`, and
-        `Lexer`; all manifested Core and runtime inputs still match.
-    - [ ] Resolve the current source capability blocker through the narrowest
-      relevant value-ownership proof, including its exact rejection controls.
-      - The current development build now treats undeclared built-in target
-        category markers as scalar syntax metadata rather than macro-family
-        storage, and ownership construction ignores compile-time projection
-        values before requiring runtime tracked-storage metadata.
-      - The focused value-ownership run passes the uppercase/lowercase inline
-        projection pair, typed collection closures, Codable, rollback, and
-        typed macro parameter defaults. The unimplemented `@shared`
-        macro-on-macro marker was removed from the graph capability fixture
-        and Core surface so graph validation can proceed without inventing a
-        macro-declaration target model.
-      - Graph capabilities and both missing-role controls now pass. value-ownership
-        next stops at the existing Range-native project macro boundary with
-        `diagnosticKind=macroExecutionBodyInvalid`, `pipelineStatus=1`, and
-        `pipelineFailureCode=1`; generated project configuration remains the
-        next independent capability slice.
-      - Keep the proof boundary explicit: value-ownership and its controls must pass
-        before advancing to smoke, candidate reproduction, or accepted-bootstrap
-        integrity verification.
-    - [x] Run the supported ladder in order: build plan, ordinary value with
-      controls, compiler smoke, compiler candidate/reproduction, and accepted
-      bootstrap integrity verification.
-      - [x] Build plan, complete value-ownership controls, Compiler V1, and
-        compiler smoke pass on the current source snapshot.
-      - [x] The optimized candidate passes the complete candidate audit and
-        reproduction compile/validate/link boundary.
-      - [x] Promote the independently verified candidate/reproduction artifact
-        and rerun accepted-bootstrap integrity verification.
-        - Promotion rebuilt the manifest from the live Core inventory and all
-          29 current compiler sources instead of retaining its stale 26-entry
-          source list.
-        - `scripts/range check-compiler` reproduced LLVM SHA-256
-          `90f3adabfc443c33860451a869ce7302bdcc17449bee0ce046f810a3b8423882`
-          at 8,536,584 bytes and executable SHA-256
-          `e7bfc578bcf5f2fd1b4faf4a7b0e8450d51776f2ac8e43dea80c455f5be3b6a1`
-          at 3,522,096 bytes in 818.31 seconds without Swift.
-        - The post-promotion candidate completed in 866 seconds: 23 seconds
-          bootstrap linking, 819 seconds Range LLVM emission, 2 seconds
-          validation, and 22 seconds linking. Its candidate and reproduction
-          LLVM were byte-identical to the accepted bootstrap; its two executables
-          were byte-identical at SHA-256
-          `12252dcd0c72aed205657df039841f75c4d1dc8b4a9b992365ae229b470162cf`.
-      - [x] Remove `scripts/range compiler progression` from the required
-        promotion ladder. Keep it only as an optional convergence diagnostic;
-        candidate/reproduction equality is the complete fixed-point proof.
-    - [x] Confirm fixed-point LLVM and executable identity and promote the
-      complete 29-source inventory only after explicit approval.
-  - [ ] Phase 1: delete the obsolete string-record compiler path.
-    - [ ] Audit every supported command, proof script, and compiler directive
-      for consumers of the legacy `CompilerProgram` record fields and the
-      summary/legacy LLVM entry points.
-    - [ ] Classify the current static deletion candidates, including
-      `compilerCoreASTSummary`, the symbol/type/declaration summaries,
-      `compilerCoreLLVM`, `parseCompilerProgramForLLVMNamedBodies`,
-      `parseCompilerStatementLegacy`, and the old TypedIR LLVM helper.
-      - [x] Delete the four independently unreachable leaf entry points
-        `compilerCoreASTSummary`, `compilerCoreLLVM`,
-        `parseCompilerProgramForLLVMNamedBodies`, and
-        `parseCompilerStatementLegacy` after a repository-wide reference audit
-        found no callers.
-        - The slice removed 172 Range lines and no direct RawBuffer calls.
-          Native compiler smoke rebuilt in 672 seconds (668 emission, 2 LLVM
-          validation, 2 linking), and the linked candidate executable remained
-          byte-identical at SHA-256
-          `1ebc06443ced5d0349ee76a2e4210fc5d7f6f243bd005c49101ad91fee77e427`.
-    - [ ] Remove only a complete unreachable chain: its record
-      encoders/decoders, parser/lowering functions, fields, column helpers,
-      and RawBuffer builders must leave together.
-    - [ ] Prove supported CLI behavior and compiler fixtures are unchanged,
-      record the compiler line-count and direct RawBuffer-call reduction, and
-      reproduce the fixed point.
-  - [ ] Phase 2: complete deterministic automatic String destruction.
-    - [ ] Complete the automatic-destruction slice under Compiler Storage for
-      normal fallthrough, early returns, branches, loops, moves, and aliases.
-    - [ ] Keep explicit destroy as an internal ownership effect while removing
-      it from ordinary authored String code.
-    - [ ] Do not migrate shared compiler text across function boundaries until
-      the ownership proofs and fixed point pass.
-  - [ ] Phase 3: remove direct RawBuffer use from the surviving compiler.
-    - [ ] Migrate function-local text builders to mutable authored String
-      storage first and guard compile time and peak memory against the rejected
-      immutable-concatenation regression.
-    - [ ] Migrate the shared LLVM block, function, global, and artifact-text
-      accumulators after cross-function String ownership is proven.
-    - [ ] Delete each compiler-facing raw text operation after its last
-      accepted caller disappears; retain the lower-level runtime primitive
-      while Buffer or String still lowers through it.
-  - [ ] Phase 4: collapse the parallel semantic/representation pipeline.
-    - [ ] Identify the exact macro-family representation and member-layout
-      facts still consumed from `CompilerMemoryGraph`.
-    - [ ] Move member-representation proof onto the same BodyArena/type-layout
-      decision used by ordinary native compilation.
-    - [ ] Extract the smallest retained macro-family representation component,
-      then delete the unconsumed general SemanticGraph, MemoryGraph, and
-      TypedIR directive chain.
-    - [ ] Preserve focused macro-family, inline/identity/transparent storage,
-      native compilation, and fixed-point proofs.
-  - [ ] Phase 5: replace anonymous IntTable programming with typed stores.
-    - [ ] Complete the generated-member delta store cutover.
-      - [x] Make macro expansion construct a named
-        `CompilerGeneratedMemberDelta`, and make validation, collision checks,
-        commit, and diagnostics consume its named fields.
-      - [ ] Replace the private 24-column backing table and pending-table copy
-        with a typed delta store and an explicit resolved-member product.
-        - The development candidate compiler accepted the 18-field scalar delta
-          aggregate; canonical-target and project macro fixtures committed one
-          and two generated members respectively through that boundary.
-      - [ ] Record delta provenance and observations as typed identities rather
-        than integer rows before making generated-member products reusable
-        across compiler runs.
-    - [ ] Pilot declarations, members, functions, parameters, and type
-      references behind named store operations while retaining private
-      `Buffer<Int>` row-major or structure-of-arrays storage.
-    - [ ] Fold parallel fields such as function ownership into their domain
-      store when doing so removes an independently maintained invariant.
-    - [ ] Delete the corresponding public column constants, partial-row
-      appends, and direct `compilerIntTableValue` calls in the same slice.
-    - [ ] Keep `syntaxIndex` as a typed derived index rather than replacing
-      constant-time lookup with scans.
-    - [ ] Apply the proven store pattern in order to Body syntax and types,
-      CFG, ownership, MIR, reachability/ABI/LLVM, and finally macro/Graph
-      stores.
-  - [ ] Phase 6: measure and reduce derived compiler state.
-    - [ ] Mark each schedule, parent map, selection map, and expression-value
-      map with its producer, last consumer, and reconstruction cost.
-    - [ ] Release or rebuild phase-local derived state after its last consumer
-      instead of retaining it for the complete compile.
-    - [ ] Decide whether Graph 0 regions, dependencies, and frontiers remain on
-      the ordinary compile path only after measuring their time/RSS cost and
-      identifying a real scheduler consumer.
-    - [ ] Do not delete canonical syntax, resolution, type, CFG, ownership,
-      MIR, reachability, or macro-result facts merely because they use dense
-      integer storage.
+This is the single active architecture plan for compiler graph, storage,
+incrementality, scheduling, and cold-start work. Historical V1 timings and
+superseded phase plans live in
+[DeltaDBSpacetimeDBRangeHandoff.md](Development/DeltaDBSpacetimeDBRangeHandoff.md),
+not as competing active checklists here.
 
-## Compiler Storage
+The implementation order is layered. V1 keeps the typed syntax, resolution,
+CFG, ownership, MIR, Behavior, and target-plotting products authoritative while
+removing measured repeated work. Composition, Delta, and Flow remain an
+isolated meta-model research lane until a later compiler generation proves
+equivalent typed queries and an incremental benefit. A faster Composition
+index is not evidence that flattening the semantic layers accelerates compiler
+emission.
 
-- [ ] Implement the persistent graph revision model described in
-  [DeltaDBSpacetimeDBRangeHandoff.md](Development/DeltaDBSpacetimeDBRangeHandoff.md).
-  - Keep stable node identities and typed edge deltas as one logical graph,
-    with cardinality-specialized physical indexes.
-  - Commit each compiler view atomically; preserve the last accepted revision
-    on a failed candidate and measure load, delta-apply, query, and
-    invalidation-frontier costs before promoting a new authority.
-  - [x] Persist a Range-shaped revision artifact as the accepted graph authority.
-    - `range compile-graph` now writes revision schema v4: deterministic
-      revision identity over parent + File fingerprint + Source provenance + node values + status,
-      a 5-node index (source/syntax/shape/behavior/compile with
-      before/after/changed value fingerprints), the 4 cardinality-one pipeline
-      edges (add/replace operations), and 5 view digests.
-    - A failed candidate never writes a revision; the last accepted revision
-      is preserved. Unchanged input reuses the artifact without rewriting it.
-    - `scripts/range check-compiler-graph-revision` proves cold insertion,
-      same-location determinism, warm reuse, parent chaining (updated
-      node.before equals the prior accepted node.after), bounded literal-edit
-      invalidation with measured affected-view counts, failed-candidate
-      last-known-good preservation, and recovery.
-    - The accepted File and phase fingerprints live in `revision.tsv`.
-      `execution.tsv` is synthesized only as a temporary `resume-v1` command
-      input and is never persisted in a graph cache. Existing v2 caches consume
-      and remove their legacy execution record after one successful migration.
-    - The V1 File identity derives from the source bundle path, so the
-      revision is deterministic per location; content-addressed node
-      identity is the next Range-owned cutover.
-  - [x] Shape consumes the persisted Source artifact and reports per-stage
-    load, delta-apply, query, and materialization costs.
-    - The graph and Shape lines consume the persisted bundle only when the
-      Source provenance in `revision.tsv` matches its profile, canonical input,
-      compiler, and actual bundle digest. `source.tsv` is no longer written or
-      read; successful migration removes a legacy copy if present.
-    - A warm reuse rewrites neither the revision nor the bundle (verified by
-      inode). A failed candidate preserves both accepted artifacts.
-    - Each graph run reports `rangeGraphMetrics`: `sourceMs`/`syntaxMs`/`loadMs`/
-      `reducerMs`/`queryMs`/`materializeMs` wall costs, `viewsAffected`,
-      `sourceArtifact`/`syntaxArtifact`, and per-phase `consumed`/`derived` flags. A phase
-      whose before/after values are equal consumed the persisted revision; a
-      phase that commits a new value derived its product.
-    - On a literal edit the report shows `source=derived`, `syntax=consumed`,
-      `shape=consumed`, `behavior=derived`, `compile=derived`, and
-      `viewsAffected=3`: the syntax and Shape stages leave the prior accepted
-      values untouched and emit no delta, so
-      the shape value is a projection of persisted syntax facts rather than a
-      fresh Source capture.
-    - `syntax-facts.tsv` persists the validated typed Shape snapshot plus its
-      syntax and Shape fingerprints; Source provenance remains in revision v4.
-      The proof makes Source unavailable,
-      runs `project-shape-v1` using only those facts, and obtains the exact
-      `compile-shape` bytes and revision Shape value with no Behavior or LLVM.
-      `resume-v1-facts` also requires a transient Source-to-syntax binding, so
-      stale facts from another generation at the same path fail closed.
-    - `compilerV1Shape` now only projects persisted facts. Behavior retains a
-      transitional Source recapture for the complete pre-link macro/lowering
-      tables; serializing and loading those tables is the next storage cutover.
-  - [x] Add the Shape-only reducer as its own compiler command.
-    - `compilerV1ShapeOnly` captures the typed declarations and main root,
-      renders only the shape snapshot, and stops; `range compile-shape`
-      consumes a Source artifact and emits only the shape delta. No macro
-      link, no LLVM emission, no behavior product.
-    - Because the capture sequence and render point match `compilerV1Shape`
-      exactly, the reducer's `after` fingerprint and snapshot are
-      byte-identical to the shape value the full V1 pipeline persists: the
-      proof asserts the emitted `after` equals the revision shape node and the
-      payload equals the `inspect-v1` shape region, with no LLVM or downstream
-      phase deltas.
-    - The graph line now persists the equivalent payload in
-      `syntax-facts.tsv`; `project-shape-v1` owns the facts-only projection.
+- [ ] V1: reduce measured typed-function reconstruction without changing the
+  language ontology.
+  - [x] Remove the unvalidated `CompilerCompositionExactIndex` lookup cutover
+    from the active graph plotter; keep the index and Composition fixtures as
+    isolated experiments.
+  - [x] Report ABI reconstruction multiplicity from the existing profiler:
+    probe passes, final emission passes, extra probes, repeated function rows,
+    and the most-probed function.
+    - The 2026-08-07 accepted-bootstrap and current-candidate profiles both
+      reported zero ABI probe passes. Do not optimize or retain products for a
+      repetition that the current compiler-source workload does not perform.
+  - [x] Report discovery-side typed products beside final emission passes.
+    - Both full profiles observed 3,033 `bodyProduct.directEffects` passes and
+      3,033 final function emission passes: one broad discovery pass and one
+      broad emission pass per reachable function instance.
+  - [x] Test one bounded parsed-syntax discovery product through final
+    emission without retaining a complete live arena, then remove it when the
+    controlled profile showed no improvement.
+    - The candidate-powered profile completed in 536,701 ms, with Behavior
+      facts ending at 172,781 ms, call-boundary shapes at 181,678 ms, and final
+      function emission at 526,444 ms. Maximum resident memory was
+      12,451,119,104 bytes and peak footprint was 15,689,364,368 bytes, so a
+      full-arena retention experiment is not acceptable without a tighter
+      physical product.
+    - The full candidate-powered workload retained and reused 216 of 3,052
+      function syntax products (7.1%). It completed in 543,000 ms, with
+      11,469,324,288 bytes maximum resident memory and 14,258,926,504 bytes
+      peak footprint. Because the compiler source grew and the earlier run was
+      not a same-source disabled control, this proves bounded consumption but
+      not a speed or memory improvement.
+    - The alternating same-candidate, same-source disabled/enabled control
+      settled the experiment: disabled runs were 437,508 ms and 437,921 ms;
+      enabled runs were 439,300 ms and 437,004 ms. The enabled mean was 437.5
+      ms slower (about 0.10%) and showed no memory win. The product, its
+      profile switch, and its focused reuse requirement were removed.
+  - [x] Establish a clean post-removal cold baseline, then split
+    `compilerBodyLLVMEmitterProcessOperation` along existing operation-family
+    boundaries and repeat the same candidate-powered profile.
+    - The current profile attributes about 52--54 seconds of compiler-source
+      emission to compiling this single function. The change must preserve
+      typed layers and earn retention through an attributable time or memory
+      improvement.
+    - Clean baseline: 445,031 ms total, 9,767,469,056 bytes maximum
+      resident memory, and 56,041 ms compiling the 539-line dispatcher.
+    - The aggregate/storage, call/string, and scalar/control helpers preserve
+      the moved operation branches exactly; the Compiler V1 gate passes with
+      linked `7`/`8` results.
+    - First post-split profile: 404,994 ms total (40,037 ms or 9.0% faster)
+      and 4,990,402,560 bytes maximum resident memory. The three helper compile
+      times sum to 16,231 ms, 39,810 ms below the monolith and therefore almost
+      exactly accounting for the full cold-time improvement.
+  - [x] Confirm the operation-family decomposition with a second cold profile.
+    - The second run took 401,424 ms with 5,674,303,488 bytes maximum resident
+      memory; helper compile time totaled 16,291 ms. Both post-split runs wrote
+      the identical artifact SHA-256.
+    - The 403,209 ms post-split mean is 41,822 ms (9.4%) faster than the clean
+      445,031 ms baseline. Reported maximum resident memory stayed between
+      4,990,402,560 and 5,674,303,488 bytes, below the 9,767,469,056-byte
+      baseline.
+  - [x] Promote the proven operation-dispatch checkpoint with the canonical
+    candidate/reproduction proof.
+    - Candidate and reproduction LLVM matched at
+      `5ed288a4ed11823c3456cbcb093b4070c6a7a4551130a73d9aac681e46f8455a`;
+      executables matched at
+      `941d9cddad2d874c3cd9180062f66847aa0b73fc0b888a2c9275766d94c6b6a2`.
+      Accepted-bootstrap integrity passed after replacement.
+  - [x] Apply the same one-change decomposition experiment to
+    `compilerBodyMIRValidationCode` from the newly promoted bootstrap.
+    - It is now the largest compiler-source function at 45,325--46,050 ms per
+      cold profile. Establish its semantic branch families before moving code,
+      preserve exact validation failures, and compare against the 403,209 ms
+      post-dispatch mean.
+    - The 608-line validator is now a 123-line coordinator over exact
+      call/macro, aggregate/storage, and optional/string/control families. The
+      Compiler V1 gate passes with linked `7`/`8` results.
+    - First post-split profile: 348,334 ms total, 54,875 ms (13.6%) below the
+      403,209 ms prior mean. The coordinator compiled in 994 ms and the largest
+      helper in 2,106 ms; the remaining helpers were below the profile's
+      top-50 duration cutoff.
+  - [x] Confirm the MIR-validation decomposition with a second cold profile.
+    - The confirmation took 348,088 ms and wrote the identical artifact
+      SHA-256. The 348,211 ms two-run mean is 54,998 ms (13.6%) below the
+      403,209 ms prior mean, with essentially identical per-function timings.
+  - [x] Inspect and decompose
+    `compilerBodyMIRBuildExpression`, now the largest compiler function at
+    13,551--13,582 ms. Preserve `CompilerBodyMIRValueResult` failure and block
+    propagation exactly, then rerun Compiler V1 and the cold profile.
+    - Scheduled and optional-join results still short-circuit in the 17-line
+      coordinator. Exact basic/reference, application/call, and operator
+      branches moved to helpers; recursive construction still returns through
+      the coordinator. Compiler V1 passes with linked `7`/`8` results.
+    - First post-split profile: 337,305 ms, 10,906 ms (3.1%) below the 348,211
+      ms prior mean. Application and basic helpers compiled in 1,460 ms and
+      1,012 ms; operator and coordinator functions were below the top-50
+      duration cutoff.
+  - [x] Confirm the expression-builder decomposition with a second cold
+    profile.
+    - The confirmation took 337,415 ms and wrote the identical artifact
+      SHA-256. The 337,360 ms two-run mean is 10,851 ms (3.1%) below the
+      348,211 ms prior mean, with stable helper timings.
+  - [x] Measure memory before continuing the
+    `compilerBodyArenaResolveExpression` decomposition.
+    - Profiler-only phase RSS telemetry places the dominant increase inside
+      function-behavior derivation: 1,686,192,128 bytes after artifact
+      candidates and 4,819,648,512 bytes after behavior facts in the
+      controlled development profile. Function emission then raised the
+      high-water mark to 5,320,802,304 bytes.
+    - The exact reference/application/literal/operator resolver split passed
+      Compiler V1, but a controlled development profile remained effectively
+      neutral at 341,832 ms and 4,820,418,560 bytes after behavior facts. The
+      split was removed; smaller source functions did not reduce the dominant
+      behavior-memory boundary.
+  - [x] Remove the duplicate transient payload allocation from runtime string
+    concatenation.
+    - `stringConcat` now transfers its already tracked joined allocation into
+      the transient Range string header instead of copying the same bytes into
+      a second allocation. Repeated development profiles produced identical
+      8,900,408-byte LLVM and the same function-artifact SHA-256
+      (`fa91789d...`). Time remained neutral within run variance. Across the
+      two direct before/after pairs, average reported peak footprint fell from
+      about 4.67 GB to 3.74 GB; maximum-resident readings were noisier.
+  - [x] Profile behavior-effect closure and owned-return-summary construction
+    with the generated candidate as the running compiler.
+    - The candidate-powered development profile measured 1,687,027,712 bytes
+      before derivation, 1,687,339,008 bytes after effect closure, and
+      4,819,025,920 bytes after owned-return summaries. Effect closure added
+      only about 0.3 MB; owned-return reconstruction added about 3.13 GB and
+      took 38,575 ms.
+    - Current-resident telemetry confirmed the pages remained live at the
+      owned-return boundary. The process construct-identity arena reserved
+      only 10,747,904 bytes, and macOS allocator pressure relief released zero
+      bytes, ruling out both construct identities and immediately reclaimable
+      allocator cache as the explanation.
+    - Repeated candidate runs emitted identical 8,901,595-byte LLVM and the
+      same function-artifact SHA-256 (`8602ec1f...`). The profiler command
+      returns status 1 in the managed sandbox only because `/usr/bin/time`
+      cannot query `kern.clockrate`; compilation reached `sourceSet.end`.
+  - [x] Account for live raw-buffer and transient-string bytes during owned
+    return reconstruction.
+    - Owned raw buffers were only 7,252,381 bytes live after the phase, with a
+      7,889,620-byte peak. Transient allocations returned to zero but reached
+      a 2,511,148,512-byte peak during the phase. This is temporary allocator
+      churn inside owned-return work items, not retained behavior facts.
+    - Repeated candidate output remained identical: 8,901,595-byte LLVM and
+      artifact SHA-256 `8602ec1f...`.
+  - [x] Attribute transient peak bytes per owned-return work item and move the
+    diagnostic boundary to the emitter after the work-item peak was shown not
+    to be causal.
+    - The corrected candidate/reproduction profile covered 381 work items; the
+      largest was only 99,392 bytes (`functionRow=1945`, `instanceID=2916`).
+      Owned-return summaries still ended around 4.82 GB RSS, but their
+      transient peak was about 40.8 MB; the 2,852,655,776-byte transient
+      high-water was reached during `functionEmission`.
+    - Function-level transient attribution identified the largest observed
+      increment as 893,450,800 bytes in
+      `compilerCoreLLVMLowerHelperFunctionTypedObserved` (function ID 1975).
+      The next slice should inspect its lowering buffers and repeated-call
+      retention before changing graph or reset semantics.
+    - Emitter experiment: `compilerBodyLLVMEmitterAppendInstruction` now
+      appends instruction components directly to `renderedBlocks`, avoiding
+      one interpolated temporary per instruction. Candidate/reproduction
+      output converged (`LLVM 8,906,270 bytes`, artifact SHA
+      `dc25ce79655d...`), but the function-emission transient high-water stayed
+      around 2.852 GB, so this change is currently inconclusive rather than a
+      measured memory win.
+    - Materialization experiment: transferring `renderedBlocks` ownership into
+      the transient region avoided the final copy in isolation, but the
+      function-emission high-water remained about 2.852 GB. The ownership
+      transfer was reverted; the next target is operation-processing churn.
+    - Emitter stage trace: planning peaked at 919,072 bytes, CFG rendering at
+      7,156,784 bytes, materialization at 81,968 bytes, and global rendering at
+      728,096 bytes. These are not large enough to explain the enclosing
+      helper's roughly 1 GB transient increment; pre-emitter parse/memory/MIR
+      boundaries are now instrumented and need a fresh candidate build to
+      bypass the prior artifact cache.
+    - Fresh candidate/reproduction attribution now identifies
+      `compilerBodyMemoryDerive` as the dominant bounded stage: 394,109,040
+      bytes peak, versus 75,152,880 for lowering emission and 30,882,096 for
+      MIR construction. The next slice should split `compilerBodyMemoryDerive`
+      across owned-path construction, value/placement/access/pass-escape,
+      validation, and lifetime phases.
+    - [x] Add `scripts/profile-range-compiler-suspects` as a repeatable TSV
+      matrix harness for owned-return, function-emission, raw-buffer,
+      per-function, and per-work-item suspects. It preserves artifact identity
+      and separates measured deltas from run-to-run RSS noise.
+      - Baseline run (`current-emitter`) completed with status 0, LLVM size
+        8,906,270, artifact SHA `dc25ce79655d...`, 5,643,960,320-byte maximum
+        resident set, 2,852,023,312-byte function-emission transient peak,
+        7,889,620-byte raw-buffer peak, and an 893,474,784-byte peak in
+        `compilerCoreLLVMLowerHelperFunctionTypedObserved`.
+    - Current proof boundary: the runtime optimization changes accepted
+      runtime-source hashes, so `check-build-plan` intentionally stops at the
+      manifest mismatch until a deliberate candidate/reproduction checkpoint.
+      The optimized runtime has profile/output equivalence evidence, not a new
+      Compiler V1 or fixed-point proof.
+- [ ] V2: introduce Composition/Delta/Flow beneath the typed semantic products
+  and prove query equivalence plus invalidation behavior before any cutover.
+- [ ] V3: reconsider which semantic distinctions and compiler-wide ABI
+  authorities can actually be deleted after V2 evidence exists.
 
-- [x] Add the first Range-authored compiler-description values.
-  - Core now defines `PhaseRegistration` and `CompilerRegistration` as
-    ordinary typed macro results. `@phase` returns its function target without
-    emitting syntax, while `@compiler` collects the construct's ordered
-    `Array<@phase>` and rejects a compiler with no phases.
-  - The focused proof registers `shape` and `usage` in source order, excludes
-    an unannotated helper, observes both phase result values, and checks the
-    exact missing-phase diagnostic.
-  - [ ] Add explicit phase dependencies and derive a schedule as another
-    graph value; do not hardcode the five illustrative compiler phases.
-  - [ ] Let a compiler registration select its source/project inputs and
-    invoke the described pipeline before synthesizing command-line behavior.
-  - [ ] Route scheduled graph domains into typed dense storage partitions
-    only after profiling identifies their producers, consumers, and costs;
-    dense buffers remain physical storage, not the semantic compiler model.
-  - [x] Carry the description through one executable Compiler V1 slice.
-    - `@main` now exposes `compile-v1` and `inspect-v1`. The V1 runner loads an
-      explicit input file as a stable `Identity : FileValue` source Delta,
-      produces inspectable Source, Shape, Behavior, and Compiled Deltas through
-      named phase functions, then delegates LLVM emission to the current native
-      compiler path.
-    - `scripts/range check-compiler-v1` proves the V1 plot artifact is
-      byte-identical to the legacy output for an ordinary Range program,
-      validates and links that LLVM, executes it with exit `7`, inspects the
-      shape/behavior/plot artifacts, and checks the typed missing-input error.
-    - [x] Expose the persistent graph line as an opt-in compiler command.
-      - `range compile-graph <FILE-OR-DIR>` resolves the current Range-authored build
-        producer and runs its `compile-v1` File -> Source -> Syntax -> Shape -> Behavior ->
-        Compiled pipeline; ordinary `range compile` remains the accepted
-        bootstrap oracle while the cutover is compared. The durable cache
-        boundary implemented today reaches persisted Syntax and facts-only Shape.
-      - `scripts/range check-compiler-graph` proves direct legacy LLVM parity,
-        project source-set parity, Source/Shape/Behavior/Compiled inspection,
-        cold insertion, unchanged reuse, and edited replacement in 7 seconds
-        without rebuilding LLVM.
-      - Graph project bundles carry the explicit `// range-development-compiler`
-        marker already used by the V1 generation proof. This is a Source
-        artifact consumed by later Shape derivation; it does not yet make graph
-        compilation the default or remove the bootstrap oracle.
-      - [x] Give the graph source-set a stable File identity and persistent
-        File -> Source artifact.
-        - `scripts/compile-range-project --graph` stores the canonical source-set
-          bundle, accepted revision, and compiled artifact under an ignored
-          Source cache keyed by the project path. It derives transient
-          `resume-v1` input from the revision. The bundle also carries the graph
-          compiler hash, so a producer change invalidates the value.
-        - Cold, warm, edited, failed-candidate, and recovery paths are covered
-          by `scripts/range check-compiler-graph`; a failed candidate restores
-          the previous accepted bundle before returning its typed error.
-      - [ ] Derive and persist canonical Shape as a separate graph artifact.
-        Shape begins after Source: Core `@syntax` and syntax-template rules must
-        derive the typed declaration, member, relationship, and cardinality
-        facts from the Source artifact. The current `resume-v1` record contains
-        only phase fingerprints for inspection; its Shape fingerprint is not a
-        durable Shape authority, and lowering still uses V1's in-process tables.
-        Add an independent Shape validation/proof before routing later phases
-        through it.
-        - [x] Persist the first graph-level V1 syntax-fact artifact and make
-          Shape a pure projection over it. Revision v4 owns its digest and
-          value; warm reuse preserves its inode, literal edits preserve its
-          value when structure is unchanged, failed candidates preserve its
-          accepted bytes, and `project-shape-v1` reproduces Shape with Source
-          unavailable.
-        - [ ] Extend the artifact from the complete typed Shape snapshot to all
-          reloadable pre-link syntax tables so Behavior no longer recaptures
-          Source before macro linking and lowering.
-        - [x] Persist the first source-local syntax Shape artifact through
-          `range shape <FILE-OR-DIR>`. The versioned artifact contains the
-          Core-authored `@syntax` recipe order, literals, typed captures, and
-          one/many/zero-or-one cardinality, with no Behavior or LLVM rows.
-          `scripts/range check-shape` proves cold insertion, warm reuse, an
-          edited literal, invalid-candidate isolation, and recovery.
-          - [x] Make Shape consume the persisted File -> Source bundle when
-            its input/compiler provenance matches, and promote a changed
-            Source bundle only after Shape succeeds. The focused proof now
-            inspects the Source bundle and its source-set hash in the Shape
-            artifact, so Shape no longer rebuilds an accepted Source value on
-            every invocation.
-        - [ ] Extend Shape input from the source-local proof to the complete
-          Core/project Source artifact after the accepted Core syntax package
-          has a complete recipe-finalization boundary. The current accepted
-          Core manifest is intentionally not forced through that finalizer by
-          the first Shape command.
-    - [ ] Separate compilation from building as explicit products and phases.
-      - Compilation consumes source, Shape, and Behavior and ends at a typed
-        compiled-program artifact containing target-independent meaning plus
-        target LLVM emission. It does not validate, link, or execute.
-      - Building consumes compiled artifacts, the selected target, runtime and
-        dependency inputs, and a `LinkPlan`; it validates and links an
-        executable artifact. Execution remains a separate run operation.
-      - Rename the current V1 Plot result to the compiled artifact, introduce
-        a build artifact around the existing authored `LinkPlan`, and update
-        `scripts/check-range-compiler-v1` to assert compile, build, and run as
-        distinct boundaries without changing their verified byte output.
-    - [x] Prove the first input boundary as an ordinary Range function returning a
-      source Delta.
-      - `compilerV1Load(input:) -> CompilerV1SourceDelta` now owns the explicit
-        file read. The Delta pairs one path-derived canonical
-        `CompilerFingerprint` with one `FileValue(path:source:)`; the duplicate
-        V1 identity type and copied hash implementation have been removed.
-      - [x] Separate stable phase identity from changing phase value identity.
-        - Source, Shape, Behavior, and Compiled Deltas retain a stable identity
-          derived from their owning File and phase, carry explicit `before` and
-          `after` value fingerprints, and connect each phase input to the prior
-          phase's `after` fingerprint.
-        - Changing File contents preserves the File identity while changing its
-          value fingerprint. Shape and later phases are now capable of update
-          semantics instead of treating each changed value as a new graph node.
-        - The development candidate rebuilt all 2,952 function artifacts and
-          passed the complete value-ownership gate in 654 seconds: 651 seconds
-          Range LLVM emission, 2 seconds validation, and 1 second linking.
-          `scripts/check-range-compiler-v1` then passed stable phase identities,
-          exact Source -> Shape -> Behavior -> Compiled value-fingerprint
-          chaining, legacy LLVM byte parity, validation, linking, execution
-          with exit `7`, and the typed missing-input error.
-      - [x] Load each prior value fingerprint from persistent execution state so
-        an update carries its real `before` value instead of the cold-start
-        `0:0` absence marker.
-        - `resume-v1 <execution.tsv> <input.range> <output.ll>` stores the File,
-          Source, Shape, Behavior, and Compiled fingerprints in one Range-owned
-          versioned record. A cold execution inserts every value; an unchanged
-          execution verifies both the current source and cached LLVM fingerprints
-          without rewriting either file; an edited execution loads the exact
-          prior phase values before replacing them.
-        - State for another File identity rejects. Malformed state is an invalid
-          cache value: it is rebuilt and replaced rather than becoming a program
-          error. Output and state writes are independently atomic; add a shared
-          transaction boundary before treating the pair as one durable commit.
-        - [x] Preserve the last-known-good execution across a failed candidate.
-          - The focused V1 gate inserts a valid generation, attempts an edited
-            source that fails with a typed compiler error, proves both the
-            accepted execution record and LLVM artifact remain byte-unchanged,
-            then advances them with the next valid source generation.
-        - The complete value-ownership gate passed after rebuilding 2,967
-          function artifacts in 667.06 seconds: LLVM emission consumed 652
-          seconds, validation 1 second, and linking 2 seconds. The focused V1
-          gate then passed in 4.46 seconds, including cold insertion, unchanged
-          no-rewrite reuse, exact prior-value update, File-identity rejection,
-          malformed-cache repair, LLVM validation/linking, and exits `7`/`8`.
-        - The current command reads the one state record repeatedly through
-          scalar helpers because aggregate ownership joins remain unsupported.
-          Replace that workaround with one loaded persistent project graph after
-          the ownership boundary can carry the decoded aggregate safely.
-      - The existing `CompilerMemoryGraph.runtimeValues` rows are specialized
-        for macro-family applications and are found by table scans. Do not call
-        this source Delta a MemoryGraph insertion or random-access value until
-        the identity/value storage boundary is generalized without a File-name
-        special case or a second graph.
-      - Prove the source Delta inspection, legacy LLVM byte parity, linked
-        execution, and missing-input error through `scripts/check-range-compiler-v1`.
-      - The focused V1 gate passed after a development candidate cache miss:
-        LLVM emission took 711 seconds, validation 1 second, and linking 2
-        seconds; 12 function artifacts were reused and 2,913 rebuilt. The V1
-        LLVM was byte-identical to the legacy path, linked, and ran with exit
-        `7`; changing only File contents preserved its path-derived identity.
-    - [ ] Generalize the existing MemoryGraph identity/value storage boundary.
-      - Remove macro-application rows and syntax IDs from the minimum runtime
-        value identity contract, then layer macro-family provenance on top.
-      - Add identity lookup and replacement without introducing another graph,
-        copied fingerprint implementation, or File-named compiler special case.
-    - [ ] Replace the handwritten V1 command branch only after the direct
-      loader function is green.
-      - The candidate surface is `@commands(.global)`: on a function it
-        registers that function; on a construct it collects eligible member
-        functions. Keep this as a graph-registration design choice until one
-        target shape and generated argv dispatch have focused proofs.
-    - The verified follow-up compiler build emitted in 663 seconds, reused
-      1,617 function artifacts, rebuilt 1,306, validated in 1 second, linked
-      in 2 seconds, and completed in 666 seconds. Reuse is still too late to
-      avoid semantic reconstruction.
-    - [ ] Make `@compiler` and `@phase(after:)` registrations drive the V1
-      runner instead of retaining a manually ordered entry adapter.
-    - [ ] Ratchet Compiler V1 into authority one artifact domain at a time.
-      - Keep the current compiler as the accepted oracle while a V1 phase runs
-        in comparison mode over the same input identity.
-      - Promote a V1 phase only after its accepted and failed-candidate paths
-        are durable; then delete the superseded legacy producer in that same
-        checkpoint instead of retaining two semantic authorities.
-      - A failed candidate records diagnostics without replacing the accepted
-        graph. A valid candidate commits one new generation atomically and
-        becomes the input identity for the next phase.
-      - [x] Prove a complete V1 compiler generation reaches its own fixed point.
-        - `scripts/range check-compiler-v1-generation` materializes the
-          canonical compiler source bundle, has the current V1 producer emit
-          and link Compiler V2, requires byte-identical V1/V2 LLVM and
-          executables, and runs the ordinary exit-7 fixture through both
-          generations. Because V1 was built from the same canonical source,
-          reproducing itself is the fixed-point check; a redundant V3 would
-          repeat the same cold proof. The expensive result is
-          content-addressed so an unchanged proof can be reused.
-        - The first full-bundle attempt exposed V1 Shape eagerly capturing
-          every function body and aborting inside statement parsing before
-          LLVM emission. V1 now follows the normal retained-graph boundary:
-          capture declarations and main once, then let reachable lowering
-          discover bodies from that same table instead of forcing all bodies
-          into Shape.
-        - Declaration-first capture completed reachable LLVM lowering, but V1
-          then rejected the product because its separate whole-program
-          `CompilerSemanticGraph` cannot represent the compiler. That legacy
-          graph is no longer V1 Behavior authority: successful reachable
-          lowering produces a stable Behavior-product fingerprint, including
-          body-only changes, while failed lowering remains a typed error. The
-          fingerprint is transitional until the persisted per-function
-          Behavior graph becomes the directly retained product.
-        - The next cold V1 self-emission completed in 2,580 seconds and
-          reproduced byte-identical V2 LLVM. Its first gate revision then
-          rejected executable bytes because it linked under the basename
-          `CompilerV2`; the repository links as `RangeCompiler.tmp` and moves
-          that file, and Mach-O UUID/ad-hoc signing includes that identifier.
-          The corrected gate reproduces the repository link contract and may
-          consume the validated development function-artifact graph; the cold
-          LLVM identity result is not discarded or mislabeled as a cache hit.
-        - The corrected proof passed: V1 emitted V2 in 2,116 seconds, and both
-          LLVM artifacts were byte-identical at 8,630,963 bytes with SHA-256
-          `872d36b31f76bb7ba0d8a64ce6b1e9f0a1631f5ea9e5d217549bd0e7ba984ab4`.
-          The linked V1/V2 executables were byte-identical at SHA-256
-          `5fbb05e0084d0ed2c1950c6ab180598a176b6bb4c9df460df23e330cc225a8ca`,
-          and each compiled, linked, and ran the ordinary fixture with exit 7.
-          The function-artifact input reduced the repeat from the observed
-          2,580-second cold emission to 2,116 seconds, but did not provide a
-          closed-module short circuit; most reconstruction still ran.
-        - [ ] Move the validated module cache ahead of reachable-body discovery.
-          - [x] Version 8 records a canonical source identity (ignoring only
-            input/output cache-directive paths), root Behavior integrity, and
-            the complete persisted artifact-record/text integrity. An exact
-            module match returns before reachable-body discovery; malformed,
-            stale-root, stale-callee, and source-mismatched caches fall back to
-            the existing checked path.
-            - The focused Compiler V1 gate passed in 51.62 seconds and proved
-              cold insertion, closed-module reuse without discovery/candidate/
-              effects/ABI/emission phases, root and callee tamper rejection,
-              malformed-cache repair, and legacy LLVM/runtime parity.
-            - The native current cold build emitted LLVM in 656 seconds and
-              completed in 659 seconds (`2,981` artifacts rebuilt). The
-              unchanged warm invocation was a cache hit in 3.94 seconds with
-              identical LLVM hash `2c2783799b1524d7d9423a2a9caac430eb9a168878d2307ad018cf365174603e`
-              and executable hash
-              `929a33f21ec6c05595c366300b53854dafc20020dd743f34792bddb66e60b424`.
-          - [ ] Run the full candidate/progression ladder before promoting the
-            new cache schema or bootstrap.
-          - The first post-edit native smoke probe reached the normal LLVM
-            producer at roughly 10.7 GB resident memory after 3:37 and was
-            stopped before completion; the completed v8 run stayed within the
-            observed safe resource envelope.
-    - [x] Replace the three independent source rebuilds with one persistent
-      project graph whose shape and behavior deltas flow between phases.
-      - [x] Make V1 Shape own one typed-syntax capture and derive both the
-        inspectable Shape snapshot and Behavior snapshot from its live tables.
-        - `compilerV1Behavior` no longer accepts source or invokes an
-          independent semantic summary; it consumes only the frozen
-          Shape-owned Behavior snapshot. The focused V1 gate enforces this
-          source boundary, preserves legacy LLVM parity and failed-candidate
-          isolation, and validates, links, and runs exits 7/8.
-        - Native smoke rebuilt the changed compiler in 663 seconds: 659
-          seconds emitting LLVM, 2 seconds validating, and 2 seconds linking.
-      - [x] Make the Compiled phase consume retained Shape and Behavior
-        products directly.
-        - Shape now invokes the linked-table native LLVM boundary while its
-          single captured syntax graph is alive and freezes that output beside
-          its Shape and Behavior snapshots. Compiled accepts no source value
-          and only commits the retained output after verifying that Behavior
-          consumes the exact Shape generation.
-        - Raw source remains the backing storage for body spans during this
-          lowering; declarations and syntax are not captured a second time.
-          Persistence across process runs still stores fingerprints and LLVM,
-          not the live typed graph, so changed input performs one complete
-          capture on its next execution.
-        - The focused V1 gate preserves legacy LLVM parity, failed-candidate
-          isolation, exact prior phase values, malformed-cache repair, and
-          linked exits `7`/`8`. Producing the changed development compiler
-          still took 830 seconds: 827 seconds emitting LLVM, 1 second
-          validating it, and 2 seconds linking, with 0 of 2,977 function
-          artifacts reused. The retained phase cutover removes duplicated V1
-          capture but does not yet solve whole-compiler reconstruction.
-    - [ ] Delete ABI and effect-summary phases from Compiler V1.
-      - Shape owns physical value representation and carried identity.
-        Behavior is the composable graph mapping from input shapes to output
-        shapes plus capability edges such as read, write, move, destroy, and
-        platform access; it is not a separately reconstructed effect table.
-      - Compose behavior along call/relationship edges and invalidate it from
-        observed identity changes. Select the target calling convention once
-        during plotting from the frozen boundary shape.
-      - Keep the current compiler's ABI/effect machinery only as the parity
-        oracle until V1 shape/behavior plotting passes the same focused native
-        controls; then delete the superseded reconstruction path.
-      - [x] Remove disposable LLVM emission from the ABI capability probe.
-        - The probe now stops after its graph-producing work and MIR
-          validation. Authoritative entry/helper lowering owns the only two
-          remaining `compilerBodyLLVMEmit` call sites; the focused V1 gate
-          rejects any return of the `abi.emit` probe.
-        - Removing the dead source reduced the immediately adjacent bootstrap-
-          producer miss from 827 seconds to 668 seconds, with validation and
-          linking taking 2 seconds each. That measures the accepted producer
-          compiling a smaller next compiler; it is not the new compiler's own
-          runtime improvement.
-        - At this intermediate checkpoint the persisted V1 execution suite
-          passed, and the dedicated mixed aggregate-return fixture still
-          rejected before LLVM output with
-          `representationSensitiveABICapabilityBlocked` at capability stage
-          `52001`; the subsequent Shape-authority cut below moves that body
-          failure out of ABI planning.
-      - [x] Make captured function discovery the ABI capability authority and
-        remove ABI component planning's second body reconstruction.
-        - Discovery publishes capability only after the function's captured
-          body, signature, call edges, CFG, owned paths, direct Behavior, and
-          representation-sensitive targets are valid. ABI component planning
-          consumes that Shape result instead of reparsing and rebuilding
-          ownership/MIR merely to decide participation.
-        - A full cold profile executed by the newly built compiler completed
-          the current compiler source set successfully in 496,221 ms and
-          emitted 8,630,832 LLVM bytes. Every `abi.parse`, `abi.resolve`,
-          `abi.cfg`, `abi.ownership`, `abi.mir`, `abi.validate`, `abi.emit`, and
-          `abi.cleanup` counter was exactly zero.
-        - The profile used 11,680,858,112 maximum resident bytes and reported a
-          15,090,461,784-byte peak footprint. The newly exposed dominant work
-          is function-effect construction at 140,391 ms followed by roughly
-          317 seconds between the frozen ABI plan and completed function
-          emission/module assembly. The largest observed function totals were
-          49,317 ms in `compilerBodyLLVMEmitterProcessOperation` and 38,951 ms
-          in `compilerBodyMIRValidationCode`.
-        - Invalid aggregate-return bodies now remain out of ABI shape planning
-          and reject at authoritative typed-body lowering with
-          `unsupportedReachableLowering`, `function=brokenPair`, and
-          `typedBodyPipelineFailure stage=52001`, before any LLVM definition or
-          call is returned.
-      - [x] Make V1 Plot accept the frozen Shape and Behavior artifacts,
-        reject a mismatched Shape-to-Behavior identity chain, and expose the
-        Behavior identity consumed by Plot for inspection and future cache
-        lookup.
-      - [x] Persist the closed Behavior mapping with each function artifact.
-        - Artifact schema version 2 records the pre-lowering function-instance
-          and body identity as Behavior input, then closes its output over the
-          proven ABI identity, effect dependencies, and observed call edges.
-          Cache reuse requires both ends of that mapping to match; superseded
-          artifact schemas are ignored safely and rebuilt.
-      - [x] Move candidate lookup ahead of ownership/ABI reconstruction.
-        - After reachability discovery freezes function-instance signatures
-          and observed call edges, each work item records a candidate only when
-          its cached Behavior input and edge fingerprint match. Final reuse
-          still requires the same row's closed output, ABI, and effect proofs.
-      - [x] Close the reachable candidate graph over instance-level dependency
-        outputs.
-        - Artifact schema version 3 fingerprints each function Behavior output
-          together with the exact specialized instances it calls and their
-          outputs. Closure is checked and timed before effect reconstruction;
-          late reuse must reproduce the same closure from current proofs.
-      - [x] Collect the unique `@main` root from captured syntax before
-        evaluating its Behavior.
-        - Later entry consumers now follow the captured
-          `mainAnnotation -> appliesTo -> entry` graph instead of reparsing
-          source text to rediscover main.
-      - [x] Make main the first ordinary Behavior root: let its evaluation own
-        body verification and callee discovery, persist its input/output, and
-        include its reachable function outputs in graph closure.
-        - Function artifact schema v4 stores a root Behavior record before the
-          per-function records. A cached graph is closed only when the captured
-          main body, its discovered instance edges, every function candidate,
-          and the root closure over those function outputs all match.
-      - [x] Bypass ownership/effect/ABI reconstruction when the complete main-
-        rooted Behavior graph matches, while retaining exact rejection proofs
-        for a changed main body, changed root edge, and changed callee output.
-        - Artifact schema version 5 stores the complete emitted module after
-          the root Behavior record. A closed hit returns it before
-          ownership/effect/ABI reconstruction and does not rewrite the output
-          artifact; mismatched main input, root output, or callee output each
-          fail closed and rebuild.
-        - Ordinary and native source-set compilation now capture an `@main`
-          root shell into the shared syntax graph immediately after declaration
-          capture; the later entry path no longer reparses source to rediscover
-          it. Executable statements still use the current BodyArena parser.
-        - `scripts/check-range-compiler-v1` passes legacy/V1 LLVM byte parity,
-          validate/link/run exit `7`, the closed-module hit, all three cache
-          rejection controls, inspectable Shape/Behavior/Plot artifacts, and
-          the typed missing-input error.
-        - The final compiler miss reused 2,947 of 2,948 function artifacts but
-          still spent 350 seconds emitting LLVM, 2 seconds validating, and 2
-          seconds linking. The next performance slice must skip module-wide
-          reconstruction across compiler-source cache keys, not merely raise
-          the late function-reuse count.
-        - [ ] Re-prove a warm artifact hit on the complete compiler source set
-          after the module-wide producer is separated from the development
-          path. A direct `range-function-artifact-input` experiment was
-          bounded at 1,373.49 seconds in `compilerBodyLLVMEmit`, emitted zero
-          LLVM bytes, and wrote no artifact before interruption; the supported
-          V1 gate's small closed-Behavior fixture remains the valid cache-hit
-          proof.
-          - `scripts/range compiler profile` now always requests an artifact
-            output and can persist it with `RANGE_COMPILER_PROFILE_ARTIFACT_OUTPUT`.
-            Its next run can consume that exact file through
-            `RANGE_COMPILER_PROFILE_ARTIFACT_INPUT`; a successful closed hit is
-            reported as `compilerArtifact status=reused` and retains the full
-            authored phase/function trace for comparison.
-          - `scripts/check-range-compiler-v1` proves the profiler path with a
-            cold artifact write followed by a warm artifact reuse. The cold
-            trace reaches effects, ABI components, and function emission; the
-            closed warm trace reaches artifact candidates but contains none of
-            those three stages. The focused proof completed in 52.09 seconds.
-          - A live complete-source profile was bounded after 16:28 at roughly
-            9 GB RSS, before it could write its cold artifact. Its trace reached
-            repeated ABI ownership/MIR work and
-            `compilerBodyLLVMEmitterProcessOperation`; retain frozen typed body
-            and ABI products before attempting another full cold-to-warm run.
-        - A subsequent one-function parser change reused 2,948 of 2,949
-          artifacts and still spent 350 seconds emitting LLVM, versus 1 second
-          validating and 2 seconds linking. This independently reproduces the
-          same late-reuse bottleneck.
-      - [x] Retire the candidate harness's obsolete
-        `environment.target.memberCount(...)` oracle.
-        - The self-compiled compiler rejects that removed magic API during
-          macro body resolution before recording a graph dependency. The
-          candidate now preserves that deterministic negative boundary; typed
-          member discovery is authored as
-          `environment.target.Declaration.members.filter(all: ...)`.
-        - The Project defaults macro and its focused fixtures now use typed
-          `State` filtering plus authored String equality. Exact read-
-          dependency recording for structural syntax collection remains a
-          separate graph-observation slice; the current collection evaluator
-          reports no legacy string-key graph reads.
-        - [ ] Give an unresolved call to removed String magic such as
-          `stringLength` or `stringByteAt` a named unregistered-capability
-          diagnostic. It currently rejects deterministically during entry
-          resolution as `invalidEntryReachability`, stage `2`; do not restore
-          either name as a compiler builtin merely to improve that message.
-      - [x] Keep generated declarations distinct from a standalone emitted
-        value inside `#environment`.
-        - Only the first expansion token may select the direct `Value(...)`
-          form. After `function`, `construct`, an attribute, or another syntax
-          token, a later `identifier(` is ordinary generated syntax rather than
-          a second attempt to parse the whole expansion as one expression.
-        - The focused generated-function suite now passes snapshot stability,
-          native LLVM validation/link/run, target-owned member placement, and
-          its collision/malformed-splice rejection controls.
-    - [ ] Support moving an owned construct extracted from a success enum
-      payload into the next function. The first direct `Result`-shaped V1
-      runner rejected at `compilerV1Run` with
-      `invalidFunctionReachability`, `detail=811`; the vertical adapter keeps
-      nominal artifacts and converts legacy string diagnostics into
-      `CompilerV1Error` until that general ownership boundary is proven.
-    - [ ] Locate the nearest `Project.range`, gather its complete source set,
-      and represent project/file locations as graph values rather than
-      limiting V1 to one explicit input file.
+The coding model is authoritative; algebraic names describe observable shapes
+but do not replace the executable Range constructs:
+
+```text
+construct = product
+enum       = sum
+property   = field
+function   = transformation
+macro      = environment
+delta      = product
+flow       = carrier of deltas
+```
+
+The core invariant is:
+
+> Every graph value is an identified, ordered composition of identities.
+> Combining compositions creates another identified Range point which can
+> itself participate in later compositions.
+
+- [ ] Milestone 1: make `Composition` the semantic graph primitive.
+  - [x] Define the minimal Core value:
+
+    ```range
+    construct Composition {
+        let identity: Identity
+        let components: Array<Identity>
+    }
+    ```
+
+    - `RangeGraphTopology.compositions` exposes the first compatibility view;
+      existing node/relationship fields remain until equivalent queries are
+      proven and their consumers can be deleted together.
+    - `scripts/range check-composition` compiles, validates, links, and runs a
+      focused fixture. Two anchors retain distinct identities over the same
+      ordered components, and a third composition recursively consumes the
+      first anchor identity; the executable exits `7`.
+
+  - [ ] Keep identity, current value, and structural fingerprint distinct.
+    - An identity names a stable authored or derived occurrence.
+    - `components` are its current value at a revision.
+    - A disposable fingerprint indexes structural equality; it never replaces
+      identity, so two occurrences may have equal components and different
+      identities.
+  - [ ] Prove ordered syntax-identity compositions for the representative
+    language forms before generalizing storage:
+    - construct member products such as `[User, name]` and `[User, age]`;
+    - enum case sums such as `[queued, Message, View]` and
+      `[pending, Message, View]`;
+    - function access/transformation paths such as
+      `[User, name, .count]`;
+    - property identities as fields rather than a separate projection value;
+    - macro identities as the available compile-time environment; and
+    - delta identities as an atomic product of change compositions.
+  - [ ] Prove composition anchoring and recursive composition.
+    - Combining `A` and `B` produces an identified anchor `AB -> [A, B]`.
+    - Many-to-many relationships are sets of such anchors, not a separate
+      table kind or cardinality ontology.
+    - Multiple anchors may share `[A, B]` while retaining distinct occurrence
+      identity and provenance.
+    - N-ary component arrays are identified hyperedges; another composition
+      may use their identity as an ordinary component.
+  - [ ] Decide explicit normalization laws rather than assuming associativity.
+    - `(A x B) x C`, `A x (B x C)`, and `[A, B, C]` retain authored identity
+      unless a typed view explicitly proves them equivalent.
+  - [ ] Replace `RangeGraphNode`, `RangeGraphRelationship`, and their parallel
+    semantic stores only when Composition fixtures prove equivalent queries
+    and the old model is deleted in the same checkpoint.
+
+- [ ] Milestone 2: represent Delta as a product of identified changes.
+  - [ ] Move rooted paths and requirement/provision routing out of Delta; they
+    belong to Flow.
+  - [ ] Encode insert, replace, remove, and relationship change as ordinary
+    change compositions carrying target, observed version or prior value, and
+    next value where applicable.
+  - [ ] Encode one Delta as an ordered composition of those change identities,
+    with parent revision, origin/environment, observations, diagnostics, and
+    provenance represented through compositions rather than a second graph
+    schema.
+  - [ ] Commit the complete Delta product atomically or leave the accepted head
+    unchanged.
+  - [ ] Prove the batching law operationally: disjoint Delta products may
+    commute; overlapping observation/write sets must retain order or be
+    re-derived from the new head.
+  - [x] Append each accepted compatibility revision as an immutable
+    parent-linked record and advance `delta-head.tsv` atomically. Warm reuse
+    and failed candidates append nothing, and an edited child preserves its
+    parent bytes.
+
+- [ ] Milestone 3: implement Flow as the system carrying Delta compositions.
+  - [ ] Define Flow independently from Delta with an identity, root,
+    environment, frontier, and ordered composition paths.
+  - [ ] Make an access path an ordered array of actual syntax identities, not
+    a parallel path-node taxonomy or a list of storage-table rows.
+  - [ ] Treat the whole graph as shared compositions while a walk rooted at one
+    composition unfolds as a tree.
+  - [ ] Make the language forms carry their natural paths:
+    - constructs carry declared field compositions;
+    - enums carry alternative case/payload compositions;
+    - functions carry consumed, accessed, and produced compositions; and
+    - macros carry the environment in which those identities are available.
+  - [ ] Make each reducer consume a Flow frontier and propose a Delta product;
+    the reducer is not itself durable state.
+  - [ ] Schedule deterministic rooted frontiers and run only interactions whose
+    observation and write compositions are disjoint.
+  - [ ] Derive binding, fan-out, erasure, ownership, and target requirements as
+    explicit compositions carried by Flow rather than implicit upward or
+    compiler-global phase state.
+
+- [ ] Milestone 4: derive cheap indexes and freeze-dried checkpoints.
+  - [x] Establish a like-for-like primitive query baseline before adding
+    indexes.
+    - `scripts/range benchmark-composition` constructs each representation
+      once, performs 20,000,000 runtime-anchored origin/role/destination
+      matches, and reports five-sample alternating medians at `-O0`.
+    - Runs on 2026-08-07 placed unindexed Composition path access at `0.992x`
+      to `1.078x` the direct-field time. This verifies no
+      primitive-level speed improvement yet; the performance claim belongs to
+      derived indexes and measured physical layout.
+  - [ ] Implement disposable exact-sequence, prefix, component-position,
+    extension, and reverse-membership indexes over Composition identities.
+    - [x] Implement the first exact-sequence lane as a compiler-owned,
+      disposable buffer index without changing the logical `Composition`
+      model.
+      - The index stores ordered two-word identity representations, uses a
+        fingerprint only to select a collision chain, and confirms every hit
+        through full ordered identity comparison.
+      - `scripts/range check-composition` proves order sensitivity, two
+        identity-distinct anchors for one component sequence, misses, and
+        equivalent results after rebuilding the index.
+      - Across four runs of 64 graph values and 500,000 exact lookups, indexed
+        lookup took `0.159x` to `0.163x` the direct relationship scan and
+        `0.135x` to `0.137x` the unindexed Composition scan at `-O0`.
+    - [ ] Add prefix, component-position, extension, and reverse-membership
+      lanes only as concrete compiler consumers require them.
+  - [ ] Keep the language model as `Array<Identity>` while measuring an inline
+    physical representation for the common two-to-four-component case and a
+    spill path for longer compositions.
+  - [ ] Make index and checkpoint storage replaceable without changing logical
+    queries; dense buffers, row-major stores, tries, and structure-of-arrays
+    remain physical choices rather than semantic authorities.
+  - [ ] Rebuild a missing or stale compatibility checkpoint by replaying the
+    accepted Delta chain, then make replay rather than `revision.tsv` presence
+    the load authority.
+  - [ ] Measure exact lookup, prefix traversal, reverse invalidation, delta
+    apply, replay, checkpoint load, compile time, and peak RSS before claiming
+    the representation is cheaper.
+
+- [ ] Milestone 5: cut the compiler over to Composition and Flow.
+  - [x] Retain schema-v9 function derivations across declaration-row shifts and
+    use stable call-boundary identities for artifact dependencies.
+  - [x] Group ownership paths, calls, and returns under one transitional
+    `CompilerFunctionBehaviorFacts` entity and reserve freeze vocabulary for
+    disposable checkpoints.
+  - [ ] Replace per-function reconstructed facts with the actual compositions
+    each function consumes, accesses, produces, moves, writes, destroys, or
+    requires from its environment.
+  - [ ] Represent each caller/callee boundary as a shared Composition. Plot the
+    target machine convention consistently at both ends without a
+    compiler-wide semantic ABI plan.
+  - [ ] Delete `CompilerCallBoundaryPlan` and parallel global effect summaries
+    once focused ownership, aggregate-return, call, and runtime controls pass
+    through the Composition path.
+  - [ ] Make changed source produce a Delta at the first changed composition
+    prefix and invalidate only its reverse-composition closure.
+  - [ ] Move cache lookup before body reconstruction and make the rolling
+    producer-keyed cache a freeze-dried Composition checkpoint rather than an
+    alternative semantic artifact graph.
+  - [ ] Make compilation consume target-independent Composition/Flow values;
+    make target plotting, build/link, and execution distinct products.
+  - [ ] Delete superseded Source/Shape/Behavior/Compiled phase records,
+    node/edge stores, numeric-column accessors, and legacy parser/lowering
+    chains only when their last supported consumer moves in the same proven
+    checkpoint.
+
+- [ ] Milestone 6: simplify physical storage and runtime after the semantic
+  cutover.
+  - [ ] Complete deterministic automatic lifetimes for Composition-owned
+    String, Buffer, and aggregate values.
+  - [ ] Move compiler text and scratch storage onto canonical authored Core
+    facilities without repeating the immutable-concatenation regression.
+  - [ ] Keep dense integer storage private behind measured Composition indexes;
+    do not create a milestone whose goal is merely renaming Int tables.
+  - [ ] Remove raw runtime and platform entry points only after their final
+    accepted Composition/Core caller disappears.
+
+Discarded roadmap assumptions:
+
+- Shape, Usage, Ownership, Representation, ABI, and LLVM are not a permanent
+  compiler-wide phase hierarchy. They may remain temporary typed views while
+  the Composition cutover is proven.
+- Nodes, binary edges, relationship cardinality tables, function-effect
+  tables, and ABI plans are not separate semantic graph authorities.
+- Typed-store migration is not an end in itself; typed views and physical
+  indexes exist to serve Composition queries.
+- The graph machine is not a late optimization milestone after compiler
+  cleanup. Composition, Delta, and Flow are the current organizing model; safe
+  deletion and performance work proceed through that model.
+
+## Compiler and Runtime Follow-ups
 
 - [x] Collapse the accidental `RootValue` taxonomy into ordinary value
   ownership.
@@ -2842,6 +2870,23 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## GPU Drawing
 
+- [ ] Establish Range-authored native FFI as the substrate for GPU and window APIs.
+  - [x] Add an `@extern` function macro whose typed `ExternRegistration` result
+    drives foreign declaration and direct-call lowering without extending the
+    hardcoded runtime-builtin table.
+  - [x] Make one post-macro `FunctionImplementation` classification authoritative
+    for Range bodies, external symbols, runtime intrinsics, and invalid mixed
+    declarations across resolution, reachability, MIR validation, and LLVM.
+  - [ ] Prove the first boundary with top-level, bodyless, non-generic `Int`
+    signatures, exact LLVM `declare`/`call` output, native linkage, execution,
+    and focused rejection controls.
+  - [x] Add typed `@link` requirements whose persisted macro values produce
+    deterministic linker metadata and drive one native-library link proof.
+  - [ ] Add opaque pointers, C strings, `Void`, callbacks, aggregate ABI rules,
+    and project-owned library/framework requirements only through subsequent
+    focused compiler proofs.
+    - [x] Prove Range-authored nominal `@opaque` handles as distinct borrowed C
+      pointer tokens before adding nullable pointers or ownership behavior.
 - [ ] Prove the first macro-lowered GPU drawing application.
   - [x] Lower a construct-attached Range macro into an ordinary generated
     function that writes a self-contained WebGPU/WGSL application.
@@ -2854,12 +2899,145 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     presents the triangle.
 - [ ] Add a native typed GPU/runtime consumer only after its shader values,
   resource ownership, effects, and Graph 0 scheduling boundary are explicit.
+  - [x] Open an SDL2 native window from Range-owned declarations, create an
+    accelerated renderer, draw and present a triangle outline, and prove typed
+    pointer, unsigned-byte, integer, and Void foreign calls without a host
+    wrapper, including renderer, window, and SDL lifecycle cleanup. This is a
+    native drawing checkpoint, not the wgpu-native backend.
+    - [x] Lift the hardcoded edge coordinates into an ordinary Range-authored
+      `Triangle` value and a `rangeViewDrawTriangle(renderer:triangle:)`
+      primitive. Prove its by-value Range ABI, one primitive call, exactly three
+      SDL edge calls, native window execution, and exit `42`.
+    - [x] Make the minimal Triangle application runnable through the public
+      `scripts/range run` path. Keep its `Main.range` separate from framework
+      source, compose the real native framework with repeatable `--source`, and
+      require an explicit unpromoted compiler path while the accepted bootstrap
+      is not the current compiler authority.
+    - [x] Confirm that the explicit SDL show/raise and event-pump revision
+      visibly presents the native Triangle window on the maintainer desktop;
+      linked execution and exit `42` alone did not prove presentation.
+    - [x] Model `Window` and `WindowRenderer` as distinct Range-authored
+      `@opaque` resource identities, route Triangle drawing through the typed
+      renderer, and add a `Window` close query for SDL quit events.
+    - [x] Remove the ten-second diagnostic lifetime so a RangeView native app
+      remains alive until its window closes or its process is terminated.
+    - [x] Introduce backend-neutral `Point`, `Size`, and `DrawingSpace` values,
+      and source the native window dimensions from its drawing space.
+    - [x] Render one collection-driven gallery from `Array<Shape>` and a
+      concrete color-representation array, with shape-specific lowering for a line, filled rectangle,
+      filled circle, and five-point polygon; prove LLVM emission, SDL linking,
+      event-driven lifetime, and visible native presentation.
+      - [ ] Add runtime closure-backed `Array.map` so the authored page can map
+        the shape collection into displayed values instead of using the current
+        indexed `while` lowering.
+      - [ ] Admit stored `Array<Point>` in ordinary project constructs, then
+        replace the five-field native Polygon proof with variable-cardinality
+        point and edge relationships.
+    - [x] Define source-first `Matrix<Element>`, `MatrixPosition`,
+      `RectangleRepresentation`, and `ForEachRepresentation` so lists, tables,
+      grids, and kanbans project from one multidimensional model.
+      - [x] Display the twelve-color palette in the native example as a 6 by 2
+        rectangle matrix using the current explicit SDL adapter.
+      - [ ] Materialize ordinary relationship-backed members from `@many`, then
+        let the executable backend consume `ForEachRepresentation` instead of
+        spelling out twelve adapter cells. Do not add Matrix-specific lowering.
+        - The intended generic closure surface currently rejects during
+          project top-level capture as `invalidTypedDeclarations`; preserve the
+          RangeView design and add its compiler fixture with that implementation
+          slice rather than weakening the representation.
+      - [ ] Resolve whether the fully generic language zone lets `Matrix` omit
+        an explicit `<Element>` binder while still giving its `@many` member a
+        stable local compile-time type identity. Keep this in the deferred
+        unified generic-parameters review rather than special-casing RangeView.
+    - [x] Define the source-first `@shape` contract, `ShapeRepresentation`, and
+      a `Triangle` with `@many(3)` points. This describes the intended RangeView
+      surface; fixed-cardinality runtime construction is not compiler-backed.
+    - [ ] Route fixed-cardinality `@many(3)` through the same general
+      relationship-backed member materialization, then replace the temporary
+      three-field `NativeTriangle` adapter with semantic `Triangle`.
+    - [x] Define semantic `Color` as OKLCH plus alpha, add the magenta, red,
+      yellow, green, cyan, and blue hue-cycle presets plus neutral colors, and
+      declare source-first `@styleModifier` fill and line transforms.
+      - [ ] Give every `@color` representation an explicit RGBA projection and
+        make the SDL adapter consume that lowering product while authored
+        collections can remain `Array<Color>`.
+        - `toRGBA(color: OKLCH)` is source-authored, but the temporary Float
+          foreign-conversion declaration is not accepted by the current extern
+          macro execution path yet.
+      - [ ] Admit reachable aggregate-return member calls, then allow the same
+        operation to be spelled `color.toRGBA()` without a framework-specific
+        compiler path.
+      - [x] Add the six adjacent-pair derivatives: rose, orange, lime, spring
+        green, azure, and violet.
+      - [x] Keep `Color` as ordinary open data and compose named values as
+        homogeneous `Color` enum cases such as `case red: OKLCH(...)`.
+      - [x] Add the general `@color` capability marker for concrete
+        representations and the composed Color enum; focused ordinary
+        compilation accepts `@color` on `RGBA` and `OKLCH`.
+      - [ ] Admit homogeneous value enum cases generally, making
+        `Color.red` an `@color` value and the enum's ordered case field directly
+        mappable without `@iterable` or a separately maintained collection.
+        - [x] Capture `case name: expression` through the existing enum-case
+          `value: @syntax?` slot and admit cases added by enum extensions.
+          - The unpromoted compiler candidate compiles
+            `Testing/RangeView/Pass/ColorValues.range` to LLVM with `main`
+            returning `42`; the missing-value rejection fixture exits `65` at
+            `topLevelCapture`.
+        - [ ] Evaluate the captured value and forward its capabilities so a
+          composed case is itself usable wherever `@color` is required.
+          - Enum macro execution cannot yet project
+            `#environment.target.Declaration.cases`; a focused validation
+            attempt reaches type derivation failure `211`, so `@color` remains
+            the honest capability marker until enum-case graph projection is
+            available.
+    - [ ] Attach ordered style transforms to shape values and define how fill
+      and line composition reaches each rendering backend.
+    - [ ] Introduce ordered drawing layers in discrete checkpoints: layer
+      identity/composition, a transparent baseline, then blur after offscreen
+      render-target semantics are explicit.
+    - [ ] Support passing borrowed opaque parameters through Range-authored
+      `Void` wrapper functions. The current compiler rejects that wrapper
+      boundary during evaluation-temporary expiration at stage `13`, so the
+      proven one-window lifecycle calls show, present, and destroy directly.
+    - [ ] Let RangeView `@app` own one explicit native-window lifecycle before
+      modeling multiple windows. Add a window collection only after each
+      window's identity, renderer/resource ownership, event routing, and close
+      behavior are explicit.
+  - [ ] Pin and resolve wgpu-native, then add the C-layout descriptors,
+    callbacks, out parameters, and platform surface bridge required for a
+    direct Range-authored wgpu render pass.
+    - [x] Pin wgpu-native `v29.0.1.1`; the macOS arm64 release archive is
+      `wgpu-macos-aarch64-release.zip` with SHA-256
+      `a5797a37b1adf720bcd5dcffb291edbbd5b7b14be0a3874c28e6393a655a7a3e`.
+    - [x] Extend contextual `nil` resolution to `@opaque` foreign parameters
+      and lower it as LLVM `ptr null`. Prove `wgpuCreateInstance(nil)` and
+      `wgpuInstanceRelease(instance:)` before introducing aggregate C ABI.
+      - A disposable compiler linked the pinned macOS arm64 dylib, created and
+        released a real wgpu instance, queried its version, and exited `42`.
+        The accepted bootstrap was not modified.
+    - [x] Complete the focused proof for inferred call bindings spelled
+      `let instance: wgpuCreateInstance(descriptor: nil)`; do not retain a
+      redundant explicit result type or introduce `=` assignment syntax.
+      - A final disposable compiler compiled the unchanged inferred opaque-call
+        and tracked wgpu-instance fixtures, emitted their exact nullable pointer
+        calls, linked both native executables, and observed exit `42`. The
+        accepted bootstrap was not promoted; the supported ownership gates
+        remain pending until bootstrap/runtime provenance is reconciled.
+    - [ ] Add aggregate-by-value and callback ABI support for
+      `WGPURequestAdapterCallbackInfo` and the returned `WGPUFuture`; adapter
+      acquisition must remain outside the nullable-pointer checkpoint.
 - [ ] Complete compiler-owned `@commandGroup` dispatch after the generated-declaration checkpoint.
-  - [x] Prove a target-owned generated `Command` enum, generated callable `runCommandLine()` fallback, linked execution, and exact empty-group rejection through `scripts/range check-value-ownership`.
-  - [x] Stop RangeView from participating in this compiler checkpoint; RangeView remains idealized example code, not validation input.
-  - [ ] Support statement arrays produced by `#commands.map` inside generated function bodies without aborting native compilation, then prove argv key comparison and `self.<command>()` dispatch.
-  - [ ] Support fieldless construct values as method receivers so a command group does not need a stored control field solely to make `CLI()` representable.
-  - [ ] Replace the focused harness reflection prelude with canonical Core declaration envelopes only after their wider dependencies compile in the supported bundle.
+   - [x] Prove a target-owned generated `Command` enum, generated callable `runCommandLine()` fallback, linked execution, and exact empty-group rejection through `scripts/range check-value-ownership`.
+   - [x] Stop RangeView from participating in this compiler checkpoint; RangeView remains idealized example code, not validation input.
+   - [ ] Support statement arrays produced by `#commands.map` inside generated function bodies without aborting native compilation, then prove argv key comparison and `self.<command>()` dispatch.
+   - [ ] Support fieldless construct values as method receivers so a command group does not need a stored control field solely to make `CLI()` representable.
+   - [ ] Replace the focused harness reflection prelude with canonical Core declaration envelopes only after their wider dependencies compile in the supported bundle.
+
+- [x] Add `@test` / `@testGroup` macros (Core/Macro/Test.range) so Range-authored tests can be written using macros; modeled on @commandGroup so tests can live alongside and trigger Range-authored CLI (@commandGroup etc.) constructs.
+   - [x] Added marker + group macro, Pass/Smoke and Fail/EmptyTestGroup fixtures under Testing/Test/.
+   - [x] Wired validation (generated Test enum + runTests, empty rejection, linked run returning 0) into check-range-value-ownership via inlined decls for snapshot.
+   - [ ] Make Test.range part of default core sources for `range run` of authored tests without manual bundle.
+   - [ ] Implement real test collection/dispatch (beyond stub return) and `range test` driver entry once CLI is more Range-owned.
 
 ## Compiler Observability
 

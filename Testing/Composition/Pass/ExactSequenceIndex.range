@@ -1,0 +1,75 @@
+@builtin
+construct Array<Element> {}
+
+@builtin
+construct Identity {
+    let first: Int
+    let second: Int
+}
+
+function compositionWords(components: Array<Identity>): Buffer<Int> {
+    let words: Buffer<Int>(bufferCreateInt(capacity: components.count * 2))
+    state component: Int(0)
+    while component < components.count {
+        words.append(element: components[component].first)
+        words.append(element: components[component].second)
+        component: component + 1
+    }
+    return words
+}
+
+function appendComposition(index: CompilerCompositionExactIndex, composition: Composition): Int {
+    let words: Buffer<Int>(compositionWords(components: composition.components))
+    let row: Int(compilerCompositionExactIndexAppend(
+        index: index,
+        identityFirst: composition.identity.first,
+        identitySecond: composition.identity.second,
+        componentWords: words
+    ))
+    words.destroy()
+    return row
+}
+
+function buildIndex(compositionsCount: Int, first: Composition, second: Composition, reversed: Composition): CompilerCompositionExactIndex {
+    let index: CompilerCompositionExactIndex(compilerCompositionExactIndexCreate(estimatedCompositionCount: compositionsCount))
+    appendComposition(index: index, composition: first)
+    appendComposition(index: index, composition: second)
+    appendComposition(index: index, composition: reversed)
+    return index
+}
+
+@main {
+    let user: Identity(first: 11, second: 101)
+    let name: Identity(first: 13, second: 103)
+    let age: Identity(first: 17, second: 107)
+    let firstComposition: Composition(identity: Identity(first: 19, second: 109), components: [user, name])
+    let secondComposition: Composition(identity: Identity(first: 23, second: 113), components: [user, name])
+    let reversedComposition: Composition(identity: Identity(first: 29, second: 127), components: [name, user])
+    let index: CompilerCompositionExactIndex(buildIndex(compositionsCount: 3, first: firstComposition, second: secondComposition, reversed: reversedComposition))
+    let rebuilt: CompilerCompositionExactIndex(buildIndex(compositionsCount: 3, first: firstComposition, second: secondComposition, reversed: reversedComposition))
+    let query: Buffer<Int>(compositionWords(components: [user, name]))
+    let reversedQuery: Buffer<Int>(compositionWords(components: [name, user]))
+    let missingQuery: Buffer<Int>(compositionWords(components: [user, age]))
+    let firstRow: Int(compilerCompositionExactIndexFirst(index: index, queryWords: query))
+    let nextRow: Int(compilerCompositionExactIndexNext(index: index, queryWords: query, row: firstRow))
+    let rebuiltFirstRow: Int(compilerCompositionExactIndexFirst(index: rebuilt, queryWords: query))
+
+    state result: Int(0)
+    if compilerCompositionExactIndexCount(index: index, queryWords: query) == 2
+        && compilerCompositionExactIndexCount(index: rebuilt, queryWords: query) == 2
+        && compilerCompositionExactIndexCount(index: index, queryWords: reversedQuery) == 1
+        && compilerCompositionExactIndexCount(index: index, queryWords: missingQuery) == 0
+        && compilerCompositionExactIndexIdentityFirst(index: index, row: firstRow) == 23
+        && compilerCompositionExactIndexIdentitySecond(index: index, row: firstRow) == 113
+        && compilerCompositionExactIndexIdentityFirst(index: index, row: nextRow) == 19
+        && compilerCompositionExactIndexIdentitySecond(index: index, row: nextRow) == 109
+        && compilerCompositionExactIndexIdentityFirst(index: rebuilt, row: rebuiltFirstRow) == 23 {
+        result: 7
+    }
+    query.destroy()
+    reversedQuery.destroy()
+    missingQuery.destroy()
+    compilerCompositionExactIndexDestroy(index: index)
+    compilerCompositionExactIndexDestroy(index: rebuilt)
+    return result
+}

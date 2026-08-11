@@ -1,0 +1,35 @@
+@builtin
+construct Identity {
+    let marker: Int
+}
+
+construct RelationshipFieldQuery {
+    let origin: Identity
+    let role: Identity
+    let destination: Identity
+    let registration: Identity
+}
+
+@main {
+    let iterations: Int(commandLineArgumentCount() * 20000000)
+    let relationship: RelationshipFieldQuery(
+        origin: Identity(marker: 11),
+        role: Identity(marker: 13),
+        destination: Identity(marker: 17),
+        registration: Identity(marker: 19)
+    )
+    state index: Int(0)
+    state matches: Int(0)
+    while index < iterations {
+        if relationship.origin.marker == 11
+            && relationship.role.marker == 13
+            && relationship.destination.marker == 17 {
+            matches: matches + 1
+        }
+        index: index + 1
+    }
+    if matches == iterations && relationship.registration.marker == 19 {
+        return 7
+    }
+    return 0
+}

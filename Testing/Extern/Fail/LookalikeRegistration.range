@@ -1,0 +1,10 @@
+construct FakeExternRegistration {
+    let function: Function
+}
+
+macro fakeExtern(): Function -> FakeExternRegistration {
+    return FakeExternRegistration(function: #environment.target)
+}
+
+@fakeExtern
+function rangeFakeExtern(value: Int): Int

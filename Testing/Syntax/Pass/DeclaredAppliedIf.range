@@ -1,0 +1,12 @@
+compilerTypedSyntaxCFGSnapshot
+
+function ready(): Bool
+function draw(): Int
+function present(): Int
+
+function render(): Int {
+    if ready() {
+        draw()
+    }
+    return present()
+}

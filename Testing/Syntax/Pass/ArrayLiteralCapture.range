@@ -1,0 +1,6 @@
+compilerTypedSyntaxSnapshot
+
+function arrayLiteralCapture(input: Int): Int {
+    let values: Array<Int>([input, 2, input + 1])
+    return values[0]
+}

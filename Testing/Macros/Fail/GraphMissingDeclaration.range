@@ -8,8 +8,8 @@ macro syntax(): Declaration -> Void {}
 macro graph(
     _ role: GraphRole,
     _ additionalRole: GraphRole?
-): Construct -> Void { environment in
-    environment.graph.addNode(role: role, additionalRole: additionalRole)
+): Construct -> Void {
+    #environment.graph.addNode(role: role, additionalRole: additionalRole)
 }
 
 compilerSourceFile\trole=project\tpath=Project/SyntaxFamily.range

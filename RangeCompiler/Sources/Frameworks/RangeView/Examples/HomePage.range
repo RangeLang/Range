@@ -11,7 +11,7 @@ construct Website {
 
 @component
 construct Header {
-    derived body: [@component] {}
+    derived view: [@component] {}
 }
 
 function renderHeader(title: String, html: String): Int {
@@ -21,7 +21,7 @@ function renderHeader(title: String, html: String): Int {
 @page
 construct HomePage {
     derived body: [@component] {
-        VStack(spacing: 10) {
+        Stack(axis: .vertical, spacing: 10) {
             Header()
         }
     }
@@ -31,20 +31,14 @@ function renderHomePage(name: String, html: String, css: String, javaScript: Str
     if html.append(text: "<!doctype html>\n<html><head><title>\(name)</title><link rel=stylesheet href=index.css></head><body>\n") != 0 {
         return 1
     }
-    if rangeViewVStackBegin(spacing: 16, html: html, css: css) != 0 {
+    if renderHeader(title: name, html: html) != 0 {
         return 2
     }
-    if renderHeader(title: name, html: html) != 0 {
+    if html.append(text: "</body><script src=index.js></script></html>\n") != 0 {
         return 3
     }
-    if rangeViewVStackEnd(html: html) != 0 {
-        return 4
-    }
-    if html.append(text: "</body><script src=index.js></script></html>\n") != 0 {
-        return 5
-    }
     if css.append(text: "body { font-family: system-ui; }\n") != 0 {
-        return 6
+        return 4
     }
     return javaScript.append(text: "document.documentElement.dataset.rangeView = 'ready';\n")
 }
@@ -74,14 +68,4 @@ function runRangeView(path: String): Int {
     css.destroy()
     javaScript.destroy()
     return emitStatus
-}
-
-@main {
-    if commandLineArgumentCount() > 1 {
-        return 64
-    }
-    if commandLineArgumentCount() == 1 {
-        return runRangeView(path: commandLineArgument(index: 0))
-    }
-    return runRangeView(path: String("index"))
 }

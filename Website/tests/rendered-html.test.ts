@@ -461,7 +461,7 @@ describe("SvelteKit routes", () => {
     expect(html).toContain("01 · macro breakdown");
     expect(html).toContain("Core/Macro/Codable.range");
     expect(html).toContain("#environment");
-    expect(html).not.toContain("environment.expand");
+    expect(html).not.toContain("#environment.expand");
     expect(html).not.toContain("declaration → graph query → expansion");
     expect(html).toContain('aria-label="Code inspection"');
     expect(html.match(/data-step="[1-7]"/g)).toHaveLength(7);
@@ -500,7 +500,7 @@ describe("SvelteKit routes", () => {
     expect(html).toContain('class="rangeSource language-range');
     expect(html).toContain("The declarative half");
     expect(html).toContain("The imperative half");
-    expect(html).not.toContain("environment.expand");
+    expect(html).not.toContain("#environment.expand");
     expect(html).toContain("The macro’s target is also its access type.");
     expect(html).toContain('aria-label="Complete Equatable synthesis"');
     expect(html).not.toContain('aria-label="Query through the Construct access type"');
@@ -538,7 +538,7 @@ describe("SvelteKit routes", () => {
       "Somewhere gives the macro a place. Sometime gives it a phase. Some place gives it a boundary.",
     );
     expect(html).toContain("Not expand. Environment.");
-    expect(html).not.toContain("environment.expand");
+    expect(html).not.toContain("#environment.expand");
   });
 
   test("renders the One Source, Two Lenses observation", async () => {
@@ -595,6 +595,41 @@ describe("SvelteKit routes", () => {
     expect(draft).not.toContain("<h2>Routes</h2>");
     expect(draft).not.toContain("<h2>The reference knot</h2>");
     expect(draft).not.toContain("graph one source of truth");
+  });
+
+  test("keeps Programming Language Design Knots hidden", async () => {
+    const [response, draft, previewGate] = await Promise.all([
+      render("/posts/programming-language-design-knots", "manual"),
+      readFile(
+        new URL(
+          "../src/routes/posts/programming-language-design-knots/+page.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/routes/posts/programming-language-design-knots/+page.server.ts",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/");
+    expect(draft).toContain('title="Programming Language Design Knots"');
+    expect(draft).toContain("The plane moves under you");
+    expect(draft).toContain("<DesignKnotPlane />");
+    expect(draft).toContain("Identity without generics");
+    expect(draft).toContain('syntax="design-code"');
+    expect(draft).toContain(
+      'label="Design code — illustrative metacode, not Range syntax"',
+    );
+    expect(draft).toContain("macro identity() { value in");
+    expect(draft).toContain('content="noindex, nofollow, noai"');
+    expect(previewGate).toContain(
+      'dev && url.searchParams.get("preview") === "range-draft"',
+    );
   });
 
   test("keeps the Intro to Range draft hidden", async () => {
@@ -1070,6 +1105,20 @@ test("joins the shader wordmark without moving its fixed focus", async () => {
   );
 });
 
+test("carries the properties rhythm through Macros and dissolves it in Environment", async () => {
+  const rhythm = await readFile(
+    new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(rhythm).toContain("Math.pow(1 - environmentLayerPresence, 3.2)");
+  expect(rhythm).toContain("updatePropertiesLayer(0.9)");
+  expect(rhythm).not.toContain("macroLayerPresence >= 0.9");
+  expect(rhythm).not.toContain(
+    "figureScrollPosition(squareFigure).audioExitGain",
+  );
+});
+
 test("swaps the two fixed Intro clock notes while animating right", async () => {
   const rhythm = await readFile(
     new URL("../src/lib/components/ThreeFourRhythm.svelte", import.meta.url),
@@ -1143,6 +1192,23 @@ test("maps macro voices across the stereo field from their visual positions", as
   expect(cloud).toContain("const wordPan = macroPanForWord(word)");
   expect(cloud).toContain("wordPan + voiceSpread");
   expect(cloud).toContain("macroPanForWord(word, fallbackPan)");
+});
+
+test("gives the Macros field a quiet rolled snare with a reverb tail", async () => {
+  const cloud = await readFile(
+    new URL("../src/lib/components/MacroWordCloud.svelte", import.meta.url),
+    "utf8",
+  );
+
+  expect(cloud).toContain(
+    "const macroSnareRollStrokePattern = [0.56, 0.72, 0.62, 1] as const",
+  );
+  expect(cloud).toContain("const macroSnareRollSpacingSeconds = 0.038");
+  expect(cloud).toContain("function playMacroSnareRoll(");
+  expect(cloud).toContain("playMacroSnareStroke(");
+  expect(cloud).toContain("duration: 3.2");
+  expect(cloud).toContain("wetLevel: 0.12");
+  expect(cloud).toContain("playMacroSnareRoll(");
 });
 
 test("centers every reverb input while preserving dry stereo panning", async () => {
@@ -1921,9 +1987,9 @@ test("snaps concept color while the spiral moves at one constant speed", async (
 
 test("uses Range-native semantic syntax roles", async () => {
   const { highlightRange } = await import("../src/lib/benchmarks");
-  const highlighted = highlightRange(`macro codable(): Construct { environment in
+  const highlighted = highlightRange(`macro codable(): Construct {
     let fields: [@stored](
-      environment.target.Declaration.members.filter(all: @stored)
+      #environment.target.Declaration.members.filter(all: @stored)
     )
     function encode<Format>(to encoder: Encoder<Format>): Result<Void, EncodingError> {
       let container: KeyedEncodingContainer<Format>(encoder.keyedContainer())

@@ -13,12 +13,12 @@ construct State {
     let value: Expression?
 }
 
-macro captureDefault(): Let -> Expression? { environment in
-    return environment.target.value
+macro captureDefault(): Let -> Expression? {
+    return #environment.target.value
 }
 
-macro captureStateDefault(): State -> Expression? { environment in
-    return environment.target.value
+macro captureStateDefault(): State -> Expression? {
+    return #environment.target.value
 }
 
 construct StoredMemberDefaults {

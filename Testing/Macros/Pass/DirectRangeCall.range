@@ -4,7 +4,7 @@ function macroIncrement(value: Int): Int {
     return value + 1
 }
 
-macro directCall(): Construct { environment in
+macro directCall(): Construct {
     let result: Int(macroIncrement(value: 1))
     if result == 2 {
         #environment {

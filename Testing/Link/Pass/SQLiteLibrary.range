@@ -1,0 +1,10 @@
+@extern
+@link(.sqlite3)
+function sqlite3_libversion_number(): Int
+
+@main {
+    if sqlite3_libversion_number() > 0 {
+        return 42
+    }
+    return 1
+}

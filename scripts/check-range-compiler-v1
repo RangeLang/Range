@@ -11,6 +11,10 @@ FUNCTION_ARTIFACTS="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerFunct
 COMPILER_V1="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerV1.range"
 COMPILER_V1_GRAPH="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerV1Graph.range"
 COMPILER_CORE="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerCore.range"
+COMPILER_TELEMETRY="$REPO_ROOT/RangeCompiler/Sources/Compiler/Driver/CompilerTelemetry.range"
+BODY_OWNERSHIP="$REPO_ROOT/RangeCompiler/Sources/Compiler/Body/CompilerBodyOwnership.range"
+BODY_PARSING="$REPO_ROOT/RangeCompiler/Sources/Compiler/Body/CompilerBodyParsing.range"
+BUILD_RESOLVER="$REPO_ROOT/scripts/resolve-range-compiler-build"
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-compiler-v1.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 
@@ -21,6 +25,53 @@ fail() {
 
 /usr/bin/grep -Fq 'construct CompilerValueFingerprint {' "$COMPILER_CORE" \
     || fail "Compiler V1 has no distinct changing-value representation"
+/usr/bin/grep -Fq 'construct CompilerFunctionDerivation {' "$COMPILER_CORE" \
+    || fail "function compilation has no retained derivation entity"
+/usr/bin/grep -Fq 'construct CompilerCallBoundaryShape {' "$COMPILER_CORE" \
+    || fail "calls have no target-independent boundary Shape"
+/usr/bin/grep -Fq 'construct CompilerFunctionBehaviorFacts {' "$COMPILER_CORE" \
+    || fail "ownership and return facts are not grouped as one Behavior product"
+/usr/bin/grep -Fq 'construct CompilerOwnedPathPreparation {' "$COMPILER_CORE" \
+    || fail "owned-path validation has no typed preparation witness"
+/usr/bin/grep -Fq 'construct CompilerProbe {' "$COMPILER_CORE" \
+    || fail "compiler telemetry has no first-class probe token"
+/usr/bin/grep -Fq 'function compilerProbeBegin(kind: Int, functionID: Int, instanceID: Int, blockID: Int, nodeID: Int, ordinal: Int, itemCount: Int): CompilerProbe' "$COMPILER_TELEMETRY" \
+    || fail "compiler telemetry cannot issue a contextual probe token"
+/usr/bin/grep -Fq 'compilerTelemetryProbeEnd(probeID: probe.id, status: status, resultCount: resultCount)' "$COMPILER_TELEMETRY" \
+    || fail "compiler telemetry does not close the exact issued probe token"
+/usr/bin/grep -Fq 'function compilerBodyArenaValidateOwnedPaths(arena: CompilerBodyArena, preparation: CompilerOwnedPathPreparation' "$BODY_OWNERSHIP" \
+    || fail "owned-path validation does not require its preparation witness"
+/usr/bin/grep -Fq 'let validationProbe: CompilerProbe(compilerProbeBegin(kind: compilerProbeKindOwnedValidation()' "$BODY_OWNERSHIP" \
+    || fail "owned-path validation does not open its first-class probe"
+/usr/bin/grep -Fq 'compilerProbeEnd(probe: validationProbe, status: status, resultCount: processedCount)' "$BODY_OWNERSHIP" \
+    || fail "owned-path validation does not close its first-class probe"
+/usr/bin/grep -Fq 'compilerProbeKindOwnedValidationReferenceCheck()' "$BODY_OWNERSHIP" \
+    || fail "owned-path block evaluation does not expose reference-check attribution"
+/usr/bin/grep -Fq 'compilerProbeKindOwnedValidationReturnTransfer()' "$BODY_OWNERSHIP" \
+    || fail "owned-path block evaluation does not expose return-transfer attribution"
+/usr/bin/grep -Fq 'compilerProbeKindOwnedValidationReturnExit()' "$BODY_OWNERSHIP" \
+    || fail "owned-path block evaluation does not expose statement-return attribution"
+/usr/bin/grep -Fq 'preparation.generation <= consumedGeneration' "$BODY_OWNERSHIP" \
+    || fail "owned-path validation does not reject a consumed preparation witness"
+/usr/bin/grep -Fq 'function compilerFunctionDeclarationDeriveLegacy(tables: CompilerSyntaxTables, index: CompilerDeclarationIndex, functionSyntaxID: Int): CompilerBodyArena' "$BODY_PARSING" \
+    || fail "function derivation does not begin from Function.Declaration identity"
+/usr/bin/grep -Fq 'let functionRow: Int(compilerSemanticFunctionRowForSyntaxID(tables: tables, functionSyntaxID: functionSyntaxID))' "$BODY_PARSING" \
+    || fail "function derivation does not resolve its disposable row from declaration identity"
+if /usr/bin/grep -Eq 'function compilerFunction(Declaration|Instance)DeriveLegacy\([^)]*functionRow:' "$BODY_PARSING"; then
+    fail "function derivation still accepts positional row identity beside Function.Declaration"
+fi
+[[ "$(/usr/bin/grep -Fc 'compilerBodyArenaPrepareReturnedAliasTopology(arena: arena,' "$BODY_OWNERSHIP")" -eq 1 ]] \
+    || fail "returned-alias topology is prepared through more than one compiler path"
+if /usr/bin/grep -Eq 'let functionInstance(Effects|EffectPaths|EffectCalls|ReturnSummaries|ReturnLeaves):' "$COMPILER_CORE"; then
+    fail "reachability still exposes parallel function effect tables"
+fi
+/usr/bin/grep -Fq 'function_artifact_producer_key="$(sha256 "$RANGE_BUILD_PRODUCER_PATH")"' "$BUILD_RESOLVER" \
+    || fail "the rolling derivation checkpoint is not partitioned by exact producer"
+/usr/bin/grep -Fq 'function-derivations/$RANGE_BUILD_PRODUCER_CAPABILITY/$function_artifact_producer_key' "$BUILD_RESOLVER" \
+    || fail "development builds do not share derivations across source revisions"
+if /usr/bin/grep -Fq 'function_artifact_source_key="$(sha256 "$SOURCE_BUNDLE")"' "$BUILD_RESOLVER"; then
+    fail "development derivations are still partitioned by the complete source bundle"
+fi
 /usr/bin/grep -Fq 'return CompilerIdentity(first: 0, second: 0)' "$COMPILER_V1_GRAPH" \
     || fail "Compiler V1 changed the absent identity wire sentinel"
 if /usr/bin/grep -Eq 'let (before|after|input): CompilerFingerprint' "$COMPILER_V1" "$COMPILER_V1_GRAPH" \
@@ -84,12 +135,12 @@ if /usr/bin/grep -Fq 'compileRangeNativeProgramOutput(source: source)' "$COMPILE
     fail "V1 Compiled still invokes the source-based native program entry"
 fi
 if /usr/bin/grep -Fq 'name: String("abi.emit")' "$LLVM_PLAN"; then
-    fail "the ABI capability probe still emits a disposable LLVM function"
+    fail "the call-boundary capability probe still emits a disposable LLVM function"
 fi
-/usr/bin/grep -Fq 'reachability.abiCapabilities.update(element: 1, index: functionRow)' "$LLVM_PLAN" \
-    || fail "function discovery does not publish its Shape-derived ABI capability"
+/usr/bin/grep -Fq 'reachability.boundaryCapabilities.update(element: 1, index: functionRow)' "$LLVM_PLAN" \
+    || fail "function discovery does not publish its Shape-derived call-boundary capability"
 if /usr/bin/grep -Fq 'compilerReachableLLVMStateProbeReachableInstancesForFunction(reachability: reachability' "$LLVM_PLAN"; then
-    fail "ABI component planning still reconstructs a discovered function body"
+    fail "call-boundary planning still reconstructs a discovered function body"
 fi
 
 write_behavior_cache_fixture() {
@@ -111,6 +162,29 @@ write_behavior_cache_fixture() {
         '' \
         '@main {' \
         "    return $main_result" \
+        '}' >> "$output"
+}
+
+write_shifted_behavior_cache_fixture() {
+    local output="$1"
+    local input_artifact="$2"
+    local output_artifact="$3"
+
+    /usr/bin/printf '%s\n' 'compilerNativeSourceSetLLVMText' > "$output"
+    /usr/bin/printf '// range-function-artifact-input %s\n' "$input_artifact" >> "$output"
+    /usr/bin/printf '// range-function-artifact-output %s\n' "$output_artifact" >> "$output"
+    /usr/bin/printf '%s\n' 'compilerSourceFile\trole=project\tpath=BehaviorCache.range' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'function earlierUnreachableValue(): Int {' \
+        '    return 11' \
+        '}' \
+        '' \
+        'function cachedBehaviorValue(): Int {' \
+        '    return 7' \
+        '}' \
+        '' \
+        '@main {' \
+        '    return cachedBehaviorValue()' \
         '}' >> "$output"
 }
 
@@ -145,9 +219,9 @@ if /usr/bin/grep -Fq 'function compilerReachableLLVMStateClassifyReturnAndCollec
     fail "effect construction still reparses each discovered function"
 fi
 candidate_lookup_line="$(/usr/bin/grep -n -F 'if compilerReachableLLVMStateFindFunctionArtifactCandidates(reachability: reachability)' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
-effect_build_line="$(/usr/bin/grep -n -F 'let effectBuildStatus: Int(compilerReachableLLVMStateBuildFunctionInstanceEffects' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
-[[ -n "$candidate_lookup_line" && -n "$effect_build_line" && "$candidate_lookup_line" -lt "$effect_build_line" ]] \
-    || fail "Behavior candidate lookup does not precede effect reconstruction"
+behavior_facts_line="$(/usr/bin/grep -n -F 'let behaviorFactsStatus: Int(compilerReachableLLVMStateDeriveFunctionBehaviorFacts' "$LLVM_PLAN" | /usr/bin/cut -d: -f1)"
+[[ -n "$candidate_lookup_line" && -n "$behavior_facts_line" && "$candidate_lookup_line" -lt "$behavior_facts_line" ]] \
+    || fail "Behavior candidate lookup does not precede Behavior-fact derivation"
 /usr/bin/grep -Fq 'function compilerReachableLLVMStateBehaviorCandidateGraphIsClosed' "$LLVM_PLAN" \
     || fail "function artifact candidates are not closed over instance dependencies"
 /usr/bin/grep -Fq 'behaviorGraphClosure.end' "$LLVM_PLAN" \
@@ -163,7 +237,7 @@ effect_build_line="$(/usr/bin/grep -n -F 'let effectBuildStatus: Int(compilerRea
 if /usr/bin/grep -Fq 'compilerCoreParseMainBlock(source: reachability.context.tables.sourceStore.source)' "$LLVM_PLAN"; then
     fail "V1 reparses source text while discovering main"
 fi
-/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=8' "$FUNCTION_ARTIFACTS" \
+/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=9' "$FUNCTION_ARTIFACTS" \
     || fail "function artifact schema was not advanced for complete module integrity"
 /usr/bin/grep -Fq 'function compilerFunctionArtifactCacheModuleText' "$FUNCTION_ARTIFACTS" \
     || fail "closed Behavior artifacts do not retain the complete emitted module"
@@ -309,16 +383,31 @@ write_behavior_cache_fixture "$WORK_ROOT/behavior-cold.range" "" "$behavior_cach
 RANGE_COMPILER_PHASE_TRACE=1 RANGE_COMPILER_FUNCTION_TRACE=1 \
     "$COMPILER" compile "$WORK_ROOT/behavior-cold.range" > "$WORK_ROOT/behavior-cold.ll" 2> "$WORK_ROOT/behavior-cold.trace"
 [[ -s "$behavior_cache" ]] || fail "cold Behavior compilation omitted its artifact"
-/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=8' "$behavior_cache" \
-    || fail "cold Behavior compilation did not write schema v8"
-/usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-cold.trace" \
-    || fail "cold Behavior compilation skipped effect reconstruction unexpectedly"
-/usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-cold.trace" \
-    || fail "cold Behavior compilation skipped ABI construction unexpectedly"
+/usr/bin/grep -Fq 'rangeFunctionArtifacts|version=9' "$behavior_cache" \
+    || fail "cold Behavior compilation did not write schema v9"
+/usr/bin/grep -Fq $'compilerPhase\tname=functionBehaviorFacts.end' "$WORK_ROOT/behavior-cold.trace" \
+    || fail "cold Behavior compilation skipped Behavior-fact derivation unexpectedly"
+/usr/bin/grep -Fq $'compilerPhase\tname=callBoundaryShapes.end' "$WORK_ROOT/behavior-cold.trace" \
+    || fail "cold Behavior compilation skipped call-boundary derivation unexpectedly"
 /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-cold.trace" \
     || fail "cold Behavior compilation skipped LLVM function emission unexpectedly"
 /usr/bin/grep -Fq 'name=bodyProduct.directEffects' "$WORK_ROOT/behavior-cold.trace" \
     || fail "cold Behavior compilation did not retain the direct effect product on its discovery arena"
+
+write_shifted_behavior_cache_fixture "$WORK_ROOT/behavior-shifted.range" "$behavior_cache" "$WORK_ROOT/behavior-shifted.cache"
+RANGE_COMPILER_PHASE_TRACE=1 \
+    "$COMPILER" compile "$WORK_ROOT/behavior-shifted.range" > "$WORK_ROOT/behavior-shifted.ll" 2> "$WORK_ROOT/behavior-shifted.trace"
+/usr/bin/cmp -s "$WORK_ROOT/behavior-cold.ll" "$WORK_ROOT/behavior-shifted.ll" \
+    || fail "unreachable declaration-row shift changed emitted LLVM"
+[[ ! -e "$WORK_ROOT/behavior-shifted.cache" ]] \
+    || fail "stable function derivation rewrote its artifact after a declaration-row shift"
+/usr/bin/grep -Fq $'compilerPhase\tname=functionArtifactCandidates.end' "$WORK_ROOT/behavior-shifted.trace" \
+    || fail "declaration-row shift did not resolve stable function derivation candidates"
+if /usr/bin/grep -Fq $'compilerPhase\tname=functionBehaviorFacts.end' "$WORK_ROOT/behavior-shifted.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=callBoundaryShapes.end' "$WORK_ROOT/behavior-shifted.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-shifted.trace"; then
+    fail "declaration-row shift did not reuse the closed Behavior graph"
+fi
 
 write_behavior_cache_fixture "$WORK_ROOT/behavior-hit.range" "$behavior_cache" "$WORK_ROOT/behavior-hit.cache" 'cachedBehaviorValue()'
 RANGE_COMPILER_PHASE_TRACE=1 \
@@ -333,10 +422,10 @@ if /usr/bin/grep -Fq 'rangeFunctionArtifacts|version=5' "$behavior_cache"; then
 fi
 if /usr/bin/grep -Fq $'compilerPhase\tname=reachabilityDiscovery.end' "$WORK_ROOT/behavior-hit.trace" \
     || /usr/bin/grep -Fq $'compilerPhase\tname=functionArtifactCandidates.end' "$WORK_ROOT/behavior-hit.trace" \
-    || /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-hit.trace" \
-    || /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-hit.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=functionBehaviorFacts.end' "$WORK_ROOT/behavior-hit.trace" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=callBoundaryShapes.end' "$WORK_ROOT/behavior-hit.trace" \
     || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-hit.trace"; then
-    fail "closed Behavior module cache did not bypass discovery, candidates, effects, ABI, and LLVM emission work"
+    fail "closed Behavior module cache did not bypass discovery, candidates, Behavior facts, call boundaries, and LLVM emission work"
 fi
 
 profile_source="$WORK_ROOT/behavior-profile.range"
@@ -352,6 +441,12 @@ RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
     || fail "profiled cold Behavior compilation did not report its artifact"
 /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-profile-cold.out" \
     || fail "profiled cold Behavior compilation did not report LLVM emission"
+/usr/bin/grep -Fq $'compilerABIReconstruction\tprobePasses=' "$WORK_ROOT/behavior-profile-cold.out" \
+    || fail "profiled cold Behavior compilation did not report ABI reconstruction multiplicity"
+/usr/bin/grep -Eq $'compilerABIReconstruction\tprobePasses=[0-9]+\temissionPasses=[0-9]+\textraProbePasses=[0-9]+\tprobedFunctions=[0-9]+\trepeatedFunctions=[0-9]+\tprobeToEmissionMilli=[0-9]+\tmaxProbePasses=[0-9]+' "$WORK_ROOT/behavior-profile-cold.out" \
+    || fail "profiled cold Behavior compilation reported a malformed ABI reconstruction summary"
+/usr/bin/grep -Eq $'compilerTypedFunctionPasses\tdiscoveryPasses=[0-9]+\temissionPasses=[0-9]+\ttotalPasses=[0-9]+\tdiscoveryToEmissionMilli=[0-9]+' "$WORK_ROOT/behavior-profile-cold.out" \
+    || fail "profiled cold Behavior compilation reported a malformed typed-function pass summary"
 RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
     RANGE_COMPILER_PROFILE_LLVM="$REPO_ROOT/RangeCompiler/Sources/Compiler/.range/Build/candidate/RangeCompiler.ll" \
     RANGE_COMPILER_PROFILE_ARTIFACT_INPUT="$profile_artifact" \
@@ -360,10 +455,10 @@ RANGE_COMPILER_PROFILE_SOURCE_BUNDLE="$profile_source" \
 [[ ! -e "$profile_next_artifact" ]] || fail "profiled closed Behavior graph rewrote an artifact"
 /usr/bin/grep -Fq $'compilerArtifact\tstatus=reused' "$WORK_ROOT/behavior-profile-hit.out" \
     || fail "profiled closed Behavior compilation did not report artifact reuse"
-if /usr/bin/grep -Fq $'compilerPhase\tname=functionEffects.end' "$WORK_ROOT/behavior-profile-hit.out" \
-    || /usr/bin/grep -Fq $'compilerPhase\tname=abiComponents.end' "$WORK_ROOT/behavior-profile-hit.out" \
+if /usr/bin/grep -Fq $'compilerPhase\tname=functionBehaviorFacts.end' "$WORK_ROOT/behavior-profile-hit.out" \
+    || /usr/bin/grep -Fq $'compilerPhase\tname=callBoundaryShapes.end' "$WORK_ROOT/behavior-profile-hit.out" \
     || /usr/bin/grep -Fq $'compilerPhase\tname=functionEmission.end' "$WORK_ROOT/behavior-profile-hit.out"; then
-    fail "profiled closed Behavior cache did not bypass effect, ABI, and LLVM emission work"
+    fail "profiled closed Behavior cache did not bypass Behavior-fact, call-boundary, and LLVM emission work"
 fi
 if /usr/bin/grep -Fq $'compilerPhase\tname=reachabilityDiscovery.end' "$WORK_ROOT/behavior-profile-hit.out"; then
     fail "source-identity module cache still reconstructed reachable function bodies"

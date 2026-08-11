@@ -1,7 +1,7 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/LegacyEnvironmentExpand.range
-macro legacyEnvironmentExpand(): Construct { environment in
-    environment.expand {
+macro legacyEnvironmentExpand(): Construct {
+    #environment.expand {
         extension #environment.target.Declaration.identifier {
             let legacyExpansionWorked: Int
         }

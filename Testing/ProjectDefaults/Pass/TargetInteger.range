@@ -1,6 +1,6 @@
 compilerMacroSnapshot
 construct ProjectDefaults {}
-macro project(): Construct -> ProjectDefaults { environment in
+macro project(): Construct -> ProjectDefaults {
     return ProjectDefaults()
 }
 

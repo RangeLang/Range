@@ -4,7 +4,7 @@ compilerSourceFile\trole=core\tpath=Core/DataSystem/Array/Array.range
 construct Array<Element> {}
 
 compilerSourceFile\trole=core\tpath=Core/Macro/GenericBoundaryMaterialization.range
-macro genericBoundaryMaterialization(): Construct { environment in
+macro genericBoundaryMaterialization(): Construct {
     let values: Array<Int>([3, 4])
     let enabled: Bool(true)
 

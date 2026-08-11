@@ -1,0 +1,38 @@
+// The canonical RangeView application example. The app owns the entry point;
+// the page owns the component tree; shapes remain ordinary Range values.
+
+@app
+construct RangeViewApp {
+    derived routes: Route {
+        Route("/") {
+            Route("home", RangeViewHome())
+        }
+    }
+}
+
+@shape
+@component
+construct Rectangle {
+    @many(4)
+    let points: Point(
+        Point(x: 96, y: 64),
+        Point(x: 704, y: 64),
+        Point(x: 704, y: 152),
+        Point(x: 96, y: 152)
+    )
+
+    function draw(): ShapeRepresentation {
+        return ShapeRepresentation(points: points)
+    }
+
+    derived view: [@component] {}
+}
+
+@page
+construct RangeViewHome {
+    derived body: [@component] {
+        Stack(.vertical, spacing: 10) {
+            Rectangle().fill(.cyan)
+        }
+    }
+}

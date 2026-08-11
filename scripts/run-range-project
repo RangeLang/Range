@@ -13,13 +13,19 @@ run_project_fail() {
 input="${1:-}"
 [[ -n "$input" ]] || run_project_fail "expected a Range program or project directory"
 shift
-if [[ "${1:-}" == "--" ]]; then
-    shift
-fi
 
 if [[ ! -e "$input" && "$input" != *.range && -f "$input.range" ]]; then
     input="$input.range"
 fi
+
+compiler_arguments=("$input")
+while [[ "${1:-}" == "--source" ]]; do
+    shift
+    [[ $# -gt 0 ]] || run_project_fail "--source requires a .range file or project directory"
+    compiler_arguments+=("--source" "$1")
+    shift
+done
+if [[ "${1:-}" == "--" ]]; then shift; fi
 
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-run.XXXXXX")"
 trap '/bin/rm -rf "$WORK_ROOT"' EXIT
@@ -27,7 +33,7 @@ trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 llvm_path="$WORK_ROOT/Program.ll"
 executable_path="$WORK_ROOT/Program"
 
-"$REPO_ROOT/scripts/compile-range-project" "$input" > "$llvm_path"
+"$REPO_ROOT/scripts/compile-range-project" "${compiler_arguments[@]}" > "$llvm_path"
 
 runtime_inputs=()
 runtime_source_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
@@ -38,8 +44,41 @@ for ((index = 0; index < runtime_source_count; index += 1)); do
     runtime_inputs+=("$runtime_path")
 done
 
-clang -O0 -fno-lto -Wno-override-module \
-    "$llvm_path" "${runtime_inputs[@]}" -o "$executable_path"
+link_arguments=()
+if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=sqlite3' "$llvm_path"; then
+    link_arguments+=("-lsqlite3")
+fi
+if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=glfw' "$llvm_path"; then
+    link_arguments+=("-lglfw")
+fi
+if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=wgpuNative' "$llvm_path"; then
+    wgpu_native_root="${WGPU_NATIVE_DIR:-}"
+    [[ -n "$wgpu_native_root" ]] || run_project_fail "@link(.wgpuNative) requires WGPU_NATIVE_DIR"
+    wgpu_native_lib="$wgpu_native_root"
+    if [[ -d "$wgpu_native_root/lib" ]]; then
+        wgpu_native_lib="$wgpu_native_root/lib"
+    fi
+    [[ -f "$wgpu_native_lib/libwgpu_native.dylib" || -f "$wgpu_native_lib/libwgpu_native.a" ]] \
+        || run_project_fail "@link(.wgpuNative) could not resolve libwgpu_native in $wgpu_native_lib"
+    link_arguments+=("-L$wgpu_native_lib" "-lwgpu_native" "-Wl,-rpath,$wgpu_native_lib")
+fi
+if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=pthread' "$llvm_path"; then
+    link_arguments+=("-lpthread")
+fi
+if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=sdl2' "$llvm_path"; then
+    command -v sdl2-config >/dev/null 2>&1 || run_project_fail "@link(.sdl2) requires sdl2-config"
+    sdl2_prefix="$(sdl2-config --prefix)"
+    [[ -d "$sdl2_prefix/lib" ]] || run_project_fail "@link(.sdl2) could not resolve SDL2 libraries"
+    link_arguments+=("-L$sdl2_prefix/lib" "-lSDL2" "-Wl,-rpath,$sdl2_prefix/lib")
+fi
+
+if [[ "${#link_arguments[@]}" -gt 0 ]]; then
+    clang -O0 -fno-lto -Wno-override-module \
+        "$llvm_path" "${runtime_inputs[@]}" "${link_arguments[@]}" -o "$executable_path"
+else
+    clang -O0 -fno-lto -Wno-override-module \
+        "$llvm_path" "${runtime_inputs[@]}" -o "$executable_path"
+fi
 
 program_exit=0
 "$executable_path" "$@" || program_exit=$?

@@ -1,0 +1,15 @@
+construct MatrixPosition {
+    let column: Int
+    let row: Int
+}
+
+// Matrix is the canonical ordered collection and layout substrate. Lists,
+// tables, grids, and kanbans are projections of its dimensions, not separate
+// container ontologies.
+construct Matrix<Element> {
+    let columns: Int
+    let rows: Int
+
+    @many
+    let elements: Element
+}

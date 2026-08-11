@@ -536,10 +536,10 @@
   }
 
   function propertiesLayerLevel() {
-    if (macroLayerPresence >= 0.9) return 0;
-    return squareFigure
-      ? figureScrollPosition(squareFigure).audioExitGain
-      : 1;
+    return Math.max(
+      0.015,
+      Math.pow(1 - environmentLayerPresence, 3.2),
+    );
   }
 
   function channelLayerLevel(channel: IntroMixChannel) {
@@ -1337,6 +1337,7 @@
       if (audioEnabled) {
         setEnvironmentScoreTreatment(0.9);
         updateIdentityLayer(1.15);
+        updatePropertiesLayer(0.9);
       }
     },
   ));
@@ -1347,7 +1348,6 @@
       const wasPresent = macroLayerPresence;
       macroLayerPresence = presence;
       updateIdentityLayer(presence > wasPresent ? 0.018 : 0.24);
-      updatePropertiesLayer(presence >= 0.9 ? 0.008 : 0.08);
     },
   ));
 

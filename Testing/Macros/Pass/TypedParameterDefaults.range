@@ -47,19 +47,19 @@ construct Let {
     let macros: Array<Macro.Application>
 }
 
-macro metadata(_ key: String?, enabled: Bool(false)): Let -> Metadata { environment in
+macro metadata(_ key: String?, enabled: Bool(false)): Let -> Metadata {
     return Metadata(key: key, enabled: enabled)
 }
 
-macro inspectMetadata(): Construct { environment in
+macro inspectMetadata(): Construct {
     let lets: Array<Let>(
-        environment.target.Declaration.members.filter(all: Let)
+        #environment.target.Declaration.members.filter(all: Let)
     )
     let enabledProperties: Array<Let>(
         lets.filter { property in
             let applications: Array<Macro.Application>(
                 property.macros.filter { application in
-                    return application.identifier.name == "metadata"
+                    return application.identity.name == "metadata"
                 }
             )
             let values: Array<Metadata>(
@@ -78,7 +78,7 @@ macro inspectMetadata(): Construct { environment in
 
     if enabledProperties.count == 1 {
         #environment {
-            extension #environment.target.Declaration.identifier {
+            extension #environment.target.Declaration.identity {
                 let typedParameterDefaultsWorked: Int
             }
         }

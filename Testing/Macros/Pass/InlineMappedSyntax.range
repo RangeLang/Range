@@ -19,9 +19,9 @@ construct Construct {
 @syntax
 construct Let {}
 
-macro inlineMappedSyntax(): Construct { environment in
+macro inlineMappedSyntax(): Construct {
     let fields: Array<Let>(
-        environment.target.Declaration.members.filter(all: Let)
+        #environment.target.Declaration.members.filter(all: Let)
     )
 
     #environment {

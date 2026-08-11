@@ -210,7 +210,7 @@
   );
   const extensionMarker = "extension #environment.target.Declaration.identity {";
   const expansionSection = sourceBlock(declarationSource, "#environment");
-  const macroDeclarationSection = "macro codable(): Construct { environment in";
+  const macroDeclarationSection = "macro codable(): Construct {";
   const macroSection = sourceBlock(declarationSource, macroDeclarationSection);
   const extensionSection = sourceBlock(declarationSource, extensionMarker);
   const fieldQuerySection = sourceBetween(

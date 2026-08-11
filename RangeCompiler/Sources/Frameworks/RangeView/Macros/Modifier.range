@@ -1,0 +1,8 @@
+enum ModifierCategory {
+    case style
+    case layout
+    case behavior
+}
+
+// Registers an ordinary function for postfix modifier member lookup.
+macro modifier(_ category: ModifierCategory): Function -> Void {}

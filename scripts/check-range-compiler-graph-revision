@@ -87,6 +87,10 @@ find_revision() {
     /usr/bin/find "$1" -type f -name revision.tsv -print -quit
 }
 
+find_delta_head() {
+    /usr/bin/find "$1" -type f -name delta-head.tsv -print -quit
+}
+
 node_changed_count() {
     /usr/bin/awk -F '\t' '$1 == "rangeRevisionNode" && $5 == "changed=1" { count += 1 } END { print count + 0 }' "$1"
 }
@@ -108,6 +112,19 @@ cold_identity="$(revision_identity "$cold_revision")"
     || fail "cold revision omitted the accepted File fingerprint"
 [[ "$(revision_parent "$cold_revision")" == "absent" ]] \
     || fail "cold revision parent is not absent"
+cold_delta_head="$(find_delta_head "$cold_cache")"
+[[ -n "$cold_delta_head" && -f "$cold_delta_head" ]] \
+    || fail "cold graph execution omitted its accepted delta head"
+[[ "$(header_value "$cold_delta_head" identity)" == "$cold_identity" \
+    && "$(header_value "$cold_delta_head" ordinal)" == "0" ]] \
+    || fail "cold delta head does not identify ordinal zero"
+cold_delta="$(dirname "$cold_revision")/deltas/$cold_identity.tsv"
+[[ -f "$cold_delta" ]] || fail "cold graph execution omitted its immutable delta"
+/usr/bin/grep -Fqx $'rangeGraphDelta\tversion=1\tidentity='"$cold_identity"$'\tparent=absent\tordinal=0' "$cold_delta" \
+    || fail "cold graph delta header is invalid"
+/usr/bin/tail -n +2 "$cold_delta" > "$WORK_ROOT/cold-a.delta-payload.tsv"
+/usr/bin/cmp -s "$WORK_ROOT/cold-a.delta-payload.tsv" "$cold_revision" \
+    || fail "cold graph delta does not carry the accepted revision action set"
 [[ "$(header_value "$cold_revision" status)" == "accepted" ]] \
     || fail "cold revision phase status is not accepted"
 [[ "$(header_value "$cold_revision" sourceProfile)" == "project" ]] \
@@ -218,6 +235,8 @@ compile_graph "$cold_cache" "$FIXTURE" "$WORK_ROOT/cold-a-migrated.ll" "$WORK_RO
 source_bundle_path="$(/usr/bin/find "$cold_cache" -type f -name ProjectSourceSet.range -print -quit)"
 syntax_facts_path="$(/usr/bin/find "$cold_cache" -type f -name syntax-facts.tsv -print -quit)"
 revision_inode="$(/usr/bin/stat -f %i "$cold_revision")"
+delta_head_inode="$(/usr/bin/stat -f %i "$(find_delta_head "$cold_cache")")"
+delta_count="$(/usr/bin/find "$(dirname "$cold_revision")/deltas" -type f -name '*.tsv' | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
 source_bundle_inode="$(/usr/bin/stat -f %i "$source_bundle_path")"
 syntax_facts_inode="$(/usr/bin/stat -f %i "$syntax_facts_path")"
 
@@ -250,6 +269,10 @@ done
     || fail "warm graph execution did not load its persisted revision record"
 [[ "$revision_inode" == "$(/usr/bin/stat -f %i "$(find_revision "$cold_cache")")" ]] \
     || fail "warm graph execution rewrote the revision-owned Source metadata"
+[[ "$delta_head_inode" == "$(/usr/bin/stat -f %i "$(find_delta_head "$cold_cache")")" ]] \
+    || fail "warm graph execution rewrote the accepted delta head"
+[[ "$delta_count" == "$(/usr/bin/find "$(dirname "$cold_revision")/deltas" -type f -name '*.tsv' | /usr/bin/wc -l | /usr/bin/tr -d ' ')" ]] \
+    || fail "warm graph execution appended a delta without a semantic change"
 [[ "$source_bundle_inode" == "$(/usr/bin/stat -f %i "$(find "$cold_cache" -name ProjectSourceSet.range -print -quit)")" ]] \
     || fail "warm graph execution rewrote the persisted Source bundle"
 [[ "$syntax_facts_inode" == "$(/usr/bin/stat -f %i "$(find "$cold_cache" -name syntax-facts.tsv -print -quit)")" ]] \
@@ -323,6 +346,10 @@ project_cold_revision="$(find_revision "$project_cache")"
 [[ -n "$project_cold_revision" && -f "$project_cold_revision" ]] \
     || fail "project cold graph execution omitted its revision artifact"
 project_cold_identity="$(revision_identity "$project_cold_revision")"
+project_delta_directory="$(dirname "$project_cold_revision")/deltas"
+project_cold_delta="$project_delta_directory/$project_cold_identity.tsv"
+[[ -f "$project_cold_delta" ]] || fail "project cold execution omitted its immutable delta"
+/bin/cp "$project_cold_delta" "$WORK_ROOT/project-cold.delta.tsv"
 project_cold_syntax="$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)"
 project_cold_syntax_inode="$(/usr/bin/stat -f %i "$project_cold_syntax")"
 project_cold_syntax_hash="$(/usr/bin/shasum -a 256 "$project_cold_syntax" | /usr/bin/awk '{print $1}')"
@@ -338,6 +365,18 @@ project_updated_revision="$(find_revision "$project_cache")"
     && fail "edited graph execution reused the prior revision identity"
 [[ "$(revision_parent "$project_updated_revision")" == "$project_cold_identity" ]] \
     || fail "updated revision parent is not the prior accepted revision"
+project_updated_identity="$(revision_identity "$project_updated_revision")"
+project_updated_delta="$project_delta_directory/$project_updated_identity.tsv"
+[[ -f "$project_updated_delta" ]] || fail "edited graph execution omitted its immutable delta"
+[[ "$(header_value "$project_updated_delta" parent)" == "$project_cold_identity" \
+    && "$(header_value "$project_updated_delta" ordinal)" == "1" ]] \
+    || fail "edited graph delta does not extend ordinal zero"
+[[ "$(header_value "$(find_delta_head "$project_cache")" identity)" == "$project_updated_identity" ]] \
+    || fail "edited graph execution did not advance the accepted delta head"
+/usr/bin/cmp -s "$project_cold_delta" "$WORK_ROOT/project-cold.delta.tsv" \
+    || fail "edited graph execution rewrote the prior immutable delta"
+[[ "$(/usr/bin/find "$project_delta_directory" -type f -name '*.tsv' | /usr/bin/wc -l | /usr/bin/tr -d ' ')" == "2" ]] \
+    || fail "edited graph execution did not retain exactly two parent-linked deltas"
 for node in source syntax shape behavior compile; do
     before="$(node_value "$project_updated_revision" "$node" before)"
     cold_after="$(node_value "$project_cold_revision" "$node" after)"
@@ -391,6 +430,7 @@ project_updated_syntax="$(/usr/bin/find "$project_cache" -type f -name syntax-fa
 # A failed candidate must preserve the last accepted revision.
 /usr/bin/perl -0pi -e 's/return 8/return missingValue/' "$project/ReturnInteger.range"
 /bin/cp "$project_updated_revision" "$WORK_ROOT/revision.last-known-good.tsv"
+/bin/cp "$(find_delta_head "$project_cache")" "$WORK_ROOT/delta-head.last-known-good.tsv"
 project_syntax_facts="$(/usr/bin/find "$project_cache" -type f -name syntax-facts.tsv -print -quit)"
 project_syntax_hash="$(/usr/bin/shasum -a 256 "$project_syntax_facts" | /usr/bin/awk '{print $1}')"
 fail_status=0
@@ -404,6 +444,10 @@ compile_graph "$project_cache" "$project" "$WORK_ROOT/project-failed.ll" "$WORK_
     || fail "failed graph candidate damaged the last accepted revision"
 [[ "$project_syntax_hash" == "$(/usr/bin/shasum -a 256 "$project_syntax_facts" | /usr/bin/awk '{print $1}')" ]] \
     || fail "failed graph candidate damaged the accepted syntax facts"
+/usr/bin/cmp -s "$(find_delta_head "$project_cache")" "$WORK_ROOT/delta-head.last-known-good.tsv" \
+    || fail "failed graph candidate advanced the accepted delta head"
+[[ "$(/usr/bin/find "$project_delta_directory" -type f -name '*.tsv' | /usr/bin/wc -l | /usr/bin/tr -d ' ')" == "2" ]] \
+    || fail "failed graph candidate appended an unaccepted delta"
 
 # Recovery to the last-known-good input must reuse the accepted artifact.
 /usr/bin/perl -0pi -e 's/return missingValue/return 8/' "$project/ReturnInteger.range"
@@ -422,4 +466,4 @@ done
     || fail "graph revision lifecycle persisted transient execution state"
 
 affected_views="$(node_changed_count "$project_updated_revision")"
-echo "Range compiler graph revision: pass (revision-owned Source and syntax facts, transient resume state, deterministic revision identity, parent chaining, node/edge/digest record, cold/warm reuse, Source-free Shape projection, measured stage costs, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"
+echo "Range compiler graph revision: pass (append-only accepted deltas and atomic head, revision checkpoint, revision-owned Source and syntax facts, transient resume state, deterministic identity and parent chaining, cold/warm reuse, Source-free Shape projection, measured stage costs, bounded literal-edit invalidation with $affected_views affected views, failed-candidate last-known-good preservation, recovery)"

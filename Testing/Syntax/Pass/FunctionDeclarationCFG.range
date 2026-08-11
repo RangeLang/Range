@@ -1,0 +1,13 @@
+compilerTypedSyntaxCFGSnapshot
+
+function graphFlow(input: Int): Int {
+    state value: Int(input + 2)
+    while value > 0 {
+        if value == 1 {
+            value: value - 1
+        } else {
+            value: value - 2
+        }
+    }
+    return value
+}

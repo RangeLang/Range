@@ -1,0 +1,277 @@
+@opaque
+construct RangeViewNativeCString {}
+
+@opaque
+construct Window {}
+
+@opaque
+construct WindowRenderer {}
+
+@extern
+@link(.sdl2)
+function SDL_Init(flags: Int): Int
+
+@extern
+function SDL_GetPlatform(): RangeViewNativeCString
+
+@extern
+function SDL_CreateWindow(title: RangeViewNativeCString, x: Int, y: Int, width: Int, height: Int, flags: Int): Window
+
+@extern
+function SDL_GetWindowID(window: Window): Int
+
+@extern
+function SDL_ShowWindow(window: Window): Void
+
+@extern
+function SDL_RaiseWindow(window: Window): Void
+
+@extern
+function SDL_CreateRenderer(window: Window, index: Int, flags: Int): WindowRenderer
+
+@extern
+function SDL_SetRenderDrawColor(renderer: WindowRenderer, red: Int<.unsigned, 8>, green: Int<.unsigned, 8>, blue: Int<.unsigned, 8>, alpha: Int<.unsigned, 8>): Int
+
+@extern
+function rangeViewOKLCHChannel(lightness: Float, chroma: Float, hue: Float, alpha: Float, channel: Int): Int<.unsigned, 8>
+
+@extern
+function SDL_RenderClear(renderer: WindowRenderer): Int
+
+@extern
+function SDL_RenderDrawLine(renderer: WindowRenderer, x1: Int, y1: Int, x2: Int, y2: Int): Int
+
+@extern
+function SDL_RenderPresent(renderer: WindowRenderer): Void
+
+@extern
+function SDL_PumpEvents(): Void
+
+@extern
+function SDL_HasEvent(eventType: Int): Int
+
+@extern
+function SDL_Delay(milliseconds: Int): Void
+
+@extern
+function SDL_DestroyRenderer(renderer: WindowRenderer): Void
+
+@extern
+function SDL_DestroyWindow(window: Window): Void
+
+@extern
+function SDL_Quit(): Void
+
+function rangeViewSetMagenta(renderer: WindowRenderer): Int {
+    let red: Int<.unsigned, 8>(255)
+    let green: Int<.unsigned, 8>(0)
+    let blue: Int<.unsigned, 8>(255)
+    let alpha: Int<.unsigned, 8>(255)
+    return SDL_SetRenderDrawColor(renderer: renderer, red: red, green: green, blue: blue, alpha: alpha)
+}
+
+function rangeViewSetCyan(renderer: WindowRenderer): Int {
+    let red: Int<.unsigned, 8>(0)
+    let green: Int<.unsigned, 8>(255)
+    let blue: Int<.unsigned, 8>(255)
+    let alpha: Int<.unsigned, 8>(255)
+    return SDL_SetRenderDrawColor(renderer: renderer, red: red, green: green, blue: blue, alpha: alpha)
+}
+
+function rangeViewSetBlue(renderer: WindowRenderer): Int {
+    let red: Int<.unsigned, 8>(0)
+    let green: Int<.unsigned, 8>(0)
+    let blue: Int<.unsigned, 8>(255)
+    let alpha: Int<.unsigned, 8>(255)
+    return SDL_SetRenderDrawColor(renderer: renderer, red: red, green: green, blue: blue, alpha: alpha)
+}
+
+function rangeViewSetColor(renderer: WindowRenderer, color: OKLCH): Int {
+    let rgba: RGBA(toRGBA(color: color))
+    return SDL_SetRenderDrawColor(
+        renderer: renderer,
+        red: rgba.red,
+        green: rgba.green,
+        blue: rgba.blue,
+        alpha: rgba.alpha)
+}
+
+function rangeViewMagenta(): OKLCH {
+    return OKLCH(lightness: 0.701673856, chroma: 0.322490965, hue: 328.363418, alpha: 1.0)
+}
+
+function rangeViewCyan(): OKLCH {
+    return OKLCH(lightness: 0.905399230, chroma: 0.154550011, hue: 194.768948, alpha: 1.0)
+}
+
+function rangeViewBlue(): OKLCH {
+    return OKLCH(lightness: 0.452013718, chroma: 0.313214372, hue: 264.052020638, alpha: 1.0)
+}
+
+function rangeViewYellow(): OKLCH {
+    return OKLCH(lightness: 0.967982720, chroma: 0.211005908, hue: 109.769232, alpha: 1.0)
+}
+
+function rangeViewDrawLine(renderer: WindowRenderer, line: Line): Int {
+    return SDL_RenderDrawLine(
+        renderer: renderer,
+        x1: line.start.x,
+        y1: line.start.y,
+        x2: line.end.x,
+        y2: line.end.y)
+}
+
+function rangeViewFillRectangle(renderer: WindowRenderer, rectangle: Rectangle): Int {
+    state offsetY: Int(0)
+    while offsetY < rectangle.size.height {
+        if SDL_RenderDrawLine(
+            renderer: renderer,
+            x1: rectangle.origin.x,
+            y1: rectangle.origin.y + offsetY,
+            x2: rectangle.origin.x + rectangle.size.width - 1,
+            y2: rectangle.origin.y + offsetY) != 0 {
+            return 1
+        }
+        offsetY: offsetY + 1
+    }
+    return 0
+}
+
+function rangeViewFillCircle(renderer: WindowRenderer, circle: Circle): Int {
+    state offsetY: Int(0 - circle.radius)
+    let radiusSquared: Int(circle.radius * circle.radius)
+    while offsetY <= circle.radius {
+        state extentX: Int(circle.radius)
+        state searching: Bool(true)
+        while searching {
+            if extentX * extentX + offsetY * offsetY <= radiusSquared {
+                searching: false
+            } else {
+                extentX: extentX - 1
+            }
+        }
+        if SDL_RenderDrawLine(
+            renderer: renderer,
+            x1: circle.center.x - extentX,
+            y1: circle.center.y + offsetY,
+            x2: circle.center.x + extentX,
+            y2: circle.center.y + offsetY) != 0 {
+            return 1
+        }
+        offsetY: offsetY + 1
+    }
+    return 0
+}
+
+function rangeViewDrawPolygon(renderer: WindowRenderer, polygon: Polygon): Int {
+    if rangeViewDrawLine(renderer: renderer, line: Line(start: polygon.first, end: polygon.second)) != 0 {
+        return 1
+    }
+    if rangeViewDrawLine(renderer: renderer, line: Line(start: polygon.second, end: polygon.third)) != 0 {
+        return 1
+    }
+    if rangeViewDrawLine(renderer: renderer, line: Line(start: polygon.third, end: polygon.fourth)) != 0 {
+        return 1
+    }
+    if rangeViewDrawLine(renderer: renderer, line: Line(start: polygon.fourth, end: polygon.fifth)) != 0 {
+        return 1
+    }
+    return rangeViewDrawLine(renderer: renderer, line: Line(start: polygon.fifth, end: polygon.first))
+}
+
+function rangeViewDrawShape(renderer: WindowRenderer, shape: Shape): Int {
+    switch shape {
+    case .line(value):
+        return rangeViewDrawLine(renderer: renderer, line: value)
+    case .rectangle(value):
+        return rangeViewFillRectangle(renderer: renderer, rectangle: value)
+    case .circle(value):
+        return rangeViewFillCircle(renderer: renderer, circle: value)
+    case .polygon(value):
+        return rangeViewDrawPolygon(renderer: renderer, polygon: value)
+    }
+}
+
+function rangeViewDrawShapeGallery(renderer: WindowRenderer): Int {
+    let shapes: Array<Shape>([
+        .line(value: Line(start: Point(x: 96, y: 94), end: Point(x: 704, y: 94))),
+        .rectangle(value: Rectangle(origin: Point(x: 96, y: 136), size: Size(width: 260, height: 120))),
+        .circle(value: Circle(center: Point(x: 574, y: 196), radius: 60)),
+        .polygon(value: Polygon(
+            first: Point(x: 96, y: 310),
+            second: Point(x: 270, y: 278),
+            third: Point(x: 356, y: 390),
+            fourth: Point(x: 208, y: 488),
+            fifth: Point(x: 82, y: 410)))
+    ])
+    let colors: Array<OKLCH>([
+        rangeViewMagenta(),
+        rangeViewCyan(),
+        rangeViewBlue(),
+        rangeViewYellow()
+    ])
+    state index: Int(0)
+    while index < shapes.count {
+        if rangeViewSetColor(renderer: renderer, color: colors[index]) != 0 {
+            return 1
+        }
+        if rangeViewDrawShape(renderer: renderer, shape: shapes[index]) != 0 {
+            return 2
+        }
+        index: index + 1
+    }
+    return 0
+}
+
+function rangeViewWindowShouldClose(window: Window): Bool {
+    SDL_PumpEvents()
+    if SDL_GetWindowID(window: window) == 0 {
+        return true
+    }
+    return SDL_HasEvent(eventType: 256) != 0
+}
+
+function rangeViewRunApplication(): Int {
+    if SDL_Init(flags: 32) != 0 {
+        return 1
+    }
+    let title: RangeViewNativeCString(SDL_GetPlatform())
+    let windowSize: Size(width: 800, height: 600)
+    let drawingSpace: DrawingSpace(size: windowSize)
+    let window: Window(SDL_CreateWindow(title: title, x: 805240832, y: 805240832, width: drawingSpace.size.width, height: drawingSpace.size.height, flags: 4))
+    if SDL_GetWindowID(window: window) == 0 {
+        return 2
+    }
+    let renderer: WindowRenderer(SDL_CreateRenderer(window: window, index: 0 - 1, flags: 2))
+    SDL_ShowWindow(window: window)
+    SDL_RaiseWindow(window: window)
+    let backgroundRed: Int<.unsigned, 8>(18)
+    let backgroundGreen: Int<.unsigned, 8>(20)
+    let backgroundBlue: Int<.unsigned, 8>(28)
+    let backgroundAlpha: Int<.unsigned, 8>(255)
+    if SDL_SetRenderDrawColor(renderer: renderer, red: backgroundRed, green: backgroundGreen, blue: backgroundBlue, alpha: backgroundAlpha) != 0 {
+        return 3
+    }
+    if SDL_RenderClear(renderer: renderer) != 0 {
+        return 4
+    }
+    if rangeViewDrawShapeGallery(renderer: renderer) != 0 {
+        return 5
+    }
+    SDL_RenderPresent(renderer: renderer)
+    state isOpen: Bool(true)
+    while isOpen {
+        if rangeViewWindowShouldClose(window: window) {
+            isOpen: false
+        }
+        SDL_Delay(milliseconds: 16)
+    }
+    SDL_DestroyRenderer(renderer: renderer)
+    SDL_DestroyWindow(window: window)
+    SDL_Quit()
+    return 42
+}
+
+function rangeViewOpenNativeWindow(): Int {
+    return rangeViewRunApplication()
+}

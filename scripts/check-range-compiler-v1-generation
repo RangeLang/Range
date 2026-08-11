@@ -124,8 +124,9 @@ load_status=0
 }
 
 source_key="$(/usr/bin/sed -n 's/^sourceSet.*sha256=\([^[:space:]]*\).*$/\1/p' "$BUILD_PLAN")"
-artifact_root="${RANGE_BUILD_CACHE_DIR:-$REPO_ROOT/.range/Compiler/BuildCache/compiler-build}/function-artifacts/per-function-artifacts-v1"
-artifact_input="$artifact_root/$source_key/FunctionArtifacts.cache"
+producer_key="$(sha256 "$PRODUCER")"
+artifact_root="${RANGE_BUILD_CACHE_DIR:-$REPO_ROOT/.range/Compiler/BuildCache/compiler-build}/function-derivations/function-derivations-v2"
+artifact_input="$artifact_root/$producer_key/FunctionArtifacts.cache"
 {
     /usr/bin/head -n 1 "$bundle"
     /usr/bin/printf '%s\n' '// range-development-compiler'

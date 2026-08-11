@@ -1,0 +1,17 @@
+@opaque
+construct PthreadHandle {}
+
+@extern
+function pthread_self(): PthreadHandle
+
+@extern
+@link(.pthread)
+function pthread_equal(left: PthreadHandle, right: PthreadHandle): Int
+
+@main {
+    let current: PthreadHandle(pthread_self())
+    if pthread_equal(left: current, right: current) == 0 {
+        return 1
+    }
+    return 42
+}

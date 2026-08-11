@@ -1,0 +1,187 @@
+// Disposable physical index over exact identity representations. Component
+// words are stored as ordered (first, second) pairs; fingerprints only select
+// collision chains and never replace exact comparison.
+construct CompilerCompositionExactIndex {
+    let bucketHeads: Buffer<Int>
+    let nextRows: Buffer<Int>
+    let fingerprints: Buffer<Int>
+    let identityWords: Buffer<Int>
+    let componentStarts: Buffer<Int>
+    let componentCounts: Buffer<Int>
+    let componentWords: Buffer<Int>
+    let bucketCount: Int
+}
+
+function compilerCompositionExactWordsFingerprint(words: Buffer<Int>): Int {
+    state fingerprint: Int(17)
+    state index: Int(0)
+    while index < words.count {
+        fingerprint: (fingerprint * 127 + words.element(index: index) + 1) % 16000057
+        index: index + 1
+    }
+    return (fingerprint * 127 + words.count + 1) % 16000057
+}
+
+function compilerCompositionExactPairFingerprint(first: Int, second: Int): Int {
+    let firstStep: Int((17 * 127 + first + 1) % 16000057)
+    let secondStep: Int((firstStep * 127 + second + 1) % 16000057)
+    return (secondStep * 127 + 3) % 16000057
+}
+
+function compilerCompositionExactIndexCreate(estimatedCompositionCount: Int): CompilerCompositionExactIndex {
+    let bucketCount: Int(estimatedCompositionCount * 2 + 1)
+    let bucketHeads: Buffer<Int>(bufferCreateInt(capacity: bucketCount))
+    state bucket: Int(0)
+    while bucket < bucketCount {
+        bucketHeads.append(element: 0 - 1)
+        bucket: bucket + 1
+    }
+    return CompilerCompositionExactIndex(
+        bucketHeads: bucketHeads,
+        nextRows: bufferCreateInt(capacity: estimatedCompositionCount),
+        fingerprints: bufferCreateInt(capacity: estimatedCompositionCount),
+        identityWords: bufferCreateInt(capacity: estimatedCompositionCount * 2),
+        componentStarts: bufferCreateInt(capacity: estimatedCompositionCount),
+        componentCounts: bufferCreateInt(capacity: estimatedCompositionCount),
+        componentWords: bufferCreateInt(capacity: estimatedCompositionCount * 4),
+        bucketCount: bucketCount
+    )
+}
+
+function compilerCompositionExactIndexAppend(index: CompilerCompositionExactIndex, identityFirst: Int, identitySecond: Int, componentWords: Buffer<Int>): Int {
+    if componentWords.count % 2 != 0 || index.bucketCount <= 0 { return 0 - 1 }
+    let row: Int(index.nextRows.count)
+    let fingerprint: Int(compilerCompositionExactWordsFingerprint(words: componentWords))
+    let bucket: Int(fingerprint % index.bucketCount)
+    if index.nextRows.append(element: index.bucketHeads.element(index: bucket)) != 0
+        || index.fingerprints.append(element: fingerprint) != 0
+        || index.identityWords.append(element: identityFirst) != 0
+        || index.identityWords.append(element: identitySecond) != 0
+        || index.componentStarts.append(element: index.componentWords.count) != 0
+        || index.componentCounts.append(element: componentWords.count / 2) != 0 {
+        return 0 - 1
+    }
+    state word: Int(0)
+    while word < componentWords.count {
+        if index.componentWords.append(element: componentWords.element(index: word)) != 0 { return 0 - 1 }
+        word: word + 1
+    }
+    if index.bucketHeads.update(element: row, index: bucket) != 0 { return 0 - 1 }
+    return row
+}
+
+function compilerCompositionExactIndexAppendPair(index: CompilerCompositionExactIndex, identityFirst: Int, identitySecond: Int, componentFirst: Int, componentSecond: Int): Int {
+    if index.bucketCount <= 0 { return 0 - 1 }
+    let row: Int(index.nextRows.count)
+    let fingerprint: Int(compilerCompositionExactPairFingerprint(first: componentFirst, second: componentSecond))
+    let bucket: Int(fingerprint % index.bucketCount)
+    if index.nextRows.append(element: index.bucketHeads.element(index: bucket)) != 0
+        || index.fingerprints.append(element: fingerprint) != 0
+        || index.identityWords.append(element: identityFirst) != 0
+        || index.identityWords.append(element: identitySecond) != 0
+        || index.componentStarts.append(element: index.componentWords.count) != 0
+        || index.componentCounts.append(element: 1) != 0
+        || index.componentWords.append(element: componentFirst) != 0
+        || index.componentWords.append(element: componentSecond) != 0
+        || index.bucketHeads.update(element: row, index: bucket) != 0 {
+        return 0 - 1
+    }
+    return row
+}
+
+function compilerCompositionExactIndexRowMatches(index: CompilerCompositionExactIndex, row: Int, queryWords: Buffer<Int>): Bool {
+    if index.componentCounts.element(index: row) * 2 != queryWords.count { return false }
+    let start: Int(index.componentStarts.element(index: row))
+    state word: Int(0)
+    while word < queryWords.count {
+        if index.componentWords.element(index: start + word) != queryWords.element(index: word) { return false }
+        word: word + 1
+    }
+    return true
+}
+
+function compilerCompositionExactIndexMatchFromRow(index: CompilerCompositionExactIndex, queryWords: Buffer<Int>, fingerprint: Int, startRow: Int): Int {
+    state row: Int(startRow)
+    while row >= 0 {
+        if index.fingerprints.element(index: row) == fingerprint
+            && compilerCompositionExactIndexRowMatches(index: index, row: row, queryWords: queryWords) {
+            return row
+        }
+        row: index.nextRows.element(index: row)
+    }
+    return 0 - 1
+}
+
+function compilerCompositionExactIndexFirst(index: CompilerCompositionExactIndex, queryWords: Buffer<Int>): Int {
+    let fingerprint: Int(compilerCompositionExactWordsFingerprint(words: queryWords))
+    if index.bucketCount <= 0 { return 0 - 1 }
+    return compilerCompositionExactIndexMatchFromRow(
+        index: index,
+        queryWords: queryWords,
+        fingerprint: fingerprint,
+        startRow: index.bucketHeads.element(index: fingerprint % index.bucketCount)
+    )
+}
+
+function compilerCompositionExactIndexFirstPair(index: CompilerCompositionExactIndex, first: Int, second: Int): Int {
+    if index.bucketCount <= 0 { return 0 - 1 }
+    let fingerprint: Int(compilerCompositionExactPairFingerprint(first: first, second: second))
+    state row: Int(index.bucketHeads.element(index: fingerprint % index.bucketCount))
+    while row >= 0 {
+        let start: Int(index.componentStarts.element(index: row))
+        if index.fingerprints.element(index: row) == fingerprint
+            && index.componentCounts.element(index: row) == 1
+            && index.componentWords.element(index: start) == first
+            && index.componentWords.element(index: start + 1) == second {
+            return row
+        }
+        row: index.nextRows.element(index: row)
+    }
+    return 0 - 1
+}
+
+function compilerCompositionExactIndexNext(index: CompilerCompositionExactIndex, queryWords: Buffer<Int>, row: Int): Int {
+    if row < 0 { return 0 - 1 }
+    let fingerprint: Int(compilerCompositionExactWordsFingerprint(words: queryWords))
+    return compilerCompositionExactIndexMatchFromRow(
+        index: index,
+        queryWords: queryWords,
+        fingerprint: fingerprint,
+        startRow: index.nextRows.element(index: row)
+    )
+}
+
+function compilerCompositionExactIndexIdentityFirst(index: CompilerCompositionExactIndex, row: Int): Int {
+    return index.identityWords.element(index: row * 2)
+}
+
+function compilerCompositionExactIndexIdentitySecond(index: CompilerCompositionExactIndex, row: Int): Int {
+    return index.identityWords.element(index: row * 2 + 1)
+}
+
+function compilerCompositionExactIndexCount(index: CompilerCompositionExactIndex, queryWords: Buffer<Int>): Int {
+    let fingerprint: Int(compilerCompositionExactWordsFingerprint(words: queryWords))
+    if index.bucketCount <= 0 { return 0 }
+    state count: Int(0)
+    state row: Int(index.bucketHeads.element(index: fingerprint % index.bucketCount))
+    while row >= 0 {
+        if index.fingerprints.element(index: row) == fingerprint
+            && compilerCompositionExactIndexRowMatches(index: index, row: row, queryWords: queryWords) {
+            count: count + 1
+        }
+        row: index.nextRows.element(index: row)
+    }
+    return count
+}
+
+function compilerCompositionExactIndexDestroy(index: CompilerCompositionExactIndex): Int {
+    state status: Int(0)
+    if index.bucketHeads.destroy() != 0 { status: 0 - 1 }
+    if index.nextRows.destroy() != 0 { status: 0 - 1 }
+    if index.fingerprints.destroy() != 0 { status: 0 - 1 }
+    if index.identityWords.destroy() != 0 { status: 0 - 1 }
+    if index.componentStarts.destroy() != 0 { status: 0 - 1 }
+    if index.componentCounts.destroy() != 0 { status: 0 - 1 }
+    if index.componentWords.destroy() != 0 { status: 0 - 1 }
+    return status
+}

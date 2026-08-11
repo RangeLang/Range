@@ -1,0 +1,37 @@
+@graph(.declaration, .application)
+construct Enum {
+    @syntax {
+        $macros
+        enum $identifier<$generics> {
+            $cases
+        }
+    }
+    @member
+    construct Declaration {
+        let macros: Array<Macro.Application>
+        let identity: Identity
+        let generics: Array<Parameter.Declaration>
+        let cases: Array<Case>
+    }
+
+    @stored
+    @syntax {
+        $macros
+        case $identifier$value
+    }
+    @property
+    @member
+    construct Case {
+        let macros: Array<Macro.Application>
+        let identity: Identity
+        let value: @syntax?
+    }
+
+    @syntax {
+        $identifier.$selectedCase
+    }
+    construct Application {
+        let identity: Identity
+        let selectedCase: Identity?
+    }
+}

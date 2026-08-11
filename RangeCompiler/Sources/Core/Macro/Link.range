@@ -1,0 +1,16 @@
+enum NativeLibrary {
+    case sqlite3
+    case glfw
+    case wgpuNative
+    case pthread
+    case sdl2
+}
+
+construct LinkRegistration {
+    let function: Function
+    let library: NativeLibrary
+}
+
+macro link(_ library: NativeLibrary): Function -> LinkRegistration {
+    return LinkRegistration(function: #environment.target, library: library)
+}

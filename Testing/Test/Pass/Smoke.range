@@ -1,0 +1,15 @@
+@testGroup
+construct TestSmoke {
+    let commandGroupStorage: Int
+
+    @test
+    function smoke() {}
+
+    @test
+    function alsoSmoke() {}
+}
+
+@main {
+    let tests: TestSmoke(commandGroupStorage: 0)
+    return tests.runCommandLine()
+}

@@ -1,4 +1,4 @@
-macro gpuCanvas(): Construct { environment in
+macro gpuCanvas(): Construct {
     #environment {
         function writeGPUCanvas(path: String): Int {
             return gpuCanvasHost(path: path, vertexCount: 3)

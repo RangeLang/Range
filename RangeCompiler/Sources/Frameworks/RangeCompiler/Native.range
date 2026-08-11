@@ -1,0 +1,15 @@
+@extern
+@builtin
+function readFile(path: String): String
+
+@extern
+@builtin
+function stringPrint(value: String): Int
+
+@extern
+@builtin
+function stringIndexOf(source: String, needle: String, start: Int): Int
+
+@extern
+@builtin
+function stringSubstring(source: String, start: Int, end: Int): String

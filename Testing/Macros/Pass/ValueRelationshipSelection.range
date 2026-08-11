@@ -16,9 +16,9 @@ construct Construct {
     }
 }
 
-macro collectValues(): Construct { environment in
+macro collectValues(): Construct {
     let valueCount: Int(
-        environment.target.Declaration.members.filter(all: @value).count
+        #environment.target.Declaration.members.filter(all: @value).count
     )
     if valueCount == 1 {
         #environment {
@@ -29,9 +29,9 @@ macro collectValues(): Construct { environment in
     }
 }
 
-macro retainSelectedValue(): Construct -> @syntax { environment in
+macro retainSelectedValue(): Construct -> @syntax {
     let selected: Array<@syntax>(
-        environment.target.Declaration.members.filter(all: @value)
+        #environment.target.Declaration.members.filter(all: @value)
     )
     let narrowed: Array<@syntax>(
         selected.filter(all: @value)

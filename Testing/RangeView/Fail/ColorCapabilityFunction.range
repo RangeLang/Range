@@ -1,0 +1,8 @@
+@color
+function invalidColor(): Int {
+    return 1
+}
+
+@main {
+    return 42
+}

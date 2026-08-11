@@ -128,11 +128,15 @@ export function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
-export function highlightRange(source: string): string {
+export function highlightRange(
+  source: string,
+  indexedKeywords: ReadonlySet<string> = new Set(),
+): string {
   const pattern = /([@#][A-Za-z_]\w*|\/\/.*$|"(?:\\.|[^"\\])*"|\b[A-Za-z_]\w*\b|\b\d(?:_?\d)*(?:\.\d(?:_?\d)*)?\b|[{}[\]();,.:<>])/gm;
   const matches = Array.from(source.matchAll(pattern));
   let output = "";
   let cursor = 0;
+  let keywordIndex = 0;
   for (const [matchIndex, match] of matches.entries()) {
     const token = match[0];
     const index = match.index ?? 0;
@@ -140,7 +144,12 @@ export function highlightRange(source: string): string {
     const previous = matches[matchIndex - 1]?.[0] ?? "";
     const next = matches[matchIndex + 1]?.[0] ?? "";
     const type = rangeSemanticTokenType(token, previous, next);
-    output += type ? `<span class="token ${type}">${escapeHtml(token)}</span>` : escapeHtml(token);
+    const indexAttribute = type === "keyword" && indexedKeywords.has(token)
+      ? ` data-keyword-index="${keywordIndex++}"`
+      : "";
+    output += type
+      ? `<span class="token ${type}"${indexAttribute}>${escapeHtml(token)}</span>`
+      : escapeHtml(token);
     cursor = index + token.length;
   }
   return output + escapeHtml(source.slice(cursor));

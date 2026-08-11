@@ -1,0 +1,6 @@
+construct UnsupportedExternAggregate {
+    let value: Int
+}
+
+@extern
+function rangeExternAggregate(value: UnsupportedExternAggregate): Int

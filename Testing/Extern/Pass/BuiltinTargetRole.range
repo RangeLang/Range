@@ -1,0 +1,10 @@
+@extern
+@builtin(.target)
+function targetPointerBits(): Int
+
+@main {
+    if targetPointerBits() == 64 {
+        return 42
+    }
+    return 1
+}

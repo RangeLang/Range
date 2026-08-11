@@ -1,0 +1,273 @@
+construct CompilerV1IdentifiedText {
+    let identity: CompilerIdentity
+    let value: String
+}
+
+construct CompilerV1Edge {
+    let from: CompilerIdentity
+    let relationship: CompilerIdentity
+    let to: CompilerIdentity
+}
+
+construct CompilerV1SourceDelta {
+    let file: CompilerV1IdentifiedText
+    let source: CompilerV1IdentifiedText
+    let edge: CompilerV1Edge
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
+}
+
+construct CompilerV1SyntaxDelta {
+    let syntax: CompilerV1IdentifiedText
+    let edge: CompilerV1Edge
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
+}
+
+construct CompilerV1ShapeDelta {
+    let shape: CompilerV1IdentifiedText
+    let edge: CompilerV1Edge
+    let before: CompilerValueFingerprint
+    let after: CompilerValueFingerprint
+}
+
+construct CompilerV1Execution {
+    let isValid: Bool
+    let file: CompilerIdentity
+    let source: CompilerValueFingerprint
+    let syntax: CompilerValueFingerprint
+    let shape: CompilerValueFingerprint
+    let behavior: CompilerValueFingerprint
+    let compiled: CompilerValueFingerprint
+}
+
+function compilerV1AbsentValue(): CompilerValueFingerprint {
+    return CompilerValueFingerprint(first: 0, second: 0)
+}
+
+function compilerV1AbsentIdentity(): CompilerIdentity {
+    return CompilerIdentity(first: 0, second: 0)
+}
+
+// Bridge to the rolling hash implementation. CompilerIdentity and
+// CompilerFingerprint share the same two-int ABI.
+function compilerV1IdentityAppendInt(identity: CompilerIdentity, value: Int): CompilerIdentity {
+    let fp: CompilerFingerprint(compilerFingerprintAppendInt(fingerprint: CompilerFingerprint(first: identity.first, second: identity.second), value: value))
+    return CompilerIdentity(first: fp.first, second: fp.second)
+}
+
+function compilerV1IdentityAppendText(identity: CompilerIdentity, tag: Int, text: String): CompilerIdentity {
+    let fp: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: CompilerFingerprint(first: identity.first, second: identity.second), tag: tag, text: text))
+    return CompilerIdentity(first: fp.first, second: fp.second)
+}
+
+function compilerV1ValueFingerprintEqual(left: CompilerValueFingerprint, right: CompilerValueFingerprint): Bool {
+    return left.first == right.first && left.second == right.second
+}
+
+function compilerV1ValueFingerprint(identity: CompilerIdentity, tag: Int, text: String): CompilerValueFingerprint {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: CompilerFingerprint(first: identity.first, second: identity.second), tag: tag, text: text))
+    return CompilerValueFingerprint(first: fingerprint.first, second: fingerprint.second)
+}
+
+function compilerV1ReconciliationInsert(): Int { return 1 }
+function compilerV1ReconciliationReuse(): Int { return 2 }
+function compilerV1ReconciliationUpdate(): Int { return 3 }
+function compilerV1ReconciliationDelete(): Int { return 4 }
+
+function compilerV1ReconciliationOperation(before: CompilerValueFingerprint, after: CompilerValueFingerprint): Int {
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    if compilerV1ValueFingerprintEqual(left: after, right: absent) {
+        if compilerV1ValueFingerprintEqual(left: before, right: absent) { return compilerV1ReconciliationReuse() }
+        return compilerV1ReconciliationDelete()
+    }
+    if compilerV1ValueFingerprintEqual(left: before, right: absent) { return compilerV1ReconciliationInsert() }
+    if compilerV1ValueFingerprintEqual(left: before, right: after) { return compilerV1ReconciliationReuse() }
+    return compilerV1ReconciliationUpdate()
+}
+
+function compilerV1ReconciliationOperationName(operation: Int): String {
+    if operation == compilerV1ReconciliationInsert() { return String("insert") }
+    if operation == compilerV1ReconciliationReuse() { return String("reuse") }
+    if operation == compilerV1ReconciliationUpdate() { return String("update") }
+    if operation == compilerV1ReconciliationDelete() { return String("delete") }
+    return String("invalid")
+}
+
+function compilerV1ExecutionEmpty(): CompilerV1Execution {
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    let absentIdentity: CompilerIdentity(compilerV1AbsentIdentity())
+    return CompilerV1Execution(
+        isValid: true,
+        file: absentIdentity,
+        source: absent,
+        syntax: absent,
+        shape: absent,
+        behavior: absent,
+        compiled: absent
+    )
+}
+
+function compilerV1ExecutionInvalid(): CompilerV1Execution {
+    let absent: CompilerValueFingerprint(compilerV1AbsentValue())
+    let absentIdentity: CompilerIdentity(compilerV1AbsentIdentity())
+    return CompilerV1Execution(
+        isValid: false,
+        file: absentIdentity,
+        source: absent,
+        syntax: absent,
+        shape: absent,
+        behavior: absent,
+        compiled: absent
+    )
+}
+
+function compilerV1ExecutionFieldIsDecimal(source: String, end: Int, ordinal: Int): Bool {
+    return compilerBuildPlanIsDecimal(
+        value: compilerBuildPlanFieldValue(source: source, start: 0, end: end, ordinal: ordinal)
+    )
+}
+
+function compilerV1ExecutionFieldInt(source: String, end: Int, ordinal: Int): Int {
+    return compilerCoreParseDecimalInt(
+        value: compilerBuildPlanFieldValue(source: source, start: 0, end: end, ordinal: ordinal)
+    )
+}
+
+function compilerV1ExecutionSourceIsValid(source: String): Bool {
+    let count: Int(source.bytes.count)
+    if count == 0 { return true }
+    if source.byte(index: count - 1) != 10 { return false }
+    let end: Int(count - 1)
+    if compilerBuildPlanFieldCount(source: source, start: 0, end: end) != 14
+        || compilerBuildPlanFieldText(source: source, start: 0, end: end, ordinal: 0) != String("compilerV1Execution")
+        || compilerBuildPlanFieldValue(source: source, start: 0, end: end, ordinal: 1) != String("2") { return false }
+    state ordinal: Int(2)
+    while ordinal < 14 {
+        if !compilerV1ExecutionFieldIsDecimal(source: source, end: end, ordinal: ordinal) { return false }
+        ordinal: ordinal + 1
+    }
+    return true
+}
+
+function compilerV1ExecutionDecode(source: String): CompilerV1Execution {
+    let count: Int(source.bytes.count)
+    if !compilerV1ExecutionSourceIsValid(source: source) { return compilerV1ExecutionInvalid() }
+    if count == 0 { return compilerV1ExecutionEmpty() }
+    let end: Int(count - 1)
+    return CompilerV1Execution(
+        isValid: true,
+        file: CompilerIdentity(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 2),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 3)
+        ),
+        source: CompilerValueFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 4),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 5)
+        ),
+        syntax: CompilerValueFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 6),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 7)
+        ),
+        shape: CompilerValueFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 8),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 9)
+        ),
+        behavior: CompilerValueFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 10),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 11)
+        ),
+        compiled: CompilerValueFingerprint(
+            first: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 12),
+            second: compilerV1ExecutionFieldInt(source: source, end: end, ordinal: 13)
+        )
+    )
+}
+
+function compilerV1ExecutionEncode(execution: CompilerV1Execution): String {
+    return "compilerV1Execution\tversion=2\tfileFirst=\(execution.file.first)\tfileSecond=\(execution.file.second)\tsourceFirst=\(execution.source.first)\tsourceSecond=\(execution.source.second)\tsyntaxFirst=\(execution.syntax.first)\tsyntaxSecond=\(execution.syntax.second)\tshapeFirst=\(execution.shape.first)\tshapeSecond=\(execution.shape.second)\tbehaviorFirst=\(execution.behavior.first)\tbehaviorSecond=\(execution.behavior.second)\tcompiledFirst=\(execution.compiled.first)\tcompiledSecond=\(execution.compiled.second)\n"
+}
+
+function compilerV1ExecutionFromDeltas(source: CompilerV1SourceDelta, syntax: CompilerV1SyntaxDelta, shape: CompilerV1ShapeDelta, behavior: CompilerV1BehaviorDelta, compiled: CompilerV1CompiledDelta): CompilerV1Execution {
+    return CompilerV1Execution(
+        isValid: true,
+        file: source.file.identity,
+        source: source.after,
+        syntax: syntax.after,
+        shape: shape.after,
+        behavior: behavior.after,
+        compiled: compiled.after
+    )
+}
+
+function compilerV1IdentityForFile(path: String): CompilerIdentity {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 1, text: path))
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
+}
+
+function compilerV1IdentityForSource(file: CompilerIdentity): CompilerIdentity {
+    return compilerV1IdentityAppendInt(identity: file, value: 1)
+}
+
+function compilerV1IdentityForFileSourceRelationship(): CompilerIdentity {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 17, text: String("CompilerV1.FileSource")))
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
+}
+
+function compilerV1IdentityForSyntax(source: CompilerIdentity): CompilerIdentity {
+    return compilerV1IdentityAppendInt(identity: source, value: 2)
+}
+
+function compilerV1IdentityForSourceSyntaxRelationship(): CompilerIdentity {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 18, text: String("CompilerV1.SourceSyntax")))
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
+}
+
+function compilerV1IdentityForSyntaxShapeRelationship(): CompilerIdentity {
+    let fingerprint: CompilerFingerprint(compilerFingerprintAppendText(fingerprint: compilerFingerprintInitial(), tag: 19, text: String("CompilerV1.SyntaxShape")))
+    return CompilerIdentity(first: fingerprint.first, second: fingerprint.second)
+}
+
+function compilerV1SyntaxDelta(source: CompilerV1SourceDelta, snapshot: String, before: CompilerValueFingerprint): CompilerV1SyntaxDelta {
+    let syntaxIdentity: CompilerIdentity(compilerV1IdentityForSyntax(source: source.source.identity))
+    return CompilerV1SyntaxDelta(
+        syntax: CompilerV1IdentifiedText(identity: syntaxIdentity, value: "\(snapshot)"),
+        edge: CompilerV1Edge(
+            from: source.source.identity,
+            relationship: compilerV1IdentityForSourceSyntaxRelationship(),
+            to: syntaxIdentity
+        ),
+        before: before,
+        after: compilerV1ValueFingerprint(identity: syntaxIdentity, tag: 16, text: snapshot)
+    )
+}
+
+function compilerV1ShapeDelta(syntaxIdentity: CompilerIdentity, snapshot: String, before: CompilerValueFingerprint): CompilerV1ShapeDelta {
+    let shapeIdentity: CompilerIdentity(compilerV1IdentityAppendInt(identity: syntaxIdentity, value: 3))
+    return CompilerV1ShapeDelta(
+        shape: CompilerV1IdentifiedText(identity: shapeIdentity, value: "\(snapshot)"),
+        edge: CompilerV1Edge(
+            from: syntaxIdentity,
+            relationship: compilerV1IdentityForSyntaxShapeRelationship(),
+            to: shapeIdentity
+        ),
+        before: before,
+        after: compilerV1ValueFingerprint(identity: shapeIdentity, tag: 12, text: snapshot)
+    )
+}
+
+function compilerV1SourceDelta(path: String, source: String, before: CompilerValueFingerprint): CompilerV1SourceDelta {
+    let fileIdentity: CompilerIdentity(compilerV1IdentityForFile(path: path))
+    let sourceIdentity: CompilerIdentity(compilerV1IdentityForSource(file: fileIdentity))
+    return CompilerV1SourceDelta(
+        file: CompilerV1IdentifiedText(identity: fileIdentity, value: "\(path)"),
+        source: CompilerV1IdentifiedText(identity: sourceIdentity, value: "\(source)"),
+        edge: CompilerV1Edge(
+            from: fileIdentity,
+            relationship: compilerV1IdentityForFileSourceRelationship(),
+            to: sourceIdentity
+        ),
+        before: before,
+        after: compilerV1ValueFingerprint(identity: sourceIdentity, tag: 11, text: source)
+    )
+}

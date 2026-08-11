@@ -1,0 +1,6 @@
+@shape
+construct ContractShape {
+    function draw(): ShapeRepresentation {
+        return ShapeRepresentation()
+    }
+}

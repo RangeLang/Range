@@ -150,6 +150,8 @@
   // then returns through a different ordering so it stays directional rather
   // than acquiring a swung pulse.
   const macroBackgroundIntervalPattern = [1, 2, 4, 8, 4, 2, 1, 2, 4, 8, 2, 4] as const;
+  const macroSnareRollStrokePattern = [0.56, 0.72, 0.62, 1] as const;
+  const macroSnareRollSpacingSeconds = 0.038;
   const backgroundMacroWords = macroWords
     .map((word) => word.text)
     .filter((word) => word !== "#environment" && word !== "@background");
@@ -883,7 +885,7 @@
   let macroSequenceTick = 0;
   let macroNextNoteTick = macroSequenceStartOffset;
   let macroNextSupportTick = macroSequenceStartOffset;
-  let macroHatRollIndex = 0;
+  let macroSnareRollIndex = 0;
   let macroBackgroundIntervalIndex = 0;
   let macroSelectionRandomState = 0x4d414352;
   let macroReleaseTick = -1;
@@ -1043,12 +1045,12 @@
         impulseLevel: 0.22,
       });
       backgroundTail = createMacroTail(audio, macroSpaceInput, {
-        duration: 2.2,
-        decay: 3.8,
-        cutoff: 9_000,
-        dryLevel: 1,
-        wetLevel: 0.22,
-        impulseLevel: 0.16,
+        duration: 3.2,
+        decay: 3.25,
+        cutoff: 5_800,
+        dryLevel: 0.82,
+        wetLevel: 0.12,
+        impulseLevel: 0.2,
       });
     }
     if (macroAudioRoute && !macroRouteOpen) {
@@ -1656,7 +1658,7 @@
     return pool[index];
   }
 
-  function playMacroSnare(
+  function playMacroSnareStroke(
     pan: number,
     onsetTime: number,
     seed: number,
@@ -1703,16 +1705,6 @@
     source.start(onsetTime);
     body.start(onsetTime);
     body.stop(onsetTime + Math.min(0.14, tailSeconds * 0.52));
-    macroSidechainPulseId += 1;
-    const sidechainPulseId = macroSidechainPulseId;
-    soundManager?.setLayerPresence?.(
-      "macros",
-      Math.min(0.95, accent / 0.21),
-    );
-    window.setTimeout(() => {
-      if (sidechainPulseId !== macroSidechainPulseId) return;
-      soundManager?.setLayerPresence?.("macros", 0);
-    }, Math.max(80, tailSeconds * 420));
     source.addEventListener("ended", () => {
       source.disconnect();
       body.disconnect();
@@ -1722,6 +1714,36 @@
       gain.disconnect();
       panner.disconnect();
     }, { once: true });
+  }
+
+  function playMacroSnareRoll(
+    pan: number,
+    onsetTime: number,
+    seed: number,
+    accent: number,
+    tailSeconds: number,
+  ) {
+    macroSnareRollStrokePattern.forEach((strokeLevel, strokeIndex) => {
+      const alternatingPan = pan
+        + (strokeIndex % 2 === 0 ? -0.018 : 0.018);
+      playMacroSnareStroke(
+        Math.max(-0.94, Math.min(0.94, alternatingPan)),
+        onsetTime + strokeIndex * macroSnareRollSpacingSeconds,
+        seed + strokeIndex * 131,
+        accent * strokeLevel,
+        tailSeconds + strokeIndex * 0.018,
+      );
+    });
+    macroSidechainPulseId += 1;
+    const sidechainPulseId = macroSidechainPulseId;
+    soundManager?.setLayerPresence?.(
+      "macros",
+      Math.min(0.72, accent / 0.18),
+    );
+    window.setTimeout(() => {
+      if (sidechainPulseId !== macroSidechainPulseId) return;
+      soundManager?.setLayerPresence?.("macros", 0);
+    }, Math.max(140, tailSeconds * 520));
   }
 
   function activateBackgroundSupport(onsetTime: number | undefined) {
@@ -1743,12 +1765,12 @@
       % macroBackgroundIntervalPattern.length;
     const interval = macroBackgroundIntervalPattern[intervalPosition]
       ?? macroBackgroundIntervalPattern[0];
-    const accent = interval === 8 ? 0.2 : interval === 4 ? 0.17 : 0.138;
-    const fallbackPan = macroHatRollIndex % 2 === 0 ? -0.24 : 0.24;
-    playMacroSnare(
+    const accent = interval === 8 ? 0.12 : interval === 4 ? 0.104 : 0.086;
+    const fallbackPan = macroSnareRollIndex % 2 === 0 ? -0.24 : 0.24;
+    playMacroSnareRoll(
       macroPanForWord(word, fallbackPan),
       now,
-      0x534e4152 + macroHatRollIndex * 97,
+      0x534e4152 + macroSnareRollIndex * 97,
       accent,
       tailSeconds,
     );
@@ -1763,7 +1785,7 @@
         releaseTimeConstant: Math.max(0.12, tailSeconds * 0.72),
       }] : []),
     ];
-    macroHatRollIndex += 1;
+    macroSnareRollIndex += 1;
     macroBackgroundIntervalIndex = (
       macroBackgroundIntervalIndex + 1
     ) % macroBackgroundIntervalPattern.length;
@@ -1904,7 +1926,7 @@
         macroSequenceTick = 0;
         macroNextNoteTick = macroSequenceStartOffset;
         macroNextSupportTick = macroSequenceStartOffset;
-        macroHatRollIndex = 0;
+        macroSnareRollIndex = 0;
         macroBackgroundIntervalIndex = 0;
         macroSelectionRandomState = 0x4d414352;
         macroReleaseTick = -1;
@@ -1954,7 +1976,7 @@
         macroSequenceTick = tick;
         macroNextNoteTick = tick + macroSequenceStartOffset;
         macroNextSupportTick = tick + macroSequenceStartOffset;
-        macroHatRollIndex = 0;
+        macroSnareRollIndex = 0;
         macroBackgroundIntervalIndex = 0;
         macroSelectionRandomState = 0x4d414352;
         macroReleaseTick = -1;

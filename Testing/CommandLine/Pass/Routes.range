@@ -13,7 +13,11 @@ construct CLI {
     }
 }
 
-@main {
+function runCLI(): Int {
     let cli: CLI(commandGroupStorage: 0)
     return cli.runCommandLine()
+}
+
+@main {
+    return runCLI()
 }

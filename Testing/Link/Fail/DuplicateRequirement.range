@@ -1,0 +1,4 @@
+@extern
+@link(.sqlite3)
+@link(.sqlite3)
+function duplicateLinkRequirement(): Int

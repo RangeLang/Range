@@ -43,7 +43,7 @@ enum DelimiterPair {
     case angles
 }
 
-macro choose(_ shape: DelimiterPair): Member -> DelimiterPair { environment in
+macro choose(_ shape: DelimiterPair): Member -> DelimiterPair {
     return shape
 }
 

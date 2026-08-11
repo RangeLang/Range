@@ -9,7 +9,7 @@ function macroPair(value: Int): MacroPair {
     return MacroPair(left: value, right: value + 1)
 }
 
-macro directAggregateCall(): Construct { environment in
+macro directAggregateCall(): Construct {
     let pair: MacroPair(macroPair(value: 4))
     let values: Array<Int>([5, 6])
     if pair.left == 4 && pair.right == 5 && values.count == 2 && values[1] == 6 {

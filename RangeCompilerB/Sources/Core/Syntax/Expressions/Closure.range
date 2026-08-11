@@ -1,0 +1,39 @@
+construct Closure {
+    @syntax {
+        {
+            $parameters
+            $body
+        }
+    }
+    construct Literal<Value = @syntax, shape: DelimiterPair = .braces> {
+        let type: TypeReference?
+        let parameters: ParameterClause?
+        let body: Block<Value, shape>
+    }
+
+    @syntax {
+        $before $closure
+    }
+    construct Application {
+        let before: @syntax
+        let closure: Literal
+    }
+
+    @syntax {
+        $closure($arguments)
+    }
+    construct Invocation<Value = Nil> {
+        let closure: Expression
+        let arguments: Array<Parameter.Application>
+        let valueType: TypeReference
+        @value
+        let value: Value
+    }
+
+    @syntax {
+        $declarations in
+    }
+    construct ParameterClause {
+        let declarations: Array<Parameter.Declaration>
+    }
+}

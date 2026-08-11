@@ -1,0 +1,3 @@
+@storage
+@literal(.numeric)
+construct Int<signedness: Signedness, bits: Int> {}

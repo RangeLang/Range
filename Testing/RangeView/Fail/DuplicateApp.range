@@ -1,0 +1,13 @@
+@app
+construct FirstWebsite {
+    derived routes: Route {
+        Route("/first") {}
+    }
+}
+
+@app
+construct SecondWebsite {
+    derived routes: Route {
+        Route("/second") {}
+    }
+}

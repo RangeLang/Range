@@ -9,8 +9,8 @@
     let value: Value
 }
 
-macro selectGraphValue(): GraphValue { environment in
-    return environment.graph.values.filter { value in
+macro selectGraphValue(): GraphValue {
+    return #environment.graph.values.filter { value in
         value.relationships.contains(role: @value)
     }
 }`;

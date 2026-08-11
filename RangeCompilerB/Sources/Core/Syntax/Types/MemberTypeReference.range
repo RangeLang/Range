@@ -1,0 +1,5 @@
+@syntax
+construct MemberTypeReference {
+    let base: TypeReference
+    let name: String
+}

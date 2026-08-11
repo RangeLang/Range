@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROFILE_SCRIPT="$SCRIPT_DIR/profile-range-compiler"
+RUN_COUNT="${RANGE_SUSPECT_RUNS:-1}"
+LABEL="${RANGE_SUSPECT_LABEL:-current}"
+COMPILER_LLVM="${RANGE_COMPILER_PROFILE_LLVM:-}"
+KEEP="${RANGE_SUSPECT_KEEP:-0}"
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage: scripts/profile-range-compiler-suspects
+
+Runs the canonical compiler profile workload and emits one TSV row per run
+covering the current memory suspects. Set RANGE_COMPILER_PROFILE_LLVM to test a
+specific accepted or candidate compiler, RANGE_SUSPECT_RUNS for repetitions,
+and RANGE_SUSPECT_LABEL for a variant name.
+USAGE
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage
+    exit 0
+fi
+if [[ ! -x "$PROFILE_SCRIPT" ]]; then
+    echo "suspect profile failed: missing $PROFILE_SCRIPT" >&2
+    exit 1
+fi
+if ! [[ "$RUN_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+    echo "suspect profile failed: RANGE_SUSPECT_RUNS must be a positive integer" >&2
+    exit 1
+fi
+
+suite_root="$(mktemp -d "${TMPDIR:-/tmp}/range-suspects.XXXXXX")"
+cleanup() {
+    if [[ "$KEEP" != 1 ]]; then
+        /bin/rm -rf "$suite_root"
+    else
+        echo "suspectProfileOutput\tdirectory=$suite_root" >&2
+    fi
+}
+trap cleanup EXIT
+
+printf 'suspect\trun\tstatus\tllvmBytes\tartifactSHA\tmaximumResidentBytes\tpeakFootprintBytes\townedReturnTransientBytes\tfunctionEmissionTransientBytes\trawBufferPeakBytes\tlargestFunctionTransientBytes\tlargestFunctionTransientName\tworkItemMaximumBytes\tworkItemMaximumName\n'
+
+for ((run = 1; run <= RUN_COUNT; run += 1)); do
+    log="$suite_root/run-$run.log"
+    profile_environment=(
+        RANGE_COMPILER_PROFILE_DEVELOPMENT=1
+        RANGE_COMPILER_PROFILE_KEEP=0
+    )
+    if [[ -n "$COMPILER_LLVM" ]]; then
+        profile_environment+=("RANGE_COMPILER_PROFILE_LLVM=$COMPILER_LLVM")
+    fi
+    env "${profile_environment[@]}" "$PROFILE_SCRIPT" > "$log" 2>&1
+
+    /usr/bin/awk -F '\t' -v suspect="$LABEL" -v run="$run" '
+        function field(name,    position, value) {
+            for (position = 1; position <= NF; position += 1) {
+                if ($position ~ ("^" name "=")) {
+                    value = $position
+                    sub("^" name "=", "", value)
+                    return value
+                }
+            }
+            return ""
+        }
+        $1 == "compilerProfile" {
+            status = field("status")
+            llvm = field("llvmBytes")
+        }
+        $1 == "compilerArtifact" { artifact = field("sha256") }
+        $1 == "compilerResources" {
+            resident = field("maximumResidentBytes")
+            footprint = field("peakFootprintBytes")
+        }
+        $1 == "compilerPhaseMemory" {
+            name = field("name")
+            peak = field("peakTransientBytes")
+            raw = field("peakRawBufferBytes")
+            if (name == "ownedReturnSummaries.end") owned = peak
+            if (name == "functionEmission.end") emission = peak
+            if (raw > rawPeak) rawPeak = raw
+        }
+        $1 == "compilerFunctionTransientPeak" {
+            bytes = field("bytes")
+            if (bytes > functionPeak) {
+                functionPeak = bytes
+                functionName = field("name")
+            }
+        }
+        $1 == "compilerTransientWorkItemSummary" {
+            workItemBytes = field("maximumBytes")
+            workItemName = field("maximumName")
+        }
+        END {
+            printf "%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+                suspect, run, status, llvm, artifact, resident, footprint,
+                owned, emission, rawPeak, functionPeak, functionName,
+                workItemBytes, workItemName
+        }
+    ' "$log"
+done

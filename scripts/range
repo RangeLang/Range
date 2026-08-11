@@ -9,13 +9,14 @@ usage() {
     cat >&2 <<'USAGE'
 Usage:
   range version
-  range compile <FILE-OR-DIR>
+  range compile <FILE-OR-DIR> [--source FILE-OR-DIR]...
   range compile-graph <FILE-OR-DIR>
   range shape <FILE-OR-DIR>
-  range run <PROGRAM-OR-DIR> [-- ARGS...]
+  range run <PROGRAM-OR-DIR> [--source FILE-OR-DIR]... [-- ARGS...]
   range lsp
   range compiler next
   range compiler next --cached-only
+  range compiler b
   range compiler progression
   range compiler progression --cached-only
   range compiler promote --approve
@@ -23,8 +24,12 @@ Usage:
   range compiler COMMAND [ARGS...]
   range check-build-plan
   range check-value-ownership [DIR]
+  range check-composition
+  range benchmark-composition
   range check-shape
   range check-compiler-smoke [DIR]
+  range check-compiler-b
+  range check-compiler-b-source-graph
   range check-compiler-v1
   range check-compiler-graph
   range check-compiler-graph-revision
@@ -62,8 +67,8 @@ case "$command" in
             "$compiler_name" "$compiler_version" "$compiler_channel" "$bootstrap_hash"
         ;;
     compile)
-        if [[ $# -ne 1 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/compile-range-project" "$1"
+        if [[ $# -lt 1 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/compile-range-project" "$@"
         ;;
     compile-graph)
         if [[ $# -ne 1 ]]; then usage; exit 1; fi
@@ -86,6 +91,10 @@ case "$command" in
         if [[ -z "$compiler_command" ]]; then usage; exit 1; fi
         shift
         case "$compiler_command" in
+            b)
+                if [[ $# -ne 0 ]]; then usage; exit 1; fi
+                "$REPO_ROOT/scripts/run-range-compiler-b"
+                ;;
             next)
                 if [[ $# -eq 0 ]]; then
                     "$REPO_ROOT/scripts/range-native" compiler-next
@@ -114,7 +123,8 @@ case "$command" in
                 compiler_directory="$REPO_ROOT/RangeCompiler/Sources/Compiler"
                 candidate_directory="$compiler_directory/.range/Build/candidate"
                 reproduction_directory="$compiler_directory/.range/Build/reproduction"
-                "$REPO_ROOT/scripts/check-range-compiler-candidate" "$compiler_directory"
+                "$REPO_ROOT/scripts/check-range-compiler-candidate" \
+                    --allow-runtime-roll "$compiler_directory"
                 "$REPO_ROOT/scripts/promote-range-compiler" \
                     --approve \
                     --candidate-llvm "$candidate_directory/RangeCompiler.ll" \
@@ -140,6 +150,14 @@ case "$command" in
         if [[ $# -gt 2 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/check-range-value-ownership" "$@"
         ;;
+    check-composition)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-composition"
+        ;;
+    benchmark-composition)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/benchmark-range-composition"
+        ;;
     check-shape)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/check-range-shape"
@@ -151,6 +169,14 @@ case "$command" in
         else
             "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint candidate-plan
         fi
+        ;;
+    check-compiler-b)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-compiler-b"
+        ;;
+    check-compiler-b-source-graph)
+        if [[ $# -ne 0 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-range-compiler-b-source-graph"
         ;;
     check-compiler-v1)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi

@@ -21,6 +21,7 @@ usage() {
 Usage:
   scripts/check-range-value-ownership [DIR]
   scripts/check-range-value-ownership --controls [DIR]
+  scripts/check-range-value-ownership --extern-only [DIR]
   scripts/check-range-value-ownership --help
 
 DIR defaults to RangeCompiler/Sources/Compiler. The command resolves a
@@ -31,6 +32,8 @@ The controls mode runs the complete neighboring value-ownership positive and
 negative fixture set against the same cached candidate compiler. Both modes first verify
 the focused @project scalar-default and @storage/@literal fixtures against
 that compiler.
+The extern-only mode runs only the Core @extern compile, LLVM, link, and execution
+proofs against the same source-addressed development compiler.
 USAGE
 }
 
@@ -76,11 +79,23 @@ check_project_integer_lowering() {
 
 check_target_pointer_bits_runtime() {
     local fixture="$REPO_ROOT/Testing/ProjectDefaults/Pass/TargetPointerBitsRuntime.range"
+    local bundle="$WORK_ROOT/project-defaults-target-pointer-bits-runtime.range"
     local llvm="$WORK_ROOT/project-defaults-target-pointer-bits-runtime.ll"
     local executable="$WORK_ROOT/project-defaults-target-pointer-bits-runtime"
     local actual_status
 
-    "$BUILD_EXECUTABLE" emit-llvm "$fixture" "$llvm" \
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/ExternReflection.range' \
+        'construct Function {}' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' > "$bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range" >> "$bundle"
+    /usr/bin/printf '%s\n' \
+        '' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Target.range' >> "$bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Target.range" >> "$bundle"
+    /usr/bin/printf '\n' >> "$bundle"
+    /bin/cat "$fixture" >> "$bundle"
+    "$BUILD_EXECUTABLE" emit-llvm "$bundle" "$llvm" \
         || fail "ProjectDefaults target-pointer-bits-runtime did not emit LLVM"
     /usr/bin/grep -Fq 'call i32 @targetPointerBits()' "$llvm" \
         || fail "ProjectDefaults target-pointer-bits-runtime omitted the builtin call"
@@ -181,7 +196,9 @@ check_removed_for_statement_rejected() {
 
 check_macro_environment() {
     local fixture="$REPO_ROOT/Testing/Macros/Pass/Environment.range"
+    local value_fixture="$REPO_ROOT/Testing/Macros/Pass/EnvironmentValue.range"
     local output="$WORK_ROOT/macro-environment.out"
+    local value_output="$WORK_ROOT/macro-environment-value.out"
     local error="$WORK_ROOT/macro-environment.err"
 
     "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
@@ -193,7 +210,15 @@ check_macro_environment() {
         || fail "single-binding macro environment did not record its graph read"
     /usr/bin/grep -Fq $'severity=1\toperation=1\tmessage=environment observed' "$output" \
         || fail "single-binding macro environment did not emit its diagnostic"
-    echo "Macros single-binding-environment: pass"
+
+    "$BUILD_EXECUTABLE" compile "$value_fixture" > "$value_output" 2> "$error" \
+        || fail "first-class macro environment value did not compile"
+    [[ ! -s "$error" ]] || fail "first-class macro environment value wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1\tcapabilityHandleCount=1\teventCount=1' "$value_output" \
+        || fail "first-class macro environment value did not retain one capability handle"
+    /usr/bin/grep -Fq $'severity=1\toperation=1\tmessage=environment retained' "$value_output" \
+        || fail "first-class macro environment value did not survive the compile-time call and identity comparison"
+    echo "Macros compile-time-environment-value: pass"
 }
 
 check_non_generic_stored_assignment() {
@@ -206,8 +231,8 @@ check_non_generic_stored_assignment() {
     [[ ! -s "$error" ]] || fail "non-generic stored Assignment wrote stderr"
     /usr/bin/grep -Fq $'typedSyntax\tvalid=true\tidentityScope=pathStable,pathlessSnapshotLocal\tfileCount=1\tsyntaxCount=4\tdeclarationCount=2\tmemberCount=2\tfunctionCount=0\tparameterCount=0\tgenericParameterCount=0' "$output" \
         || fail "non-generic stored Assignment did not preserve its two-member declaration shape"
-    /usr/bin/grep -Eq $'member\\trow=0\\t.*parentSyntaxID=1\\tordinal=0\\t.*name=identifier\\t.*type=Identifier\\t' "$output" \
-        || fail "non-generic stored Assignment did not place identifier in key slot 0"
+    /usr/bin/grep -Eq $'member\\trow=0\\t.*parentSyntaxID=1\\tordinal=0\\t.*name=identity\\t.*type=Identity\\t' "$output" \
+        || fail "non-generic stored Assignment did not place identity in key slot 0"
     /usr/bin/grep -Eq $'member\\trow=1\\t.*parentSyntaxID=1\\tordinal=1\\t.*name=value\\t.*type=@stored\\t' "$output" \
         || fail "non-generic stored Assignment did not place its @stored value in slot 1"
     echo "Macros non-generic-stored-assignment: pass"
@@ -274,6 +299,145 @@ check_block_source_layout() {
     echo "Syntax Block source-layout: pass"
 }
 
+check_declared_applied_if_graph() {
+    local syntax_fixture="$REPO_ROOT/Testing/Syntax/Pass/DeclaredAppliedIf.range"
+    local runtime_fixture="$REPO_ROOT/Testing/ControlFlow/Pass/DeclaredAppliedIfRuntime.range"
+    local output="$WORK_ROOT/declared-applied-if.out"
+    local error="$WORK_ROOT/declared-applied-if.err"
+    local llvm="$WORK_ROOT/declared-applied-if-runtime.ll"
+    local executable="$WORK_ROOT/declared-applied-if-runtime"
+    local actual_status
+
+    "$BUILD_EXECUTABLE" compile "$syntax_fixture" > "$output" 2> "$error" \
+        || fail "declared/applied if graph fixture did not compile"
+    [[ ! -s "$error" ]] || fail "declared/applied if graph fixture wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntax\tvalid=true\tidentityScope=pathStable,pathlessSnapshotLocal\tfileCount=1\tsyntaxCount=14\tdeclarationCount=4\tmemberCount=0\tfunctionCount=4\tparameterCount=0\tgenericParameterCount=0\ttypeReferenceCount=0\tslotCount=6\tslotOccurrenceCount=3\tbodyNodeCount=10\tbodyEdgeCount=10\tsourceGapCount=5' "$output" \
+        || fail "declared/applied if graph did not retain its exact typed shape"
+    for declaration in ready draw present render; do
+        /usr/bin/grep -Eq "^declaration\\trow=[0-9]+\\t.*kind=function\\t.*name=$declaration\\t" "$output" \
+            || fail "declared/applied if graph omitted the $declaration declaration"
+    done
+    [[ "$(/usr/bin/grep -Ec $'^syntax\tid=[0-9]+\tkind=application\t' "$output" || true)" -eq 3 ]] \
+        || fail "declared/applied if graph did not retain ready, draw, and present as three applications"
+    /usr/bin/grep -Fq $'bodyEdge\trow=1\tvalues=6,5,4,0' "$output" \
+        || fail "ready application did not retain its callee"
+    /usr/bin/grep -Fq $'bodyEdge\trow=2\tvalues=7,6,15,0' "$output" \
+        || fail "if did not retain ready as its condition"
+    /usr/bin/grep -Fq $'bodyEdge\trow=3\tvalues=4,7,1,0' "$output" \
+        || fail "outer block did not retain if as statement zero"
+    /usr/bin/grep -Fq $'bodyEdge\trow=4\tvalues=7,8,16,0' "$output" \
+        || fail "if did not retain its nested then block"
+    /usr/bin/grep -Fq $'bodyEdge\trow=5\tvalues=10,9,4,0' "$output" \
+        || fail "draw application did not retain its callee"
+    /usr/bin/grep -Fq $'bodyEdge\trow=6\tvalues=8,10,1,0' "$output" \
+        || fail "then block did not retain draw as statement zero"
+    /usr/bin/grep -Fq $'bodyEdge\trow=7\tvalues=12,11,4,0' "$output" \
+        || fail "present application did not retain its callee"
+    /usr/bin/grep -Fq $'bodyEdge\trow=8\tvalues=13,12,3,0' "$output" \
+        || fail "return did not retain the present application"
+    /usr/bin/grep -Fq $'bodyEdge\trow=9\tvalues=4,13,1,1' "$output" \
+        || fail "outer block did not retain return as statement one"
+    /usr/bin/grep -Fq $'typedSyntaxCFG\tvalid=true\tlegacyMatch=true\tfunctionRow=3\trootSyntaxID=4\tblockCount=3\tedgeCount=3\tscheduleCount=6' "$output" \
+        || fail "typed body relationships did not derive a three-block CFG matching the legacy arena"
+    /usr/bin/grep -Fq $'syntaxCFGBlock\trow=0\tvalues=0,4,0,0,1,7' "$output" \
+        || fail "typed CFG entry block did not terminate on the if condition"
+    /usr/bin/grep -Fq $'syntaxCFGBlock\trow=1\tvalues=1,8,0,0,3,7' "$output" \
+        || fail "typed CFG then block did not fall through after draw"
+    /usr/bin/grep -Fq $'syntaxCFGBlock\trow=2\tvalues=2,4,1,0,2,13' "$output" \
+        || fail "typed CFG continuation block did not retain the return"
+    /usr/bin/grep -Fq $'syntaxCFGEdge\trow=0\tvalues=0,1,1,0' "$output" \
+        || fail "typed CFG omitted the true edge into the then block"
+    /usr/bin/grep -Fq $'syntaxCFGEdge\trow=1\tvalues=0,2,2,1' "$output" \
+        || fail "typed CFG omitted the false edge into the continuation"
+    /usr/bin/grep -Fq $'syntaxCFGEdge\trow=2\tvalues=1,2,3,0' "$output" \
+        || fail "typed CFG omitted then fallthrough into the continuation"
+    /usr/bin/grep -Fq $'syntaxCFGSchedule\trow=0\tvalues=0,0,6,1,0' "$output" \
+        || fail "typed CFG did not evaluate ready in the entry block"
+    /usr/bin/grep -Fq $'syntaxCFGSchedule\trow=2\tvalues=2,1,10,1,0' "$output" \
+        || fail "typed CFG did not evaluate draw in the then block"
+    /usr/bin/grep -Fq $'syntaxCFGSchedule\trow=4\tvalues=4,2,12,1,0' "$output" \
+        || fail "typed CFG did not evaluate present in the continuation block"
+
+    "$BUILD_EXECUTABLE" emit-llvm "$runtime_fixture" "$llvm" \
+        || fail "declared/applied if runtime fixture did not emit LLVM"
+    [[ "$(/usr/bin/grep -Ec 'br i1' "$llvm" || true)" -eq 1 ]] \
+        || fail "declared/applied if runtime did not retain one conditional branch"
+    for application in ready draw present; do
+        [[ "$(/usr/bin/grep -Ec "call .*@$application" "$llvm" || true)" -eq 1 ]] \
+            || fail "declared/applied if runtime did not retain one $application call"
+    done
+    validate_llvm "$llvm"
+    link_llvm "$llvm" "$executable"
+    if "$executable"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 7 ]] \
+        || fail "declared/applied if runtime returned $actual_status, expected 7"
+    echo "Syntax declared/applied if graph + runtime CFG: pass"
+}
+
+check_function_declaration_body_coverage() {
+    local fixture="$REPO_ROOT/Testing/Syntax/Pass/FunctionDeclarationBodyCoverage.range"
+    local output="$WORK_ROOT/function-declaration-body-coverage.out"
+    local error="$WORK_ROOT/function-declaration-body-coverage.err"
+    local kind
+
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Function.Declaration body-coverage fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Function.Declaration body-coverage fixture wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
+        || fail "Function.Declaration body-coverage fixture did not produce valid typed syntax"
+    for kind in while if grouping prefixNot prefixNegate doubleLiteral equality booleanAnd booleanOr addition subtraction multiplication division remainder lessThan lessEqual greaterThan greaterEqual optionalCoalescing arrayLiteral index interpolatedString stringSegment closure; do
+        /usr/bin/grep -Eq "^syntax\\tid=[0-9]+\\tkind=$kind\\t" "$output" \
+            || fail "Function.Declaration body capture omitted $kind"
+    done
+    [[ "$(/usr/bin/grep -Ec $'^syntax\tid=[0-9]+\tkind=block\t' "$output" || true)" -eq 11 ]] \
+        || fail "Function.Declaration body capture did not retain seven function blocks and four nested regions"
+    [[ "$(/usr/bin/grep -Ec $'^bodyEdge\trow=[0-9]+\tvalues=[0-9]+,[0-9]+,27,[0-9]+$' "$output" || true)" -eq 3 ]] \
+        || fail "Function.Declaration body capture did not retain three ordered array elements"
+    [[ "$(/usr/bin/grep -Ec $'^bodyEdge\trow=[0-9]+\tvalues=[0-9]+,[0-9]+,21,[0-9]+$' "$output" || true)" -eq 2 ]] \
+        || fail "Function.Declaration body capture did not retain ordered interpolation parts"
+    [[ "$(/usr/bin/grep -Ec $'^bodyEdge\trow=[0-9]+\tvalues=[0-9]+,[0-9]+,28,0$' "$output" || true)" -eq 1 ]] \
+        || fail "Function.Declaration body capture did not retain one trailing closure"
+    [[ "$(/usr/bin/grep -Ec $'^bodyEdge\trow=[0-9]+\tvalues=[0-9]+,[0-9]+,29,0$' "$output" || true)" -eq 1 ]] \
+        || fail "Function.Declaration body capture did not retain the closure parameter"
+    echo "Syntax Function.Declaration body coverage: pass"
+}
+
+check_function_declaration_cfg() {
+    local fixture="$REPO_ROOT/Testing/Syntax/Pass/FunctionDeclarationCFG.range"
+    local output="$WORK_ROOT/function-declaration-cfg.out"
+    local error="$WORK_ROOT/function-declaration-cfg.err"
+
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Function.Declaration graph CFG fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Function.Declaration graph CFG fixture wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntax\tvalid=true' "$output" \
+        || fail "Function.Declaration graph CFG fixture did not produce valid typed syntax"
+    /usr/bin/grep -Eq $'^typedSyntaxCFG\tvalid=true\tlegacyMatch=true\tfunctionRow=0\trootSyntaxID=[0-9]+\tblockCount=[0-9]+\tedgeCount=[0-9]+\tscheduleCount=[0-9]+$' "$output" \
+        || fail "Function.Declaration graph CFG did not exactly match the legacy while/if-else product"
+    [[ "$(/usr/bin/grep -Ec $'^syntaxCFGEdge\t.*,4,0$' "$output" || true)" -eq 1 ]] \
+        || fail "Function.Declaration graph CFG did not retain one loop backedge"
+    echo "Syntax Function.Declaration graph CFG while/if-else equality: pass"
+}
+
+check_function_declaration_interpolation_cfg() {
+    local fixture="$REPO_ROOT/Testing/Syntax/Pass/FunctionDeclarationInterpolationCFG.range"
+    local output="$WORK_ROOT/function-declaration-interpolation-cfg.out"
+    local error="$WORK_ROOT/function-declaration-interpolation-cfg.err"
+
+    "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error" \
+        || fail "Function.Declaration interpolation CFG fixture did not compile"
+    [[ ! -s "$error" ]] || fail "Function.Declaration interpolation CFG fixture wrote stderr"
+    /usr/bin/grep -Fq $'typedSyntaxCFG\tvalid=true\tlegacyMatch=true\tfunctionRow=0\trootSyntaxID=2\tblockCount=1\tedgeCount=0\tscheduleCount=6' "$output" \
+        || fail "Function.Declaration interpolation CFG did not exactly match the legacy product"
+    [[ "$(/usr/bin/grep -Ec $'^syntaxCFGSchedule\t' "$output" || true)" -eq 6 ]] \
+        || fail "Function.Declaration interpolation CFG did not schedule both literal and expression parts"
+    echo "Syntax Function.Declaration interpolation CFG equality: pass"
+}
+
 check_postfix_zero_or_one_occurrence() {
     local fixture="$REPO_ROOT/Testing/Syntax/Pass/PostfixZeroOrOneOccurrence.range"
     local output="$WORK_ROOT/postfix-zero-or-one-occurrence.out"
@@ -328,6 +492,44 @@ check_legacy_environment_expand_rejected() {
     /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$output" \
         || fail "legacy environment.expand did not fail macro body validation"
     echo "Macros legacy-environment-expand-rejected: pass"
+}
+
+check_legacy_environment_binder_rejected() {
+    local fixture="$REPO_ROOT/Testing/Macros/Fail/LegacyEnvironmentBinder.range"
+    local output="$WORK_ROOT/macro-legacy-environment-binder.out"
+    local error="$WORK_ROOT/macro-legacy-environment-binder.err"
+    local actual_status
+
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "legacy environment binder exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] || fail "legacy environment binder rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=macroLinking\tcount=1\tdiagnosticKind=macroCapabilityHeaderMalformed' "$output" \
+        || fail "legacy environment binder did not fail macro header validation"
+    echo "Macros legacy-environment-binder-rejected: pass"
+}
+
+check_legacy_bare_environment_rejected() {
+    local fixture="$REPO_ROOT/Testing/Macros/Fail/LegacyBareEnvironment.range"
+    local output="$WORK_ROOT/macro-legacy-bare-environment.out"
+    local error="$WORK_ROOT/macro-legacy-bare-environment.err"
+    local actual_status
+
+    if "$BUILD_EXECUTABLE" compile "$fixture" > "$output" 2> "$error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] \
+        || fail "legacy bare environment exited $actual_status instead of 65"
+    [[ ! -s "$error" ]] || fail "legacy bare environment rejection wrote stderr"
+    /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$output" \
+        || fail "legacy bare environment did not fail macro body validation"
+    echo "Macros legacy-bare-environment-rejected: pass"
 }
 
 check_macro_result_values() {
@@ -495,7 +697,7 @@ write_error_capability_bundle() {
         'macro member(): Declaration | Member -> Void {}' \
         'macro stored(): Construct -> Void {}' \
         '' \
-        'construct Identifier {' \
+        'construct Identity {' \
         '    let name: String' \
         '    let id: String' \
         '}' \
@@ -507,7 +709,7 @@ write_error_capability_bundle() {
         'construct Construct {' \
         '    @member' \
         '    construct Declaration {' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '        let members: Array<@member>' \
         '    }' \
         '}' \
@@ -515,7 +717,7 @@ write_error_capability_bundle() {
         '@stored' \
         '@member' \
         'construct Let {' \
-        '    let identifier: Identifier' \
+        '    let identity: Identity' \
         '}' > "$output"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Error.range' >> "$output"
@@ -580,14 +782,14 @@ write_compiler_registration_bundle() {
         'macro member(): Declaration | Member -> Void {}' \
         'macro syntax(): Declaration -> Void {}' \
         '' \
-        'construct Identifier {' \
+        'construct Identity {' \
         '    let name: String' \
         '}' \
         '' \
         'construct Construct {' \
         '    @member' \
         '    construct Declaration {' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '        let members: Array<@member>' \
         '    }' \
         '}' \
@@ -596,7 +798,7 @@ write_compiler_registration_bundle() {
         '    @syntax' \
         '    @member' \
         '    construct Declaration {' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '    }' \
         '}' > "$output"
     /usr/bin/printf '%s\n' \
@@ -652,6 +854,662 @@ check_compiler_registration() {
     echo "Macros Core compiler registration: pass"
 }
 
+write_extern_bundle() {
+    local output="$1"
+    local header="$2"
+    local fixture="$3"
+    local extern_source="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/ExternReflection.range' \
+        'construct Function {}' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' >> "$output"
+    /bin/cat "$extern_source" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+write_process_extern_bundle() {
+    local output="$1"
+    local fixture="$2"
+    local extern_source="$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range"
+    local process_source="$REPO_ROOT/RangeCompiler/Sources/Core/System/Process.range"
+
+    : > "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/ExternReflection.range' \
+        'construct Function {}' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' >> "$output"
+    /bin/cat "$extern_source" >> "$output"
+    /usr/bin/printf '%s\n' \
+        '' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Process.range' >> "$output"
+    /bin/cat "$process_source" >> "$output"
+    /usr/bin/printf '\ncompilerSourceFile\trole=project\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_extern_registration() {
+    local runtime_builtin_model="$REPO_ROOT/RangeCompiler/Sources/Compiler/Body/CompilerBodyModel.range"
+    local legacy_llvm_model="$REPO_ROOT/RangeCompiler/Sources/Compiler/LLVM/CompilerBodyLLVM.range"
+    local process_source="$REPO_ROOT/RangeCompiler/Sources/Core/System/Process.range"
+    local process_extern_promoted=0
+    if /usr/bin/grep -Fq 'function commandLineArgument(index: Int): String' "$process_source" \
+        && /usr/bin/grep -B2 -F 'function commandLineArgument(index: Int): String' "$process_source" | /usr/bin/grep -Fq '@extern'; then
+        process_extern_promoted=1
+    fi
+    local migrated_symbol
+    for migrated_symbol in \
+        targetPointerBits \
+        commandLineArgumentCount \
+        stringTransientRegionMark \
+        stringTransientRegionReset \
+        compilerMetricsReset \
+        compilerMetricsFunctionEnd; do
+        if /usr/bin/grep -Fq "String(\"$migrated_symbol\")" "$runtime_builtin_model"; then
+            fail "authored compiler extern $migrated_symbol remains name-keyed in the runtime-builtin model"
+        fi
+        if /usr/bin/grep -Fq "@$migrated_symbol(" "$legacy_llvm_model"; then
+            fail "authored compiler extern $migrated_symbol remains in the legacy LLVM declaration prelude"
+        fi
+    done
+    if [[ "$process_extern_promoted" -eq 1 ]]; then
+        for migrated_symbol in commandLineArgument runProcess runProcessBatch; do
+            if /usr/bin/grep -Fq "String(\"$migrated_symbol\")" "$runtime_builtin_model"; then
+                fail "authored compiler extern $migrated_symbol remains name-keyed in the runtime-builtin model"
+            fi
+            if /usr/bin/grep -Fq "@$migrated_symbol(" "$legacy_llvm_model"; then
+                fail "authored compiler extern $migrated_symbol remains in the legacy LLVM declaration prelude"
+            fi
+        done
+    fi
+
+    local pass_fixture="$REPO_ROOT/Testing/Extern/Pass/ScalarIntCall.range"
+    local host_fixture="$REPO_ROOT/Testing/Extern/Pass/ScalarIntHost.c"
+    local snapshot_bundle="$WORK_ROOT/extern-scalar-int.snapshot.range"
+    local native_bundle="$WORK_ROOT/extern-scalar-int.native.range"
+    local pass_output="$WORK_ROOT/extern-scalar-int.pass.out"
+    local pass_error="$WORK_ROOT/extern-scalar-int.pass.err"
+    local llvm="$WORK_ROOT/extern-scalar-int.ll"
+    local executable="$WORK_ROOT/extern-scalar-int"
+    local temporary="$WORK_ROOT/extern-scalar-int.tmp"
+    local actual_status
+
+    write_extern_bundle "$snapshot_bundle" compilerMacroSnapshot "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$snapshot_bundle" > "$pass_output" 2> "$pass_error" \
+        || fail "Core @extern scalar registration did not compile: $(/usr/bin/head -n 1 "$pass_output")"
+    [[ ! -s "$pass_error" ]] || fail "Core @extern scalar registration wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$pass_output" \
+        || fail "Core @extern and its result-compatible alias did not execute"
+
+    write_extern_bundle "$native_bundle" "" "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$native_bundle" > "$llvm" 2> "$pass_error" \
+        || fail "Core @extern scalar registration did not emit LLVM"
+    [[ ! -s "$pass_error" ]] || fail "Core @extern scalar LLVM emission wrote stderr"
+    [[ "$(/usr/bin/grep -F -c 'declare i32 @rangeExternAdd(i32, i32)' "$llvm" || true)" -eq 1 ]] \
+        || fail "Core @extern did not emit exactly one scalar declaration"
+    [[ "$(/usr/bin/grep -F -c 'declare i32 @rangeNativeMultiply(i32, i32)' "$llvm" || true)" -eq 1 ]] \
+        || fail "ExternRegistration-compatible macro did not emit exactly one scalar declaration"
+    /usr/bin/grep -Fq 'call i32 @rangeNativeMultiply(i32 6, i32 7)' "$llvm" \
+        || fail "ExternRegistration-compatible macro did not emit the scalar direct call"
+    /usr/bin/grep -Eq 'call i32 @rangeExternAdd\(i32 %r[0-9]+, i32 0\)' "$llvm" \
+        || fail "Core @extern did not emit the scalar direct call"
+    if /usr/bin/grep -Fq 'define i32 @rangeExternAdd' "$llvm"; then
+        fail "Core @extern emitted a Range definition for the foreign symbol"
+    fi
+    if /usr/bin/grep -Fq 'define i32 @rangeNativeMultiply' "$llvm"; then
+        fail "ExternRegistration-compatible macro emitted a Range definition for the foreign symbol"
+    fi
+    validate_llvm "$llvm"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" "$host_fixture" -o "$temporary"
+    /bin/mv "$temporary" "$executable"
+    actual_status=0
+    "$executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core @extern linked execution returned $actual_status, expected 42"
+
+    local string_fixture="$REPO_ROOT/Testing/Extern/Pass/StringCall.range"
+    local string_host_fixture="$REPO_ROOT/Testing/Extern/Pass/StringCallHost.c"
+    local string_bundle="$WORK_ROOT/extern-string.native.range"
+    local string_llvm="$WORK_ROOT/extern-string.ll"
+    local string_error="$WORK_ROOT/extern-string.err"
+    local string_executable="$WORK_ROOT/extern-string"
+    write_extern_bundle "$string_bundle" "" "$string_fixture"
+    "$BUILD_EXECUTABLE" compile "$string_bundle" > "$string_llvm" 2> "$string_error" \
+        || fail "Core @extern String registration did not emit LLVM: $(/usr/bin/head -n 1 "$string_llvm")"
+    [[ ! -s "$string_error" ]] || fail "Core @extern String LLVM emission wrote stderr"
+    [[ "$(/usr/bin/grep -F -c 'declare ptr @rangeExternStringIdentity(ptr)' "$string_llvm" || true)" -eq 1 ]] \
+        || fail "Core @extern String registration did not emit exactly one pointer declaration"
+    /usr/bin/grep -Fq 'call ptr @rangeExternStringIdentity(ptr @.str.entry.0)' "$string_llvm" \
+        || fail "Core @extern String registration omitted its direct pointer call"
+    if /usr/bin/grep -Fq 'define ptr @rangeExternStringIdentity' "$string_llvm"; then
+        fail "Core @extern String registration emitted a Range definition"
+    fi
+    validate_llvm "$string_llvm"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$string_llvm" "${RUNTIME_INPUTS[@]}" "$string_host_fixture" -o "$temporary"
+    /bin/mv "$temporary" "$string_executable"
+    actual_status=0
+    "$string_executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core @extern String linked execution returned $actual_status, expected 42"
+
+    local role_fixture="$REPO_ROOT/Testing/Extern/Pass/BuiltinTargetRole.range"
+    local role_bundle="$WORK_ROOT/extern-builtin-target-role.native.range"
+    local role_llvm="$WORK_ROOT/extern-builtin-target-role.ll"
+    local role_error="$WORK_ROOT/extern-builtin-target-role.err"
+    local role_executable="$WORK_ROOT/extern-builtin-target-role"
+    write_extern_bundle "$role_bundle" "" "$role_fixture"
+    "$BUILD_EXECUTABLE" compile "$role_bundle" > "$role_llvm" 2> "$role_error" \
+        || fail "Core @extern with builtin target role did not emit LLVM"
+    [[ ! -s "$role_error" ]] || fail "Core @extern with builtin target role wrote stderr"
+    [[ "$(/usr/bin/grep -F -c 'declare i32 @targetPointerBits()' "$role_llvm" || true)" -eq 1 ]] \
+        || fail "Core @extern with builtin target role omitted its foreign declaration"
+    /usr/bin/grep -Fq 'call i32 @targetPointerBits()' "$role_llvm" \
+        || fail "Core @extern with builtin target role omitted its foreign call"
+    validate_llvm "$role_llvm"
+    link_llvm "$role_llvm" "$role_executable"
+    actual_status=0
+    "$role_executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core @extern with builtin target role returned $actual_status, expected 42"
+
+    local scalar_fixture="$REPO_ROOT/Testing/Extern/Pass/CompilerScalarBridges.range"
+    local scalar_bundle="$WORK_ROOT/extern-compiler-scalars.native.range"
+    local scalar_llvm="$WORK_ROOT/extern-compiler-scalars.ll"
+    local scalar_error="$WORK_ROOT/extern-compiler-scalars.err"
+    local scalar_executable="$WORK_ROOT/extern-compiler-scalars"
+    local declaration call
+    write_extern_bundle "$scalar_bundle" "" "$scalar_fixture"
+    "$BUILD_EXECUTABLE" compile "$scalar_bundle" > "$scalar_llvm" 2> "$scalar_error" \
+        || fail "compiler scalar @extern batch did not emit LLVM"
+    [[ ! -s "$scalar_error" ]] || fail "compiler scalar @extern batch wrote stderr"
+    for declaration in \
+        'declare i32 @targetPointerBits()' \
+        'declare i32 @commandLineArgumentCount()' \
+        'declare i32 @stringTransientRegionMark()' \
+        'declare i32 @stringTransientRegionReset(i32)' \
+        'declare i32 @compilerMetricsReset()' \
+        'declare i32 @compilerMetricsFunctionEnd(i32, i32)'; do
+        [[ "$(/usr/bin/grep -F -c "$declaration" "$scalar_llvm" || true)" -eq 1 ]] \
+            || fail "compiler scalar @extern batch did not emit exactly one $declaration"
+    done
+    for call in \
+        'call i32 @targetPointerBits()' \
+        'call i32 @commandLineArgumentCount()' \
+        'call i32 @stringTransientRegionMark()' \
+        'call i32 @stringTransientRegionReset(' \
+        'call i32 @compilerMetricsReset()' \
+        'call i32 @compilerMetricsFunctionEnd('; do
+        /usr/bin/grep -Fq "$call" "$scalar_llvm" \
+            || fail "compiler scalar @extern batch omitted $call"
+    done
+    validate_llvm "$scalar_llvm"
+    link_llvm "$scalar_llvm" "$scalar_executable"
+    actual_status=0
+    "$scalar_executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "compiler scalar @extern batch returned $actual_status, expected 42"
+
+    if [[ "$process_extern_promoted" -eq 1 ]]; then
+    local process_fixture="$REPO_ROOT/Testing/Extern/Pass/ProcessBridges.range"
+    local process_bundle="$WORK_ROOT/extern-process.native.range"
+    local process_llvm="$WORK_ROOT/extern-process.ll"
+    local process_error="$WORK_ROOT/extern-process.err"
+    local process_executable="$WORK_ROOT/extern-process"
+    write_process_extern_bundle "$process_bundle" "$process_fixture"
+    "$BUILD_EXECUTABLE" compile "$process_bundle" > "$process_llvm" 2> "$process_error" \
+        || fail "Core Process @extern batch did not emit LLVM: $(/usr/bin/head -n 1 "$process_llvm")"
+    [[ ! -s "$process_error" ]] || fail "Core Process @extern batch wrote stderr"
+    for declaration in \
+        'declare ptr @commandLineArgument(i32)' \
+        'declare i32 @runProcess(ptr, ptr)' \
+        'declare i32 @runProcessBatch(ptr, i32)'; do
+        [[ "$(/usr/bin/grep -F -c "$declaration" "$process_llvm" || true)" -eq 1 ]] \
+            || fail "Core Process @extern batch did not emit exactly one $declaration"
+    done
+    for call in \
+        'call ptr @commandLineArgument(i32 1000000)' \
+        'call i32 @runProcess(' \
+        'call i32 @runProcessBatch('; do
+        /usr/bin/grep -Fq "$call" "$process_llvm" \
+            || fail "Core Process @extern batch omitted $call"
+    done
+    validate_llvm "$process_llvm"
+    link_llvm "$process_llvm" "$process_executable"
+    actual_status=0
+    "$process_executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core Process @extern batch returned $actual_status, expected 42"
+    fi
+
+    if [[ "$controls" -eq 1 ]]; then
+        local relative fixture bundle output error
+        for relative in \
+            Testing/Extern/Fail/BodyPresent.range \
+            Testing/Extern/Fail/NonIntSignature.range \
+            Testing/Extern/Fail/BodylessWithoutRegistration.range \
+            Testing/Extern/Fail/GenericFunction.range \
+            Testing/Extern/Fail/LookalikeRegistration.range; do
+            fixture="$REPO_ROOT/$relative"
+            bundle="$WORK_ROOT/$(/usr/bin/basename "$relative").bundle.range"
+            output="$WORK_ROOT/$(/usr/bin/basename "$relative").out"
+            error="$WORK_ROOT/$(/usr/bin/basename "$relative").err"
+            write_extern_bundle "$bundle" compilerMacroSnapshot "$fixture"
+            actual_status=0
+            "$BUILD_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+                || actual_status=$?
+            [[ "$actual_status" -eq 65 && ! -s "$error" ]] \
+                || fail "$relative rejected at the wrong boundary"
+            /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$output" \
+                || fail "$relative omitted its extern registration rejection"
+        done
+    fi
+
+    echo "Macros Core @extern scalar/String native calls and orthogonal builtin roles: pass"
+}
+
+write_link_bundle() {
+    local output="$1"
+    local header="$2"
+    local fixture="$3"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/LinkReflection.range' \
+        'construct Function {}' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range" >> "$output"
+    /usr/bin/printf '%s\n' \
+        '' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Link.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Link.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_link_registration() {
+    local pass_fixture="$REPO_ROOT/Testing/Link/Pass/SQLiteLibrary.range"
+    local snapshot_bundle="$WORK_ROOT/link-sqlite.snapshot.range"
+    local snapshot_output="$WORK_ROOT/link-sqlite.snapshot.out"
+    local snapshot_error="$WORK_ROOT/link-sqlite.snapshot.err"
+    local native_bundle="$WORK_ROOT/link-sqlite.native.range"
+    local llvm="$WORK_ROOT/link-sqlite.ll"
+    local native_error="$WORK_ROOT/link-sqlite.native.err"
+    local executable="$WORK_ROOT/link-sqlite"
+    local temporary="$WORK_ROOT/link-sqlite.tmp"
+    local actual_status
+    local link_arguments=()
+
+    write_link_bundle "$snapshot_bundle" compilerMacroSnapshot "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$snapshot_bundle" > "$snapshot_output" 2> "$snapshot_error" \
+        || fail "Core @link SQLite registration did not compile"
+    [[ ! -s "$snapshot_error" ]] || fail "Core @link SQLite registration wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$snapshot_output" \
+        || fail "Core @extern and @link did not both execute"
+
+    write_link_bundle "$native_bundle" "" "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$native_bundle" > "$llvm" 2> "$native_error" \
+        || fail "Core @link SQLite program did not emit LLVM"
+    [[ ! -s "$native_error" ]] || fail "Core @link SQLite LLVM emission wrote stderr"
+    [[ "$(/usr/bin/grep -Fxc '; range-link-v1 kind=library id=sqlite3' "$llvm" || true)" -eq 1 ]] \
+        || fail "Core @link did not emit exactly one typed SQLite requirement"
+    /usr/bin/grep -Fq 'declare i32 @sqlite3_libversion_number()' "$llvm" \
+        || fail "Core @link fixture omitted its foreign declaration"
+    /usr/bin/grep -Fq 'call i32 @sqlite3_libversion_number()' "$llvm" \
+        || fail "Core @link fixture omitted its foreign call"
+    validate_llvm "$llvm"
+    if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=sqlite3' "$llvm"; then
+        link_arguments+=("-lsqlite3")
+    fi
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" "${link_arguments[@]}" -o "$temporary"
+    /bin/mv "$temporary" "$executable"
+    actual_status=0
+    "$executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core @link SQLite execution returned $actual_status, expected 42"
+
+    if [[ "$controls" -eq 1 ]]; then
+        local relative fixture bundle output error
+        for relative in \
+            Testing/Link/Fail/RangeFunctionRequirement.range \
+            Testing/Link/Fail/DuplicateRequirement.range; do
+            fixture="$REPO_ROOT/$relative"
+            bundle="$WORK_ROOT/$(/usr/bin/basename "$relative").link.bundle.range"
+            output="$WORK_ROOT/$(/usr/bin/basename "$relative").link.out"
+            error="$WORK_ROOT/$(/usr/bin/basename "$relative").link.err"
+            write_link_bundle "$bundle" compilerMacroSnapshot "$fixture"
+            actual_status=0
+            "$BUILD_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+                || actual_status=$?
+            [[ "$actual_status" -eq 65 && ! -s "$error" ]] \
+                || fail "$relative rejected at the wrong boundary"
+            /usr/bin/grep -Fq $'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid' "$output" \
+                || fail "$relative omitted its typed link registration rejection"
+        done
+    fi
+
+    echo "Macros Core @link native SQLite requirement: pass"
+}
+
+write_opaque_bundle() {
+    local output="$1"
+    local header="$2"
+    local fixture="$3"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/NativeReflection.range' \
+        'construct Function {}' \
+        'construct Construct {}' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range" >> "$output"
+    /usr/bin/printf '%s\n' \
+        '' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Link.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Link.range" >> "$output"
+    /usr/bin/printf '%s\n' \
+        '' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Opaque.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Opaque.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_opaque_handle() {
+    local pass_fixture="$REPO_ROOT/Testing/Extern/Pass/PthreadOpaqueHandle.range"
+    local snapshot_bundle="$WORK_ROOT/opaque-pthread.snapshot.range"
+    local snapshot_output="$WORK_ROOT/opaque-pthread.snapshot.out"
+    local snapshot_error="$WORK_ROOT/opaque-pthread.snapshot.err"
+    local native_bundle="$WORK_ROOT/opaque-pthread.native.range"
+    local llvm="$WORK_ROOT/opaque-pthread.ll"
+    local native_error="$WORK_ROOT/opaque-pthread.native.err"
+    local executable="$WORK_ROOT/opaque-pthread"
+    local temporary="$WORK_ROOT/opaque-pthread.tmp"
+    local actual_status
+
+    write_opaque_bundle "$snapshot_bundle" compilerMacroSnapshot "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$snapshot_bundle" > "$snapshot_output" 2> "$snapshot_error" \
+        || fail "Core @opaque pthread registration did not compile"
+    [[ ! -s "$snapshot_error" ]] || fail "Core @opaque pthread registration wrote stderr"
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=4' "$snapshot_output" \
+        || fail "Core @opaque, @extern, and @link registrations did not execute"
+
+    write_opaque_bundle "$native_bundle" "" "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$native_bundle" > "$llvm" 2> "$native_error" \
+        || fail "Core @opaque pthread program did not emit LLVM"
+    [[ ! -s "$native_error" ]] || fail "Core @opaque pthread LLVM emission wrote stderr"
+    [[ "$(/usr/bin/grep -Fxc '; range-link-v1 kind=library id=pthread' "$llvm" || true)" -eq 1 ]] \
+        || fail "Core @opaque pthread program omitted its typed link requirement"
+    /usr/bin/grep -Fq 'declare ptr @pthread_self()' "$llvm" \
+        || fail "Core @opaque did not lower the foreign handle return as ptr"
+    /usr/bin/grep -Fq 'declare i32 @pthread_equal(ptr, ptr)' "$llvm" \
+        || fail "Core @opaque did not lower foreign handle parameters as ptr"
+    /usr/bin/grep -Eq 'call ptr @pthread_self\(\)' "$llvm" \
+        || fail "Core @opaque omitted the native handle-producing call"
+    /usr/bin/grep -Eq 'call i32 @pthread_equal\(ptr %r[0-9]+, ptr %r[0-9]+\)' "$llvm" \
+        || fail "Core @opaque omitted the native handle-consuming call"
+    if /usr/bin/grep -Fq '%Range.PthreadHandle = type' "$llvm"; then
+        fail "Core @opaque emitted an aggregate layout for a foreign handle"
+    fi
+    validate_llvm "$llvm"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "${RUNTIME_INPUTS[@]}" -lpthread -o "$temporary"
+    /bin/mv "$temporary" "$executable"
+    actual_status=0
+    "$executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core @opaque pthread execution returned $actual_status, expected 42"
+
+    local nullable_fixture="$REPO_ROOT/Testing/Extern/Pass/NullableOpaqueArgument.range"
+    local nullable_bundle="$WORK_ROOT/nullable-opaque.native.range"
+    local nullable_llvm="$WORK_ROOT/nullable-opaque.ll"
+    local nullable_error="$WORK_ROOT/nullable-opaque.err"
+    local nullable_executable="$WORK_ROOT/nullable-opaque"
+    write_opaque_bundle "$nullable_bundle" "" "$nullable_fixture"
+    "$BUILD_EXECUTABLE" compile "$nullable_bundle" > "$nullable_llvm" 2> "$nullable_error" \
+        || fail "Core @opaque nullable argument did not emit LLVM"
+    [[ ! -s "$nullable_error" ]] || fail "Core @opaque nullable argument wrote stderr"
+    /usr/bin/grep -Fq 'call void @free(ptr null)' "$nullable_llvm" \
+        || fail "Core @opaque nil argument did not lower as ptr null"
+    validate_llvm "$nullable_llvm"
+    link_llvm "$nullable_llvm" "$nullable_executable"
+    actual_status=0
+    "$nullable_executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core @opaque nullable execution returned $actual_status, expected 42"
+
+    local inferred_fixture="$REPO_ROOT/Testing/Extern/Pass/InferredOpaqueCall.range"
+    local inferred_host="$REPO_ROOT/Testing/Extern/Pass/InferredOpaqueCallHost.c"
+    local inferred_bundle="$WORK_ROOT/inferred-opaque-call.range"
+    local inferred_llvm="$WORK_ROOT/inferred-opaque-call.ll"
+    local inferred_error="$WORK_ROOT/inferred-opaque-call.err"
+    local inferred_executable="$WORK_ROOT/inferred-opaque-call"
+    write_opaque_bundle "$inferred_bundle" "" "$inferred_fixture"
+    "$BUILD_EXECUTABLE" compile "$inferred_bundle" > "$inferred_llvm" 2> "$inferred_error" \
+        || fail "Core inferred opaque call binding did not emit LLVM"
+    [[ ! -s "$inferred_error" ]] || fail "Core inferred opaque call binding wrote stderr"
+    /usr/bin/grep -Fq 'call ptr @rangeExternOpaqueIdentity(ptr null)' "$inferred_llvm" \
+        || fail "Core inferred opaque call binding omitted its nullable foreign call"
+    validate_llvm "$inferred_llvm"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$inferred_llvm" "${RUNTIME_INPUTS[@]}" "$inferred_host" -o "$inferred_executable"
+    actual_status=0
+    "$inferred_executable" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "Core inferred opaque call binding returned $actual_status, expected 42"
+
+    if [[ "$controls" -eq 1 ]]; then
+        local relative fixture bundle output error expected
+        for relative in \
+            Testing/Extern/Fail/OpaqueStoredMember.range \
+            Testing/Extern/Fail/OpaqueDirectConstruction.range; do
+            fixture="$REPO_ROOT/$relative"
+            bundle="$WORK_ROOT/$(/usr/bin/basename "$relative").opaque.bundle.range"
+            output="$WORK_ROOT/$(/usr/bin/basename "$relative").opaque.out"
+            error="$WORK_ROOT/$(/usr/bin/basename "$relative").opaque.err"
+            write_opaque_bundle "$bundle" "" "$fixture"
+            actual_status=0
+            "$BUILD_EXECUTABLE" compile "$bundle" > "$output" 2> "$error" \
+                || actual_status=$?
+            [[ "$actual_status" -eq 65 && ! -s "$error" ]] \
+                || fail "$relative rejected at the wrong boundary"
+            expected=$'compilerError\tkind=macroExecution\tdiagnosticKind=macroExecutionBodyInvalid'
+            if [[ "$relative" == *OpaqueDirectConstruction.range ]]; then
+                expected=$'compilerError\tkind=invalidEntryReachability'
+            fi
+            /usr/bin/grep -Fq "$expected" "$output" \
+                || fail "$relative omitted its opaque-handle rejection"
+        done
+
+        local nil_int_fixture="$REPO_ROOT/Testing/Extern/Fail/NilIntArgument.range"
+        local nil_int_bundle="$WORK_ROOT/nil-int-argument.range"
+        local nil_int_output="$WORK_ROOT/nil-int-argument.out"
+        local nil_int_error="$WORK_ROOT/nil-int-argument.err"
+        write_opaque_bundle "$nil_int_bundle" "" "$nil_int_fixture"
+        actual_status=0
+        "$BUILD_EXECUTABLE" compile "$nil_int_bundle" > "$nil_int_output" 2> "$nil_int_error" \
+            || actual_status=$?
+        [[ "$actual_status" -eq 65 && ! -s "$nil_int_error" ]] \
+            || fail "Core nil Int argument rejected at the wrong boundary"
+        /usr/bin/grep -Fq $'compilerError\tkind=invalidEntryReachability\tstage=2' "$nil_int_output" \
+            || fail "Core nil Int argument omitted its exact rejection"
+    fi
+
+    echo "Macros Core @opaque native pthread handle and nullable foreign argument: pass"
+}
+
+check_range_view_native_window() {
+    local color_macro="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Macros/Color.range"
+    local color_fixture="$REPO_ROOT/Testing/RangeView/Pass/ColorCapability.range"
+    local color_fail_fixture="$REPO_ROOT/Testing/RangeView/Fail/ColorCapabilityFunction.range"
+    local color_bundle="$WORK_ROOT/range-view-color-capability.range"
+    local color_llvm="$WORK_ROOT/range-view-color-capability.ll"
+    local color_error="$WORK_ROOT/range-view-color-capability.err"
+    local color_fail_bundle="$WORK_ROOT/range-view-color-capability-function.range"
+    local color_fail_output="$WORK_ROOT/range-view-color-capability-function.out"
+    local color_fail_error="$WORK_ROOT/range-view-color-capability-function.err"
+    local geometry="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Drawing/Geometry.range"
+    local style="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Drawing/Style.range"
+    local shapes="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Drawing/Shapes.range"
+    local iterable="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Macros/Iterable.range"
+    local framework="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Native/Window.range"
+    local color_native="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Native/Color.c"
+    local fixture="$REPO_ROOT/Testing/RangeView/Pass/NativeWindow.range"
+    local bundle="$WORK_ROOT/range-view-native-window.range"
+    local llvm="$WORK_ROOT/range-view-native-window.ll"
+    local error="$WORK_ROOT/range-view-native-window.err"
+    local executable="$WORK_ROOT/range-view-native-window"
+    local temporary="$WORK_ROOT/range-view-native-window.tmp"
+    local sdl2_prefix actual_status native_pid
+
+    write_opaque_bundle "$color_bundle" "" "$color_macro"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${color_fixture#"$REPO_ROOT/"}" >> "$color_bundle"
+    /bin/cat "$color_fixture" >> "$color_bundle"
+    /usr/bin/printf '\n' >> "$color_bundle"
+    "$BUILD_EXECUTABLE" compile "$color_bundle" > "$color_llvm" 2> "$color_error" \
+        || fail "RangeView @color capability fixture did not emit LLVM"
+    [[ ! -s "$color_error" ]] || fail "RangeView @color capability fixture wrote stderr"
+    /usr/bin/grep -Fq 'ret i32 42' "$color_llvm" \
+        || fail "RangeView @color capability fixture omitted its runtime result"
+
+    write_opaque_bundle "$color_fail_bundle" "" "$color_macro"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${color_fail_fixture#"$REPO_ROOT/"}" >> "$color_fail_bundle"
+    /bin/cat "$color_fail_fixture" >> "$color_fail_bundle"
+    /usr/bin/printf '\n' >> "$color_fail_bundle"
+    actual_status=0
+    "$BUILD_EXECUTABLE" compile "$color_fail_bundle" > "$color_fail_output" 2> "$color_fail_error" \
+        || actual_status=$?
+    [[ "$actual_status" -eq 65 && ! -s "$color_fail_error" ]] \
+        || fail "RangeView @color accepted a Function target"
+    /usr/bin/grep -Fq $'compilerError\tkind=macroLinking\tcount=1\tdiagnosticKind=macroTargetSurfaceMismatch' "$color_fail_output" \
+        || fail "RangeView @color Function rejection omitted its exact boundary"
+
+    write_opaque_bundle "$bundle" "" "$geometry"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${color_macro#"$REPO_ROOT/"}" >> "$bundle"
+    /bin/cat "$color_macro" >> "$bundle"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${style#"$REPO_ROOT/"}" >> "$bundle"
+    /bin/cat "$style" >> "$bundle"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${shapes#"$REPO_ROOT/"}" >> "$bundle"
+    /bin/cat "$shapes" >> "$bundle"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${iterable#"$REPO_ROOT/"}" >> "$bundle"
+    /bin/cat "$iterable" >> "$bundle"
+    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${framework#"$REPO_ROOT/"}" >> "$bundle"
+    /bin/cat "$framework" >> "$bundle"
+    /usr/bin/printf '\n' >> "$bundle"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$bundle"
+    /bin/cat "$fixture" >> "$bundle"
+    /usr/bin/printf '\n' >> "$bundle"
+    "$BUILD_EXECUTABLE" compile "$bundle" > "$llvm" 2> "$error" \
+        || fail "RangeView native window did not emit LLVM"
+    [[ ! -s "$error" ]] || fail "RangeView native window LLVM emission wrote stderr"
+    [[ "$(/usr/bin/grep -Fxc '; range-link-v1 kind=library id=sdl2' "$llvm" || true)" -eq 1 ]] \
+        || fail "RangeView native window omitted its typed SDL2 link requirement"
+    /usr/bin/grep -Fq '%Range.Point = type { i32, i32 }' "$llvm" \
+        || fail "RangeView native window omitted its framework Point value"
+    /usr/bin/grep -Fq '%Range.Size = type { i32, i32 }' "$llvm" \
+        || fail "RangeView native window omitted its framework Size value"
+    /usr/bin/grep -Fq '%Range.DrawingSpace = type { ptr }' "$llvm" \
+        || fail "RangeView native window omitted its framework DrawingSpace value"
+    /usr/bin/grep -Fq '%Range.Rectangle = type { ptr, ptr }' "$llvm" \
+        || fail "RangeView native window omitted its Point-and-Size Rectangle"
+    /usr/bin/grep -Fq '%Range.OKLCH = type { double, double, double, double }' "$llvm" \
+        || fail "RangeView native window omitted its concrete OKLCH color value"
+    /usr/bin/grep -Fq '%Range.RGBA = type { i8, i8, i8, i8 }' "$llvm" \
+        || fail "RangeView native window omitted its RGBA lowering product"
+    /usr/bin/grep -Fq '%Range.Shape = type { i32, %Range.Line, %Range.Rectangle, %Range.Circle, %Range.Polygon }' "$llvm" \
+        || fail "RangeView native window omitted its heterogeneous Shape value"
+    /usr/bin/grep -Fq 'declare ptr @SDL_CreateWindow(ptr, i32, i32, i32, i32, i32)' "$llvm" \
+        || fail "RangeView native window omitted its typed window declaration"
+    /usr/bin/grep -Fq 'declare ptr @SDL_CreateRenderer(ptr, i32, i32)' "$llvm" \
+        || fail "RangeView native window omitted its typed renderer declaration"
+    /usr/bin/grep -Fq 'call void @SDL_ShowWindow' "$llvm" \
+        || fail "RangeView native window did not explicitly show its window"
+    /usr/bin/grep -Fq 'call void @SDL_RaiseWindow' "$llvm" \
+        || fail "RangeView native window did not raise its window"
+    /usr/bin/grep -Fq 'define i1 @rangeViewWindowShouldClose(ptr %window)' "$llvm" \
+        || fail "RangeView native window omitted its typed Window close-query boundary"
+    /usr/bin/grep -Fq 'call i1 @rangeViewWindowShouldClose(ptr ' "$llvm" \
+        || fail "RangeView native window did not route its event loop through the Window value"
+    /usr/bin/grep -Fq 'declare i32 @SDL_HasEvent(i32)' "$llvm" \
+        || fail "RangeView native window omitted its typed SDL event query"
+    /usr/bin/grep -Fq 'call i32 @SDL_HasEvent(i32 256)' "$llvm" \
+        || fail "RangeView native window did not query the SDL quit event"
+    /usr/bin/grep -Fq 'declare i32 @SDL_SetRenderDrawColor(ptr, i8, i8, i8, i8)' "$llvm" \
+        || fail "RangeView native window omitted its unsigned-byte color ABI"
+    /usr/bin/grep -Fq 'declare i8 @rangeViewOKLCHChannel(double, double, double, double, i32)' "$llvm" \
+        || fail "RangeView native window omitted its Float-backed OKLCH conversion declaration"
+    /usr/bin/grep -Fq 'define i32 @rangeViewFillRectangle(ptr %renderer, %Range.Rectangle %rectangle)' "$llvm" \
+        || fail "RangeView native window omitted its filled rectangle boundary"
+    /usr/bin/grep -Fq 'define i32 @rangeViewFillCircle(ptr %renderer, %Range.Circle %circle)' "$llvm" \
+        || fail "RangeView native window omitted its filled Circle boundary"
+    /usr/bin/grep -Fq 'define i32 @rangeViewDrawPolygon(ptr %renderer, %Range.Polygon %polygon)' "$llvm" \
+        || fail "RangeView native window omitted its Polygon boundary"
+    /usr/bin/grep -Fq 'define i32 @rangeViewDrawShapeGallery(ptr %renderer)' "$llvm" \
+        || fail "RangeView native window omitted its collection-driven shape gallery"
+    /usr/bin/grep -Fq 'call void @toRGBA(ptr ' "$llvm" \
+        || fail "RangeView native window did not lower Color through toRGBA"
+    /usr/bin/grep -Fq 'call i32 @rangeViewDrawShapeGallery(ptr ' "$llvm" \
+        || fail "RangeView native window did not draw through its shape gallery"
+    /usr/bin/grep -Eq 'alloca %Range\.Shape, i32 4' "$llvm" \
+        || fail "RangeView native window omitted its four-value Shape collection"
+    /usr/bin/grep -Eq 'alloca %Range\.OKLCH, i32 4' "$llvm" \
+        || fail "RangeView native window omitted its four-value OKLCH collection"
+    /usr/bin/grep -Fq 'call void @SDL_RenderPresent' "$llvm" \
+        || fail "RangeView native window omitted its Void presentation call"
+    /usr/bin/grep -Fq 'declare void @SDL_PumpEvents()' "$llvm" \
+        || fail "RangeView native window omitted its event-pump declaration"
+    /usr/bin/grep -Fq 'call void @SDL_PumpEvents()' "$llvm" \
+        || fail "RangeView native window did not service its native event queue"
+    /usr/bin/grep -Fq 'declare void @SDL_Delay(i32)' "$llvm" \
+        || fail "RangeView native window omitted its SDL frame-delay declaration"
+    /usr/bin/grep -Fq 'call void @SDL_Delay(i32 16)' "$llvm" \
+        || fail "RangeView native window omitted its event-loop frame delay"
+    ! /usr/bin/grep -Fq 'i32 10000' "$llvm" \
+        || fail "RangeView native window retained a time-bounded event loop"
+    /usr/bin/grep -Fq 'call void @SDL_DestroyRenderer' "$llvm" \
+        || fail "RangeView native window omitted renderer destruction"
+    /usr/bin/grep -Fq 'call void @SDL_DestroyWindow' "$llvm" \
+        || fail "RangeView native window omitted window destruction"
+    /usr/bin/grep -Fq 'call void @SDL_Quit' "$llvm" \
+        || fail "RangeView native window omitted SDL shutdown"
+    validate_llvm "$llvm"
+
+    command -v sdl2-config >/dev/null 2>&1 \
+        || fail "RangeView native window proof requires sdl2-config"
+    sdl2_prefix="$(sdl2-config --prefix)"
+    [[ -d "$sdl2_prefix/lib" ]] || fail "RangeView native window could not resolve SDL2 libraries"
+    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "$color_native" "${RUNTIME_INPUTS[@]}" \
+        -L"$sdl2_prefix/lib" -lSDL2 -Wl,-rpath,"$sdl2_prefix/lib" -o "$temporary"
+    /bin/mv "$temporary" "$executable"
+    "$executable" &
+    native_pid=$!
+    /bin/sleep 1
+    /bin/kill -0 "$native_pid" 2>/dev/null \
+        || fail "RangeView native window did not remain alive for event-driven termination"
+    /bin/kill "$native_pid"
+    actual_status=0
+    wait "$native_pid" || actual_status=$?
+    [[ "$actual_status" -eq 42 ]] \
+        || fail "RangeView native window termination returned $actual_status, expected graceful result 42"
+    echo "RangeView native @app page window remains alive until termination and tears down gracefully: pass"
+}
+
 write_hashable_bundle() {
     local output="$1"
     local fixture="$2"
@@ -663,18 +1521,22 @@ write_hashable_bundle() {
         '' \
         'macro member(): Declaration | Member -> Void {}' \
         '' \
-        'construct Identifier {' \
+        'construct Identity {' \
         '    let name: String' \
+        '}' \
+        '' \
+        'construct MacroDiagnostics {' \
+        '    function error(_ message: String)' \
         '}' \
         '' \
         '@member' \
         'construct Let {' \
-        '    let identifier: Identifier' \
+        '    let identity: Identity' \
         '}' \
         '' \
         'construct Construct {' \
         '    construct Declaration {' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '        let members: Array<@member>' \
         '    }' \
         '}' > "$output"
@@ -748,10 +1610,10 @@ check_many_relationship_registration() {
         'construct TypeReference {}' \
         'construct Expression {}' \
         '' \
-        'construct Identifier {' \
+        'construct Identity {' \
         '    let name: String' \
         '    let id: String' \
-        '    let parent: Identifier?' \
+        '    let parent: Identity?' \
         '    let source: @syntax?' \
         '}' \
         '' \
@@ -760,8 +1622,8 @@ check_many_relationship_registration() {
         '}' \
         '' \
         'construct MacroApplication {' \
-        '    let identifier: Identifier' \
-        '    let target: Identifier' \
+        '    let identity: Identity' \
+        '    let target: Identity' \
         '    let genericArguments: Array<TypeReference>' \
         '    let argumentClause: String' \
         '    let arguments: Array<Expression>' \
@@ -1033,7 +1895,7 @@ check_coding_core_surface() {
     [[ "$(/usr/bin/grep -F -c $'storage=indirect\t' "$output" || true)" -eq 2 ]] \
         || fail "Range-authored JSON did not preserve two recursive indirect collections"
     /usr/bin/grep -Fq 'function encode<Format>(to encoder: Encoder<Format>)' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
-        && /usr/bin/grep -Fq 'container.encode(#property.identifier' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
+        && /usr/bin/grep -Fq 'container.encode(#property.identity' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
         && /usr/bin/grep -Fq 'function decode<Format>(from decoder: Decoder<Format>)' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
         && /usr/bin/grep -Fq 'default: #property.value' "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Codable.range" \
         || fail "Range-authored Codable is not wired to the generic coding surface"
@@ -1208,14 +2070,14 @@ write_command_group_bundle() {
         'macro member(): Declaration | Member -> Void {}' \
         'macro syntax(): Declaration -> Void {}' \
         '' \
-        'construct Identifier {' \
+        'construct Identity {' \
         '    let name: String' \
         '}' \
         '' \
         'construct Construct {' \
         '    @member' \
         '    construct Declaration {' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '        let members: Array<@member>' \
         '    }' \
         '}' \
@@ -1224,12 +2086,16 @@ write_command_group_bundle() {
         '    @syntax' \
         '    @member' \
         '    construct Declaration {' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '    }' \
         '}' >> "$output"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/CommandGroup.range' >> "$output"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/CommandGroup.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Main.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Main.range" >> "$output"
     /usr/bin/printf '\n' >> "$output"
     /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
     /bin/cat "$fixture" >> "$output"
@@ -1299,6 +2165,108 @@ check_command_group() {
     echo "CommandLine @commandGroup boundary: pass (generated enum/fallback snapshot, linked fallback execution, empty-group rejection)"
 }
 
+write_test_group_bundle() {
+    local output="$1"
+    local header="$2"
+    local fixture="$3"
+
+    : > "$output"
+    if [[ -n "$header" ]]; then
+        /usr/bin/printf '%s\n' "$header" >> "$output"
+    fi
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/CommandReflection.range' \
+        '@builtin' \
+        'construct Array<Element> {}' \
+        '' \
+        'macro member(): Declaration | Member -> Void {}' \
+        'macro syntax(): Declaration -> Void {}' \
+        '' \
+        'construct Identity {' \
+        '    let name: String' \
+        '}' \
+        '' \
+        'construct Construct {' \
+        '    @member' \
+        '    construct Declaration {' \
+        '        let identity: Identity' \
+        '        let members: Array<@member>' \
+        '    }' \
+        '}' \
+        '' \
+        'construct Function {' \
+        '    @syntax' \
+        '    @member' \
+        '    construct Declaration {' \
+        '        let identity: Identity' \
+        '    }' \
+        '}' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Main.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Main.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Test.range' >> "$output"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Test.range" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$output"
+    /bin/cat "$fixture" >> "$output"
+    /usr/bin/printf '\n' >> "$output"
+}
+
+check_test_group() {
+    local pass_fixture="$REPO_ROOT/Testing/Test/Pass/Smoke.range"
+    local fail_fixture="$REPO_ROOT/Testing/Test/Fail/EmptyTestGroup.range"
+    local snapshot_bundle="$WORK_ROOT/test-group.snapshot.range"
+    local snapshot_output="$WORK_ROOT/test-group.snapshot.out"
+    local snapshot_error="$WORK_ROOT/test-group.snapshot.err"
+    local native_bundle="$WORK_ROOT/test-group.native.range"
+    local native_llvm="$WORK_ROOT/test-group.native.ll"
+    local native_error="$WORK_ROOT/test-group.native.err"
+    local native_executable="$WORK_ROOT/test-group.native"
+    local fail_bundle="$WORK_ROOT/test-group.empty.range"
+    local fail_output="$WORK_ROOT/test-group.empty.out"
+    local fail_error="$WORK_ROOT/test-group.empty.err"
+    local actual_status
+
+    write_test_group_bundle "$snapshot_bundle" compilerMacroSnapshot "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$snapshot_bundle" > "$snapshot_output" 2> "$snapshot_error" \
+        || fail "@testGroup snapshot did not compile"
+    [[ ! -s "$snapshot_error" ]] || fail "@testGroup snapshot wrote stderr"
+    /usr/bin/grep -E -q $'macroGraphGeneratedEnum\trow=[0-9]+\tkind=enum\townerSyntaxID=[0-9]+.*\tname=Command\t' "$snapshot_output" \
+        || fail "@testGroup snapshot omitted its target-owned Command enum"
+    /usr/bin/grep -E -q $'macroGraphGeneratedFunction\trow=[0-9]+\tkind=function\townerSyntaxID=[0-9]+.*\tname=runCommandLine\treturnType=Int\t' "$snapshot_output" \
+        || fail "@testGroup snapshot omitted its target-owned runCommandLine function"
+
+    write_test_group_bundle "$native_bundle" "" "$pass_fixture"
+    "$BUILD_EXECUTABLE" compile "$native_bundle" > "$native_llvm" 2> "$native_error" \
+        || fail "@testGroup ordinary program did not emit LLVM"
+    [[ ! -s "$native_error" ]] || fail "@testGroup ordinary program wrote stderr"
+    validate_llvm "$native_llvm"
+    link_llvm "$native_llvm" "$native_executable"
+    if "$native_executable" > "$WORK_ROOT/test-group.run.out" 2> "$WORK_ROOT/test-group.run.err"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 0 ]] || fail "@testGroup generated fallback exited $actual_status instead of 0"
+
+    write_test_group_bundle "$fail_bundle" compilerMacroSnapshot "$fail_fixture"
+    if "$BUILD_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
+        actual_status=0
+    else
+        actual_status=$?
+    fi
+    [[ "$actual_status" -eq 65 ]] || fail "empty @testGroup exited $actual_status instead of 65"
+    [[ ! -s "$fail_error" ]] || fail "empty @testGroup rejection wrote stderr"
+    /usr/bin/grep -Fq '@testGroup requires at least one @test function.' "$fail_output" \
+        || fail "empty @testGroup omitted its focused diagnostic"
+    if /usr/bin/grep -Fq 'define ' "$fail_output"; then
+        fail "empty @testGroup emitted LLVM before rejection"
+    fi
+    echo "Test @testGroup boundary: pass (generated Command enum/runCommandLine fallback, linked execution, empty-group rejection)"
+}
+
 check_macro_body_capture() {
     local pass_fixture="$REPO_ROOT/Testing/Macros/Pass/CapturedBodyString.range"
     local type_fixture="$REPO_ROOT/Testing/Macros/Fail/CapturedBodyRequiresString.range"
@@ -1311,6 +2279,12 @@ check_macro_body_capture() {
     local actual_status
 
     /usr/bin/printf '%s\n' compilerMacroSnapshot > "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/ExternReflection.range' \
+        'construct Function {}' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' >> "$pass_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$pass_bundle"
@@ -1328,7 +2302,7 @@ check_macro_body_capture() {
     "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$error" \
         || fail "@capture body String did not compile"
     [[ ! -s "$error" ]] || fail "@capture body String wrote stderr"
-    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1' "$pass_output" \
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3' "$pass_output" \
         || fail "@capture body String did not execute"
     /usr/bin/grep -Fq $'scalar=1\tchildCount=0\tparentRow=-1' "$pass_output" \
         || fail "@capture body String did not preserve the raw recipe text"
@@ -1493,7 +2467,7 @@ check_range_authored_syntax_template() {
         'macro member(): Declaration | Member -> Void {}' \
         'macro stored(): Construct -> Void {}' \
         'construct Nil {}' \
-        'construct Identifier {' \
+        'construct Identity {' \
         '    let name: String' \
         '}' \
         'construct TypeReference {}' \
@@ -1505,8 +2479,8 @@ check_range_authored_syntax_template() {
         'construct Macro {' \
         '    construct Declaration {}' \
         '    construct Application<Value = Nil> {' \
-        '        let identifier: Identifier' \
-        '        let target: Identifier' \
+        '        let identity: Identity' \
+        '        let target: Identity' \
         '        let genericArguments: Array<TypeReference>' \
         '        let argumentClause: String' \
         '        let arguments: Array<Expression>' \
@@ -1519,15 +2493,21 @@ check_range_authored_syntax_template() {
         'construct Construct {' \
         '    construct Declaration {' \
         '        let macros: Array<Macro.Application>' \
-        '        let identifier: Identifier' \
+        '        let identity: Identity' \
         '        let members: Array<@member>' \
         '    }' \
         '}' \
         '@stored' \
         '@member' \
         'construct Let {' \
-        '    let identifier: Identifier' \
+        '    let identity: Identity' \
         '}' > "$pass_bundle"
+    /usr/bin/printf '%s\n' \
+        'compilerSourceFile\trole=core\tpath=Core/Macro/ExternReflection.range' \
+        'construct Function {}' \
+        'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/Macro/Extern.range' >> "$pass_bundle"
+    /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Extern.range" >> "$pass_bundle"
+    /usr/bin/printf '\n' >> "$pass_bundle"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=RangeCompiler/Sources/Core/System/Memory/RawBuffer.range' >> "$pass_bundle"
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range" >> "$pass_bundle"
@@ -1574,29 +2554,29 @@ check_range_authored_syntax_template() {
     "$BUILD_EXECUTABLE" compile "$pass_bundle" > "$pass_output" 2> "$pass_error" \
         || fail "Range-authored syntax template value did not compile"
     [[ ! -s "$pass_error" ]] || fail "Range-authored syntax template value wrote stderr"
-    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=1' "$pass_output" \
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=3' "$pass_output" \
         || fail "Range-authored syntax macro did not execute"
-    /usr/bin/grep -E -q $'macroResult\trow=0.*kind=3.*typeKind=4.*nominalSyntaxID=[0-9]+.*childCount=9.*parentRow=-1' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=4.*kind=3.*typeKind=4.*nominalSyntaxID=[0-9]+.*childCount=9.*parentRow=-1' "$pass_output" \
         || fail "Range-authored syntax macro did not return a typed SyntaxTemplate"
     /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=29.*parentRow=[0-9]+.*ordinal=0' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain the captured recipe String"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=3.*parentRow=0.*ordinal=1' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=2.*typeKind=4.*childCount=3.*parentRow=4.*ordinal=1' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its declaration-member many"
-    [[ "$(/usr/bin/grep -E -c $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*childCount=0.*parentRow=[0-9]+' "$pass_output")" -eq 5 ]] \
+    [[ "$(/usr/bin/grep -E -c $'macroResult\trow=[0-9]+\tinvocationRow=2.*kind=5.*typeKind=6.*childCount=0.*parentRow=[0-9]+' "$pass_output")" -eq 5 ]] \
         || fail "Range-authored SyntaxTemplate did not retain its members and resolved capture handles"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=0.*ordinal=2' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=4.*ordinal=2' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its first resolved capture member"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=0.*ordinal=3' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=4.*ordinal=3' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its second resolved capture member"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=0.*ordinal=4' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=4.*ordinal=4' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its capture count"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=11.*parentRow=0.*ordinal=5' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=11.*parentRow=4.*ordinal=5' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its derived literal prefix count"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=16.*parentRow=0.*ordinal=6' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=16.*parentRow=4.*ordinal=6' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its separator start"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=1.*parentRow=0.*ordinal=7' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=1.*parentRow=4.*ordinal=7' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its separator count"
-    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=0.*ordinal=8' "$pass_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=[0-9]+.*kind=1.*typeKind=1.*scalar=2.*parentRow=4.*ordinal=8' "$pass_output" \
         || fail "Range-authored SyntaxTemplate did not retain its derived literal suffix count"
 
     if "$BUILD_EXECUTABLE" compile "$fail_bundle" > "$fail_output" 2> "$fail_error"; then
@@ -1617,25 +2597,25 @@ check_range_authored_syntax_template() {
     fi
     [[ ! -s "$match_error" ]] \
         || fail "Range-authored single-capture syntax match wrote stderr"
-    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=2' "$match_output" \
+    /usr/bin/grep -Fq $'macroExecution\tvalid=true\tinvocationCount=4' "$match_output" \
         || fail "Range-authored single-capture syntax match did not execute"
-    /usr/bin/grep -E -q $'macroResult\trow=46.*invocationRow=1.*kind=3.*typeKind=4.*childCount=3.*parentRow=-1' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=50.*invocationRow=3.*kind=3.*typeKind=4.*childCount=3.*parentRow=-1' "$match_output" \
         || fail "Range-authored single-capture syntax match did not return a populated Match"
-    /usr/bin/grep -E -q $'macroResult\trow=47.*invocationRow=1.*kind=3.*typeKind=4.*childCount=9.*parentRow=46.*ordinal=0' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=51.*invocationRow=3.*kind=3.*typeKind=4.*childCount=9.*parentRow=50.*ordinal=0' "$match_output" \
         || fail "Range-authored single-capture syntax match did not retain its derived template"
-    /usr/bin/grep -E -q $'macroResult\trow=93.*invocationRow=1.*kind=5.*typeKind=6.*parentRow=46.*ordinal=1' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=97.*invocationRow=3.*kind=5.*typeKind=6.*parentRow=50.*ordinal=1' "$match_output" \
         || fail "Range-authored single-capture syntax match did not retain its source syntax"
-    /usr/bin/grep -E -q $'macroResult\trow=94.*invocationRow=1.*kind=3.*typeKind=4.*childCount=2.*parentRow=46.*ordinal=2' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=98.*invocationRow=3.*kind=3.*typeKind=4.*childCount=2.*parentRow=50.*ordinal=2' "$match_output" \
         || fail "Range-authored single-capture syntax match did not retain its populated Capture"
-    /usr/bin/grep -E -q $'macroResult\trow=95.*invocationRow=1.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=94.*ordinal=0' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=99.*invocationRow=3.*kind=5.*typeKind=6.*scalar=[0-9]+.*childCount=0.*parentRow=98.*ordinal=0' "$match_output" \
         || fail "Range-authored single-capture syntax match did not reference its captured Let member"
-    /usr/bin/grep -E -q $'macroResult\trow=96.*invocationRow=1.*kind=2.*typeKind=4.*childCount=1.*parentRow=94.*ordinal=1' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=100.*invocationRow=3.*kind=2.*typeKind=4.*childCount=1.*parentRow=98.*ordinal=1' "$match_output" \
         || fail "Range-authored single-capture syntax match did not retain one captured syntax value"
-    /usr/bin/grep -E -q $'macroResult\trow=97.*invocationRow=1.*kind=5.*typeKind=6.*childCount=3.*parentRow=96.*ordinal=0' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=101.*invocationRow=3.*kind=5.*typeKind=6.*childCount=3.*parentRow=100.*ordinal=0' "$match_output" \
         || fail "Range-authored single-capture syntax match did not materialize the captured syntax slice"
-    /usr/bin/grep -E -q $'macroResult\trow=99.*invocationRow=1.*kind=1.*scalar=434.*parentRow=97.*ordinal=1' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=103.*invocationRow=3.*kind=1.*scalar=421.*parentRow=101.*ordinal=1' "$match_output" \
         || fail "Range-authored single-capture syntax match did not start its slice at name"
-    /usr/bin/grep -E -q $'macroResult\trow=100.*invocationRow=1.*kind=1.*scalar=438.*parentRow=97.*ordinal=2' "$match_output" \
+    /usr/bin/grep -E -q $'macroResult\trow=104.*invocationRow=3.*kind=1.*scalar=425.*parentRow=101.*ordinal=2' "$match_output" \
         || fail "Range-authored single-capture syntax match did not end its slice after name"
     if "$BUILD_EXECUTABLE" compile "$mismatch_bundle" > "$mismatch_output" 2> "$mismatch_error"; then
         actual_status=0
@@ -1714,44 +2694,44 @@ check_canonical_declaration_envelopes() {
     )
     local -a expectations=(
         'Macro.range|macros'
-        'Macro.range|identifier'
+        'Macro.range|identity'
         'Macro.range|target'
         'Identity.range|name'
         'Identity.range|id'
         'Identity.range|parent'
         'Identity.range|source'
         'SyntaxForm.range|introducer'
-        'SyntaxForm.range|identifier'
+        'SyntaxForm.range|identity'
         'SyntaxForm.range|role'
         'SyntaxForm.range|enclosure'
         'SyntaxForm.range|child'
         'SyntaxForm.range|parts'
         'Construct.range|macros'
-        'Construct.range|identifier'
+        'Construct.range|identity'
         'Function.range|macros'
-        'Function.range|identifier'
+        'Function.range|identity'
         'Function.range|parameters'
         'Function.range|returnType'
         'Function.range|body'
         'Enum.range|macros'
-        'Enum.range|identifier'
+        'Enum.range|identity'
         'Extension.range|macros'
-        'Extension.range|identifier'
+        'Extension.range|identity'
         'Parameter.range|macros'
-        'Parameter.range|identifier'
+        'Parameter.range|identity'
         'Let.range|macros'
-        'Let.range|identifier'
+        'Let.range|identity'
         'Let.range|value'
         'State.range|macros'
-        'State.range|identifier'
+        'State.range|identity'
         'State.range|value'
         'Binding.range|macros'
-        'Binding.range|identifier'
+        'Binding.range|identity'
         'Binding.range|type'
         'Binding.range|getterBody'
         'Binding.range|setterBody'
         'Derived.range|macros'
-        'Derived.range|identifier'
+        'Derived.range|identity'
         'Derived.range|type'
         'Derived.range|body'
     )
@@ -1775,15 +2755,15 @@ check_canonical_declaration_envelopes() {
             || fail "Canonical declaration envelope omitted $path let $name"
     done
     if /usr/bin/grep -F $'graphNominal\t' "$output" \
-        | /usr/bin/grep -F $'keyword=let\tname=identity\t' \
+        | /usr/bin/grep -F $'keyword=let\tname=identifier\t' \
         | /usr/bin/grep -F 'path=RangeCompiler/Sources/Core/' > /dev/null; then
-        fail "Canonical declaration envelopes retained a parallel identity field"
+        fail "Canonical declaration envelopes retained a parallel identifier field"
     fi
     /usr/bin/grep -F $'graphNominal\t' "$output" \
         | /usr/bin/grep -F $'keyword=let\tname=parent\t' \
         | /usr/bin/grep -F 'path=RangeCompiler/Sources/Core/Syntax/Identity.range' \
         > /dev/null \
-        || fail "Canonical Identifier omitted its direct parent relationship"
+        || fail "Canonical Identity omitted its direct parent relationship"
     if /usr/bin/grep -Fq 'GraphIdentity' "$bundle" || /usr/bin/grep -Fq 'RangeGraphIdentity' "$bundle"; then
         fail "Canonical declaration envelopes retained a parallel identity type"
     fi
@@ -2042,7 +3022,7 @@ check_storage_literals() {
     /bin/cat "$REPO_ROOT/RangeCompiler/Sources/Core/Macro/Literal.range" >> "$core_bundle"
     /usr/bin/printf '%s\n' \
         'compilerSourceFile\trole=core\tpath=Core/Syntax/Program/RelationshipPrerequisites.range' \
-        'construct Identifier {}' \
+        'construct Identity {}' \
         '' \
         'enum DelimiterPair {' \
         '    case parentheses' \
@@ -2267,6 +3247,7 @@ main_value_ownership() {
     local compiler_input="$DEFAULT_COMPILER_DIR"
     local compiler_directory canonical_core_source_path
     local controls=0
+    local extern_only=0
 
     if [[ "$#" -eq 1 && ( "$1" == "--help" || "$1" == "-h" ) ]]; then
         usage
@@ -2275,6 +3256,11 @@ main_value_ownership() {
         controls=1
     elif [[ "$#" -eq 2 && "$1" == "--controls" ]]; then
         controls=1
+        compiler_input="$2"
+    elif [[ "$#" -eq 1 && "$1" == "--extern-only" ]]; then
+        extern_only=1
+    elif [[ "$#" -eq 2 && "$1" == "--extern-only" ]]; then
+        extern_only=1
         compiler_input="$2"
     elif [[ "$#" -eq 1 ]]; then
         compiler_input="$1"
@@ -2314,6 +3300,11 @@ main_value_ownership() {
     resolve_compiler_build 0
     echo "checkpoint value-ownership:build-cache-$BUILD_CACHE_STATUS: pass"
     echo "checkpoint value-ownership:candidate-resolved: pass"
+    if [[ "$extern_only" -eq 1 ]]; then
+        check_extern_registration
+        echo "checkpoint value-ownership:extern-only-complete: pass"
+        return 0
+    fi
     check_removed_for_statement_rejected
     check_unregistered_string_reads_rejected
     check_macro_environment
@@ -2321,8 +3312,14 @@ main_value_ownership() {
     check_non_generic_stored_assignment
     check_block_value_shape_identity
     check_block_source_layout
+    check_declared_applied_if_graph
+    check_function_declaration_body_coverage
+    check_function_declaration_cfg
+    check_function_declaration_interpolation_cfg
     check_postfix_zero_or_one_occurrence
     check_legacy_macro_modifiers_rejected
+    check_legacy_environment_binder_rejected
+    check_legacy_bare_environment_rejected
     check_legacy_environment_expand_rejected
     check_macro_result_values
     check_macro_generic_boundary_materialization
@@ -2333,6 +3330,10 @@ main_value_ownership() {
     check_canonical_declaration_envelopes
     check_hashable_function_synthesis
     check_compiler_registration
+    check_extern_registration
+    check_link_registration
+    check_opaque_handle
+    check_range_view_native_window
     check_many_relationship_registration
     check_enum_parameter_materialization
     check_block_relationship_reification
@@ -2347,6 +3348,7 @@ main_value_ownership() {
     check_typed_parameter_defaults
     check_graph_capabilities
     check_command_group
+    check_test_group
     check_macro_body_capture
     check_syntax_recipes
     check_legacy_bracket_collection_type_rejected
@@ -2365,4 +3367,6 @@ main_value_ownership() {
     echo "checkpoint value-ownership:development-producer-validated: pass"
 }
 
-main_value_ownership "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main_value_ownership "$@"
+fi

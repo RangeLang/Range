@@ -1,0 +1,9 @@
+@stored
+@syntax {
+    $identifier: $value
+}
+@statement
+construct Assignment {
+    let identity: Identity
+    let value: @stored
+}

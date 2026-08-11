@@ -1,0 +1,8 @@
+@color
+enum InvalidColor {
+    case missing:
+}
+
+@main {
+    return 42
+}

@@ -1,0 +1,33 @@
+@builtin
+construct Array<Element> {}
+
+@builtin
+construct Identity {
+    let marker: Int
+}
+
+@main {
+    let iterations: Int(commandLineArgumentCount() * 20000000)
+    let relationship: Composition(
+        identity: Identity(marker: 19),
+        components: [
+            Identity(marker: 11),
+            Identity(marker: 13),
+            Identity(marker: 17)
+        ]
+    )
+    state index: Int(0)
+    state matches: Int(0)
+    while index < iterations {
+        if relationship.components[0].marker == 11
+            && relationship.components[1].marker == 13
+            && relationship.components[2].marker == 17 {
+            matches: matches + 1
+        }
+        index: index + 1
+    }
+    if matches == iterations && relationship.identity.marker == 19 {
+        return 7
+    }
+    return 0
+}

@@ -1,0 +1,1 @@
+macro styleModifier(): Function -> Void {}

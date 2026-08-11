@@ -1,0 +1,1 @@
+macro color(): Construct | Enum -> Void {}

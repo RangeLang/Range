@@ -1,0 +1,41 @@
+compilerTypedSyntaxSnapshot
+
+function bodyCoverage(input: Int, fallback: Int): Bool {
+    state value: Int((input + 2) * 3)
+    while value > 0 && input != 9 {
+        if !false {
+            value: value - 1
+        } else {
+            value: value % 2
+        }
+    }
+    return value == 0 || input < fallback
+}
+
+function boundaryCoverage(input: Int): Bool {
+    return input <= 9 || input >= 1
+}
+
+function optionalCoverage(input: Int?): Int {
+    return input ?? -1
+}
+
+function doubleCoverage(): Float<64> {
+    return -1.5 / 2.0
+}
+
+function arrayCoverage(input: Int): Int {
+    let values: Array<Int>([input, 2, input + 1])
+    return values[0]
+}
+
+function interpolationCoverage(input: Int): String {
+    return "value=\(input + 1)"
+}
+
+function closureCoverage(input: Int): Int {
+    apply() { value in
+        return value
+    }
+    return input
+}

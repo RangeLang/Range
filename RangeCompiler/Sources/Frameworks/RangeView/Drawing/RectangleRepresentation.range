@@ -1,0 +1,4 @@
+construct RectangleRepresentation {
+    let origin: Point
+    let size: Size
+}

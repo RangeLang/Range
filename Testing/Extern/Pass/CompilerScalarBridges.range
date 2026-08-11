@@ -1,0 +1,33 @@
+@extern
+@builtin(.target)
+function targetPointerBits(): Int
+
+@extern
+@builtin
+function commandLineArgumentCount(): Int
+
+@extern
+@builtin
+function stringTransientRegionMark(): Int
+
+@extern
+@builtin
+function stringTransientRegionReset(mark: Int): Int
+
+@extern
+@builtin
+function compilerMetricsReset(): Int
+
+@extern
+@builtin
+function compilerMetricsFunctionEnd(legacyParses: Int, recordBytes: Int): Int
+
+@main {
+    if targetPointerBits() != 64 { return 1 }
+    if commandLineArgumentCount() != 0 { return 2 }
+    let mark: Int(stringTransientRegionMark())
+    if stringTransientRegionReset(mark: mark) != 0 { return 3 }
+    if compilerMetricsReset() != 0 { return 4 }
+    if compilerMetricsFunctionEnd(legacyParses: 0, recordBytes: 0) != 0 { return 5 }
+    return 42
+}

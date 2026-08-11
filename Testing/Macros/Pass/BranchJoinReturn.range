@@ -22,9 +22,9 @@ construct Construct {
 
 construct JoinedResult {}
 
-macro joined(): Construct -> JoinedResult { environment in
+macro joined(): Construct -> JoinedResult {
     let members: Array<State>(
-        environment.target.Declaration.members.filter(all: State)
+        #environment.target.Declaration.members.filter(all: State)
     )
     if members.count == 0 {
         #environment {

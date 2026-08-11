@@ -1,0 +1,14 @@
+enum StyleTransform {
+    case fill(color: @color)
+    case line(color: @color, width: Int)
+}
+
+@modifier(.style)
+function fill<Paint: @color>(_ color: Paint): StyleTransform {
+    return StyleTransform(.fill(color: color))
+}
+
+@modifier(.style)
+function line<Paint: @color>(_ color: Paint, width: Int): StyleTransform {
+    return StyleTransform(.line(color: color, width: width))
+}

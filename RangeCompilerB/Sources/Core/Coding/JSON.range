@@ -1,0 +1,18 @@
+@encoding
+construct JSON {
+    state root: JSONValue
+}
+
+enum JSONValue {
+    case null
+    case boolean(value: Bool)
+    case number(value: String)
+    case string(value: String)
+    case array(indirect elements: Array<JSONValue>)
+    case object(indirect members: Array<JSONMember>)
+}
+
+construct JSONMember {
+    let name: String
+    let value: JSONValue
+}

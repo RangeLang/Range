@@ -47,7 +47,7 @@ verify_manifest_file() {
     fi
 }
 
-verify_manifest_inputs() {
+verify_accepted_compiler_artifacts() {
     if [[ "$(manifest_value formatVersion)" != "1" ]]; then
         echo "Unsupported Range compiler bootstrap manifest." >&2
         exit 1
@@ -64,11 +64,23 @@ verify_manifest_inputs() {
         echo "Accepted compiler executable is invalid: ${executable_path#"$REPO_ROOT/"}" >&2
         exit 1
     fi
+}
+
+verify_manifest_inputs() {
+    verify_accepted_compiler_artifacts
     local index runtime_count
     runtime_count="$(manifest_value runtimeSources)"
     for ((index = 0; index < runtime_count; index += 1)); do
         verify_manifest_file "runtimeSources.$index"
     done
+}
+
+accepted_compiler_executable() {
+    # A child compiler revision is produced by the committed accepted artifact.
+    # Its compiler and runtime sources are child inputs, so their hashes belong
+    # to the child build key rather than the parent's integrity check.
+    verify_accepted_compiler_artifacts
+    /usr/bin/printf '%s\n' "$REPO_ROOT/$(manifest_value executable.path)"
 }
 
 runtime_inputs() {
@@ -426,7 +438,7 @@ compiler_next() {
     local cached_fixed_point cached_executable cached_executable_path expected_fixed_point
     local -a core_sources project_sources runtimes
 
-    compiler="$(ensure_bootstrap_compiler)"
+    compiler="$(accepted_compiler_executable)"
     compiler_project="$(compiler_project_file)"
     command_line_source="$(project_command_line_source "$compiler_project")"
     compiler_directory="$(cd "$command_line_source" && pwd)"
@@ -610,7 +622,7 @@ compiler_progression() {
     candidate_llvm="$(dirname "$candidate_executable")/RangeCompiler.ll"
     bundle="$(dirname "$candidate_executable")/CompilerSourceSet.range"
     bootstrap_llvm="$REPO_ROOT/$(manifest_value bootstrap.path)"
-    bootstrap_executable="$(ensure_bootstrap_compiler)"
+    bootstrap_executable="$(accepted_compiler_executable)"
     if [[ ! -f "$candidate_llvm" || ! -f "$bundle" ]]; then
         echo "Compiler progression candidate is incomplete." >&2
         return 65

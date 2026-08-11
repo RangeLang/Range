@@ -1,5 +1,6 @@
 <script lang="ts">
   import CodeBlock from "$lib/components/CodeBlock.svelte";
+  import CompilationTree from "$lib/components/CompilationTree.svelte";
   import EssayPage from "$lib/components/EssayPage.svelte";
   import FibonacciSphereShader from "$lib/components/FibonacciSphereShader.svelte";
 
@@ -10,7 +11,7 @@
     let enclosure: RelationshipEnclosure
 }
 
-macro value(): Member -> RelationshipRegistration { environment in
+macro value(): Member -> RelationshipRegistration {
     return scalarValueRelationship()
 }`;
 
@@ -51,6 +52,22 @@ enum RelationshipEnclosure {
 >
   <section>
     <h2>The next smallest thing</h2>
+
+    <p>
+      Core is the smallest logical unit inside Range compilation. It contains
+      the commands, macro definitions, and fundamental values needed to
+      describe the language without making the native bootstrap the language's
+      permanent architecture.
+    </p>
+
+    <p>
+      The compiler is itself a project implemented in Range. Core provides the
+      authority that compiles that compiler project; the resulting compiler is
+      then what compiles your project. The same path can branch into any number
+      of programs without introducing another compiler model.
+    </p>
+
+    <CompilationTree />
 
     <p>
       The first introduction began with Range’s smallest unit of meaning:

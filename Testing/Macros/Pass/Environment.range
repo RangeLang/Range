@@ -1,8 +1,8 @@
 compilerMacroSnapshot
 compilerSourceFile\trole=core\tpath=Core/Macro/Environment.range
-macro environmentProbe(): Construct { context in
-    context.graph.declarationCount("Construct", "Value")
-    context.diagnostics.information("environment observed")
+macro environmentProbe(): Construct {
+    #environment.graph.declarationCount("Construct", "Value")
+    #environment.information("environment observed")
 }
 compilerSourceFile\trole=project\tpath=Project/Value.range
 @environmentProbe

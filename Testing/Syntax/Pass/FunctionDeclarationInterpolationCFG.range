@@ -1,0 +1,5 @@
+compilerTypedSyntaxCFGSnapshot
+
+function interpolationFlow(input: Int): String {
+    return "value=\(input + 1)"
+}

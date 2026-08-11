@@ -1,6 +1,3 @@
-compilerSourceFile\trole=core\tpath=Core/System/Target.range
-@builtin(.target)
-function targetPointerBits(): Int
 compilerSourceFile\trole=project\tpath=Main.range
 @main {
     return targetPointerBits()
