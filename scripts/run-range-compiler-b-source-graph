@@ -34,7 +34,7 @@ started_ms="$(now_ms)"
 product_started_ms="$started_ms"
 product_status=0
 RANGE_DEVELOPMENT_COMPILER="$PRODUCER" \
-    "$REPO_ROOT/scripts/range" run "$REPO_ROOT/Examples/RangeCompilerB" \
+    "$REPO_ROOT/scripts/range" run "$REPO_ROOT/Projects/RangeCompilerB/Example" \
     --source "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler" \
     -- "$INPUT" > "$product" || product_status=$?
 product_finished_ms="$(now_ms)"
@@ -47,7 +47,7 @@ compiler_b_source_hash="$({
     sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/Lexer.range"
     sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/Graph.range"
     sha256 "$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeCompiler/RangeCompiler.range"
-    sha256 "$REPO_ROOT/Examples/RangeCompilerB/CompilerBApp.range"
+    sha256 "$REPO_ROOT/Projects/RangeCompilerB/Example/CompilerBApp.range"
 } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 application_identity="$(/usr/bin/printf 'producer=%s\ncompilerB=%s\ninput=%s\nproduct=%s\n' \
     "$producer_hash" "$compiler_b_source_hash" "$input_hash" "$product_hash" \

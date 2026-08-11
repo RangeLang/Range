@@ -500,6 +500,23 @@ void *listFiles(void *opaquePath) {
     return result ? result : rangeStringEmpty();
 }
 
+void *firstRangeFile(void *opaquePath) {
+    void *listingValue = listFiles(opaquePath);
+    const char *listing = rangeStringData(listingValue);
+    if (!listing) return rangeStringEmpty();
+    const char *lineStart = listing;
+    while (*lineStart) {
+        const char *lineEnd = strchr(lineStart, '\n');
+        size_t length = lineEnd ? (size_t)(lineEnd - lineStart) : strlen(lineStart);
+        if (length >= 6 && memcmp(lineStart + length - 6, ".range", 6) == 0) {
+            return rangeStringCreateTransientCopy(lineStart, length);
+        }
+        if (!lineEnd) break;
+        lineStart = lineEnd + 1;
+    }
+    return rangeStringEmpty();
+}
+
 int32_t writeFile(void *opaquePath, void *opaqueText) {
     char *path = rangeStringData(opaquePath);
     char *text = rangeStringData(opaqueText);

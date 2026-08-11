@@ -1,4 +1,21 @@
-# RangeView
+# RangeView project
+
+This directory is the standalone RangeView project. It contains the framework
+sources plus the application entrypoint and example shapes under
+`Sources/RangeView/`. Compiler B is a separate sibling project at
+`Projects/RangeCompilerB/`.
+
+The old GPUCanvas and native-triangle demos are not project boundaries anymore.
+
+Run the complete RangeView source set with:
+
+```sh
+scripts/range run Projects/RangeView
+```
+
+---
+
+# Framework reference
 
 RangeView turns Range values into web files. It does not define a virtual DOM
 or require a browser runtime.

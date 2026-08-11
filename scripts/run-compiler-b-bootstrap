@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-B_ROOT="$REPO_ROOT/RangeCompilerB"
+B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
 BOOTSTRAP="$REPO_ROOT/RangeCompiler/Bootstrap/range"
 ROUTE="${1:-}"
 
@@ -40,15 +40,16 @@ printf '%s\n' \
     'construct Construct {}' >> "$BUNDLE"
 
 for relative in \
-    RangeCompilerB/Sources/Core/Macro/Main.range \
-    RangeCompilerB/Sources/Core/Macro/Link.range \
-    RangeCompilerB/Sources/Core/Macro/Opaque.range \
-    RangeCompilerB/Sources/Core/System/Optional/Nil.range \
-    RangeCompilerB/Sources/Core/System/Optional/Optional.range; do
+    Projects/RangeCompilerB/Sources/CompilerB/Core/Main.range \
+    RangeCompiler/Sources/Core/Macro/Link.range \
+    RangeCompiler/Sources/Core/Macro/Opaque.range \
+    RangeCompiler/Sources/Core/System/Optional/Nil.range \
+    RangeCompiler/Sources/Core/System/Optional/Optional.range; do
     append_source core "$relative" "$REPO_ROOT/$relative"
 done
 
 append_source project CompilerB/Main.range "$B_ROOT/Sources/CompilerB/Main.range"
+append_source project CompilerB/Lexer.range "$B_ROOT/Sources/CompilerB/Lexer.range"
 
 compile_status=0
 "$BOOTSTRAP" "$BUNDLE" > "$LLVM" || compile_status=$?

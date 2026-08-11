@@ -1,5 +1,10 @@
 # TODO
 
+- [x] Establish standalone project roots: `Projects/RangeView/` owns the
+  RangeView framework and example entrypoint, while `Projects/RangeCompilerB/`
+  owns Compiler B. Remove the obsolete GPUCanvas and native-triangle example
+  projects.
+
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
@@ -240,6 +245,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         accepts one route and calls the B-owned `listFiles` extern to print
         recursive regular files. Full project-run proof is pending the
         repository's existing bootstrap runtime-hash mismatch.
+      - [x] Add B-owned minimal Core declarations and a first lexer; a project
+        route now selects its first `.range` file and prints 30 lexer tokens.
     - [ ] Replace B's inherited source, declaration, application, Block, and
       relationship tables with typed graph values carrying stable identities.
     - [ ] Derive Compiler B Resolution, CFG, Ownership, and MIR as whole Range

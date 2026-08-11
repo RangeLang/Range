@@ -1,6 +1,9 @@
 @extern
 function listFiles(path: String): String
 
+@extern
+function firstRangeFile(path: String): String
+
 @main {
     let argumentCount: Int(commandLineArgumentCount())
     if argumentCount != 1 {
@@ -10,6 +13,8 @@ function listFiles(path: String): String
 
     let route: String(commandLineArgument(index: 0))
     let files: String(listFiles(path: route))
-    print(value: "route=\(route)\n\(files)")
+    let sourcePath: String(firstRangeFile(path: route))
+    let source: String(readFile(path: sourcePath))
+    print(value: "route=\(route)\nsource=\(sourcePath)\n\(files)\n\(compilerBLexSummary(source: source))")
     return 0
 }

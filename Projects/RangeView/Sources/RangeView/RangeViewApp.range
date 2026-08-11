@@ -1,5 +1,4 @@
-// The canonical RangeView application example. The app owns the entry point;
-// the page owns the component tree; shapes remain ordinary Range values.
+// RangeView's application entrypoint and the first source-level example.
 
 @app
 construct RangeViewApp {

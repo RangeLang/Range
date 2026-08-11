@@ -1355,7 +1355,7 @@ check_opaque_handle() {
 }
 
 check_range_view_native_window() {
-    local color_macro="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Macros/Color.range"
+    local color_macro="$REPO_ROOT/Projects/RangeView/Macros/Color.range"
     local color_fixture="$REPO_ROOT/Testing/RangeView/Pass/ColorCapability.range"
     local color_fail_fixture="$REPO_ROOT/Testing/RangeView/Fail/ColorCapabilityFunction.range"
     local color_bundle="$WORK_ROOT/range-view-color-capability.range"
@@ -1364,12 +1364,12 @@ check_range_view_native_window() {
     local color_fail_bundle="$WORK_ROOT/range-view-color-capability-function.range"
     local color_fail_output="$WORK_ROOT/range-view-color-capability-function.out"
     local color_fail_error="$WORK_ROOT/range-view-color-capability-function.err"
-    local geometry="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Drawing/Geometry.range"
-    local style="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Drawing/Style.range"
-    local shapes="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Drawing/Shapes.range"
-    local iterable="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Macros/Iterable.range"
-    local framework="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Native/Window.range"
-    local color_native="$REPO_ROOT/RangeCompiler/Sources/Frameworks/RangeView/Native/Color.c"
+    local geometry="$REPO_ROOT/Projects/RangeView/Drawing/Geometry.range"
+    local style="$REPO_ROOT/Projects/RangeView/Drawing/Style.range"
+    local shapes="$REPO_ROOT/Projects/RangeView/Drawing/Shapes.range"
+    local iterable="$REPO_ROOT/Projects/RangeView/Macros/Iterable.range"
+    local framework="$REPO_ROOT/Projects/RangeView/Native/Window.range"
+    local color_native="$REPO_ROOT/Projects/RangeView/Native/Color.c"
     local fixture="$REPO_ROOT/Testing/RangeView/Pass/NativeWindow.range"
     local bundle="$WORK_ROOT/range-view-native-window.range"
     local llvm="$WORK_ROOT/range-view-native-window.ll"

@@ -1,0 +1,49 @@
+function compilerBIsWhitespace(byte: Int): Bool {
+    return byte == 9 || byte == 10 || byte == 13 || byte == 32
+}
+
+function compilerBIsLetter(byte: Int): Bool {
+    return (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) || byte == 95
+}
+
+function compilerBIsDigit(byte: Int): Bool {
+    return byte >= 48 && byte <= 57
+}
+
+function compilerBLexSummary(source: String): String {
+    state cursor: Int(0)
+    state tokenCount: Int(0)
+    state output: String("lex\tvalid=true\n")
+    while cursor < source.count {
+        let byte: Int(source.byte(index: cursor))
+        if compilerBIsWhitespace(byte: byte) {
+            cursor: cursor + 1
+        } else {
+            let start: Int(cursor)
+            if compilerBIsLetter(byte: byte) {
+                cursor: cursor + 1
+                while cursor < source.count
+                    && (compilerBIsLetter(byte: source.byte(index: cursor))
+                        || compilerBIsDigit(byte: source.byte(index: cursor))) {
+                    cursor: cursor + 1
+                }
+                let text: String(source.substring(start: start, end: cursor))
+                output.append(text: "token\tkind=word\ttext=\(text)\n")
+            } else if compilerBIsDigit(byte: byte) {
+                cursor: cursor + 1
+                while cursor < source.count && compilerBIsDigit(byte: source.byte(index: cursor)) {
+                    cursor: cursor + 1
+                }
+                let text: String(source.substring(start: start, end: cursor))
+                output.append(text: "token\tkind=integer\ttext=\(text)\n")
+            } else {
+                cursor: cursor + 1
+                let text: String(source.substring(start: start, end: cursor))
+                output.append(text: "token\tkind=symbol\ttext=\(text)\n")
+            }
+            tokenCount: tokenCount + 1
+        }
+    }
+    output.append(text: "tokenCount=\(tokenCount)\n")
+    return output
+}

@@ -91,7 +91,7 @@
   may express the intended language and framework design ahead of what the
   current compiler can compile.
 - Put every RangeView macro under
-  `RangeCompiler/Sources/Frameworks/RangeView/Macros/`, grouped by concern.
+  `Projects/RangeView/Macros/`, grouped by concern.
   `Macros/Core.range` owns the foundational `@app`, `@component`, and `@page`
   macros; do not duplicate macro declarations in `RangeView.range`.
 - Do not treat a RangeView compilation failure as evidence that its design is

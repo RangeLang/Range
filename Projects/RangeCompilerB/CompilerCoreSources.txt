@@ -1,0 +1,8 @@
+Projects/RangeCompilerB/Sources/Core/Package/LinkPlan.range
+Projects/RangeCompilerB/Sources/CompilerB/Core/Extern.range
+Projects/RangeCompilerB/Sources/Core/System/Memory/RawBuffer.range
+Projects/RangeCompilerB/Sources/Core/System/Memory/Buffer.range
+Projects/RangeCompilerB/Sources/CompilerB/Core/Process.range
+Projects/RangeCompilerB/Sources/Core/System/Target.range
+Projects/RangeCompilerB/Sources/CompilerB/Core/String.range
+Projects/RangeCompilerB/Sources/Core/Coding/UUID.range

@@ -7,7 +7,7 @@ actively evolving, complete compiler fork:
 
 ```text
 Compiler A: RangeCompiler/Bootstrap + frozen RangeCompiler source
-Compiler B: RangeCompilerB/Project.range + complete copied source/runtime
+Compiler B: Projects/RangeCompilerB/Project.range + complete copied source/runtime
 ```
 
 The duplication is a deliberate bootstrap boundary, not two implementations
@@ -26,12 +26,12 @@ implementation, and native runtime:
 
 ```text
 CompilerB.Source
-├── RangeCompilerB/Project.range
-├── RangeCompilerB/CompilerCoreSources.txt
-├── RangeCompilerB/Sources/Core/**
-├── RangeCompilerB/Sources/Foundation/**
-├── RangeCompilerB/Sources/Compiler/**
-└── RangeCompilerB/Runtime/**
+├── Projects/RangeCompilerB/Project.range
+├── Projects/RangeCompilerB/CompilerCoreSources.txt
+├── Projects/RangeCompilerB/Sources/Core/**
+├── Projects/RangeCompilerB/Sources/Foundation/**
+├── Projects/RangeCompilerB/Sources/Compiler/**
+└── Projects/RangeCompilerB/Runtime/**
 ```
 
 Ignored `.range/` and `.build/` directories are rebuildable materializations

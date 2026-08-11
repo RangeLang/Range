@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPILER_B_ROOT="$REPO_ROOT/RangeCompilerB"
+COMPILER_B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
 
 [[ -f "$COMPILER_B_ROOT/Project.range" ]] || {
     echo "range compiler b check: missing Compiler B project" >&2
