@@ -1,6 +1,6 @@
 @project
 construct Project {
     let name: Title("Range")
-    let version: Version(0.1.28)
+    let version: Version(26.0.3)
     let author: "George"
 }
