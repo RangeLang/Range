@@ -15,13 +15,16 @@ function compilerBSyntaxRevisionSignalValuesAreValid(
     ))
     if removed.change != .removed
         || removed.revision != .previous
-        || removed.identity.value != 40 { return false }
+        || removed.identity.value != 40
+        || removed.counterpart.value != 0 - 1 { return false }
     if changed.change != .changed
         || changed.revision != .current
-        || changed.identity.value != 39 { return false }
+        || changed.identity.value != 39
+        || changed.counterpart.value != 0 { return false }
     if added.change != .added
         || added.revision != .current
-        || added.identity.value != 0 { return false }
+        || added.identity.value != 0
+        || added.counterpart.value != 0 - 1 { return false }
     return true
 }
 

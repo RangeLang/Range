@@ -1,0 +1,10 @@
+construct LLVM {}
+
+macro member(): Let | State | Derived | Binding -> Void {}
+macro many(): @member {}
+
+@many
+state integers: @integer
+
+@many
+derived commands: integers -> LLVM

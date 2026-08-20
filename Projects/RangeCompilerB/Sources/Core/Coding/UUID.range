@@ -1,11 +1,4 @@
 construct UUID {
-    let bytes: String
-
-    derived count: Int {
-        16
-    }
-
-    function byte(index: Int): Int {
-        return stringByteAt(source: bytes, index: index)
-    }
+    @many(count: 16)
+    let bytes: Byte
 }

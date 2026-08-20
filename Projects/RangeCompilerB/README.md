@@ -39,45 +39,89 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   queries and the backend consume those facets; they do not rescan tokens for
   structural keywords. There is no central syntax-kind enum.
 - Macro declarations are retained as their own declaration facet, and their
-  target/result signatures are checked at each resolved application. Compiler
+  target constraints are checked at each resolved application. Compiler
   B deliberately has no authored `{ environment in ... }` binder and no
   special `inspect` interpreter. A future executable macro body receives its
   compile-time context implicitly and runs through the same typed body/process
   representation used for ordinary functions.
-- `let` and `state` now share a canonical `Member` facet with owner identity,
-  keyword and identifier tokens, type token, and initializer token span.
-  Ordered macro applications target those same member identities. Empty marker
-  `macro print(): Member {}` applications are the graph fact: they resolve to
-  the exact Macro declaration identity, relate to owned state and top-level let
-  targets without executing a body. Applying the marker to a declaration
-  rejects at the typed target boundary.
+- `@member` is an authored macro family, not a nominal `Member` construct. Its
+  target alternatives are `Let | State | Derived | Binding`; transforms such
+  as `macro print(): @member {}` resolve that family through the retained macro
+  signature graph. The focused proof admits all four concrete property forms
+  and rejects a Construct before macro-body execution. The parser retains each
+  property's owner, concrete keyword, identity, type, and value span; the
+  remaining shared property-row storage is an implementation detail to split
+  into concrete facet stores, not a source-level `Member` type.
 - Macro application resolution happens once during compilation. Every
   application stores its resolved Macro declaration identity, application
   identity, target identity, and ordinal as canonical graph relationships.
   Queries such as the eventual `functions.filter(all: @extern)` read those
   application relationships directly; B does not copy them into an attachment
   registry. Explicit `#environment: extern()` registration is not part of the
-  model; ordinary typed queries over `#environment.graph` are.
+  model. The macro environment is the graph-scoped capability surface:
+  `#environment.target`, `#environment.macros`, and
+  `#environment.diagnostic(...)` are direct accesses rather than members of a
+  second `#environment.graph` object. The process graph retains imperative
+  calls as environment effects; `@diagnostic` remains an ordinary Macro
+  relationship only where a fallible local query actually needs it.
+- Representation macros emit ordinary initializer applications inside
+  target-owned `#environment` extensions. `LLVM(type: ...)` belongs to the
+  target Declaration and `LLVM(value: ...)` belongs to its Application; there
+  are no privileged `LLVM.type` / `LLVM.value` helper functions and no
+  redundant `-> LLVM` result promise. Macro collection retains every authored
+  Environment as a node containing ordered ordinary Range nodes. Resolving a
+  Macro Application gives that Application ordered references to all of its
+  Macro's Environments; LLVM lookup then walks those relationships rather than
+  a special emission table.
+- Temporary macro execution products are keyed by that canonical Application
+  identity. They do not copy the target syntax or target token: emission walks
+  from product to Application and then reads target/declaration relationships
+  from the graph. Product rows therefore have no positional coupling to
+  Application rows. The remaining scalar status/layout/value columns are an
+  execution bridge until emitted products gain stable graph identities.
+- Compiler B now retains authored collection production as graph data. In
+  `@many state integers: @integer`, the collection resolves its selector to
+  the exact `integer` Macro declaration; in
+  `@many derived commands: integers -> LLVM`, the production resolves its
+  source collection and output Construct identities. The selector Macro must
+  contain an initializer Application whose identity matches that output
+  declaration. LLVM execution is admitted
+  only when a Macro Application feeds one of these resolved productions. A
+  collection-production runner walks every Application selected from the AST,
+  executes its Macro process, and appends a product carrying both Application
+  and production identity. The derived `commands` collection is therefore
+  populated before LLVM rendering, and the backend no longer mirrors every
+  unrelated Macro Application into an empty product row. General execution of
+  the macro body still owns the remaining scalar schema bridge.
+- Compiler B's Core `UUID` is one immutable `@many(count: 16)` `let` property of
+  `Byte`, replacing the transitional `String` backing and integer-returning
+  byte accessor. The graph retains the exact count argument and relationship;
+  composing that property product into an enclosing `[16 x i8]` LLVM aggregate
+  remains general `@many` layout work rather than UUID-specific backend logic.
+  UUID v4 generation is separate policy over this representation.
 - Collection transformations use that same relationship model. An empty
-  `macro collectionModifier(): Function {}` marks functions such as
-  `filter(named:)`; the function signature retains its `@many -> @any`
+  `macro collectionModifier(): Macro {}` marks macros such as
+  `filter(named:)`; the macro signature retains its `@many -> @any`
   cardinality mapping. Cardinality names are retained token identities rather
-  than a closed compiler enum, so the same query also represents
-  `@many -> @some` and `@some -> @many`. `map(transform:)` is collected through
-  the same marker and preserves `@many -> @many` while its Function argument
-  describes the element transformation. A qualified call retains the complete token path to its
-  left as its predecessor root, so `Something.something.filter(...)` supplies
-  `Something.something` to `#environment.target.root()` without a modifier
-  registry or function-name dispatch. Executing the modifier body and
-  materializing its bounded output remain a later process slice.
+  than a closed compiler enum. `map(transform:)` is collected through the same
+  marker while its Function argument describes the element transformation.
+  Calls and terminal projections are canonical Applications: each retains its
+  own identity, predecessor Application, and resolved Function or Macro
+  declaration. `Something.something.filter(...).map(...)` therefore becomes
+  one root -> filter -> map identity chain, and a modifier receives its
+  predecessor directly as `#environment.target`. Executing the modifier body
+  and materializing its bounded output remain a later process slice.
 - The existing `many` macro now queries
-  `#environment.graph.functions.filter(all: @collectionModifier)` and directly
-  composes each canonical `#modifier` syntax value into an extension of its
-  target identity. This is authored Range code, not a compiler-known
-  collection registry or attachment helper. B retains the query as a canonical
-  local call and `extension target { #source }` as a general member-composition
-  facet. Executing the collection closure into deduplicated target-to-Function
-  relationships is the next graph-expansion slice.
+  `#environment.macros.filter(all: @collectionModifier)` and directly
+  splices the plural `#modifiers` identity into an extension of its target
+  Application. The splice cardinality handles none, one, or many identities;
+  no authored `map`, collection registry, or attachment helper is involved. B
+  retains the query and target/source-collection identities as one
+  Application-provision facet. Materializing that collection into deduplicated
+  target-to-Macro relationships is the next graph-expansion slice.
+  Its element type is guaranteed declaration knowledge and is read directly
+  from `#environment.target.Declaration.type`; it is not represented as an
+  optional diagnostic binding.
 - `Core/Extern.range` still exposes `ExternRegistration` only because accepted
   Compiler A compiles and links B today and recognizes that nominal result as
   its extern ABI registration. It is a bootstrap adapter, not the V3 model;

@@ -1,6 +1,9 @@
 construct LLVM {}
 
-macro scalar(): Construct -> LLVM {
+macro member(): Let | State | Derived | Binding -> Void {}
+macro many(): @member {}
+
+macro scalar(): Construct {
     return LLVM(
         type: "%Range.Legacy = type { i8 }",
         value: "%Range.Legacy { i8 42 }"
@@ -12,6 +15,12 @@ construct Legacy {
     let bits: Int(8)
     let signed: Bool(false)
 }
+
+@many
+state scalars: @scalar
+
+@many
+derived commands: scalars -> LLVM
 
 function answer(): Legacy {
     return 42

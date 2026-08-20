@@ -1,7 +1,9 @@
 construct LLVM {}
-macro member(): Let | State | Derived | Binding -> Void {}
 
-macro integer(): Construct {
+macro member(): Let | State | Derived | Binding -> Void {}
+macro many(): @member {}
+
+macro scalar(): Construct {
     @diagnostic
     let bits: #environment.target.Declaration.members.filter(named: "bits").first ? "Construct must specify bits"
     @diagnostic
@@ -18,3 +20,25 @@ macro integer(): Construct {
 }
 
 macro diagnostic(): @member -> Void {}
+
+@scalar
+construct Tiny {
+    let bits: Int(8)
+    let signed: Bool(false)
+}
+
+@scalar
+construct Word {
+    let bits: Int(16)
+    let signed: Bool(false)
+}
+
+@many
+state scalars: @scalar
+
+@many
+derived commands: scalars -> LLVM
+
+function answer(): Tiny {
+    return 42
+}

@@ -1,38 +1,50 @@
+function compilerBSyntaxSignalPreviousIdentity(
+    signal: CompilerBSyntaxDeltaSignal
+): SyntaxNodeID {
+    if signal.revision == .previous { return signal.identity }
+    return signal.counterpart
+}
+
+function compilerBSyntaxSignalCurrentIdentity(
+    signal: CompilerBSyntaxDeltaSignal
+): SyntaxNodeID {
+    if signal.revision == .current { return signal.identity }
+    return signal.counterpart
+}
+
+function compilerBRenderSyntaxObservationHalf(
+    label: String,
+    half: CompilerBDeclarationObservationHalf
+): String {
+    if half.present {
+        return "\t\(label)=present\t\(label)Name=\(half.name)\t\(label)Body=\(half.body.value)"
+    }
+    return "\t\(label)=absent"
+}
+
 function compilerBRenderSyntaxSignalObservation(
     previous: CompilerBSyntaxRevision,
     current: CompilerBSyntaxRevision,
     signal: CompilerBSyntaxDeltaSignal
 ): String {
-    state output: String("syntaxSignal\tchange=\(compilerBSyntaxDeltaKindName(kind: signal.change))\trevision=\(compilerBGraphRevisionName(revision: signal.revision))\tidentity=\(signal.identity.value)\n")
-    let functionQuery: CompilerBFunctionDeclarationQuery(
-        compilerBFunctionDeclarationQueryForSignal(signal: signal)
-    )
-    let functionResult: CompilerBDeclarationQueryResult(
-        compilerBFunctionDeclarationQueryExecute(
-            previous: previous,
-            current: current,
-            query: functionQuery
+    let before: CompilerBDeclarationObservationHalf(
+        compilerBDeclarationObservationInRevision(
+            revision: previous,
+            identity: compilerBSyntaxSignalPreviousIdentity(signal: signal)
         )
     )
-    if functionResult.found {
-        output.append(text: "graphQuery\ttype=Function.Declaration\trevision=\(compilerBGraphRevisionName(revision: functionQuery.revision))\tidentity=\(functionQuery.identity.value)\tfound=true\tname=\(functionResult.name)\tbody=\(functionResult.body.value)\n")
-        return output
-    }
-    let constructQuery: CompilerBConstructDeclarationQuery(
-        compilerBConstructDeclarationQueryForSignal(signal: signal)
-    )
-    let constructResult: CompilerBDeclarationQueryResult(
-        compilerBConstructDeclarationQueryExecute(
-            previous: previous,
-            current: current,
-            query: constructQuery
+    let after: CompilerBDeclarationObservationHalf(
+        compilerBDeclarationObservationInRevision(
+            revision: current,
+            identity: compilerBSyntaxSignalCurrentIdentity(signal: signal)
         )
     )
-    if constructResult.found {
-        output.append(text: "graphQuery\ttype=Construct.Declaration\trevision=\(compilerBGraphRevisionName(revision: constructQuery.revision))\tidentity=\(constructQuery.identity.value)\tfound=true\tname=\(constructResult.name)\tbody=\(constructResult.body.value)\n")
-        return output
-    }
-    output.append(text: "graphQuery\trevision=\(compilerBGraphRevisionName(revision: signal.revision))\tidentity=\(signal.identity.value)\tfound=false\n")
+    state kind: String(after.kind)
+    if !after.present { kind: before.kind }
+    state output: String("observation\tchange=\(compilerBSyntaxDeltaKindName(kind: signal.change))\tidentity=\(signal.identity.value)")
+    output.append(text: compilerBRenderSyntaxObservationHalf(label: "before", half: before))
+    output.append(text: compilerBRenderSyntaxObservationHalf(label: "after", half: after))
+    output.append(text: "\ttype=\(kind)\n")
     return output
 }
 

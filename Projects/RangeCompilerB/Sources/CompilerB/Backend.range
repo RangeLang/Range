@@ -69,51 +69,20 @@ function compilerBEmitLLVM(source: String): CompilerBLLVMModule {
     state diagnostic: String(revision.diagnostic)
     if revision.valid { diagnostic: "" }
     state emissionCount: Int(0)
-    state executionRow: Int(0)
-    while executionRow < revision.macroApplications.syntaxIDs.count && diagnostic == "" {
-        let targetSyntaxID: Int(revision.macroApplications.targetSyntaxIDs.element(
-            index: executionRow
-        ))
-        state productRow: Int(0 - 1)
-        if compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.locals.syntaxIDs,
-            syntaxID: targetSyntaxID
-        ) >= 0 {
-            productRow: compilerBMacroProductStoreAppend(
-                store: products,
-                status: 0,
-                applicationSyntaxID: revision.macroApplications.syntaxIDs.element(
-                    index: executionRow
-                ),
-                targetSyntaxID: targetSyntaxID,
-                targetIdentityTokenID: revision.macroApplications.targetIdentityTokenIDs.element(
-                    index: executionRow
-                ),
-                bitCount: 0,
-                signed: false,
-                hasValue: false,
-                value: 0
-            )
-            if productRow >= 0 {
-                products.emittedValues.update(element: 0, index: productRow)
-            }
-        } else {
-            productRow: compilerBExecuteMacroApplicationInto(
-                revision: revision,
-                products: products,
-                applicationRow: executionRow,
-                hasApplicationValue: false,
-                applicationValue: 0
-            )
-        }
-        if productRow < 0 {
-            diagnostic: "unable to retain macro execution product"
-        } else if products.statuses.element(index: productRow) != 0 {
+    if diagnostic == "" && compilerBRunCollectionProductions(
+        revision: revision,
+        products: products
+    ) != 0 {
+        diagnostic: "unable to run collection productions"
+    }
+    state productRow: Int(0)
+    while productRow < products.statuses.count && diagnostic == "" {
+        if products.statuses.element(index: productRow) != 0 {
             diagnostic: compilerBMacroProductStoreDiagnostic(store: products, row: productRow)
         } else if products.emittedValues.element(index: productRow) == 1 {
             emissionCount: emissionCount + 1
         }
-        executionRow: executionRow + 1
+        productRow: productRow + 1
     }
     let functionCount: Int(revision.functionDeclarations.syntaxIDs.count)
     if diagnostic == "" && functionCount == 0 {
@@ -132,11 +101,23 @@ function compilerBEmitLLVM(source: String): CompilerBLLVMModule {
             id: TokenID(value: revision.macroApplications.identityTokenIDs.element(index: macroRow))
         ))
         output.append(text: "; range-b macro-application identity=\(revision.macroApplications.syntaxIDs.element(index: macroRow)) declaration=\(revision.macroApplications.macroDeclarationSyntaxIDs.element(index: macroRow)) name=\(revision.source.substring(start: macroIdentity.start, end: macroIdentity.end)) target=\(revision.macroApplications.targetSyntaxIDs.element(index: macroRow)) ordinal=\(revision.macroApplications.ordinals.element(index: macroRow))\n")
-        if products.emittedValues.element(index: macroRow) == 1 {
-            output.append(text: "; range-b macro-execution application=\(products.applicationSyntaxIDs.element(index: macroRow)) target=\(products.targetSyntaxIDs.element(index: macroRow)) product=LLVM\n")
-            output.append(text: "\(compilerBMacroProductStoreLLVM(revision: revision, store: products, row: macroRow))\n")
-        }
         macroRow: macroRow + 1
+    }
+    state productOutputRow: Int(0)
+    while productOutputRow < products.statuses.count && diagnostic == "" {
+        if products.emittedValues.element(index: productOutputRow) == 1 {
+            let applicationSyntaxID: Int(
+                products.applicationSyntaxIDs.element(index: productOutputRow)
+            )
+            let applicationRow: Int(compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.macroApplications.syntaxIDs,
+                syntaxID: applicationSyntaxID
+            ))
+            output.append(text: "; range-b collection-product production=\(products.collectionProductionSyntaxIDs.element(index: productOutputRow)) application=\(applicationSyntaxID)\n")
+            output.append(text: "; range-b macro-execution application=\(applicationSyntaxID) target=\(revision.macroApplications.targetSyntaxIDs.element(index: applicationRow)) product=LLVM\n")
+            output.append(text: "\(compilerBMacroProductStoreLLVM(revision: revision, store: products, row: productOutputRow))\n")
+        }
+        productOutputRow: productOutputRow + 1
     }
     if diagnostic == "" && emissionCount > 0 { output.append(text: "\n") }
 
@@ -246,10 +227,21 @@ function compilerBEmitLLVM(source: String): CompilerBLLVMModule {
         }
 
         state valueProductRow: Int(0 - 1)
+        state collectionProductionSyntaxID: Int(0 - 1)
+        if diagnostic == "" {
+            collectionProductionSyntaxID: compilerBCollectionProductionSyntaxIDForMacroApplication(
+                revision: revision,
+                applicationRow: applicationRow
+            )
+            if collectionProductionSyntaxID < 0 {
+                diagnostic: "function return type has no collection production"
+            }
+        }
         if diagnostic == "" {
             valueProductRow: compilerBExecuteMacroApplicationInto(
                 revision: revision,
                 products: products,
+                collectionProductionSyntaxID: collectionProductionSyntaxID,
                 applicationRow: applicationRow,
                 hasApplicationValue: true,
                 applicationValue: literalValue

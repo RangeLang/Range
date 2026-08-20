@@ -61,9 +61,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       carries byte count explicitly (`Byte = 1`, current `Int = 4`) through
       indexing and IR. The focused runtime-free products prove `Byte` lowers
       to LLVM `i8`, `Int` lowers to LLVM `i32`, and both execute with exit 42.
+    - [x] Replace Compiler B Core UUID's transitional String storage with one
+      immutable `@many(count: 16) let bytes: Byte` relationship.
+      - The focused graph proof retains the Byte `let` property, typed count argument,
+        and exact `@many` Application relationship. General nested `@many`
+        product composition must prove the eventual `[16 x i8]` LLVM layout;
+        do not special-case UUID in the backend. UUID v4 generation remains a
+        separate operation over the 16-byte representation.
     - [x] Replace Byte's bootstrap `Int<.unsigned, 8>` field and backend
       type-name matching with a resolved `@integer` relationship, canonical
-      `let bits: Int(...)` / `let signed: Bool(...)` Member facets, and a
+      `let bits: Int(...)` / `let signed: Bool(...)` property facets, and a
       parser-materialized integer-literal identity -> token -> value relation.
       Runtime-free Byte and Int products derive nominal LLVM aggregate types
       and values from graph queries; invalid widths and overflowing literals
@@ -72,11 +79,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       and make its emitted LLVM products the backend input.
       - Function and macro declarations share one canonical process/expression
         graph. Macro execution reads application, target, and optional value
-        facts through independent `LLVM.type(...)` and `LLVM.value(...)`
-        executions, validates each product, and appends it to a generic product
-        store. The backend selects products by target identity and never by the
-        `integer` macro name; returned LLVM aggregates are no longer an
-        execution path.
+        facts by walking each resolved Macro Application's ordered Environment
+        relationships and their ordinary `LLVM(type: ...)` and
+        `LLVM(value: ...)` initializer Application nodes,
+        validates each product, and appends it to the transitional generic
+        product store. The backend selects products by target identity and
+        never by the `integer` macro name; returned LLVM aggregates and
+        redundant `-> LLVM` promises are not execution paths.
     - [ ] Replace the bootstrap-bounded `Buffer<Int>` scalar value column in
       the canonical Return facet with a canonical arbitrary-precision value
       identity. Token and literal identities are already separate; this is
@@ -106,6 +115,126 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       the signal. Declaration matching uses its current semantic key (nominal
       facet plus identity token), so source-offset shifts do not turn an
       existing declaration into remove-plus-add.
+    - [ ] Make the program entry point a declared graph relationship instead of
+      an inherited filename convention. An entry macro (for example `@main`)
+      attaches to one function; the backend selects the entry by that
+      relationship, and `scripts/run-compiler-b-bootstrap` stops special-casing
+      `Main.range` / `FocusedEntry.range` bundle order.
+      - Exactly one entry per program is a graph fact: zero or multiple entry
+        applications reject at declaration time with a focused Fail fixture.
+    - [x] Reshape syntax observation as a revision pair. An observation is two
+      instances of the same declaration bracketing the difference step, not a
+      single-revision lookup.
+      - The delta store records each signal's counterpart identity at
+        difference time (semantic matching stays in the revision operation);
+        observation resolves both halves without re-matching. Each signal
+        renders one `observation` row with explicit before/after halves whose
+        pair shape agrees with the change kind; absence is a pair half, so no
+        diagnostic channel and no standalone `found=false` row remain. One
+        kind-reporting helper over the shared `CompilerBDeclarationFacetStore`
+        replaced the Function/Construct render cascade, and the
+        `SyntaxRevisionDifference` fixture plus
+        `scripts/check-range-compiler-b` assertions moved in lockstep with the
+        changed signal asserting both halves.
+    - [ ] Extend pair observation from declaration presence to facet-level
+      deltas: a changed pair renders which facets differ (identity name, body,
+      members) as the recorded trace of one structural comparison walk.
+      - Equality is the same walk short-circuited to a Bool; surgical update
+        emission is the same walk made constructive. Implement the walk once;
+        the projections must not fork into independent comparison code.
+      - Observation code keeps no diagnostic channel: both sides of the step
+        are already-valid graphs, so every rendered fact is graph knowledge.
+    - [ ] Sweep the remaining Core macros (`Bool.range`, `Integer`,
+      `Diagnostic.range`) for the Many.range diagnostic principle: graph-known
+      facts are read without diagnostic fallbacks; only value-level facts the
+      graph cannot know emit `#environment.diagnostic(...)`.
+      - Extend `scripts/check-range-compiler-b` with per-macro assertions
+        mirroring the existing Many.range checks (no `@diagnostic` fallback on
+        guaranteed knowledge, diagnostics through the environment gate).
+    - [ ] Rebuild the Compiler B gate around one produced compiler instead of
+      per-fixture entry compilation.
+      - [ ] Route fixtures into a B executable as input data (a parse/emit
+        route per fixture file) instead of appending each fixture to the
+        bundle as a compiled-in focused entry. This is the same capability as
+        the self-source parse checkpoint aimed at smaller files first.
+      - [ ] Memoize the A -> B build in the gate's work directory keyed by a
+        content hash of the bootstrap binary, the source inventory, the
+        runtime C sources, and the clang flags. The cache is derived
+        memoization only; never commit a B binary as a second compiler
+        authority.
+      - [ ] Until fixtures are inputs, run the independent per-fixture
+        bootstrap invocations through a bounded parallel job pool; a failing
+        fixture must still fail the whole gate with its exact message.
+      - Standing-graph direction note: every run currently constructs the
+        complete revision graph from text and destroys it. The end state
+        constructs only the empty graph (the identity value of the graph)
+        and everything after is applied deltas — parsing a source is itself
+        the observation `(empty, parsed)`, an all-added pair, making the
+        parser a special case of the observation machinery rather than a
+        separate constructor. Entry (`@main`) is the designated observation
+        point where batch-time callers ask the standing graph for a value,
+        not where execution begins.
+    - [ ] Complete the macro-family target model promoted ahead of the
+      self-source syntax checkpoint:
+      - [x] Retain macro target unions and use them for admission before body
+        execution. `@member` is authored as
+        `Let | State | Derived | Binding`, and a transform targeting `@member`
+        resolves that signature through the graph rather than matching a
+        nominal `Member` spelling.
+      - whether `target` should be a derived query over the environment gate
+        (for example `#environment.filter(type: Self)`) rather than an
+        intrinsic, leaving the gate itself as the single macro intrinsic;
+      - whether the paths a macro body mentions should be its constraints, so
+        a mentioned path that exists on no admitted materialization rejects at
+        declaration time without a separate constraint syntax;
+      - [ ] Split the current shared property-row storage into concrete Let,
+        State, Derived, and Binding facets and retire its `kindCodes` column.
+        The source-level abstraction is already `@member`; this remaining
+        storage cleanup must not reintroduce a nominal Member target.
+      - [ ] Invert the family from enumerated to accumulated: the concretes
+        become declarations and `@member` becomes a conformance marker
+        targeting them (`@member construct Let`), so the property family is
+        the open set of declarations carrying the @member relationship rather
+        than the closed union authored in `member()`'s signature.
+        - Conformance is application: a transform constrains by the @member
+          relationship (the `filter(all: @collectionModifier)` pattern in
+          Many.range), so extending the family is one new declaration plus
+          one application, with no union edited anywhere.
+        - Requires the previous storage split: `Let`, `State`, `Derived`, and
+          `Binding` must exist as declarations before anything can attach to
+          them. Until then the union-authored `member()` marker stays the
+          accepted checkpoint, and `scripts/check-range-compiler-b` asserts
+          its exact current form.
+      - [ ] Give conformance an attachment scope: the `@member` application
+        carries where the concrete may attach (`@member(target: Construct)`
+        on `construct Let`), verified as a graph query at every ownership
+        edge.
+        - Scope is declared where underived and derived where derivable:
+          `Let` and `State` imply nothing about their owners, so their scope
+          is a genuine declared fact; `Derived` mentions sibling members and
+          `Binding` references another's `State`, so their scope derives from
+          their own semantics. Where both exist, declared must agree with
+          derived. An omitted `target:` argument is the identity value — the
+          unconstrained or derived scope — so the argument appears only when
+          it says something.
+      - Composition-algebra note for the scope rules: a construct is a
+        product (all members coexist) and an enum is a sum (one case
+        active), so product citizens (`Let | State | Derived | Binding`)
+        cannot sit in a sum, and `case` is the sum citizen — to `Enum` what
+        member is to `Construct`, suggesting a dual `@case` marker.
+        Algebras nest freely while citizens do not cross: an enum cannot own
+        `state`, but a case can own a product (associated values are a
+        product nested in a sum arm).
+      - Acceptance case for the unified generic parameters review
+        (`AGENTS.md`): the pair-observation renderer
+        (`compilerBRenderSyntaxSignalObservation` and its declaration-only
+        resolver) must collapse to one kind-anonymous declaration — pair
+        resolution, presence, and change-kind agreement written once, with
+        the facet family, per-half facts, and rendering supplied by each
+        concrete through its family conformance. If the generics design
+        cannot express that collapse, the design is wrong. Do not hand-write
+        per-kind observation resolvers (members, macro applications) in the
+        meantime beyond what a slice's proof requires.
     - [ ] Replace the defunctionalized syntax revision operation with a
       first-class `(previous, current) -> product` transform after indirect
       function values have their own focused accepted-compiler proof.
@@ -135,10 +264,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           later process slices.
       - [ ] Complete independent macro execution products for representation
         functions.
-        - [x] Retain ordered freestanding qualified calls such as
-          `LLVM.type(...)` and `LLVM.value(...)` as separate process executions;
-          `@integer` and `@many(count:)` no longer package those executions in
-          one returned `LLVM` aggregate.
+        - [x] Retain Macro Environments as plural graph relationships containing
+          ordinary Range nodes. Macro collection records every authored
+          Environment; each resolved Macro Application carries ordered
+          references to its Macro's Environments. `@integer` and
+          `@many(count:)` contain independent
+          `LLVM(type: ...)` and `LLVM(value: ...)` values inside extensions of
+          the target Declaration and Application; qualified helper calls,
+          returned LLVM aggregates, `-> LLVM` result promises, and the flattened
+          environment-emission table are retired.
         - [ ] Bind typed macro arguments and Member element-type queries from
           canonical graph facets, then compose `@many(count:)` into enclosing
           LLVM aggregate layouts and many-valued application emission.
@@ -153,11 +287,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           separately from one-value and many-value cardinality, resolve by
           application/declaration/target identity, and expose String RHS facts.
           The `diagnostic` macro retains two `if`
-          operations and two graph diagnostic effects without lowering or
+          operations and two environment diagnostic effects without lowering or
           executing them yet. A bootstrap-only empty `integer` signature lets
           frozen Compiler A build B without making it the V3 macro authority.
-        - [x] Lower the canonical macro's independent `LLVM.type(...)` and
-          `LLVM.value(...)` executions through graph identity. `\(bits)`
+        - [x] Lower the canonical macro's independent `LLVM(type: ...)` and
+          `LLVM(value: ...)` Environment nodes through graph identity. `\(bits)`
           resolves the local query to one Member and renders its scalar
           initializer, while target identity and application value projections
           transfer their retained facts into the template. Runtime-free Int
@@ -180,31 +314,46 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           `#environment: extern()` registration is not part of this
           architecture; ordinary macro graph queries remain available.
       - [x] Collect collection modifiers as canonical macro relationships and
-        retain their cardinality transforms and attached call roots.
-        - `@collectionModifier` resolves to the exact marked Function identity;
-          `filter(named:)` retains `@many -> @any` as its input/output
+        retain their cardinality transforms on Applications.
+        - `@collectionModifier` resolves to the exact marked Macro identity;
+          `filter(named:)` is a macro retaining `@many -> @any` as its
+          input/output
           cardinality mapping rather than a generic parameter or name-keyed
           compiler rule.
-        - `map(transform:)` uses the same marker and retains `@many -> @many`;
+        - `map(transform:)` uses the same marker and retains its cardinality;
           element transformation is expressed by its Function input while the
           graph carries cardinality and predecessor correspondence.
         - Cardinalities remain source-token identities rather than a closed
-          compiler enum; focused fixtures also retain `@many -> @some` and
-          `@some -> @many` mappings through the same marker query.
-        - Qualified calls retain the complete predecessor token path, so
-          `Something.something.filter(...)` exposes `Something.something` as
-          the input root and `#environment.target.root()` exposes the same
-          relationship inside the modifier process.
+          compiler enum.
+        - [x] Stabilize member access and chained execution as one canonical
+          Application relationship.
+          - Every Application retains its own syntax identity, predecessor
+            Application, and resolved Function or Macro declaration identity.
+            `Something.something.filter(...).map(...)` proves the exact
+            root -> filter -> map identity chain and reads `many -> any -> many`
+            from the resolved Macro declarations.
+          - A terminal projection such as `filter(...).first` is another
+            Application, while optional fallback remains a separate expression.
+            Token-root reconstruction, function-modifier rows, and copied
+            callee-segment storage are retired.
         - [x] Author direct modifier provision in the existing `many` macro.
-          - `many` queries `#environment.graph.functions` for every
-            `@collectionModifier`, maps the canonical Function syntax values,
-            and splices each `#modifier` directly into an extension of the
-            target identity. There is no attachment helper or copied modifier
-            declaration; exact graph relationships are intended to deduplicate.
+          - `many` queries `#environment.macros` for every
+            `@collectionModifier` and splices the resulting plural `#modifiers`
+            identity directly into an extension of the target Application.
+            The splice cardinality materializes none, one, or many identities;
+            there is no authored traversal, attachment helper, or copied
+            modifier declaration.
           - Compiler B retains the graph query as a canonical local call and
-            the direct target/source splice as a general member-composition
-            facet. Executing the collection closure into one deduplicated
-            relationship per selected Function remains pending.
+            the direct target/source-collection identities as one
+            Application-provision facet. Materializing the selected identities
+            into deduplicated graph relationships remains pending.
+          - [x] Make the macro environment itself the graph capability surface.
+            - Graph collections and effects are direct `#environment` members:
+              `#environment.macros` and `#environment.diagnostic(...)`. The
+              parser retains calls as environment effects instead of a
+              conflicting `graphEffects` lane. `many` reads its guaranteed
+              declaration element type directly and no longer marks that query
+              with `@diagnostic` or an optional String fallback.
         - [ ] Execute the modifier process over the selected graph collection
           and materialize its bounded `@any` output; this checkpoint proves
           collection and query shape, not `while`/`append` evaluation.
@@ -217,6 +366,31 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           duplicate discovery pass, and integer-literal registry. LLVM emission
           now queries Function, signature, Block, Return, represented type, and
           literal facts from the canonical revision per declaration.
+        - [x] Key temporary macro execution products by canonical Application
+          identity and remove their copied target syntax/token columns. Product
+          lookup no longer assumes Application rows and execution-product rows
+          share an index; target and declaration relationships are read back
+          through the Application graph facet.
+        - [x] Retain the first authored collection-to-collection production and
+          route LLVM macro execution through it.
+          - `@many state integers: @integer` resolves its selector to one Macro
+            identity, while `@many derived commands: integers -> LLVM` resolves
+            its source collection and output Construct identities. An authored
+            Environment node must initialize that output declaration; a
+            mismatch is a focused syntax rejection. The backend executes
+            matching Macro Applications through this relation rather than the
+            `integer` name or a declared result promise.
+          - [x] Run the resolved production and populate its derived product
+            collection by walking every selected AST Macro Application.
+            - Products retain both source Application and destination
+              production identity. A focused two-Construct proof produces two
+              LLVM collection products, while unrelated `@diagnostic` and
+              `@many` Applications produce no placeholder rows. This also
+              removes the former Application-row/product-row alignment
+              dependency.
+        - [ ] Move the remaining execution outputs (`status`, emitted LLVM,
+          integer layout, and application value) into stable graph products as
+          their syntax identities and invalidation behavior are implemented.
       - [ ] Lower the first `@print` value event through Range-owned formatting
         and buffering to one true libc/OS byte-write extern; do not move
         inspection or timeline policy into the foreign shim.

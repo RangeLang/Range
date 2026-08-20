@@ -1,18 +1,42 @@
-function compilerBFunctionDeclarationQueryForSignal(
-    signal: CompilerBSyntaxDeltaSignal
-): CompilerBFunctionDeclarationQuery {
-    return CompilerBFunctionDeclarationQuery(
-        revision: signal.revision,
-        identity: signal.identity
+function compilerBDeclarationObservationInRevision(
+    revision: CompilerBSyntaxRevision,
+    identity: SyntaxNodeID
+): CompilerBDeclarationObservationHalf {
+    let functionResult: CompilerBDeclarationQueryResult(
+        compilerBDeclarationQueryExecuteInRevision(
+            revision: revision,
+            declarations: revision.functionDeclarations,
+            identity: identity
+        )
     )
-}
-
-function compilerBConstructDeclarationQueryForSignal(
-    signal: CompilerBSyntaxDeltaSignal
-): CompilerBConstructDeclarationQuery {
-    return CompilerBConstructDeclarationQuery(
-        revision: signal.revision,
-        identity: signal.identity
+    if functionResult.found {
+        return CompilerBDeclarationObservationHalf(
+            present: true,
+            kind: "Function.Declaration",
+            name: functionResult.name,
+            body: functionResult.body
+        )
+    }
+    let constructResult: CompilerBDeclarationQueryResult(
+        compilerBDeclarationQueryExecuteInRevision(
+            revision: revision,
+            declarations: revision.constructDeclarations,
+            identity: identity
+        )
+    )
+    if constructResult.found {
+        return CompilerBDeclarationObservationHalf(
+            present: true,
+            kind: "Construct.Declaration",
+            name: constructResult.name,
+            body: constructResult.body
+        )
+    }
+    return CompilerBDeclarationObservationHalf(
+        present: false,
+        kind: "",
+        name: "",
+        body: SyntaxNodeID(value: 0 - 1)
     )
 }
 
@@ -183,6 +207,69 @@ function compilerBFunctionCardinalityQueryExecute(
     )
 }
 
+function compilerBMacroCardinalityQueryExecute(
+    revision: CompilerBSyntaxRevision,
+    macroSyntaxID: Int
+): CompilerBFunctionCardinalityQueryResult {
+    let row: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.macroSignatures.macroSyntaxIDs,
+        syntaxID: macroSyntaxID
+    ))
+    if row < 0 {
+        return CompilerBFunctionCardinalityQueryResult(
+            found: false,
+            input: TokenID(value: 0 - 1),
+            output: TokenID(value: 0 - 1)
+        )
+    }
+    let inputTokenID: Int(
+        revision.macroSignatures.inputCardinalityTokenIDs.element(index: row)
+    )
+    let outputTokenID: Int(
+        revision.macroSignatures.outputCardinalityTokenIDs.element(index: row)
+    )
+    return CompilerBFunctionCardinalityQueryResult(
+        found: inputTokenID >= 0 && outputTokenID >= 0,
+        input: TokenID(value: inputTokenID),
+        output: TokenID(value: outputTokenID)
+    )
+}
+
+function compilerBCollectionProductionSyntaxIDForMacroApplication(
+    revision: CompilerBSyntaxRevision,
+    applicationRow: Int
+): Int {
+    let macroSyntaxID: Int(
+        revision.macroApplications.macroDeclarationSyntaxIDs.element(index: applicationRow)
+    )
+    state result: Int(0 - 1)
+    state count: Int(0)
+    state productionRow: Int(0)
+    while productionRow < revision.process.collectionProductions.syntaxIDs.count {
+        let sourceCollectionSyntaxID: Int(
+            revision.process.collectionProductions.sourceCollectionSyntaxIDs.element(
+                index: productionRow
+            )
+        )
+        let collectionRow: Int(compilerBFacetRowForSyntaxID(
+            syntaxIDs: revision.process.collections.syntaxIDs,
+            syntaxID: sourceCollectionSyntaxID
+        ))
+        if collectionRow >= 0
+            && revision.process.collections.selectorMacroSyntaxIDs.element(
+                index: collectionRow
+            ) == macroSyntaxID {
+            result: revision.process.collectionProductions.syntaxIDs.element(
+                index: productionRow
+            )
+            count: count + 1
+        }
+        productionRow: productionRow + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return result
+}
+
 function compilerBTargetIdentityTokenID(
     revision: CompilerBSyntaxRevision,
     targetSyntaxID: Int
@@ -284,17 +371,115 @@ function compilerBTargetMatchesTypeToken(
             syntaxID: targetSyntaxID
         ) >= 0
     }
-    if compilerBTokenMatchesBytes(source: revision.source, token: typeToken, expected: "Member") {
-        return compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.members.syntaxIDs,
-            syntaxID: targetSyntaxID
-        ) >= 0
-            || compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.locals.syntaxIDs,
-                syntaxID: targetSyntaxID
-            ) >= 0
+    let memberRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.members.syntaxIDs,
+        syntaxID: targetSyntaxID
+    ))
+    if memberRow >= 0 {
+        let kind: Int(revision.members.kindCodes.element(index: memberRow))
+        if compilerBTokenMatchesBytes(source: revision.source, token: typeToken, expected: "Let") {
+            return kind == compilerBParserMemberKindLetCode()
+        }
+        if compilerBTokenMatchesBytes(source: revision.source, token: typeToken, expected: "State") {
+            return kind == compilerBParserMemberKindStateCode()
+        }
+        if compilerBTokenMatchesBytes(source: revision.source, token: typeToken, expected: "Derived") {
+            return kind == compilerBParserMemberKindDerivedCode()
+        }
+        if compilerBTokenMatchesBytes(source: revision.source, token: typeToken, expected: "Binding") {
+            return kind == compilerBParserMemberKindBindingCode()
+        }
     }
     return false
+}
+
+function compilerBTargetMatchesTypeAlternatives(
+    revision: CompilerBSyntaxRevision,
+    targetSyntaxID: Int,
+    firstTypeTokenID: Int,
+    afterLastTypeTokenID: Int
+): Bool {
+    if firstTypeTokenID < 0 || afterLastTypeTokenID <= firstTypeTokenID { return false }
+    state tokenID: Int(firstTypeTokenID)
+    state expectsType: Bool(true)
+    state matches: Bool(false)
+    while tokenID < afterLastTypeTokenID {
+        if expectsType {
+            let token: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: tokenID)
+            ))
+            if token.kind != .identity { return false }
+            if compilerBTargetMatchesTypeToken(
+                revision: revision,
+                targetSyntaxID: targetSyntaxID,
+                typeTokenID: tokenID
+            ) { matches: true }
+        } else if compilerBParserTokenByte(
+            source: revision.source,
+            tokens: revision.tokens,
+            tokenID: tokenID
+        ) != 124 { return false }
+        expectsType: !expectsType
+        tokenID: tokenID + 1
+    }
+    return !expectsType && matches
+}
+
+function compilerBMacroDeclarationNamedToken(
+    revision: CompilerBSyntaxRevision,
+    identityTokenID: Int
+): Int {
+    if identityTokenID < 0 { return 0 - 1 }
+    let identity: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: identityTokenID)
+    ))
+    state declarationSyntaxID: Int(0 - 1)
+    state row: Int(0)
+    while row < revision.macroDeclarations.syntaxIDs.count {
+        let candidate: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: revision.macroDeclarations.identityTokenIDs.element(index: row))
+        ))
+        if compilerBTokenBytesEqual(
+            source: revision.source,
+            left: identity,
+            right: candidate
+        ) {
+            if declarationSyntaxID >= 0 { return 0 - 2 }
+            declarationSyntaxID: revision.macroDeclarations.syntaxIDs.element(index: row)
+        }
+        row: row + 1
+    }
+    return declarationSyntaxID
+}
+
+function compilerBTargetMatchesMacroFamily(
+    revision: CompilerBSyntaxRevision,
+    targetSyntaxID: Int,
+    familyTokenID: Int
+): Bool {
+    let familySyntaxID: Int(compilerBMacroDeclarationNamedToken(
+        revision: revision,
+        identityTokenID: familyTokenID
+    ))
+    if familySyntaxID < 0 { return false }
+    let signatureRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.macroSignatures.macroSyntaxIDs,
+        syntaxID: familySyntaxID
+    ))
+    if signatureRow < 0 { return false }
+    return compilerBTargetMatchesTypeAlternatives(
+        revision: revision,
+        targetSyntaxID: targetSyntaxID,
+        firstTypeTokenID: revision.macroSignatures.targetTypeTokenIDs.element(
+            index: signatureRow
+        ),
+        afterLastTypeTokenID: revision.macroSignatures.afterLastTargetTypeTokenIDs.element(
+            index: signatureRow
+        )
+    )
 }
 
 function compilerBMacroDeclarationForApplication(
@@ -476,13 +661,33 @@ function compilerBValidateDeclaredMacroApplications(
             if signatureRow < 0 {
                 valid: false
                 diagnostic: "macro signature is missing"
-            } else if !compilerBTargetMatchesTypeToken(
-                revision: revision,
-                targetSyntaxID: targetSyntaxID,
-                typeTokenID: revision.macroSignatures.targetTypeTokenIDs.element(index: signatureRow)
-            ) {
-                valid: false
-                diagnostic: "macro target does not satisfy declared type"
+            } else {
+                let firstTargetTypeTokenID: Int(
+                    revision.macroSignatures.targetTypeTokenIDs.element(index: signatureRow)
+                )
+                state targetMatches: Bool(false)
+                if firstTargetTypeTokenID >= 0 {
+                    targetMatches: compilerBTargetMatchesTypeAlternatives(
+                        revision: revision,
+                        targetSyntaxID: targetSyntaxID,
+                        firstTypeTokenID: firstTargetTypeTokenID,
+                        afterLastTypeTokenID: revision.macroSignatures.afterLastTargetTypeTokenIDs.element(
+                            index: signatureRow
+                        )
+                    )
+                } else {
+                    targetMatches: compilerBTargetMatchesMacroFamily(
+                        revision: revision,
+                        targetSyntaxID: targetSyntaxID,
+                        familyTokenID: revision.macroSignatures.inputCardinalityTokenIDs.element(
+                            index: signatureRow
+                        )
+                    )
+                }
+                if !targetMatches {
+                    valid: false
+                    diagnostic: "macro target does not satisfy declared type"
+                }
             }
             if valid {
                 state parameterRow: Int(0)

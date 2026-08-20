@@ -119,7 +119,16 @@ systems. Questions for that review include:
 - how specialization bindings should be exposed as type-level properties
   without adding fields to every runtime instance; and
 - how parameter usage should contribute capability requirements such as
-  `Element.layout` through the graph.
+  `Element.layout` through the graph;
+- whether parameters and arguments should unify into bidirectional bindings,
+  where an application's `label: value` pairs are declaration work (the label
+  can name what a macro emits) and validation is unification of the body's
+  mentions with the supplied bindings rather than fixed-slot matching; and
+- whether an unbound binding should resolve to its type's identity value (the
+  value under which the operation does nothing: `0`, `""`, the empty
+  collection, an enum's declared identity case), making defaults type-owned,
+  requiredness derived (a type without an identity makes its bindings
+  required), and per-parameter default syntax unnecessary.
 
 Revisit this only after the current generic system blocks a permanent Buffer
 layout implementation, or after that implementation is complete. Do not make

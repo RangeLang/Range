@@ -1,4 +1,0 @@
-function query(): Void {
-    Something.something.filter(named: "bits")
-    Something.something.map(transform: normalize)
-}

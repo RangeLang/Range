@@ -1,4 +1,5 @@
-macro metadata(count: Int): Member -> Void {}
+macro member(): Let | State | Derived | Binding -> Void {}
+macro metadata(count: Int): @member -> Void {}
 
 @metadata(count: true)
 let bytes: Byte

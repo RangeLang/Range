@@ -15,4 +15,5 @@ Projects/RangeCompilerB/Sources/CompilerB/Core/Process.range
 Projects/RangeCompilerB/Sources/Core/System/Target.range
 Projects/RangeCompilerB/Sources/CompilerB/Core/Byte.range
 Projects/RangeCompilerB/Sources/CompilerB/Core/String.range
+Projects/RangeCompilerB/Sources/CompilerB/Core/Macros/Member.range
 Projects/RangeCompilerB/Sources/Core/Coding/UUID.range

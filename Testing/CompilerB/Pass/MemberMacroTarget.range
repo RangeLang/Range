@@ -1,8 +1,21 @@
-macro print(): Member {}
+macro member(): Let | State | Derived | Binding -> Void {}
+macro print(): @member {}
+macro values(): @member -> String {}
+
+construct String {}
 
 construct Counter {
     @print
     state count: Int(20)
+
+    @print
+    binding selected: Int
+
+    @values
+    state values: @values
+
+    @print
+    derived labels: values -> String
 }
 
 @print

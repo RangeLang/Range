@@ -1,0 +1,23 @@
+construct LLVM {}
+
+macro member(): Let | State | Derived | Binding -> Void {}
+macro many(): @member {}
+macro integer(): Construct {
+    #environment {
+        extension #environment.target.Declaration {
+            LLVM(type: "")
+        }
+    }
+}
+
+@integer
+construct Byte {
+    let bits: Int(8)
+    let signed: Bool(false)
+}
+
+@many
+state integers: @integer
+
+@many
+derived commands: integers -> LLVM

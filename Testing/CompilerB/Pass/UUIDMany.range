@@ -1,0 +1,11 @@
+construct LLVM {}
+
+macro member(): Let | State | Derived | Binding -> Void {}
+macro many(count: Int): @member {}
+
+construct Byte {}
+
+construct UUID {
+    @many(count: 16)
+    let bytes: Byte
+}

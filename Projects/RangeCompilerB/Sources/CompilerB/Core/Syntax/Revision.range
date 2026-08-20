@@ -50,7 +50,8 @@ function compilerBSyntaxDeltaStoreCreate(capacity: Int): CompilerBSyntaxDeltaSto
     return CompilerBSyntaxDeltaStore(
         kinds: bufferCreateInt(capacity: capacity),
         revisions: bufferCreateInt(capacity: capacity),
-        identities: bufferCreateInt(capacity: capacity)
+        identities: bufferCreateInt(capacity: capacity),
+        counterparts: bufferCreateInt(capacity: capacity)
     )
 }
 
@@ -58,11 +59,13 @@ function compilerBSyntaxDeltaStoreAppend(
     store: CompilerBSyntaxDeltaStore,
     kind: Int,
     revision: Int,
-    identity: Int
+    identity: Int,
+    counterpart: Int
 ): Int {
     if store.kinds.append(element: kind) != 0 { return 0 - 1 }
     if store.revisions.append(element: revision) != 0 { return 0 - 1 }
-    return store.identities.append(element: identity)
+    if store.identities.append(element: identity) != 0 { return 0 - 1 }
+    return store.counterparts.append(element: counterpart)
 }
 
 function compilerBSyntaxDeltaStoreDestroy(store: CompilerBSyntaxDeltaStore): Int {
@@ -70,6 +73,7 @@ function compilerBSyntaxDeltaStoreDestroy(store: CompilerBSyntaxDeltaStore): Int
     if store.kinds.destroy() != 0 { status: 0 - 1 }
     if store.revisions.destroy() != 0 { status: 0 - 1 }
     if store.identities.destroy() != 0 { status: 0 - 1 }
+    if store.counterparts.destroy() != 0 { status: 0 - 1 }
     return status
 }
 
@@ -86,6 +90,9 @@ function compilerBSyntaxDeltaSignal(
         ),
         identity: SyntaxNodeID(
             value: delta.changes.identities.element(index: row)
+        ),
+        counterpart: SyntaxNodeID(
+            value: delta.changes.counterparts.element(index: row)
         )
     )
 }
@@ -181,7 +188,8 @@ function compilerBSyntaxDifferenceRemovedFacet(
                 store: changes,
                 kind: compilerBSyntaxDeltaKindRemovedCode(),
                 revision: compilerBGraphRevisionPreviousCode(),
-                identity: previousDeclarations.syntaxIDs.element(index: row)
+                identity: previousDeclarations.syntaxIDs.element(index: row),
+                counterpart: 0 - 1
             ) != 0 { return 0 - 1 }
             count: count + 1
         }
@@ -220,7 +228,8 @@ function compilerBSyntaxDifferenceChangedFacet(
                     store: changes,
                     kind: compilerBSyntaxDeltaKindChangedCode(),
                     revision: compilerBGraphRevisionCurrentCode(),
-                    identity: currentDeclarations.syntaxIDs.element(index: currentRow)
+                    identity: currentDeclarations.syntaxIDs.element(index: currentRow),
+                    counterpart: previousDeclarations.syntaxIDs.element(index: row)
                 ) != 0 { return 0 - 1 }
                 count: count + 1
             }
@@ -251,7 +260,8 @@ function compilerBSyntaxDifferenceAddedFacet(
                 store: changes,
                 kind: compilerBSyntaxDeltaKindAddedCode(),
                 revision: compilerBGraphRevisionCurrentCode(),
-                identity: currentDeclarations.syntaxIDs.element(index: row)
+                identity: currentDeclarations.syntaxIDs.element(index: row),
+                counterpart: 0 - 1
             ) != 0 { return 0 - 1 }
             count: count + 1
         }

@@ -1,6 +1,7 @@
 construct LLVM {}
+macro member(): Let | State | Derived | Binding -> Void {}
 
-macro metadata(count: Int, enabled: Bool, label: String): Member -> LLVM {}
+macro metadata(count: Int, enabled: Bool, label: String): @member {}
 
 construct Packet {
     @metadata(count: 4, enabled: true, label: "bytes")

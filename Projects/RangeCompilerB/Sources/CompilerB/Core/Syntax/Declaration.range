@@ -42,6 +42,9 @@ construct CompilerBMacroApplicationStore {
     let argumentLabelTokenIDs: Buffer<Int>
     let argumentValueExpressionSyntaxIDs: Buffer<Int>
     let argumentOrdinals: Buffer<Int>
+    let environmentApplicationSyntaxIDs: Buffer<Int>
+    let environmentSyntaxIDs: Buffer<Int>
+    let environmentOrdinals: Buffer<Int>
 }
 
 construct CompilerBFunctionSignatureFacetStore {
@@ -75,21 +78,17 @@ construct CompilerBExpressionFacetStore {
     let integerValues: Buffer<Int>
 }
 
-construct CompilerBCallExpressionFacetStore {
-    let expressionSyntaxIDs: Buffer<Int>
-    let rootFirstTokenIDs: Buffer<Int>
-    let rootAfterLastTokenIDs: Buffer<Int>
-    let functionIdentityTokenIDs: Buffer<Int>
+construct CompilerBApplicationFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let predecessorSyntaxIDs: Buffer<Int>
+    let declarationSyntaxIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let firstTokenIDs: Buffer<Int>
+    let afterLastTokenIDs: Buffer<Int>
 }
 
-construct CompilerBCallCalleeSegmentStore {
-    let expressionSyntaxIDs: Buffer<Int>
-    let tokenIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
-}
-
-construct CompilerBCallArgumentFacetStore {
-    let callExpressionSyntaxIDs: Buffer<Int>
+construct CompilerBApplicationArgumentFacetStore {
+    let applicationSyntaxIDs: Buffer<Int>
     let labelTokenIDs: Buffer<Int>
     let valueExpressionSyntaxIDs: Buffer<Int>
     let ordinals: Buffer<Int>
@@ -127,7 +126,7 @@ construct CompilerBConditionalFacetStore {
     let bodySyntaxIDs: Buffer<Int>
 }
 
-construct CompilerBGraphEffectFacetStore {
+construct CompilerBEnvironmentEffectFacetStore {
     let syntaxIDs: Buffer<Int>
     let ownerSyntaxIDs: Buffer<Int>
     let identityTokenIDs: Buffer<Int>
@@ -135,12 +134,42 @@ construct CompilerBGraphEffectFacetStore {
     let afterLastArgumentTokenIDs: Buffer<Int>
 }
 
-construct CompilerBMemberCompositionFacetStore {
+construct CompilerBApplicationProvisionFacetStore {
     let syntaxIDs: Buffer<Int>
     let ownerSyntaxIDs: Buffer<Int>
-    let firstTargetTokenIDs: Buffer<Int>
-    let afterLastTargetTokenIDs: Buffer<Int>
+    let targetApplicationSyntaxIDs: Buffer<Int>
+    let sourceSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBEnvironmentFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerDeclarationSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBEnvironmentNodeFacetStore {
+    let environmentSyntaxIDs: Buffer<Int>
+    let syntaxIDs: Buffer<Int>
+    let parentSyntaxIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
+construct CompilerBExtensionFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let targetApplicationSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBCollectionFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let selectorIdentityTokenIDs: Buffer<Int>
+    let selectorMacroSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBCollectionProductionFacetStore {
+    let syntaxIDs: Buffer<Int>
     let sourceIdentityTokenIDs: Buffer<Int>
+    let sourceCollectionSyntaxIDs: Buffer<Int>
+    let outputIdentityTokenIDs: Buffer<Int>
+    let outputDeclarationSyntaxIDs: Buffer<Int>
 }
 
 construct CompilerBExecutionFacetStore {
@@ -153,22 +182,29 @@ construct CompilerBExecutionFacetStore {
 construct CompilerBProcessGraph {
     let processes: CompilerBProcessFacetStore
     let expressions: CompilerBExpressionFacetStore
-    let calls: CompilerBCallExpressionFacetStore
-    let callees: CompilerBCallCalleeSegmentStore
-    let arguments: CompilerBCallArgumentFacetStore
+    let applications: CompilerBApplicationFacetStore
+    let arguments: CompilerBApplicationArgumentFacetStore
     let projections: CompilerBProjectionSegmentStore
     let locals: CompilerBLocalBindingFacetStore
     let noValueFallbacks: CompilerBNoValueFallbackFacetStore
     let conditionals: CompilerBConditionalFacetStore
-    let graphEffects: CompilerBGraphEffectFacetStore
-    let memberCompositions: CompilerBMemberCompositionFacetStore
+    let environmentEffects: CompilerBEnvironmentEffectFacetStore
+    let applicationProvisions: CompilerBApplicationProvisionFacetStore
+    let environments: CompilerBEnvironmentFacetStore
+    let environmentNodes: CompilerBEnvironmentNodeFacetStore
+    let extensions: CompilerBExtensionFacetStore
+    let collections: CompilerBCollectionFacetStore
+    let collectionProductions: CompilerBCollectionProductionFacetStore
     let executions: CompilerBExecutionFacetStore
 }
 
 construct CompilerBMacroSignatureFacetStore {
     let macroSyntaxIDs: Buffer<Int>
     let targetTypeTokenIDs: Buffer<Int>
+    let afterLastTargetTypeTokenIDs: Buffer<Int>
     let resultTypeTokenIDs: Buffer<Int>
+    let inputCardinalityTokenIDs: Buffer<Int>
+    let outputCardinalityTokenIDs: Buffer<Int>
     let parameterMacroSyntaxIDs: Buffer<Int>
     let parameterIdentityTokenIDs: Buffer<Int>
     let parameterTypeTokenIDs: Buffer<Int>
@@ -248,6 +284,7 @@ construct CompilerBSyntaxDeltaSignal {
     let change: CompilerBSyntaxDeltaKind
     let revision: CompilerBGraphRevision
     let identity: SyntaxNodeID
+    let counterpart: SyntaxNodeID
 }
 
 construct CompilerBFunctionDeclarationQuery {
@@ -270,6 +307,13 @@ construct CompilerBMemberQuery {
 
 construct CompilerBDeclarationQueryResult {
     let found: Bool
+    let name: String
+    let body: SyntaxNodeID
+}
+
+construct CompilerBDeclarationObservationHalf {
+    let present: Bool
+    let kind: String
     let name: String
     let body: SyntaxNodeID
 }
@@ -304,6 +348,7 @@ construct CompilerBSyntaxDeltaStore {
     let kinds: Buffer<Int>
     let revisions: Buffer<Int>
     let identities: Buffer<Int>
+    let counterparts: Buffer<Int>
 }
 
 construct CompilerBSyntaxDelta {

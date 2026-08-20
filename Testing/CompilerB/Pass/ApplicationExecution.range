@@ -1,0 +1,13 @@
+macro collectionModifier(): Macro {}
+
+@collectionModifier
+macro filter(named: String): @many -> @any {}
+
+@collectionModifier
+macro map(transform: Function): @any -> @many {}
+
+function normalize(): Void {}
+
+function query(): Void {
+    Something.something.filter(named: "bits").map(transform: normalize)
+}
