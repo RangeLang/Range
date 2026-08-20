@@ -1,0 +1,316 @@
+construct SyntaxNodeID {
+    let value: Int
+}
+
+construct TokenSpan {
+    let first: TokenID
+    let afterLast: TokenID
+}
+
+construct SyntaxNode {
+    let id: SyntaxNodeID
+    let tokens: TokenSpan
+}
+
+construct SyntaxNodeStore {
+    let ids: Buffer<Int>
+    let firstTokenIDs: Buffer<Int>
+    let afterLastTokenIDs: Buffer<Int>
+}
+
+construct CompilerBDeclarationFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let bodySyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBBlockFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let parentSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBMacroApplicationStore {
+    let syntaxIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let macroDeclarationSyntaxIDs: Buffer<Int>
+    let firstArgumentTokenIDs: Buffer<Int>
+    let afterLastArgumentTokenIDs: Buffer<Int>
+    let targetSyntaxIDs: Buffer<Int>
+    let targetIdentityTokenIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+    let argumentApplicationSyntaxIDs: Buffer<Int>
+    let argumentLabelTokenIDs: Buffer<Int>
+    let argumentValueExpressionSyntaxIDs: Buffer<Int>
+    let argumentOrdinals: Buffer<Int>
+}
+
+construct CompilerBFunctionSignatureFacetStore {
+    let functionSyntaxIDs: Buffer<Int>
+    let returnTypeTokenIDs: Buffer<Int>
+    let inputCardinalityTokenIDs: Buffer<Int>
+    let outputCardinalityTokenIDs: Buffer<Int>
+}
+
+construct CompilerBReturnFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let valueExpressionSyntaxIDs: Buffer<Int>
+    let firstValueTokenIDs: Buffer<Int>
+    let afterLastValueTokenIDs: Buffer<Int>
+    let valueKindCodes: Buffer<Int>
+    let integerValues: Buffer<Int>
+}
+
+construct CompilerBProcessFacetStore {
+    let ownerSyntaxIDs: Buffer<Int>
+    let bodySyntaxIDs: Buffer<Int>
+    let returnSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBExpressionFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let kindCodes: Buffer<Int>
+    let firstTokenIDs: Buffer<Int>
+    let afterLastTokenIDs: Buffer<Int>
+    let integerValues: Buffer<Int>
+}
+
+construct CompilerBCallExpressionFacetStore {
+    let expressionSyntaxIDs: Buffer<Int>
+    let rootFirstTokenIDs: Buffer<Int>
+    let rootAfterLastTokenIDs: Buffer<Int>
+    let functionIdentityTokenIDs: Buffer<Int>
+}
+
+construct CompilerBCallCalleeSegmentStore {
+    let expressionSyntaxIDs: Buffer<Int>
+    let tokenIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
+construct CompilerBCallArgumentFacetStore {
+    let callExpressionSyntaxIDs: Buffer<Int>
+    let labelTokenIDs: Buffer<Int>
+    let valueExpressionSyntaxIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
+construct CompilerBProjectionSegmentStore {
+    let expressionSyntaxIDs: Buffer<Int>
+    let tokenIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
+construct CompilerBLocalBindingFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let valueExpressionSyntaxIDs: Buffer<Int>
+    let firstValueTokenIDs: Buffer<Int>
+    let afterLastValueTokenIDs: Buffer<Int>
+}
+
+construct CompilerBNoValueFallbackFacetStore {
+    let expressionSyntaxIDs: Buffer<Int>
+    let questionTokenIDs: Buffer<Int>
+    let firstTargetTokenIDs: Buffer<Int>
+    let afterLastTargetTokenIDs: Buffer<Int>
+    let firstRHSTokenIDs: Buffer<Int>
+    let afterLastRHSTokenIDs: Buffer<Int>
+}
+
+construct CompilerBConditionalFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let firstConditionTokenIDs: Buffer<Int>
+    let afterLastConditionTokenIDs: Buffer<Int>
+    let bodySyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBGraphEffectFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let firstArgumentTokenIDs: Buffer<Int>
+    let afterLastArgumentTokenIDs: Buffer<Int>
+}
+
+construct CompilerBMemberCompositionFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let firstTargetTokenIDs: Buffer<Int>
+    let afterLastTargetTokenIDs: Buffer<Int>
+    let sourceIdentityTokenIDs: Buffer<Int>
+}
+
+construct CompilerBExecutionFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let expressionSyntaxIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
+construct CompilerBProcessGraph {
+    let processes: CompilerBProcessFacetStore
+    let expressions: CompilerBExpressionFacetStore
+    let calls: CompilerBCallExpressionFacetStore
+    let callees: CompilerBCallCalleeSegmentStore
+    let arguments: CompilerBCallArgumentFacetStore
+    let projections: CompilerBProjectionSegmentStore
+    let locals: CompilerBLocalBindingFacetStore
+    let noValueFallbacks: CompilerBNoValueFallbackFacetStore
+    let conditionals: CompilerBConditionalFacetStore
+    let graphEffects: CompilerBGraphEffectFacetStore
+    let memberCompositions: CompilerBMemberCompositionFacetStore
+    let executions: CompilerBExecutionFacetStore
+}
+
+construct CompilerBMacroSignatureFacetStore {
+    let macroSyntaxIDs: Buffer<Int>
+    let targetTypeTokenIDs: Buffer<Int>
+    let resultTypeTokenIDs: Buffer<Int>
+    let parameterMacroSyntaxIDs: Buffer<Int>
+    let parameterIdentityTokenIDs: Buffer<Int>
+    let parameterTypeTokenIDs: Buffer<Int>
+    let parameterOrdinals: Buffer<Int>
+}
+
+construct CompilerBMemberFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let kindCodes: Buffer<Int>
+    let keywordTokenIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let typeTokenIDs: Buffer<Int>
+    let firstInitializerTokenIDs: Buffer<Int>
+    let afterLastInitializerTokenIDs: Buffer<Int>
+    let initializerKindCodes: Buffer<Int>
+    let initializerValues: Buffer<Int>
+}
+
+enum CompilerBScalarKind {
+    case none
+    case integer
+    case boolean
+}
+
+enum CompilerBExpressionKind {
+    case unknown
+    case integer
+    case boolean
+    case projection
+    case call
+    case string
+    case noValueFallback
+}
+
+construct CompilerBSyntaxSummary {
+    let rendered: String
+    let valid: Bool
+    let diagnostic: String
+}
+
+construct CompilerBSyntaxRevision {
+    let source: String
+    let tokens: CompilerBRetainedTokenStore
+    let nodes: SyntaxNodeStore
+    let functionDeclarations: CompilerBDeclarationFacetStore
+    let constructDeclarations: CompilerBDeclarationFacetStore
+    let enumDeclarations: CompilerBDeclarationFacetStore
+    let macroDeclarations: CompilerBDeclarationFacetStore
+    let blocks: CompilerBBlockFacetStore
+    let macroApplications: CompilerBMacroApplicationStore
+    let functionSignatures: CompilerBFunctionSignatureFacetStore
+    let returns: CompilerBReturnFacetStore
+    let process: CompilerBProcessGraph
+    let macroSignatures: CompilerBMacroSignatureFacetStore
+    let members: CompilerBMemberFacetStore
+    let valid: Bool
+    let diagnostic: String
+}
+
+enum CompilerBSyntaxRevisionOperation {
+    case difference
+}
+
+enum CompilerBSyntaxDeltaKind {
+    case added
+    case removed
+    case changed
+}
+
+enum CompilerBGraphRevision {
+    case previous
+    case current
+}
+
+construct CompilerBSyntaxDeltaSignal {
+    let change: CompilerBSyntaxDeltaKind
+    let revision: CompilerBGraphRevision
+    let identity: SyntaxNodeID
+}
+
+construct CompilerBFunctionDeclarationQuery {
+    let revision: CompilerBGraphRevision
+    let identity: SyntaxNodeID
+}
+
+construct CompilerBConstructDeclarationQuery {
+    let revision: CompilerBGraphRevision
+    let identity: SyntaxNodeID
+}
+
+construct CompilerBMacroDeclarationQuery {
+    let identity: SyntaxNodeID
+}
+
+construct CompilerBMemberQuery {
+    let identity: SyntaxNodeID
+}
+
+construct CompilerBDeclarationQueryResult {
+    let found: Bool
+    let name: String
+    let body: SyntaxNodeID
+}
+
+construct CompilerBMemberQueryResult {
+    let found: Bool
+    let owner: SyntaxNodeID
+    let isLet: Bool
+    let keyword: TokenID
+    let name: String
+    let type: TokenID
+    let typeName: String
+    let initializer: TokenSpan
+    let initializerKind: CompilerBScalarKind
+    let initializerInteger: Int
+    let initializerBoolean: Bool
+}
+
+construct CompilerBFunctionCardinalityQueryResult {
+    let found: Bool
+    let input: TokenID
+    let output: TokenID
+}
+
+construct CompilerBMacroValidationResult {
+    let valid: Bool
+    let diagnostic: String
+}
+
+
+construct CompilerBSyntaxDeltaStore {
+    let kinds: Buffer<Int>
+    let revisions: Buffer<Int>
+    let identities: Buffer<Int>
+}
+
+construct CompilerBSyntaxDelta {
+    let changes: CompilerBSyntaxDeltaStore
+    let addedCount: Int
+    let removedCount: Int
+    let changedCount: Int
+    let valid: Bool
+    let diagnostic: String
+}

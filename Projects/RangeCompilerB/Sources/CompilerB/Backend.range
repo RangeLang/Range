@@ -1,0 +1,321 @@
+construct CompilerBLLVMModule {
+    let text: String
+    let functionCount: Int
+    let valid: Bool
+    let diagnostic: String
+}
+
+function compilerBReturnFacetCountForOwner(
+    returns: CompilerBReturnFacetStore,
+    ownerSyntaxID: Int
+): Int {
+    state row: Int(0)
+    state count: Int(0)
+    while row < returns.syntaxIDs.count {
+        if returns.ownerSyntaxIDs.element(index: row) == ownerSyntaxID {
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBReturnFacetRowForOwner(
+    returns: CompilerBReturnFacetStore,
+    ownerSyntaxID: Int
+): Int {
+    state row: Int(0)
+    while row < returns.syntaxIDs.count {
+        if returns.ownerSyntaxIDs.element(index: row) == ownerSyntaxID { return row }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerBFunctionIdentityIsDuplicate(
+    revision: CompilerBSyntaxRevision,
+    declarationRow: Int
+): Bool {
+    let identity: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(
+            value: revision.functionDeclarations.identityTokenIDs.element(index: declarationRow)
+        )
+    ))
+    state previousRow: Int(0)
+    while previousRow < declarationRow {
+        let previousIdentity: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(
+                value: revision.functionDeclarations.identityTokenIDs.element(index: previousRow)
+            )
+        ))
+        if compilerBTokenBytesEqual(
+            source: revision.source,
+            left: previousIdentity,
+            right: identity
+        ) { return true }
+        previousRow: previousRow + 1
+    }
+    return false
+}
+
+function compilerBEmitLLVM(source: String): CompilerBLLVMModule {
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: source))
+    let productCapacity: Int(revision.tokens.kinds.count)
+    let products: CompilerBMacroProductStore(compilerBMacroProductStoreCreate(
+        capacity: productCapacity
+    ))
+    state diagnostic: String(revision.diagnostic)
+    if revision.valid { diagnostic: "" }
+    state emissionCount: Int(0)
+    state executionRow: Int(0)
+    while executionRow < revision.macroApplications.syntaxIDs.count && diagnostic == "" {
+        let targetSyntaxID: Int(revision.macroApplications.targetSyntaxIDs.element(
+            index: executionRow
+        ))
+        state productRow: Int(0 - 1)
+        if compilerBFacetRowForSyntaxID(
+            syntaxIDs: revision.process.locals.syntaxIDs,
+            syntaxID: targetSyntaxID
+        ) >= 0 {
+            productRow: compilerBMacroProductStoreAppend(
+                store: products,
+                status: 0,
+                applicationSyntaxID: revision.macroApplications.syntaxIDs.element(
+                    index: executionRow
+                ),
+                targetSyntaxID: targetSyntaxID,
+                targetIdentityTokenID: revision.macroApplications.targetIdentityTokenIDs.element(
+                    index: executionRow
+                ),
+                bitCount: 0,
+                signed: false,
+                hasValue: false,
+                value: 0
+            )
+            if productRow >= 0 {
+                products.emittedValues.update(element: 0, index: productRow)
+            }
+        } else {
+            productRow: compilerBExecuteMacroApplicationInto(
+                revision: revision,
+                products: products,
+                applicationRow: executionRow,
+                hasApplicationValue: false,
+                applicationValue: 0
+            )
+        }
+        if productRow < 0 {
+            diagnostic: "unable to retain macro execution product"
+        } else if products.statuses.element(index: productRow) != 0 {
+            diagnostic: compilerBMacroProductStoreDiagnostic(store: products, row: productRow)
+        } else if products.emittedValues.element(index: productRow) == 1 {
+            emissionCount: emissionCount + 1
+        }
+        executionRow: executionRow + 1
+    }
+    let functionCount: Int(revision.functionDeclarations.syntaxIDs.count)
+    if diagnostic == "" && functionCount == 0 {
+        diagnostic: "no function declaration"
+    }
+
+    state output: String("")
+    if diagnostic == "" {
+        output.append(text: "; range-b canonical-functions=\(functionCount) macro-applications=\(revision.macroApplications.syntaxIDs.count) macro-emissions=\(emissionCount)\n")
+    }
+
+    state macroRow: Int(0)
+    while macroRow < revision.macroApplications.syntaxIDs.count && diagnostic == "" {
+        let macroIdentity: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: revision.macroApplications.identityTokenIDs.element(index: macroRow))
+        ))
+        output.append(text: "; range-b macro-application identity=\(revision.macroApplications.syntaxIDs.element(index: macroRow)) declaration=\(revision.macroApplications.macroDeclarationSyntaxIDs.element(index: macroRow)) name=\(revision.source.substring(start: macroIdentity.start, end: macroIdentity.end)) target=\(revision.macroApplications.targetSyntaxIDs.element(index: macroRow)) ordinal=\(revision.macroApplications.ordinals.element(index: macroRow))\n")
+        if products.emittedValues.element(index: macroRow) == 1 {
+            output.append(text: "; range-b macro-execution application=\(products.applicationSyntaxIDs.element(index: macroRow)) target=\(products.targetSyntaxIDs.element(index: macroRow)) product=LLVM\n")
+            output.append(text: "\(compilerBMacroProductStoreLLVM(revision: revision, store: products, row: macroRow))\n")
+        }
+        macroRow: macroRow + 1
+    }
+    if diagnostic == "" && emissionCount > 0 { output.append(text: "\n") }
+
+    state firstFunctionName: String("")
+    state firstFunctionTypeName: String("")
+    state firstFunctionBitCount: Int(0)
+    state firstFunctionSigned: Bool(false)
+    state declarationRow: Int(0)
+    while declarationRow < functionCount && diagnostic == "" {
+        let functionSyntaxID: Int(
+            revision.functionDeclarations.syntaxIDs.element(index: declarationRow)
+        )
+        if compilerBFunctionIdentityIsDuplicate(
+            revision: revision,
+            declarationRow: declarationRow
+        ) {
+            diagnostic: "duplicate function identity"
+        }
+
+        let signatureRow: Int(compilerBFacetRowForSyntaxID(
+            syntaxIDs: revision.functionSignatures.functionSyntaxIDs,
+            syntaxID: functionSyntaxID
+        ))
+        if diagnostic == "" && signatureRow < 0 {
+            diagnostic: "function is missing a retained signature"
+        }
+
+        state returnTypeTokenID: Int(0 - 1)
+        state applicationRow: Int(0 - 1)
+        state returnTypeName: String("")
+        if diagnostic == "" {
+            returnTypeTokenID: revision.functionSignatures.returnTypeTokenIDs.element(
+                index: signatureRow
+            )
+            if returnTypeTokenID < 0 {
+                diagnostic: "function is missing an emitted return type"
+            } else {
+                let returnTypeToken: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: returnTypeTokenID)
+                ))
+                applicationRow: compilerBMacroProductApplicationRowForTypeToken(
+                    revision: revision,
+                    products: products,
+                    typeToken: returnTypeToken
+                )
+                if applicationRow < 0 {
+                    diagnostic: "function return type has no macro emission"
+                } else {
+                    returnTypeName: revision.source.substring(
+                        start: returnTypeToken.start,
+                        end: returnTypeToken.end
+                    )
+                }
+            }
+        }
+
+        if diagnostic == "" && compilerBReturnFacetCountForOwner(
+            returns: revision.returns,
+            ownerSyntaxID: functionSyntaxID
+        ) != 1 {
+            diagnostic: "first backend slice requires exactly one return"
+        }
+
+        state returnRow: Int(0 - 1)
+        state valueTokenID: Int(0 - 1)
+        state literalValue: Int(0)
+        state literalIdentity: Int(0 - 1)
+        if diagnostic == "" {
+            returnRow: compilerBReturnFacetRowForOwner(
+                returns: revision.returns,
+                ownerSyntaxID: functionSyntaxID
+            )
+            valueTokenID: revision.returns.firstValueTokenIDs.element(index: returnRow)
+            if revision.returns.valueKindCodes.element(index: returnRow)
+                != compilerBParserScalarKindIntegerCode() {
+                diagnostic: "first backend slice requires return <integer> as the complete body"
+            } else {
+                literalValue: revision.returns.integerValues.element(index: returnRow)
+                literalIdentity: compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: valueTokenID)
+                ).start
+            }
+        }
+
+        if diagnostic == "" {
+            let bodySyntaxID: Int(
+                revision.functionDeclarations.bodySyntaxIDs.element(index: declarationRow)
+            )
+            let bodyNodeRow: Int(compilerBSyntaxNodeRowForID(
+                store: revision.nodes,
+                syntaxID: bodySyntaxID
+            ))
+            let returnNodeRow: Int(compilerBSyntaxNodeRowForID(
+                store: revision.nodes,
+                syntaxID: revision.returns.syntaxIDs.element(index: returnRow)
+            ))
+            if bodyNodeRow < 0 || returnNodeRow < 0 {
+                diagnostic: "function body relationships are incomplete"
+            } else if revision.nodes.firstTokenIDs.element(index: returnNodeRow)
+                    != revision.nodes.firstTokenIDs.element(index: bodyNodeRow) + 1
+                || revision.returns.afterLastValueTokenIDs.element(index: returnRow)
+                    != revision.nodes.afterLastTokenIDs.element(index: bodyNodeRow) - 1 {
+                diagnostic: "first backend slice requires return <integer> as the complete body"
+            }
+        }
+
+        state valueProductRow: Int(0 - 1)
+        if diagnostic == "" {
+            valueProductRow: compilerBExecuteMacroApplicationInto(
+                revision: revision,
+                products: products,
+                applicationRow: applicationRow,
+                hasApplicationValue: true,
+                applicationValue: literalValue
+            )
+            if valueProductRow < 0 {
+                diagnostic: "unable to retain macro value product"
+            } else {
+                let valueStatus: Int(products.statuses.element(index: valueProductRow))
+                if valueStatus != 0 {
+                    diagnostic: compilerBMacroProductStoreDiagnostic(
+                        store: products,
+                        row: valueProductRow
+                    )
+                } else if products.emittedValues.element(index: valueProductRow) == 0 {
+                    diagnostic: "macro did not emit a function return value"
+                }
+            }
+        }
+
+        if diagnostic == "" {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.functionDeclarations.identityTokenIDs.element(
+                    index: declarationRow
+                ))
+            ))
+            let name: String(
+                revision.source.substring(start: identity.start, end: identity.end)
+            )
+            output.append(text: "; range-b application-value identity=\(literalIdentity) token=\(valueTokenID) value=\(literalValue) macro=\(products.applicationSyntaxIDs.element(index: valueProductRow))\n")
+            output.append(text: "define %Range.\(returnTypeName) @\(name)() {\nentry:\n  ret \(compilerBMacroProductStoreLLVM(revision: revision, store: products, row: valueProductRow))\n}\n\n")
+            if declarationRow == 0 {
+                firstFunctionName: name
+                firstFunctionTypeName: returnTypeName
+                firstFunctionBitCount: products.bitCounts.element(index: valueProductRow)
+                firstFunctionSigned: products.signedValues.element(index: valueProductRow) == 1
+            }
+        }
+        declarationRow: declarationRow + 1
+    }
+
+    if diagnostic == "" {
+        let entryLLVMType: String("i\(firstFunctionBitCount)")
+        output.append(text: "define i32 @main() {\nentry:\n")
+        output.append(text: "  %aggregate = call %Range.\(firstFunctionTypeName) @\(firstFunctionName)()\n")
+        output.append(text: "  %scalar = extractvalue %Range.\(firstFunctionTypeName) %aggregate, 0\n")
+        if firstFunctionBitCount < 32 {
+            if firstFunctionSigned {
+                output.append(text: "  %result = sext \(entryLLVMType) %scalar to i32\n")
+            } else {
+                output.append(text: "  %result = zext \(entryLLVMType) %scalar to i32\n")
+            }
+        } else {
+            output.append(text: "  %result = add \(entryLLVMType) %scalar, 0\n")
+        }
+        output.append(text: "  ret i32 %result\n}\n")
+    }
+
+    let valid: Bool(diagnostic == "")
+    compilerBMacroProductStoreDestroy(store: products)
+    compilerBSyntaxRevisionDestroy(revision: revision)
+    if !valid { output: "" }
+    return CompilerBLLVMModule(
+        text: output,
+        functionCount: functionCount,
+        valid: valid,
+        diagnostic: diagnostic
+    )
+}

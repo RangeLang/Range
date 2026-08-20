@@ -1,0 +1,4 @@
+macro print(): Member {}
+
+@print
+construct NotAMember {}

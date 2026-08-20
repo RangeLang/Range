@@ -8,6 +8,256 @@
 Priority and dependency order live in [MILESTONES.md](MILESTONES.md). This file
 owns the actionable checkboxes for the active and deliberately deferred work.
 
+## Active compiler work
+
+- [ ] Grow Compiler B as a greenfield compiler through bounded runnable slices;
+  follow `Development/CompilerForkArchitecture.md`.
+  - [x] Freeze Compiler A as the accepted bootstrap and reference
+    implementation. A builds B but does not supply syntax or later products for
+    B to consume.
+  - [x] Reduce `Projects/RangeCompilerB/` to its B-owned entry, lexer/parser,
+    minimal Core, selected low-level dependencies, and runtime; remove the
+    copied A compiler tree and unused copied Core/Foundation sources.
+  - [x] Remove explicit generic binders and generic type applications from
+    Compiler B's accepted language model.
+    - Element identity, cardinality, and input/output correspondence come from
+      graph relationships instead of authored `<Element>` parameters.
+    - [ ] Replace the remaining accepted-A `Buffer<Int>` and `Buffer<Byte>`
+      bootstrap storage spellings with B-owned graph-native cardinality storage
+      before the complete Compiler B source set becomes a self-source fixture.
+  - [x] Establish `scripts/range check-compiler-b` as the focused runnable B
+    gate.
+    - It proves file and directory routes, a
+      write/append/read/copy/move/remove round trip, lexer output, and the
+      current function/construct/Block syntax rows.
+    - It does not prove B self-compilation, candidate/reproduction identity,
+      the complete language, or bootstrap promotion.
+  - [ ] Complete the self-source lexical and syntax checkpoint.
+    - The coarse parser currently reports function and Block rows for B's
+      `Main.range` and `Lexer.range`; this is baseline observation only.
+    - [x] Add typed `TokenID` and retained token storage with kind and exact
+      source range; rendered token text must not be the parser's input.
+    - [ ] Make lexing string- and comment-aware, including escaped string
+      delimiters, so braces and declaration-like text inside lexical regions
+      cannot become syntax.
+      - [x] Retain quoted strings, including escaped delimiters, as single
+        tokens so macro query labels, diagnostic messages, and interpolated
+        LLVM templates cannot leak braces or declaration words into parsing.
+        Comment regions remain pending.
+    - [x] Make parsing consume retained token identities instead of rescanning
+      raw source for declaration keywords and balanced braces.
+    - [ ] Extend `scripts/range check-compiler-b` to parse B's own `Main.range`
+      and `Lexer.range` and assert their exact expected top-level declarations
+      and Block relationships.
+  - [x] Add stable `SyntaxNodeID` values before adding more syntax marker or
+    relationship columns; buffer rows remain physical locations, not semantic
+    identity.
+    - [x] Establish the first typed `TokenID` -> `SyntaxNodeID` backend path for
+      no-parameter functions whose complete body is `return <integer>`.
+      Declaration discovery deliberately runs twice through one canonical
+      identity index, but emits exactly one LLVM function definition.
+    - [x] Add B's first literal scalar data unit: `Byte` is one unsigned
+      eight-bit value, `String` owns `Buffer<Byte>`, and integer lowering
+      carries byte count explicitly (`Byte = 1`, current `Int = 4`) through
+      indexing and IR. The focused runtime-free products prove `Byte` lowers
+      to LLVM `i8`, `Int` lowers to LLVM `i32`, and both execute with exit 42.
+    - [x] Replace Byte's bootstrap `Int<.unsigned, 8>` field and backend
+      type-name matching with a resolved `@integer` relationship, canonical
+      `let bits: Int(...)` / `let signed: Bool(...)` Member facets, and a
+      parser-materialized integer-literal identity -> token -> value relation.
+      Runtime-free Byte and Int products derive nominal LLVM aggregate types
+      and values from graph queries; invalid widths and overflowing literals
+      reject before emission without a parallel representation store.
+    - [x] Execute the Range-authored `@integer` macro body over the stable graph
+      and make its emitted LLVM products the backend input.
+      - Function and macro declarations share one canonical process/expression
+        graph. Macro execution reads application, target, and optional value
+        facts through independent `LLVM.type(...)` and `LLVM.value(...)`
+        executions, validates each product, and appends it to a generic product
+        store. The backend selects products by target identity and never by the
+        `integer` macro name; returned LLVM aggregates are no longer an
+        execution path.
+    - [ ] Replace the bootstrap-bounded `Buffer<Int>` scalar value column in
+      the canonical Return facet with a canonical arbitrary-precision value
+      identity. Token and literal identities are already separate; this is
+      required before integer literals can exceed the accepted compiler's Int.
+    - [x] Replace the disposable/backend lexer split with one retained token
+      store and concrete `CompilerBToken { id, kind, start, end }` values.
+      Identity equality compares `TokenID`; lexical equality compares source
+      bytes over retained ranges without allocating token text.
+    - [x] Move stable source-derived identities into the general syntax store;
+      Block parent relationships now reference declaration `SyntaxNodeID`
+      values rather than physical rows.
+    - [x] Reduce the common syntax node to `SyntaxNodeID + TokenSpan`; retain
+      the token store for the lifetime of each syntax revision so byte ranges,
+      names, and rendered locations are derived from token identities instead
+      of copied into every node.
+    - [x] Materialize the first separate Core-shaped facets for
+      `Function.Declaration`, `Construct.Declaration`, and `Block`. Function
+      and Construct queries resolve identity-token and body-syntax
+      relationships through individual typed functions; no central syntax-kind
+      enum owns those nominal types.
+    - [x] Retain independently owned previous and current syntax revisions and
+      apply a typed difference operation that produces added, removed, and
+      changed signals. Each signal carries only change kind, revision, and
+      syntax identity. Separate `Function.Declaration` and
+      `Construct.Declaration` query pipelines resolve nominal facts such as
+      identity and body; query results and source ranges are not copied into
+      the signal. Declaration matching uses its current semantic key (nominal
+      facet plus identity token), so source-offset shifts do not turn an
+      existing declaration into remove-plus-add.
+    - [ ] Replace the defunctionalized syntax revision operation with a
+      first-class `(previous, current) -> product` transform after indirect
+      function values have their own focused accepted-compiler proof.
+      - The accepted bootstrap currently proves individual owned revision
+        values, but this slice deliberately avoids nesting two Buffer-owning
+        revisions inside another owned aggregate.
+    - [ ] Collect the remainder of each rich Core syntax representation into
+      facets and relationships: parameters, rich type references,
+      members, and complete Block contents.
+      - [x] Make the parser the sole structural token interpreter for the first
+        lowering slice. One syntax revision now owns ordered declaration macro
+        applications, function-signature return-type tokens, and Return
+        relationships; representation execution and backend indexing consume
+        those facets without rescanning tokens for `function` or `return`.
+      - [x] Remove the temporary V3 `{ environment in ... }`/`inspect` model.
+        - Macro declarations and target/result signatures remain canonical.
+          Empty marker applications are graph relationships, while executable
+          macro bodies will receive compile-time context implicitly through the
+          shared typed body/process pipeline. B has no special self-returning
+          macro interpreter.
+      - [x] Execute the first real macro body through a shared typed process
+        representation without an authored environment binder.
+        - The bounded first process retains Return, call, labeled argument, and
+          environment-projection expressions once for both functions and
+          macros. `@integer` proves target/member/value reads and generic LLVM
+          product emission; locals, branches, and additional operations remain
+          later process slices.
+      - [ ] Complete independent macro execution products for representation
+        functions.
+        - [x] Retain ordered freestanding qualified calls such as
+          `LLVM.type(...)` and `LLVM.value(...)` as separate process executions;
+          `@integer` and `@many(count:)` no longer package those executions in
+          one returned `LLVM` aggregate.
+        - [ ] Bind typed macro arguments and Member element-type queries from
+          canonical graph facets, then compose `@many(count:)` into enclosing
+          LLVM aggregate layouts and many-valued application emission.
+          - [x] Retain required labeled macro parameters and application
+            arguments as canonical signature/application facets; validate
+            missing, duplicate, unknown, and mistyped `Int`, `Bool`, and
+            `String` bindings, and expose bound scalar values to LLVM source
+            template interpolation without macro-name dispatch.
+      - [x] Retain the first annotation-driven local process graph from the
+        canonical `Core/Macros/Integer.range` source.
+        - Two `@diagnostic` local bindings retain no-value RHS relationships
+          separately from one-value and many-value cardinality, resolve by
+          application/declaration/target identity, and expose String RHS facts.
+          The `diagnostic` macro retains two `if`
+          operations and two graph diagnostic effects without lowering or
+          executing them yet. A bootstrap-only empty `integer` signature lets
+          frozen Compiler A build B without making it the V3 macro authority.
+        - [x] Lower the canonical macro's independent `LLVM.type(...)` and
+          `LLVM.value(...)` executions through graph identity. `\(bits)`
+          resolves the local query to one Member and renders its scalar
+          initializer, while target identity and application value projections
+          transfer their retained facts into the template. Runtime-free Int
+          and Byte products now use this canonical Core macro, link, and exit
+          42; local Void diagnostic applications remain non-emitting graph
+          effects.
+      - [x] Retain `let` and `state` as canonical Member facets and permit
+        ordered macro applications to target their shared syntax identities.
+        - Members retain owner, keyword, identifier, type, and initializer
+          token span. Empty marker `macro print(): Member {}` resolves both
+          owned state and top-level let relationships; applying it to a Construct
+          rejects at the typed target boundary without executing a macro body.
+      - [x] Resolve macro applications once as canonical graph relationships.
+        - Every resolved application stores its exact Macro declaration syntax
+          identity alongside application and target identities. Relationship
+          queries read those columns directly without an attachment registry,
+          rescanning source, re-resolving names, or executing marker macros.
+        - Empty `macro extern(): Function {}` applications relate directly to
+          two Function targets without body execution. Explicit
+          `#environment: extern()` registration is not part of this
+          architecture; ordinary macro graph queries remain available.
+      - [x] Collect collection modifiers as canonical macro relationships and
+        retain their cardinality transforms and attached call roots.
+        - `@collectionModifier` resolves to the exact marked Function identity;
+          `filter(named:)` retains `@many -> @any` as its input/output
+          cardinality mapping rather than a generic parameter or name-keyed
+          compiler rule.
+        - `map(transform:)` uses the same marker and retains `@many -> @many`;
+          element transformation is expressed by its Function input while the
+          graph carries cardinality and predecessor correspondence.
+        - Cardinalities remain source-token identities rather than a closed
+          compiler enum; focused fixtures also retain `@many -> @some` and
+          `@some -> @many` mappings through the same marker query.
+        - Qualified calls retain the complete predecessor token path, so
+          `Something.something.filter(...)` exposes `Something.something` as
+          the input root and `#environment.target.root()` exposes the same
+          relationship inside the modifier process.
+        - [x] Author direct modifier provision in the existing `many` macro.
+          - `many` queries `#environment.graph.functions` for every
+            `@collectionModifier`, maps the canonical Function syntax values,
+            and splices each `#modifier` directly into an extension of the
+            target identity. There is no attachment helper or copied modifier
+            declaration; exact graph relationships are intended to deduplicate.
+          - Compiler B retains the graph query as a canonical local call and
+            the direct target/source splice as a general member-composition
+            facet. Executing the collection closure into one deduplicated
+            relationship per selected Function remains pending.
+        - [ ] Execute the modifier process over the selected graph collection
+          and materialize its bounded `@any` output; this checkpoint proves
+          collection and query shape, not `while`/`append` evaluation.
+      - [ ] Remove the A-facing `ExternRegistration` bootstrap adapter once B
+        compiles its own Core extern declarations. Until then accepted Compiler
+        A requires the nominal macro result to register the foreign ABI; B's
+        own resolved macro application relationships are the V3 model.
+      - [x] Lower the first scalar Function products directly from graph queries.
+        - Removed the copied Function index, identical IR function store,
+          duplicate discovery pass, and integer-literal registry. LLVM emission
+          now queries Function, signature, Block, Return, represented type, and
+          literal facts from the canonical revision per declaration.
+      - [ ] Lower the first `@print` value event through Range-owned formatting
+        and buffering to one true libc/OS byte-write extern; do not move
+        inspection or timeline policy into the foreign shim.
+    - [ ] Give macro expansion products stable syntax identities before
+      broadening body syntax or relationships.
+  - [ ] Route calls through `FileManager` receivers once a focused fixture
+    proves construct member calls with `String` parameters and returns across
+    the accepted Compiler A ABI/discovery boundary; until then B calls the same
+    Range-owned `fileManager...` implementations directly.
+  - [ ] Remove `Runtime/RangeCompilerHost.c` from Compiler B's link; Range must
+    own ordinary runtime behavior and generated LLVM must call true libc/OS
+    symbols directly.
+    - [x] Prove direct authored `opendir`, `readdir`, and `closedir` declarations
+      and remove the C-owned directory wrapper, copied path, recursive policy,
+      and close operation. This is only a partial boundary proof while the host
+      file remains linked.
+    - [ ] Replace A-generated calls to the inherited String, RawBuffer,
+      construct-storage, argv, process, file, and transient-allocation runtime
+      ABI with Range-owned/native LLVM definitions before deleting the host.
+    - [x] Emit, link, and execute the first B-owned runtime-free LLVM product:
+      `function answer(): Int { return 42 }` becomes nominal `%Range.Int`
+      type/value LLVM plus a native `main`, links without any runtime source,
+      and exits `42`.
+    - Do not replace C with a hand-authored `.ll` runtime; that changes the
+      frontend spelling without making Range the implementation authority.
+  - [ ] Add resolution, CFG, ownership, MIR, and emission only as later B-owned
+    products derived from retained syntax identities, each with its own
+    runnable focused proof.
+  - [ ] Attempt B self-compilation only after those required products exist. At
+    that milestone, require byte-identical candidate/reproduction LLVM and
+    executables before describing B as self-hosting.
+  - [ ] Use the Compiler A escape valve only for a concrete focused blocker,
+    with no architecture-preserving B solution, and only after explicit
+    maintainer approval of the general A change and bootstrap promotion.
+
+## Deferred and historical backlog
+
+Compiler A implementation tasks below are frozen reference work, not active
+compiler direction. Reactivate one only through the documented Compiler A
+escape valve. RangeView remains deferred unless it is explicitly reintroduced.
+
 - [ ] Finish the RangeView app-to-window entry hook.
   - [x] Make `@app` emit the single top-level `@main` block through
     `#environment`, with root-graph duplicate-main rejection.
@@ -186,79 +436,6 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     `compilerTypedSyntaxCFGSnapshot` proves three syntax-identified blocks,
     true/false/fallthrough edges, six scheduled operations, and
     `legacyMatch=true`; lowering authority remains on the legacy arena.
-  - [ ] Replace `CompilerBodyArena` through Compiler B rather than migrating
-    phases in place inside Compiler A; follow
-    `Development/CompilerForkArchitecture.md`. Compiler A remains the frozen
-    `Source -> typed syntax graph` producer while the Range-authored Compiler B
-    owns every later product.
-    - [x] Inventory the arena's copied syntax, resolution, CFG, ownership, MIR,
-      and diagnostic state; identify all twelve direct body-parse call sites and
-      assign every field group to its graph-native product owner.
-    - [x] Remove the duplicate `CompilerFunctionBody` wrapper and use the
-      existing function or entry declaration syntax identity plus its `body`
-      edge as the source fact. Keep function-instance, receiver, and type-key
-      specialization context separate from that source identity.
-      - All twelve former parse callers now enter explicit declaration,
-        function-instance, entry, macro, or closure legacy adapters; every
-        `CompilerBodyArena` constructor and the sole remaining body parse call
-        are behind that boundary.
-      - Early typed declaration capture now always records the declaration's
-        Block root while full statement capture remains an explicit policy. A
-        development candidate passed the complete binding-reference and value
-        ownership suites, macro linking/execution/integration, generated
-        functions, Registrable, committed expansion, macro arrays, exact typed
-        body replay, and native smoke. The broader audit then reached the
-        checkout's existing direct-`@many` unresolved-macro boundary. No
-        reproduction or fixed point ran.
-      - Function derivation now accepts only the `Function.Declaration` syntax
-        identity, resolves its disposable function-table row internally, and
-        fails closed when that identity has no function facet. Positional row,
-        function-instance, receiver, and type-key context no longer compete
-        with the declaration as source identity.
-    - [x] Freeze the interrupted in-place parser-emission experiment in
-      Compiler A. Compiler A is now the bootstrap producer rather than the
-      active surface for arrays, closures, switches, jumps, or body migration.
-    - [x] Create the complete `RangeCompilerB/` compiler node by copying the
-      authored Project, Core inventory, Core, Foundation, Compiler, and Runtime
-      sources while excluding `Bootstrap/`, `.range/`, and `.build/` products.
-      Compiler B is the sole mutable compiler source tree.
-    - [x] Wire `scripts/range compiler b` and
-      `scripts/range check-compiler-b` to the complete A -> B -> B
-      candidate/reproduction proof. Keep the earlier one-file lexer/fact-matrix
-      work only as `scripts/range check-compiler-b-source-graph`, a component
-      probe rather than the compiler architecture.
-    - [ ] Make the complete Compiler B fork pass its first self-compilation
-      fixed point: accepted A builds B, B builds the identical source revision,
-      and candidate/reproduction LLVM and executables compare byte for byte.
-      - The first complete B run built and linked candidate B from 35
-        inventoried files, with 880 seconds in LLVM emission and 929 seconds
-        total candidate production. Source loading, role ordering, canonical
-        Core, binding, ownership, macro execution/linking, generated functions,
-        Registrable, committed expansion, macro arrays, body replay, and native
-        smoke passed. The candidate then reached the checkout's existing direct
-        `@many` boundary and rejected `UUIDManyDirectLayout.range` with exit 65
-        and `diagnosticKind=unresolvedMacro`; reproduction did not run.
-    - [ ] Move project and file gathering from shell source bundles into
-      Compiler B's Range-authored driver. A selects and builds B but never
-      discovers or interprets B's product inputs.
-      - [x] Start the standalone B entry slice: `Sources/CompilerB/Main.range`
-        accepts one route and calls the B-owned `listFiles` extern to print
-        recursive regular files. Full project-run proof is pending the
-        repository's existing bootstrap runtime-hash mismatch.
-      - [x] Add B-owned minimal Core declarations and a first lexer; a project
-        route now selects its first `.range` file and prints 30 lexer tokens.
-    - [ ] Replace B's inherited source, declaration, application, Block, and
-      relationship tables with typed graph values carrying stable identities.
-    - [ ] Derive Compiler B Resolution, CFG, Ownership, and MIR as whole Range
-      products from those identities, deleting reparsing and `CompilerBodyArena`
-      adapters as each vertical replacement passes self-compilation.
-    - [ ] Measure complete B self-compilation and individual product phases;
-      report wall time, maximum RSS, graph counts, and per-phase totals.
-    - [ ] After the B fixed point, compile and run RangeView with the exact
-      reproduced B artifact as the first independent product gate.
-    - [ ] Delete Compiler A's body reparsing and `CompilerBodyArena` only after
-      Compiler B owns the required product and the accepted authority is moved
-      at a deliberate fixed-point checkpoint.
     - [x] Research the Bend/HVM lineage, including Bend2's move from HVM2's
       ultra-eager reducer to HVM4's optimal lazy model, and record the
       transferable mechanisms, evidence boundaries, and limitations in

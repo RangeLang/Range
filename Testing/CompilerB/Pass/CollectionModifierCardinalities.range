@@ -1,0 +1,7 @@
+macro collectionModifier(): Function {}
+
+@collectionModifier
+function compact(): @many -> @some {}
+
+@collectionModifier
+function expand(): @some -> @many {}

@@ -1,0 +1,13 @@
+macro diagnostic(): Member -> Void {
+  if  #environment.target.value.RHS != String {
+    #environment.graph.diagnostic(
+        "Diagnostic RHS needs to be of type String"
+    )
+
+  }
+    if !#environment.target.value.isTarget {
+        #environment.graph.diagnostic(
+            #environment.target.value.RHS
+        )
+    }
+}

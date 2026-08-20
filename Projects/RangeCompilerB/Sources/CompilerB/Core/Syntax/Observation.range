@@ -1,0 +1,56 @@
+function compilerBRenderSyntaxSignalObservation(
+    previous: CompilerBSyntaxRevision,
+    current: CompilerBSyntaxRevision,
+    signal: CompilerBSyntaxDeltaSignal
+): String {
+    state output: String("syntaxSignal\tchange=\(compilerBSyntaxDeltaKindName(kind: signal.change))\trevision=\(compilerBGraphRevisionName(revision: signal.revision))\tidentity=\(signal.identity.value)\n")
+    let functionQuery: CompilerBFunctionDeclarationQuery(
+        compilerBFunctionDeclarationQueryForSignal(signal: signal)
+    )
+    let functionResult: CompilerBDeclarationQueryResult(
+        compilerBFunctionDeclarationQueryExecute(
+            previous: previous,
+            current: current,
+            query: functionQuery
+        )
+    )
+    if functionResult.found {
+        output.append(text: "graphQuery\ttype=Function.Declaration\trevision=\(compilerBGraphRevisionName(revision: functionQuery.revision))\tidentity=\(functionQuery.identity.value)\tfound=true\tname=\(functionResult.name)\tbody=\(functionResult.body.value)\n")
+        return output
+    }
+    let constructQuery: CompilerBConstructDeclarationQuery(
+        compilerBConstructDeclarationQueryForSignal(signal: signal)
+    )
+    let constructResult: CompilerBDeclarationQueryResult(
+        compilerBConstructDeclarationQueryExecute(
+            previous: previous,
+            current: current,
+            query: constructQuery
+        )
+    )
+    if constructResult.found {
+        output.append(text: "graphQuery\ttype=Construct.Declaration\trevision=\(compilerBGraphRevisionName(revision: constructQuery.revision))\tidentity=\(constructQuery.identity.value)\tfound=true\tname=\(constructResult.name)\tbody=\(constructResult.body.value)\n")
+        return output
+    }
+    output.append(text: "graphQuery\trevision=\(compilerBGraphRevisionName(revision: signal.revision))\tidentity=\(signal.identity.value)\tfound=false\n")
+    return output
+}
+
+function compilerBRenderSyntaxDelta(
+    previous: CompilerBSyntaxRevision,
+    current: CompilerBSyntaxRevision,
+    delta: CompilerBSyntaxDelta
+): String {
+    state output: String("")
+    state row: Int(0)
+    while row < delta.changes.kinds.count {
+        output.append(text: compilerBRenderSyntaxSignalObservation(
+            previous: previous,
+            current: current,
+            signal: compilerBSyntaxDeltaSignal(delta: delta, row: row)
+        ))
+        row: row + 1
+    }
+    output.append(text: "syntaxDeltaCount=\(delta.changes.kinds.count)\tadded=\(delta.addedCount)\tremoved=\(delta.removedCount)\tchanged=\(delta.changedCount)\tvalid=\(delta.valid)\tdiagnostic=\(delta.diagnostic)\n")
+    return output
+}

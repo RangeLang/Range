@@ -1,10 +1,4 @@
-@extern
-function listFiles(path: String): String
-
-@extern
-function firstRangeFile(path: String): String
-
-@main {
+function compilerBEntry(): Int {
     let argumentCount: Int(commandLineArgumentCount())
     if argumentCount != 1 {
         print(value: "usage: compiler-b <route>")
@@ -12,9 +6,22 @@ function firstRangeFile(path: String): String
     }
 
     let route: String(commandLineArgument(index: 0))
-    let files: String(listFiles(path: route))
-    let sourcePath: String(firstRangeFile(path: route))
-    let source: String(readFile(path: sourcePath))
-    print(value: "route=\(route)\nsource=\(sourcePath)\n\(files)\n\(compilerBLexSummary(source: source))")
+    if !fileManagerPathExists(path: route) {
+        print(value: "compiler-b: route does not exist: \(route)")
+        return 66
+    }
+    let files: String(fileManagerListFiles(path: route))
+    let sourcePath: String(fileManagerFirstFileWithSuffix(files: files, suffix: ".range"))
+    let source: String(fileManagerReadFile(path: sourcePath))
+
+    let lexed: String(compilerBLex(source: source))
+    print(value: "route=\(route)\nsource=\(sourcePath)\n\(files)\n\(lexed)")
+    let syntax: CompilerBSyntaxSummary(compilerBParse(source: source))
+    print(value: syntax.rendered)
+    print(value: "syntax\tvalid=\(syntax.valid)\tdiagnostic=\(syntax.diagnostic)\n")
     return 0
+}
+
+@main {
+    return compilerBEntry()
 }

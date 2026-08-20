@@ -1,4 +1,0 @@
-@syntax
-construct OptionalTypeReference {
-    let wrapped: TypeReference
-}

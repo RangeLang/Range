@@ -1,3 +1,0 @@
-construct UnicodeScalar {
-    let value: Int
-}

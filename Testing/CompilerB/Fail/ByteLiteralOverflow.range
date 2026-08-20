@@ -1,0 +1,3 @@
+function answer(): Byte {
+    return 256
+}

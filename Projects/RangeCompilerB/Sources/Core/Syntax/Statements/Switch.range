@@ -1,6 +1,0 @@
-@statement
-@syntax(switch $expression $cases)
-construct Switch {
-    let expression: Expression
-    let cases: Array<SwitchCase>
-}

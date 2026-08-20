@@ -1,20 +1,25 @@
 # Compiler body graph migration
 
-## Status: moved to Compiler B
+## Status: historical Compiler A post-mortem
 
 This document preserves the inventory and measurements that exposed Compiler
 A's duplicate body parsing. Its former in-place migration is frozen. We will
 not extend A's `Function.Declaration` capture with arrays, closures, switches,
 jumps, CFG derivation, or additional compatibility carriers.
 
-Compiler A now only compiles the Compiler B sources. Compiler B lives under
-`Sources/Frameworks/RangeCompiler` and owns file loading, lexing, syntax-graph
-construction, Resolution, CFG, Ownership, MIR, and the final product. The arena
-inventory below defines behavior that B must replace; it is not an instruction
-to refactor or dual-run those phases inside A. See
-`Development/CompilerForkArchitecture.md` for the active path.
+Compiler A now only builds runnable Compiler B slices. Compiler B lives under
+`Projects/RangeCompilerB/Sources/CompilerB/` and is being grown from a minimal
+B-owned lexer/parser rather than from copied A phases. The arena inventory below
+records what was learned from A. It is not an active migration sequence and is
+not an instruction to copy, refactor, or dual-run those phases inside B. See
+`Development/CompilerForkArchitecture.md` for the active plan.
 
-## Corrected construction boundary
+Everything below this status section is historical design evidence. Statements
+about a migration, dual runner, or replacement order describe the abandoned
+in-place Compiler A plan unless they are separately adopted by a current B
+checkpoint.
+
+## Historical construction boundary
 
 The typed body tables currently demonstrate the desired vocabulary and CFG
 shape, but their contents are not yet canonical parse products.
@@ -33,17 +38,17 @@ introduces the declaration's Block, body nodes, ordered relationships, slot
 occurrences, and source gaps itself. B does not consume A's serialized
 `CompilerExpression`, `CompilerStatement`, syntax facts, or arena state.
 
-## Decision
+## Durable lesson
 
 `CompilerBodyArena` is not the future function-body representation. The typed
 syntax graph is the authority for body identity, nesting, roles, and source
 locations. Resolution, CFG, ownership, and MIR are independently derived graph
 products attached to that authority.
 
-The arena remains temporarily as a legacy runner so that the graph-native
-pipeline can be checked for exact product equality and measured against the
-same compiler workload. It must not be hydrated from typed syntax as a new
-permanent architecture.
+The arena remains part of frozen Compiler A behavior. Compiler B does not copy
+it as a legacy runner. When B eventually derives equivalent products, this
+inventory may inform focused comparisons, but it does not prescribe B's
+implementation sequence.
 
 ## Why the current boundary is expensive
 
@@ -125,9 +130,9 @@ dependencies, not new parsers. Dense tables remain valid physical indexes when
 they make a query cheap; their rows do not replace the stable syntax identity
 of the fact they index.
 
-## Dual-run comparison
+## Historical dual-run proposal
 
-The migration needs three explicit execution modes at one central
+The abandoned in-place migration proposed three execution modes at one central
 function-body derivation seam:
 
 - `legacy`: run only the arena pipeline. This preserves the current product and
@@ -161,7 +166,9 @@ Local row numbers and allocation order are not semantic equality. Each
 comparison normalizes rows by its stable source, type, function-instance, path,
 or operation identity before comparing values and ordered relationships.
 
-## Migration order
+## Historical migration order
+
+This order is retained as evidence, not as the active Compiler B plan:
 
 1. Use the existing `Function.Declaration` syntax identity and its `body` edge
    as the central runner input. Route all twelve parse callers through it

@@ -8,10 +8,6 @@ function commandLineArgument(index: Int): String
 
 @extern
 @builtin
-function readFile(path: String): String
-
-@extern
-@builtin
 function stringPrint(value: String): Int
 
 construct ProcessPlan {

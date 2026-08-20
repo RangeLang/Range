@@ -1,0 +1,301 @@
+@opaque
+construct FileHandle {}
+
+@opaque
+construct DirectoryHandle {}
+
+@opaque
+construct DirectoryEntry {}
+
+@opaque
+construct NativeCString {}
+
+@extern
+function filePrimitivePathKind(path: String): Int
+
+@extern
+function filePrimitiveOpen(path: String, mode: Int): FileHandle
+
+@extern
+function filePrimitiveHandleIsValid(handle: FileHandle): Int
+
+@extern
+function filePrimitiveRead(handle: FileHandle, byteCount: Int): String
+
+@extern
+function filePrimitiveWrite(handle: FileHandle, text: String): Int
+
+@extern
+function filePrimitiveClose(handle: FileHandle): Int
+
+@extern
+function filePrimitiveRemove(path: String): Int
+
+@extern
+function filePrimitiveMove(source: String, destination: String): Int
+
+@extern
+function rangeStringData(value: String): NativeCString
+
+@extern
+function opendir(path: NativeCString): DirectoryHandle
+
+@extern
+function readdir(directory: DirectoryHandle): DirectoryEntry
+
+@extern
+function closedir(directory: DirectoryHandle): Int
+
+@extern
+function nativeDirectoryHandleIsValid(handle: DirectoryHandle): Int
+
+@extern
+function nativeDirectoryEntryName(entry: DirectoryEntry): String
+
+@extern
+function directoryPrimitiveCreate(path: String): Int
+
+function fileManagerChildPath(path: String, name: String): String {
+    if path.count != 0 && path.byte(index: path.count - 1) == 47 {
+        return "\(path)\(name)"
+    }
+    return "\(path)/\(name)"
+}
+
+function fileManagerPathExists(path: String): Bool {
+    return filePrimitivePathKind(path: path) != 0
+}
+
+function directoryPrimitiveOpen(path: String): DirectoryHandle {
+    return opendir(path: rangeStringData(value: path))
+}
+
+function directoryPrimitiveHandleIsValid(handle: DirectoryHandle): Int {
+    return nativeDirectoryHandleIsValid(handle: handle)
+}
+
+function directoryPrimitiveEntryName(directoryEntry: DirectoryEntry): String {
+    return nativeDirectoryEntryName(entry: directoryEntry)
+}
+
+function directoryPrimitiveNextName(handle: DirectoryHandle): String {
+    return directoryPrimitiveEntryName(directoryEntry: readdir(directory: handle))
+}
+
+function directoryPrimitiveClose(handle: DirectoryHandle): Int {
+    return closedir(directory: handle)
+}
+
+function fileManagerListDirectoryEntries(path: String, directory: DirectoryHandle): String {
+    let name: String(directoryPrimitiveNextName(handle: directory))
+    if name.count == 0 {
+        return ""
+    }
+    if name == "." || name == ".." {
+        return fileManagerListDirectoryEntries(path: path, directory: directory)
+    }
+
+    let child: String(fileManagerChildPath(path: path, name: name))
+    let childKind: Int(filePrimitivePathKind(path: child))
+    if childKind == 1 {
+        return "\(child)\n\(fileManagerListDirectoryEntries(path: path, directory: directory))"
+    }
+    if childKind == 2 {
+        return "\(fileManagerListFiles(path: child))\(fileManagerListDirectoryEntries(path: path, directory: directory))"
+    }
+    return fileManagerListDirectoryEntries(path: path, directory: directory)
+}
+
+function fileManagerListFiles(path: String): String {
+    let kind: Int(filePrimitivePathKind(path: path))
+    if kind == 1 {
+        return "\(path)\n"
+    }
+    if kind != 2 {
+        return ""
+    }
+
+    let directory: DirectoryHandle(opendir(path: rangeStringData(value: path)))
+    if nativeDirectoryHandleIsValid(handle: directory) == 0 {
+        return ""
+    }
+
+    let files: String(fileManagerListDirectoryEntries(path: path, directory: directory))
+    closedir(directory: directory)
+    return files
+}
+
+function fileManagerReadFile(path: String): String {
+    let handle: FileHandle(filePrimitiveOpen(path: path, mode: 0))
+    if filePrimitiveHandleIsValid(handle: handle) == 0 {
+        return ""
+    }
+
+    state contents: String("")
+    state reading: Bool(true)
+    while reading {
+        let chunk: String(filePrimitiveRead(handle: handle, byteCount: 65536))
+        if chunk.count == 0 {
+            reading: false
+        } else {
+            contents.append(text: chunk)
+        }
+    }
+    filePrimitiveClose(handle: handle)
+    return contents
+}
+
+function fileManagerWriteFile(path: String, text: String, mode: Int): Int {
+    let handle: FileHandle(filePrimitiveOpen(path: path, mode: mode))
+    if filePrimitiveHandleIsValid(handle: handle) == 0 {
+        return 73
+    }
+    let writeStatus: Int(filePrimitiveWrite(handle: handle, text: text))
+    let closeStatus: Int(filePrimitiveClose(handle: handle))
+    if writeStatus != 0 {
+        return writeStatus
+    }
+    return closeStatus
+}
+
+function fileManagerCopyFile(source: String, destination: String): Int {
+    if filePrimitivePathKind(path: source) != 1 {
+        return 66
+    }
+    return fileManagerWriteFile(path: destination, text: fileManagerReadFile(path: source), mode: 1)
+}
+
+function fileManagerHasSuffix(value: String, suffix: String): Bool {
+    if suffix.count > value.count {
+        return false
+    }
+    return value.substring(start: value.count - suffix.count, end: value.count) == suffix
+}
+
+function fileManagerFirstFileWithSuffix(files: String, suffix: String): String {
+    state start: Int(0)
+    state cursor: Int(0)
+    while cursor <= files.count {
+        if cursor == files.count || files.byte(index: cursor) == 10 {
+            let path: String(files.substring(start: start, end: cursor))
+            if fileManagerHasSuffix(value: path, suffix: suffix) {
+                return path
+            }
+            start: cursor + 1
+        }
+        cursor: cursor + 1
+    }
+    return ""
+}
+
+construct FileManager {
+    let readChunkSize: Int
+
+    function pathKind(path: String): Int {
+        return filePrimitivePathKind(path: path)
+    }
+
+    function exists(path: String): Bool {
+        return fileManagerPathExists(path: path)
+    }
+
+    function isFile(path: String): Bool {
+        return filePrimitivePathKind(path: path) == 1
+    }
+
+    function isDirectory(path: String): Bool {
+        return filePrimitivePathKind(path: path) == 2
+    }
+
+    function openFile(path: String, mode: Int): FileHandle {
+        return filePrimitiveOpen(path: path, mode: mode)
+    }
+
+    function fileIsOpen(handle: FileHandle): Bool {
+        return filePrimitiveHandleIsValid(handle: handle) != 0
+    }
+
+    function readChunk(handle: FileHandle, byteCount: Int): String {
+        return filePrimitiveRead(handle: handle, byteCount: byteCount)
+    }
+
+    function writeChunk(handle: FileHandle, text: String): Int {
+        return filePrimitiveWrite(handle: handle, text: text)
+    }
+
+    function closeFile(handle: FileHandle): Int {
+        return filePrimitiveClose(handle: handle)
+    }
+
+    function remove(path: String): Int {
+        return filePrimitiveRemove(path: path)
+    }
+
+    function move(source: String, destination: String): Int {
+        return filePrimitiveMove(source: source, destination: destination)
+    }
+
+    function openDirectory(path: String): DirectoryHandle {
+        return opendir(path: rangeStringData(value: path))
+    }
+
+    function directoryIsOpen(handle: DirectoryHandle): Bool {
+        return directoryPrimitiveHandleIsValid(handle: handle) != 0
+    }
+
+    function nextDirectoryEntry(handle: DirectoryHandle): DirectoryEntry {
+        return readdir(directory: handle)
+    }
+
+    function directoryEntryName(directoryEntry: DirectoryEntry): String {
+        return directoryPrimitiveEntryName(directoryEntry: directoryEntry)
+    }
+
+    function closeDirectory(handle: DirectoryHandle): Int {
+        return closedir(directory: handle)
+    }
+
+    function createDirectory(path: String): Int {
+        return directoryPrimitiveCreate(path: path)
+    }
+
+    function read(path: String): String {
+        let handle: FileHandle(filePrimitiveOpen(path: path, mode: 0))
+        if filePrimitiveHandleIsValid(handle: handle) == 0 {
+            return ""
+        }
+
+        state contents: String("")
+        state reading: Bool(true)
+        while reading {
+            let chunk: String(filePrimitiveRead(handle: handle, byteCount: self.readChunkSize))
+            if chunk.count == 0 {
+                reading: false
+            } else {
+                contents.append(text: chunk)
+            }
+        }
+        filePrimitiveClose(handle: handle)
+        return contents
+    }
+
+    function write(path: String, text: String): Int {
+        return fileManagerWriteFile(path: path, text: text, mode: 1)
+    }
+
+    function append(path: String, text: String): Int {
+        return fileManagerWriteFile(path: path, text: text, mode: 2)
+    }
+
+    function copy(source: String, destination: String): Int {
+        return fileManagerCopyFile(source: source, destination: destination)
+    }
+
+    function files(path: String): String {
+        return fileManagerListFiles(path: path)
+    }
+
+    function firstFile(path: String, suffix: String): String {
+        return fileManagerFirstFileWithSuffix(files: fileManagerListFiles(path: path), suffix: suffix)
+    }
+}

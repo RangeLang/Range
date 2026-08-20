@@ -1,4 +1,0 @@
-construct Character {
-    @many
-    let scalars: UnicodeScalar
-}

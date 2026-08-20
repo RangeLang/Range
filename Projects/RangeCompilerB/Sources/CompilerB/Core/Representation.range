@@ -1,0 +1,689 @@
+construct CompilerBMacroProductStore {
+    let statuses: Buffer<Int>
+    let emittedValues: Buffer<Int>
+    let applicationSyntaxIDs: Buffer<Int>
+    let targetSyntaxIDs: Buffer<Int>
+    let targetIdentityTokenIDs: Buffer<Int>
+    let bitCounts: Buffer<Int>
+    let signedValues: Buffer<Int>
+    let hasValues: Buffer<Int>
+    let values: Buffer<Int>
+}
+
+function compilerBMacroProductStoreCreate(
+    capacity: Int
+): CompilerBMacroProductStore {
+    return CompilerBMacroProductStore(
+        statuses: bufferCreateInt(capacity: capacity),
+        emittedValues: bufferCreateInt(capacity: capacity),
+        applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
+        targetSyntaxIDs: bufferCreateInt(capacity: capacity),
+        targetIdentityTokenIDs: bufferCreateInt(capacity: capacity),
+        bitCounts: bufferCreateInt(capacity: capacity),
+        signedValues: bufferCreateInt(capacity: capacity),
+        hasValues: bufferCreateInt(capacity: capacity),
+        values: bufferCreateInt(capacity: capacity)
+    )
+}
+
+function compilerBMacroProductStoreDestroy(store: CompilerBMacroProductStore): Int {
+    state status: Int(0)
+    if store.statuses.destroy() != 0 { status: 0 - 1 }
+    if store.emittedValues.destroy() != 0 { status: 0 - 1 }
+    if store.applicationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.targetSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.targetIdentityTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if store.bitCounts.destroy() != 0 { status: 0 - 1 }
+    if store.signedValues.destroy() != 0 { status: 0 - 1 }
+    if store.hasValues.destroy() != 0 { status: 0 - 1 }
+    if store.values.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBMacroProductStoreAppend(
+    store: CompilerBMacroProductStore,
+    status: Int,
+    applicationSyntaxID: Int,
+    targetSyntaxID: Int,
+    targetIdentityTokenID: Int,
+    bitCount: Int,
+    signed: Bool,
+    hasValue: Bool,
+    value: Int
+): Int {
+    let row: Int(store.statuses.count)
+    if store.statuses.append(element: status) != 0 { return 0 - 1 }
+    state emitted: Int(0)
+    if status == 0 { emitted: 1 }
+    if store.emittedValues.append(element: emitted) != 0 { return 0 - 1 }
+    if store.applicationSyntaxIDs.append(element: applicationSyntaxID) != 0 { return 0 - 1 }
+    if store.targetSyntaxIDs.append(element: targetSyntaxID) != 0 { return 0 - 1 }
+    if store.targetIdentityTokenIDs.append(element: targetIdentityTokenID) != 0 { return 0 - 1 }
+    if store.bitCounts.append(element: bitCount) != 0 { return 0 - 1 }
+    state signedValue: Int(0)
+    if signed { signedValue: 1 }
+    if store.signedValues.append(element: signedValue) != 0 { return 0 - 1 }
+    state hasValueCode: Int(0)
+    if hasValue { hasValueCode: 1 }
+    if store.hasValues.append(element: hasValueCode) != 0 { return 0 - 1 }
+    if store.values.append(element: value) != 0 { return 0 - 1 }
+    return row
+}
+
+function compilerBMacroProductStoreDiagnostic(
+    store: CompilerBMacroProductStore,
+    row: Int
+): String {
+    let status: Int(store.statuses.element(index: row))
+    if status == 1 { return "macro application is unresolved" }
+    if status == 2 { return "macro process is missing" }
+    if status == 3 { return "macro execution is missing" }
+    if status == 11 { return "integer LLVM execution requires an integer bits query" }
+    if status == 12 { return "integer LLVM execution requires a boolean signed query" }
+    if status == 13 { return "integer LLVM bits must be byte-aligned and at most 32" }
+    if status == 15 { return "integer literal does not fit represented type" }
+    return ""
+}
+
+function compilerBSourceSpanMatches(
+    source: String,
+    start: Int,
+    end: Int,
+    expected: String
+): Bool {
+    if end - start != expected.count { return false }
+    state offset: Int(0)
+    while offset < expected.count {
+        if source.byte(index: start + offset) != expected.byte(index: offset) { return false }
+        offset: offset + 1
+    }
+    return true
+}
+
+function compilerBTargetMemberRowNamed(
+    revision: CompilerBSyntaxRevision,
+    targetSyntaxID: Int,
+    name: String
+): Int {
+    state result: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        if revision.members.ownerSyntaxIDs.element(index: row) == targetSyntaxID {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.members.identityTokenIDs.element(index: row))
+            ))
+            if compilerBTokenMatchesBytes(
+                source: revision.source,
+                token: identity,
+                expected: name
+            ) {
+                result: row
+                count: count + 1
+            }
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return result
+}
+
+function compilerBLocalSelectedMemberRow(
+    revision: CompilerBSyntaxRevision,
+    macroSyntaxID: Int,
+    targetSyntaxID: Int,
+    expressionStart: Int,
+    expressionEnd: Int
+): Int {
+    state localRow: Int(0)
+    while localRow < revision.process.locals.syntaxIDs.count {
+        if revision.process.locals.ownerSyntaxIDs.element(index: localRow) == macroSyntaxID {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.process.locals.identityTokenIDs.element(index: localRow))
+            ))
+            if compilerBSourceSpanMatches(
+                source: revision.source,
+                start: expressionStart,
+                end: expressionEnd,
+                expected: revision.source.substring(start: identity.start, end: identity.end)
+            ) {
+                let firstValueTokenID: Int(
+                    revision.process.locals.firstValueTokenIDs.element(index: localRow)
+                )
+                let afterLastValueTokenID: Int(
+                    revision.process.locals.afterLastValueTokenIDs.element(index: localRow)
+                )
+                state tokenID: Int(firstValueTokenID)
+                while tokenID < afterLastValueTokenID {
+                    let token: CompilerBToken(compilerBRetainedToken(
+                        store: revision.tokens,
+                        id: TokenID(value: tokenID)
+                    ))
+                    if token.kind == .string {
+                        let name: String(revision.source.substring(
+                            start: token.start + 1,
+                            end: token.end - 1
+                        ))
+                        return compilerBTargetMemberRowNamed(
+                            revision: revision,
+                            targetSyntaxID: targetSyntaxID,
+                            name: name
+                        )
+                    }
+                    tokenID: tokenID + 1
+                }
+            }
+        }
+        localRow: localRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerBLocalSelectedMemberRowNamed(
+    revision: CompilerBSyntaxRevision,
+    macroSyntaxID: Int,
+    targetSyntaxID: Int,
+    localName: String
+): Int {
+    state localRow: Int(0)
+    while localRow < revision.process.locals.syntaxIDs.count {
+        if revision.process.locals.ownerSyntaxIDs.element(index: localRow) == macroSyntaxID {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.process.locals.identityTokenIDs.element(index: localRow))
+            ))
+            if compilerBTokenMatchesBytes(
+                source: revision.source,
+                token: identity,
+                expected: localName
+            ) {
+                let firstValueTokenID: Int(
+                    revision.process.locals.firstValueTokenIDs.element(index: localRow)
+                )
+                let afterLastValueTokenID: Int(
+                    revision.process.locals.afterLastValueTokenIDs.element(index: localRow)
+                )
+                state tokenID: Int(firstValueTokenID)
+                while tokenID < afterLastValueTokenID {
+                    let token: CompilerBToken(compilerBRetainedToken(
+                        store: revision.tokens,
+                        id: TokenID(value: tokenID)
+                    ))
+                    if token.kind == .string {
+                        return compilerBTargetMemberRowNamed(
+                            revision: revision,
+                            targetSyntaxID: targetSyntaxID,
+                            name: revision.source.substring(
+                                start: token.start + 1,
+                                end: token.end - 1
+                            )
+                        )
+                    }
+                    tokenID: tokenID + 1
+                }
+            }
+        }
+        localRow: localRow + 1
+    }
+    return 0 - 1
+}
+
+function compilerBRenderSourceTemplate(
+    revision: CompilerBSyntaxRevision,
+    templateExpressionSyntaxID: Int,
+    macroSyntaxID: Int,
+    applicationSyntaxID: Int,
+    targetSyntaxID: Int,
+    applicationValue: Int
+): String {
+    let expressionRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.expressions.syntaxIDs,
+        syntaxID: templateExpressionSyntaxID
+    ))
+    if expressionRow < 0 { return "" }
+    let token: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: revision.process.expressions.firstTokenIDs.element(
+            index: expressionRow
+        ))
+    ))
+    if token.kind != .string { return "" }
+    let targetIdentityTokenID: Int(compilerBTargetIdentityTokenID(
+        revision: revision,
+        targetSyntaxID: targetSyntaxID
+    ))
+    state output: String("")
+    state cursor: Int(token.start + 1)
+    let limit: Int(token.end - 1)
+    while cursor < limit {
+        if cursor + 2 < limit && revision.source.byte(index: cursor) == 92
+            && revision.source.byte(index: cursor + 1) == 40 {
+            state closing: Int(cursor + 2)
+            while closing < limit && revision.source.byte(index: closing) != 41 {
+                closing: closing + 1
+            }
+            if closing >= limit { return "" }
+            let expressionStart: Int(cursor + 2)
+            let expressionEnd: Int(closing)
+            if compilerBSourceSpanMatches(
+                source: revision.source,
+                start: expressionStart,
+                end: expressionEnd,
+                expected: "#environment.target.identity"
+            ) {
+                let identity: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: targetIdentityTokenID)
+                ))
+                output.append(text: revision.source.substring(
+                    start: identity.start,
+                    end: identity.end
+                ))
+            } else if compilerBSourceSpanMatches(
+                source: revision.source,
+                start: expressionStart,
+                end: expressionEnd,
+                expected: "#environment.target.Application.value"
+            ) {
+                output.append(text: "\(applicationValue)")
+            } else {
+                state argumentExpressionSyntaxID: Int(0 - 1)
+                state parameterRow: Int(0)
+                while parameterRow < revision.macroSignatures.parameterMacroSyntaxIDs.count
+                    && argumentExpressionSyntaxID < 0 {
+                    if revision.macroSignatures.parameterMacroSyntaxIDs.element(index: parameterRow)
+                        == macroSyntaxID {
+                        let parameter: CompilerBToken(compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: revision.macroSignatures.parameterIdentityTokenIDs.element(
+                                index: parameterRow
+                            ))
+                        ))
+                        if compilerBSourceSpanMatches(
+                            source: revision.source,
+                            start: expressionStart,
+                            end: expressionEnd,
+                            expected: revision.source.substring(
+                                start: parameter.start,
+                                end: parameter.end
+                            )
+                        ) {
+                            let argumentRow: Int(compilerBMacroArgumentRowForParameter(
+                                source: revision.source,
+                                tokens: revision.tokens,
+                                argumentApplicationSyntaxIDs: revision.macroApplications.argumentApplicationSyntaxIDs,
+                                argumentLabelTokenIDs: revision.macroApplications.argumentLabelTokenIDs,
+                                applicationSyntaxID: applicationSyntaxID,
+                                parameterIdentityTokenID: revision.macroSignatures.parameterIdentityTokenIDs.element(
+                                    index: parameterRow
+                                )
+                            ))
+                            if argumentRow >= 0 {
+                                argumentExpressionSyntaxID: revision.macroApplications.argumentValueExpressionSyntaxIDs.element(
+                                    index: argumentRow
+                                )
+                            }
+                        }
+                    }
+                    parameterRow: parameterRow + 1
+                }
+                if argumentExpressionSyntaxID >= 0 {
+                    let argumentExpressionRow: Int(compilerBFacetRowForSyntaxID(
+                        syntaxIDs: revision.process.expressions.syntaxIDs,
+                        syntaxID: argumentExpressionSyntaxID
+                    ))
+                    if argumentExpressionRow < 0 { return "" }
+                    let kind: Int(revision.process.expressions.kindCodes.element(
+                        index: argumentExpressionRow
+                    ))
+                    if kind == compilerBParserExpressionKindIntegerCode() {
+                        output.append(text: "\(revision.process.expressions.integerValues.element(index: argumentExpressionRow))")
+                    } else {
+                        let argumentToken: CompilerBToken(compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: revision.process.expressions.firstTokenIDs.element(
+                                index: argumentExpressionRow
+                            ))
+                        ))
+                        state argumentStart: Int(argumentToken.start)
+                        state argumentEnd: Int(argumentToken.end)
+                        if kind == compilerBParserExpressionKindStringCode() {
+                            argumentStart: argumentStart + 1
+                            argumentEnd: argumentEnd - 1
+                        } else if kind != compilerBParserExpressionKindBooleanCode() {
+                            return ""
+                        }
+                        output.append(text: revision.source.substring(
+                            start: argumentStart,
+                            end: argumentEnd
+                        ))
+                    }
+                } else {
+                    let memberRow: Int(compilerBLocalSelectedMemberRow(
+                        revision: revision,
+                        macroSyntaxID: macroSyntaxID,
+                        targetSyntaxID: targetSyntaxID,
+                        expressionStart: expressionStart,
+                        expressionEnd: expressionEnd
+                    ))
+                    if memberRow < 0 { return "" }
+                    output.append(text: "\(revision.members.initializerValues.element(index: memberRow))")
+                }
+            }
+            cursor: closing + 1
+        } else {
+            output.append(text: revision.source.substring(start: cursor, end: cursor + 1))
+            cursor: cursor + 1
+        }
+    }
+    return output
+}
+
+function compilerBMacroLLVMExecutionExpressionSyntaxID(
+    revision: CompilerBSyntaxRevision,
+    macroSyntaxID: Int,
+    hasApplicationValue: Bool
+): Int {
+    let functionName: String("type")
+    state selectedFunctionName: String(functionName)
+    if hasApplicationValue { selectedFunctionName: "value" }
+    state result: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.executions.ownerSyntaxIDs.count {
+        if revision.process.executions.ownerSyntaxIDs.element(index: row) == macroSyntaxID {
+            let expressionSyntaxID: Int(
+                revision.process.executions.expressionSyntaxIDs.element(index: row)
+            )
+            if compilerBCallCalleeMatches(
+                revision: revision,
+                expressionSyntaxID: expressionSyntaxID,
+                first: "LLVM",
+                second: selectedFunctionName
+            ) {
+                result: expressionSyntaxID
+                count: count + 1
+            }
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return result
+}
+
+function compilerBMacroProductStoreLLVM(
+    revision: CompilerBSyntaxRevision,
+    store: CompilerBMacroProductStore,
+    row: Int
+): String {
+    if store.emittedValues.element(index: row) == 0
+        || store.statuses.element(index: row) != 0 { return "" }
+    let applicationRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.macroApplications.syntaxIDs,
+        syntaxID: store.applicationSyntaxIDs.element(index: row)
+    ))
+    let macroSyntaxID: Int(
+        revision.macroApplications.macroDeclarationSyntaxIDs.element(index: applicationRow)
+    )
+    let expressionSyntaxID: Int(compilerBMacroLLVMExecutionExpressionSyntaxID(
+        revision: revision,
+        macroSyntaxID: macroSyntaxID,
+        hasApplicationValue: store.hasValues.element(index: row) == 1
+    ))
+    if expressionSyntaxID < 0 { return "" }
+    let templateExpressionSyntaxID: Int(compilerBCallArgumentExpressionSyntaxID(
+        revision: revision,
+        callExpressionSyntaxID: expressionSyntaxID,
+        label: "value"
+    ))
+    return compilerBRenderSourceTemplate(
+        revision: revision,
+        templateExpressionSyntaxID: templateExpressionSyntaxID,
+        macroSyntaxID: macroSyntaxID,
+        applicationSyntaxID: store.applicationSyntaxIDs.element(index: row),
+        targetSyntaxID: store.targetSyntaxIDs.element(index: row),
+        applicationValue: store.values.element(index: row)
+    )
+}
+
+function compilerBCallArgumentExpressionSyntaxID(
+    revision: CompilerBSyntaxRevision,
+    callExpressionSyntaxID: Int,
+    label: String
+): Int {
+    state row: Int(0)
+    while row < revision.process.arguments.callExpressionSyntaxIDs.count {
+        if revision.process.arguments.callExpressionSyntaxIDs.element(index: row)
+            == callExpressionSyntaxID {
+            let labelTokenID: Int(
+                revision.process.arguments.labelTokenIDs.element(index: row)
+            )
+            if labelTokenID >= 0 {
+                let labelToken: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: labelTokenID)
+                ))
+                if compilerBTokenMatchesBytes(
+                    source: revision.source,
+                    token: labelToken,
+                    expected: label
+                ) {
+                    return revision.process.arguments.valueExpressionSyntaxIDs.element(index: row)
+                }
+            }
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerBCallCalleeMatches(
+    revision: CompilerBSyntaxRevision,
+    expressionSyntaxID: Int,
+    first: String,
+    second: String
+): Bool {
+    state count: Int(0)
+    state firstMatches: Bool(false)
+    state secondMatches: Bool(false)
+    state row: Int(0)
+    while row < revision.process.callees.expressionSyntaxIDs.count {
+        if revision.process.callees.expressionSyntaxIDs.element(index: row)
+            == expressionSyntaxID {
+            let token: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.process.callees.tokenIDs.element(index: row))
+            ))
+            let ordinal: Int(revision.process.callees.ordinals.element(index: row))
+            if ordinal == 0 {
+                firstMatches: compilerBTokenMatchesBytes(
+                    source: revision.source,
+                    token: token,
+                    expected: first
+                )
+            }
+            if ordinal == 1 {
+                secondMatches: compilerBTokenMatchesBytes(
+                    source: revision.source,
+                    token: token,
+                    expected: second
+                )
+            }
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count == 2 && firstMatches && secondMatches
+}
+
+function compilerBIntegerValueFits(
+    value: Int,
+    bitCount: Int,
+    signed: Bool
+): Bool {
+    if value < 0 { return false }
+    if bitCount >= 32 { return true }
+    state maximum: Int(1)
+    state availableBits: Int(bitCount)
+    if signed { availableBits: availableBits - 1 }
+    state bit: Int(0)
+    while bit < availableBits {
+        maximum: maximum * 2
+        bit: bit + 1
+    }
+    return value < maximum
+}
+
+function compilerBExecuteSourceTemplateMacroInto(
+    revision: CompilerBSyntaxRevision,
+    products: CompilerBMacroProductStore,
+    applicationRow: Int,
+    expressionSyntaxID: Int,
+    hasApplicationValue: Bool,
+    applicationValue: Int
+): Int {
+    let targetSyntaxID: Int(revision.macroApplications.targetSyntaxIDs.element(
+        index: applicationRow
+    ))
+    let declarationSyntaxID: Int(
+        revision.macroApplications.macroDeclarationSyntaxIDs.element(index: applicationRow)
+    )
+    let bitsMemberRow: Int(compilerBLocalSelectedMemberRowNamed(
+        revision: revision,
+        macroSyntaxID: declarationSyntaxID,
+        targetSyntaxID: targetSyntaxID,
+        localName: "bits"
+    ))
+    let signedMemberRow: Int(compilerBLocalSelectedMemberRowNamed(
+        revision: revision,
+        macroSyntaxID: declarationSyntaxID,
+        targetSyntaxID: targetSyntaxID,
+        localName: "signed"
+    ))
+    state status: Int(0)
+    state bitCount: Int(0)
+    state signedValue: Bool(false)
+    if bitsMemberRow < 0 {
+        status: 11
+    } else if signedMemberRow < 0 {
+        status: 12
+    } else {
+        bitCount: revision.members.initializerValues.element(index: bitsMemberRow)
+        signedValue: revision.members.initializerValues.element(index: signedMemberRow) != 0
+    }
+    if status == 0 && (bitCount <= 0 || bitCount > 32 || bitCount % 8 != 0) {
+        status: 13
+    }
+    if status == 0 && hasApplicationValue && !compilerBIntegerValueFits(
+        value: applicationValue,
+        bitCount: bitCount,
+        signed: signedValue
+    ) { status: 15 }
+    return compilerBMacroProductStoreAppend(
+        store: products,
+        status: status,
+        applicationSyntaxID: revision.macroApplications.syntaxIDs.element(index: applicationRow),
+        targetSyntaxID: targetSyntaxID,
+        targetIdentityTokenID: revision.macroApplications.targetIdentityTokenIDs.element(
+            index: applicationRow
+        ),
+        bitCount: bitCount,
+        signed: signedValue,
+        hasValue: hasApplicationValue,
+        value: applicationValue
+    )
+}
+
+function compilerBExecuteMacroApplicationInto(
+    revision: CompilerBSyntaxRevision,
+    products: CompilerBMacroProductStore,
+    applicationRow: Int,
+    hasApplicationValue: Bool,
+    applicationValue: Int
+): Int {
+    let applicationSyntaxID: Int(revision.macroApplications.syntaxIDs.element(
+        index: applicationRow
+    ))
+    let targetSyntaxID: Int(revision.macroApplications.targetSyntaxIDs.element(
+        index: applicationRow
+    ))
+    let targetIdentityTokenID: Int(revision.macroApplications.targetIdentityTokenIDs.element(
+        index: applicationRow
+    ))
+    let declarationSyntaxID: Int(revision.macroApplications.macroDeclarationSyntaxIDs.element(
+        index: applicationRow
+    ))
+    state status: Int(0)
+    state expressionSyntaxID: Int(0 - 1)
+    if declarationSyntaxID < 0 {
+        status: 1
+    }
+    state processRow: Int(0 - 1)
+    if status == 0 {
+        processRow: compilerBFacetRowForSyntaxID(
+            syntaxIDs: revision.process.processes.ownerSyntaxIDs,
+            syntaxID: declarationSyntaxID
+        )
+        if processRow < 0 { status: 2 }
+    }
+    if status == 0 {
+        expressionSyntaxID: compilerBMacroLLVMExecutionExpressionSyntaxID(
+            revision: revision,
+            macroSyntaxID: declarationSyntaxID,
+            hasApplicationValue: hasApplicationValue
+        )
+        if expressionSyntaxID >= 0 {
+            return compilerBExecuteSourceTemplateMacroInto(
+                revision: revision,
+                products: products,
+                applicationRow: applicationRow,
+                expressionSyntaxID: expressionSyntaxID,
+                hasApplicationValue: hasApplicationValue,
+                applicationValue: applicationValue
+            )
+        }
+    }
+    state bitCount: Int(0)
+    state signedValue: Bool(false)
+    if status == 0 { status: 3 }
+    return compilerBMacroProductStoreAppend(
+        store: products,
+        status: status,
+        applicationSyntaxID: applicationSyntaxID,
+        targetSyntaxID: targetSyntaxID,
+        targetIdentityTokenID: targetIdentityTokenID,
+        bitCount: bitCount,
+        signed: signedValue,
+        hasValue: hasApplicationValue,
+        value: applicationValue
+    )
+}
+
+function compilerBMacroProductApplicationRowForTypeToken(
+    revision: CompilerBSyntaxRevision,
+    products: CompilerBMacroProductStore,
+    typeToken: CompilerBToken
+): Int {
+    state row: Int(0)
+    while row < revision.macroApplications.syntaxIDs.count
+        && row < products.statuses.count {
+        let targetIdentityTokenID: Int(
+            revision.macroApplications.targetIdentityTokenIDs.element(index: row)
+        )
+        if targetIdentityTokenID >= 0 && products.emittedValues.element(index: row) == 1 {
+            let candidate: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: targetIdentityTokenID)
+            ))
+            if compilerBTokenBytesEqual(
+                source: revision.source,
+                left: candidate,
+                right: typeToken
+            ) { return row }
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}

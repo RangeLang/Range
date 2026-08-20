@@ -107,8 +107,8 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#FFFFFFD9"
-  Light: "#000000D9"
+  Dark: "#F5A524FF"
+  Light: "#B45309FF"
   FontSize: 12
   FontWeight: "normal"
   FontStyle: "normal"
@@ -553,13 +553,13 @@
   Supported: true
   ZedNative: true
   Needs: []
-  Dark: "#FFFFFFD9"
-  Light: "#000000D9"
+  Dark: "#92A1B1FF"
+  Light: "#4A5560FF"
   FontSize: 12
   FontWeight: "normal"
   FontStyle: "normal"
   TextDecoration:
-  Notes: "Local variable declarations and uses."
+  Notes: "Local variable declarations and uses, including the leading receiver in a member chain."
 
 - Name: "Other Parameters"
   XcodeCategory: "Other Properties and Globals"
@@ -598,10 +598,10 @@
   Supported: true
   ZedNative: false
   Needs: []
-  Dark: "#FFFFFFD9"
-  Light: "#000000D9"
+  Dark: "#9B8ACBFF"
+  Light: "#55447FFF"
   FontSize: 12
-  FontWeight: "normal"
+  FontWeight: "medium"
   FontStyle: "normal"
   TextDecoration:
   Notes: "Macro declaration names."

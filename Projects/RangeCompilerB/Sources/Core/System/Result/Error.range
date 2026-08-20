@@ -1,4 +1,0 @@
-@error
-construct Error {
-    let message: String
-}

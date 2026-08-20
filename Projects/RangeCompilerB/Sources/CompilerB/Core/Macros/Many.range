@@ -1,0 +1,28 @@
+macro many(count: Int): Member -> LLVM {
+  @diagnostic
+  let element: #environment.target.Declaration.type ? "Many member must specify an element type"
+
+  if count < 0 {
+    #environment.graph.diagnostic(
+      "Many count must not be negative"
+    )
+  }
+
+  let modifiers: #environment.graph.functions.filter(all: @collectionModifier)
+
+  modifiers.map { modifier in
+    #environment {
+      extension #environment.target.identity {
+        #modifier
+      }
+    }
+  }
+
+  LLVM.type(
+    value: "[\(count) x %Range.\(element.identity)]"
+  )
+
+  LLVM.value(
+    value: "[\(count) x %Range.\(element.identity)] \(#environment.target.Application.values)"
+  )
+}

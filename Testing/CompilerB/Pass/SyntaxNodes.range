@@ -1,0 +1,11 @@
+function first(): Int {
+    return 1
+}
+
+construct Point {
+    let x: Int
+}
+
+function second(): Int {
+    return 2
+}

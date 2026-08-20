@@ -1,0 +1,5 @@
+@integer
+construct Int {
+    let bits: Int(32)
+    let signed: Bool(true)
+}

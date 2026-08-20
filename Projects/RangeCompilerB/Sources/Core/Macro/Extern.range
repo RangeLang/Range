@@ -1,7 +1,0 @@
-construct ExternRegistration {
-    let function: Function
-}
-
-macro extern(): Function -> ExternRegistration {
-    return ExternRegistration(function: #environment.target)
-}

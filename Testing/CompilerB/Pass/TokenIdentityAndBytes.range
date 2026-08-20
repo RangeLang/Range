@@ -1,0 +1,23 @@
+function compilerBTokenIdentityAndBytesEntry(): Int {
+    let source: String("alpha alpha beta")
+    let tokens: CompilerBRetainedTokenStore(compilerBLexRetained(source: source))
+    state result: Int(0)
+    if tokens.kinds.count != 3 { result: 1 }
+
+    let first: CompilerBToken(compilerBRetainedToken(store: tokens, id: TokenID(value: 0)))
+    let repeated: CompilerBToken(compilerBRetainedToken(store: tokens, id: TokenID(value: 1)))
+    let different: CompilerBToken(compilerBRetainedToken(store: tokens, id: TokenID(value: 2)))
+    if result == 0 && (first.kind != .identity || repeated.kind != .identity || different.kind != .identity) { result: 2 }
+    if result == 0 && !compilerBTokenIdentityEquals(left: first, right: first) { result: 3 }
+    if result == 0 && compilerBTokenIdentityEquals(left: first, right: repeated) { result: 4 }
+    if result == 0 && !compilerBTokenBytesEqual(source: source, left: first, right: repeated) { result: 5 }
+    if result == 0 && compilerBTokenBytesEqual(source: source, left: first, right: different) { result: 6 }
+    if result == 0 && !compilerBTokenMatchesBytes(source: source, token: first, expected: "alpha") { result: 7 }
+    if result == 0 && compilerBTokenMatchesBytes(source: source, token: first, expected: "beta") { result: 8 }
+    if compilerBRetainedTokenStoreDestroy(store: tokens) != 0 { result: 9 }
+    return result
+}
+
+@main {
+    return compilerBTokenIdentityAndBytesEntry()
+}

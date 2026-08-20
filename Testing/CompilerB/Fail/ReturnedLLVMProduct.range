@@ -1,0 +1,18 @@
+construct LLVM {}
+
+macro scalar(): Construct -> LLVM {
+    return LLVM(
+        type: "%Range.Legacy = type { i8 }",
+        value: "%Range.Legacy { i8 42 }"
+    )
+}
+
+@scalar
+construct Legacy {
+    let bits: Int(8)
+    let signed: Bool(false)
+}
+
+function answer(): Legacy {
+    return 42
+}

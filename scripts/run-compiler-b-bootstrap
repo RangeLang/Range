@@ -5,11 +5,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
 BOOTSTRAP="$REPO_ROOT/RangeCompiler/Bootstrap/range"
+ENTRY_SOURCE=""
+
+if [[ "${1:-}" == "--entry" ]]; then
+    if [[ "$#" -lt 3 ]]; then
+        echo "usage: scripts/run-compiler-b-bootstrap [--entry <entry.range>] <route>" >&2
+        exit 64
+    fi
+    ENTRY_SOURCE="${2:-}"
+    shift 2
+fi
+
 ROUTE="${1:-}"
 
 if [[ -z "$ROUTE" ]]; then
-    echo "usage: scripts/run-compiler-b-bootstrap <route>" >&2
+    echo "usage: scripts/run-compiler-b-bootstrap [--entry <entry.range>] <route>" >&2
     exit 64
+fi
+if [[ -n "$ENTRY_SOURCE" && ! -f "$ENTRY_SOURCE" ]]; then
+    echo "compiler-b: missing entry source: $ENTRY_SOURCE" >&2
+    exit 66
 fi
 
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b-bootstrap.XXXXXX")"
@@ -34,13 +49,9 @@ while IFS= read -r relative; do
     append_source core "$relative" "$REPO_ROOT/$relative"
 done < "$B_ROOT/CompilerCoreSources.txt"
 
-printf '%s\n' \
-    'compilerSourceFile\trole=core\tpath=Core/Macro/NativeReflection.range' \
-    'construct Function {}' \
-    'construct Construct {}' >> "$BUNDLE"
-
 for relative in \
     Projects/RangeCompilerB/Sources/CompilerB/Core/Main.range \
+    RangeCompiler/Sources/Core/Macro/Extern.range \
     RangeCompiler/Sources/Core/Macro/Link.range \
     RangeCompiler/Sources/Core/Macro/Opaque.range \
     RangeCompiler/Sources/Core/System/Optional/Nil.range \
@@ -48,8 +59,12 @@ for relative in \
     append_source core "$relative" "$REPO_ROOT/$relative"
 done
 
-append_source project CompilerB/Main.range "$B_ROOT/Sources/CompilerB/Main.range"
-append_source project CompilerB/Lexer.range "$B_ROOT/Sources/CompilerB/Lexer.range"
+if [[ -n "$ENTRY_SOURCE" ]]; then
+    append_source project CompilerB/FocusedEntry.range "$ENTRY_SOURCE"
+else
+    append_source project CompilerB/Main.range "$B_ROOT/Sources/CompilerB/Main.range"
+    append_source project CompilerB/Lexer.range "$B_ROOT/Sources/CompilerB/Lexer.range"
+fi
 
 compile_status=0
 "$BOOTSTRAP" "$BUNDLE" > "$LLVM" || compile_status=$?

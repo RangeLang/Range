@@ -1,0 +1,9 @@
+macro print(): Member {}
+
+construct Counter {
+    @print
+    state count: Int(20)
+}
+
+@print
+let seed: Int(1)

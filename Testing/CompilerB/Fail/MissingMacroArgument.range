@@ -1,0 +1,4 @@
+macro metadata(count: Int): Member -> Void {}
+
+@metadata
+let bytes: Byte

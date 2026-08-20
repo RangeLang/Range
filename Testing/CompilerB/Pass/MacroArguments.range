@@ -1,0 +1,8 @@
+construct LLVM {}
+
+macro metadata(count: Int, enabled: Bool, label: String): Member -> LLVM {}
+
+construct Packet {
+    @metadata(count: 4, enabled: true, label: "bytes")
+    let bytes: Byte
+}

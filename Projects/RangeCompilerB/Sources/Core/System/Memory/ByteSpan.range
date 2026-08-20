@@ -1,5 +1,0 @@
-construct ByteSpan {
-    let bytes: Buffer<Int<.unsigned, 8>>
-    let start: Int
-    let count: Int
-}

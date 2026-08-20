@@ -1,0 +1,27 @@
+construct LLVM {}
+
+macro scalar(): Construct -> LLVM {
+    @diagnostic
+    let bits: #environment.target.Declaration.members.filter(named: "bits").first ? "Construct must specify bits"
+    @diagnostic
+    let signed: #environment.target.Declaration.members.filter(named: "signed").first ? "Construct must specify signed"
+
+    LLVM.type(
+        value: "%Range.\(#environment.target.identity) = type { i\(bits) }"
+    )
+    LLVM.value(
+        value: "%Range.\(#environment.target.identity) { i\(bits) \(#environment.target.Application.value) }"
+    )
+}
+
+macro diagnostic(): Member -> Void {}
+
+@scalar
+construct Tiny {
+    let bits: Int(8)
+    let signed: Bool(false)
+}
+
+function answer(): Tiny {
+    return 42
+}

@@ -1,0 +1,47 @@
+macro bool(): Construct -> LLVM {
+
+  LLVM.type(
+    value: "%Range.\(#environment.target.identity) = type { i1 }"
+  )
+
+  LLVM.value(
+    value: "%Range.\(#environment.target.identity) { i1 \(#environment.target.Application.value) }"
+  )
+
+}
+
+macro collectionModifier(): Function {}
+
+@collectionModifier
+function filter(named: String): @many -> @any {
+    state input: #environment.target.root()
+    state output: @any(capacity: input.capacity)
+    state index: Int(0)
+
+    while index < input.count {
+        let element: input.element(index: index)
+
+        if element.name == named {
+            output.append(element)
+        }
+
+        index: index + 1
+    }
+
+    output
+}
+
+@collectionModifier
+function map(transform: Function): @many -> @many {
+    state input: #environment.target.root()
+    state output: @many(capacity: input.count)
+    state index: Int(0)
+
+    while index < input.count {
+        let element: input.element(index: index)
+        output.append(transform(element))
+        index: index + 1
+    }
+
+    output
+}

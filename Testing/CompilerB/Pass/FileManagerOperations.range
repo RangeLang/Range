@@ -1,0 +1,42 @@
+function fileManagerOperationsEntry(): Int {
+    if commandLineArgumentCount() != 1 {
+        return 64
+    }
+
+    let path: String(commandLineArgument(index: 0))
+    let directory: String("\(path).directory")
+    let copy: String("\(directory)/copy.txt")
+    let moved: String("\(directory)/moved.txt")
+    if directoryPrimitiveCreate(path: directory) != 0 {
+        return 1
+    }
+    if fileManagerWriteFile(path: path, text: "alpha", mode: 1) != 0 {
+        return 2
+    }
+    if fileManagerWriteFile(path: path, text: "-beta", mode: 2) != 0 {
+        return 3
+    }
+    if !fileManagerPathExists(path: path) || filePrimitivePathKind(path: path) != 1 {
+        return 4
+    }
+    if fileManagerReadFile(path: path) != "alpha-beta" {
+        return 5
+    }
+    if fileManagerCopyFile(source: path, destination: copy) != 0 {
+        return 6
+    }
+    if filePrimitiveMove(source: copy, destination: moved) != 0 {
+        return 7
+    }
+    if fileManagerReadFile(path: moved) != "alpha-beta" {
+        return 8
+    }
+    if filePrimitiveRemove(path: moved) != 0 || fileManagerPathExists(path: moved) {
+        return 9
+    }
+    return 0
+}
+
+@main {
+    return fileManagerOperationsEntry()
+}

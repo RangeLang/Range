@@ -2,123 +2,126 @@
 
 ## Decision
 
-Range compiler development now has one frozen bootstrap authority and one
-actively evolving, complete compiler fork:
+Range compiler development has one accepted bootstrap authority and one
+greenfield compiler under active development:
 
 ```text
-Compiler A: RangeCompiler/Bootstrap + frozen RangeCompiler source
-Compiler B: Projects/RangeCompilerB/Project.range + complete copied source/runtime
+Compiler A: accepted bootstrap and frozen reference implementation
+Compiler B: minimal B-owned compiler grown through runnable slices
 ```
 
-The duplication is a deliberate bootstrap boundary, not two implementations
-that must evolve together. Compiler A exists only to produce the first Compiler
-B executable. All subsequent compiler changes belong to B.
+The committed LLVM, executable, and manifest under `RangeCompiler/Bootstrap/`
+remain the repository's single accepted compiler authority. That accepted
+Compiler A builds the current Compiler B executable. Compiler A does not
+produce syntax, tables, arenas, or later compiler products for B to consume.
 
-Do not copy `RangeCompiler/Bootstrap/` into B. Git history preserves prior A
-source checkpoints, while the committed LLVM, executable, and manifest under
-`RangeCompiler/Bootstrap/` remain the repository's single accepted authority.
+Compiler A source is frozen by default. Compiler B must not copy A's compiler
+tree or migrate A's internals phase by phase. Git history and the live A source
+remain available as references when B needs to understand proven behavior.
 
 ## Compiler B node
 
-Compiler B is one identified compiler-source node whose value includes its
-project declaration, Core inventory, Core/Foundation declarations, compiler
-implementation, and native runtime:
+Compiler B is the current minimal project rooted at
+`Projects/RangeCompilerB/`:
 
 ```text
 CompilerB.Source
-├── Projects/RangeCompilerB/Project.range
-├── Projects/RangeCompilerB/CompilerCoreSources.txt
-├── Projects/RangeCompilerB/Sources/Core/**
-├── Projects/RangeCompilerB/Sources/Foundation/**
-├── Projects/RangeCompilerB/Sources/Compiler/**
-└── Projects/RangeCompilerB/Runtime/**
+├── Project.range
+├── CompilerCoreSources.txt
+├── Sources/CompilerB/**
+├── selected low-level Sources/Core/** dependencies
+└── Runtime/**
 ```
 
-Ignored `.range/` and `.build/` directories are rebuildable materializations
-and never contribute to this node. RangeView is an independent product node,
-not part of Compiler B's source value.
+It deliberately does not contain a copied `Sources/Compiler/` tree or a copied
+Foundation. Add a source only when a runnable B slice requires it. Ignored
+`.range/` and `.build/` directories are rebuildable materializations and never
+contribute to the compiler-source value.
 
-## Primary proof
+RangeView is outside the active Compiler B plan. It may become an independent
+product proof later, but it does not drive the current lexer/parser slices.
 
-Self-compilation is B's first acceptance boundary:
+## Development rule
+
+Grow B one executable capability at a time:
 
 ```text
-accepted Compiler A + CompilerB.Source(R1)
-    -> Compiler B candidate
+accepted Compiler A + current B sources
+    -> runnable Compiler B slice
 
-Compiler B candidate + CompilerB.Source(R1)
-    -> Compiler B reproduction
-
-candidate LLVM == reproduction LLVM
-candidate executable == reproduction executable
+runnable Compiler B slice + focused input
+    -> exact asserted product
 ```
 
-This is the repository's existing two-build fixed-point rule applied to the B
-project. Tiny fixtures remain debugging probes, but they do not replace the
-self-hosting proof.
+Each slice has one bounded product and one focused check. A passing slice proves
+only that product. It is not self-hosting, fixed-point, full-language, or
+promotion evidence.
 
-After the fixed point, the exact reproduced B artifact compiles RangeView:
+The active checkpoint is self-source lexical and syntax correctness:
+
+1. Retain tokens with typed identity and source ranges.
+2. Treat strings and comments as lexical regions so braces and declaration-like
+   text inside them cannot become syntax.
+3. Make the parser consume retained tokens rather than rescan raw source.
+4. Parse B's own `Main.range` and `Lexer.range` and assert their exact expected
+   top-level declaration and Block nodes.
+
+The current coarse parser already prints function and Block rows for both files.
+That observation is a baseline, not completion of this checkpoint, because the
+lexer/parser is not yet string- or comment-aware and does not retain token
+identity.
+
+## Long horizon
+
+Self-hosting remains a later acceptance milestone, not the current edit loop.
+B must first acquire the required compiler products through runnable slices:
 
 ```text
-Compiler B reproduction + RangeView source(V1)
-    -> RangeView product(P1)
-```
-
-That second application tests B against an independent product. It is not the
-first proof that B is complete.
-
-## Complete compiler ownership
-
-Compiler B owns the entire compilation request:
-
-```text
-project path
-    -> file and source gathering
-    -> Core/Foundation/framework/product inventory
-    -> lexical syntax
-    -> declaration/application graph
-    -> macro expansion and resolution
+source files
+    -> retained tokens
+    -> syntax identities and relationships
+    -> resolution
     -> CFG and ownership
     -> MIR
-    -> LLVM emission
-    -> linking
-    -> executable product
+    -> LLVM and linking
 ```
 
-Shell scripts may select A or B and invoke the process, but they must not become
-a second semantic compiler. File gathering and source roles move into B's Range
-driver rather than remaining a permanent shell-produced source bundle.
+Only when B can compile the relevant language surface does the fixed-point rule
+apply:
 
-## Migration rule
+```text
+accepted compiler + CompilerB.Source(R1) -> candidate
+candidate + CompilerB.Source(R1)         -> reproduction
+```
 
-B initially duplicates the complete working compiler, including inherited
-tables, body arenas, and lowering code. Those are a runnable baseline rather
-than the target design. Replace one vertical phase at a time inside B while A
-stays frozen:
+Candidate/reproduction LLVM and executables must compare byte for byte before a
+B checkpoint can be described as self-hosting. Promotion remains separate and
+requires explicit maintainer approval.
 
-1. Move project and file gathering into B.
-2. Make typed Source, File, Declaration, Application, Block, and relationship
-   values the sole source graph authority.
-3. Derive resolution and CFG from those stable identities without reparsing.
-4. Derive ownership and MIR as typed products.
-5. Emit and link entirely through B.
-6. Delete displaced tables, arenas, serialized records, and compatibility
-   adapters as each B-owned replacement proves itself through self-compilation.
+## Compiler A escape valve
 
-Buffers or matrices may remain physical storage where useful. Anonymous table
-columns must not remain the semantic authority when the graph already provides
-typed identity and relationships.
+An A change is allowed only when all of the following are true:
 
-## Commands
+1. A focused fixture reproduces a concrete accepted-Compiler-A limitation that
+   blocks the next B slice.
+2. The required capability cannot be implemented inside B or behind B's
+   primitive runtime boundary without violating the intended architecture.
+3. The proposed A change is the smallest general capability that removes the
+   blocker, not a B-specific name or fixture special case.
+4. The maintainer explicitly approves the A change and its bootstrap promotion
+   before B depends on it.
+
+Without that evidence and approval, A stays frozen and work continues inside B.
+
+## Current commands
 
 ```sh
-# Complete A -> B -> B fixed-point proof.
-scripts/range compiler b
+# Focused runnable B proof: file routes and IO, lexer output, and syntax rows.
 scripts/range check-compiler-b
 
-# Earlier single-file lexical/source-graph component probe only.
-scripts/range check-compiler-b-source-graph
+# Run the accepted-A-built B executable against one file or directory route.
+scripts/run-compiler-b-bootstrap <route>
 ```
 
-Promotion remains deliberate and separate. A passing B fixed point does not
-automatically replace `RangeCompiler/Bootstrap/`.
+Neither command currently proves A -> B -> B reproduction or a Compiler B
+fixed point.

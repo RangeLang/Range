@@ -5,16 +5,440 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPILER_B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
 
-[[ -f "$COMPILER_B_ROOT/Project.range" ]] || {
-    echo "range compiler b check: missing Compiler B project" >&2
-    exit 1
-}
-[[ -f "$COMPILER_B_ROOT/CompilerCoreSources.txt" ]] || {
-    echo "range compiler b check: missing Compiler B Core inventory" >&2
+fail() {
+    echo "range compiler b check: $*" >&2
     exit 1
 }
 
-RANGE_COMPILER_PROJECT_ROOT="$COMPILER_B_ROOT" \
-    exec "$SCRIPT_DIR/check-range-compiler-candidate" \
-        --allow-runtime-roll \
-        "$COMPILER_B_ROOT/Sources/Compiler"
+[[ -f "$COMPILER_B_ROOT/Project.range" ]] || fail "missing Compiler B project"
+[[ -f "$COMPILER_B_ROOT/CompilerCoreSources.txt" ]] || fail "missing Compiler B Core inventory"
+[[ ! -d "$COMPILER_B_ROOT/Sources/Compiler" ]] || fail "copied Compiler A source tree is still present"
+
+while IFS= read -r relative; do
+    [[ -n "$relative" ]] || continue
+    [[ -f "$REPO_ROOT/$relative" ]] || fail "missing inventoried source: $relative"
+done < "$COMPILER_B_ROOT/CompilerCoreSources.txt"
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b-check.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT
+output="$work_root/bootstrap.out"
+directory_output="$work_root/directory.out"
+fixture="$REPO_ROOT/Testing/CompilerB/Pass/SyntaxNodes.range"
+token_syntax_fixture="$REPO_ROOT/Testing/CompilerB/Pass/TokenDrivenSyntax.range"
+token_syntax_output="$work_root/token-syntax.out"
+file_manager_fixture="$REPO_ROOT/Testing/CompilerB/Pass/FileManagerOperations.range"
+direct_directory_fixture="$REPO_ROOT/Testing/CompilerB/Pass/DirectDirectoryLLVM.range"
+token_identity_fixture="$REPO_ROOT/Testing/CompilerB/Pass/TokenIdentityAndBytes.range"
+syntax_revision_fixture="$REPO_ROOT/Testing/CompilerB/Pass/SyntaxRevisionDifference.range"
+syntax_revision_output="$work_root/syntax-revision.out"
+member_macro_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MemberMacroTarget.range"
+member_macro_output="$work_root/member-macro.out"
+member_macro_mismatch_fixture="$REPO_ROOT/Testing/CompilerB/Fail/MacroMemberTargetMismatch.range"
+member_macro_mismatch_output="$work_root/member-macro-mismatch.out"
+generic_declaration_fixture="$REPO_ROOT/Testing/CompilerB/Fail/GenericDeclaration.range"
+generic_declaration_output="$work_root/generic-declaration.out"
+generic_member_fixture="$REPO_ROOT/Testing/CompilerB/Fail/GenericMemberType.range"
+generic_member_output="$work_root/generic-member.out"
+generic_function_type_fixture="$REPO_ROOT/Testing/CompilerB/Fail/GenericFunctionType.range"
+generic_function_type_output="$work_root/generic-function-type.out"
+macro_relationship_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroApplicationRelationships.range"
+macro_relationship_output="$work_root/macro-relationship.out"
+macro_argument_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroArguments.range"
+macro_argument_output="$work_root/macro-argument.out"
+macro_argument_missing_fixture="$REPO_ROOT/Testing/CompilerB/Fail/MissingMacroArgument.range"
+macro_argument_type_fixture="$REPO_ROOT/Testing/CompilerB/Fail/InvalidMacroArgumentType.range"
+macro_argument_unknown_fixture="$REPO_ROOT/Testing/CompilerB/Fail/UnknownMacroArgument.range"
+macro_argument_duplicate_fixture="$REPO_ROOT/Testing/CompilerB/Fail/DuplicateMacroArgument.range"
+macro_argument_failure_output="$work_root/macro-argument-failure.out"
+collection_modifier_root_fixture="$REPO_ROOT/Testing/CompilerB/Pass/CollectionModifierRoot.range"
+collection_modifier_root_output="$work_root/collection-modifier-root.out"
+collection_modifier_cardinalities_fixture="$REPO_ROOT/Testing/CompilerB/Pass/CollectionModifierCardinalities.range"
+collection_modifier_cardinalities_output="$work_root/collection-modifier-cardinalities.out"
+backend_entry_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EmitIntegerLLVM.range"
+backend_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntegerReturnProduct.range"
+backend_byte_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ByteReturnProduct.range"
+backend_int_representation_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntRepresentation.range"
+backend_product_identity_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroProductIdentity.range"
+backend_macro_argument_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroArgumentLLVM.range"
+backend_returned_product_fixture="$REPO_ROOT/Testing/CompilerB/Fail/ReturnedLLVMProduct.range"
+backend_rejection_fixture="$REPO_ROOT/Testing/CompilerB/Fail/UnsupportedReturnProduct.range"
+backend_byte_overflow_fixture="$REPO_ROOT/Testing/CompilerB/Fail/ByteLiteralOverflow.range"
+backend_missing_representation_fixture="$REPO_ROOT/Testing/CompilerB/Fail/MissingIntegerRepresentation.range"
+backend_invalid_representation_fixture="$REPO_ROOT/Testing/CompilerB/Fail/InvalidIntegerRepresentation.range"
+backend_missing_metadata_fixture="$REPO_ROOT/Testing/CompilerB/Fail/MissingIntegerMetadata.range"
+file_manager_output="$work_root/file-manager.txt"
+backend_llvm="$work_root/compiler-b-product.ll"
+backend_executable="$work_root/compiler-b-product"
+backend_byte_llvm="$work_root/compiler-b-byte-product.ll"
+backend_byte_executable="$work_root/compiler-b-byte-product"
+backend_int_source="$work_root/compiler-b-int-source.range"
+backend_byte_source="$work_root/compiler-b-byte-source.range"
+backend_rejection_source="$work_root/compiler-b-rejection-source.range"
+backend_byte_overflow_source="$work_root/compiler-b-byte-overflow-source.range"
+backend_rejection_output="$work_root/compiler-b-rejection.out"
+backend_byte_overflow_output="$work_root/compiler-b-byte-overflow.out"
+backend_missing_representation_output="$work_root/compiler-b-missing-representation.out"
+backend_invalid_representation_source="$work_root/compiler-b-invalid-representation-source.range"
+backend_invalid_representation_output="$work_root/compiler-b-invalid-representation.out"
+backend_missing_metadata_source="$work_root/compiler-b-missing-metadata-source.range"
+backend_missing_metadata_output="$work_root/compiler-b-missing-metadata.out"
+backend_product_identity_output="$work_root/compiler-b-product-identity.ll"
+backend_macro_argument_output="$work_root/compiler-b-macro-argument.ll"
+backend_macro_argument_executable="$work_root/compiler-b-macro-argument"
+backend_returned_product_output="$work_root/compiler-b-returned-product.out"
+integer_macro_output="$work_root/compiler-b-integer-macro.out"
+many_macro_output="$work_root/compiler-b-many-macro.out"
+bool_macro_output="$work_root/compiler-b-bool-macro.out"
+file_api="$COMPILER_B_ROOT/Sources/CompilerB/Core/File/File.range"
+syntax_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/Declaration.range"
+syntax_query_api="$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/Query.range"
+syntax_parser="$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/Parser.range"
+representation_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Representation.range"
+integer_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Integer.range"
+many_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Many.range"
+bool_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Bool.range"
+integer_bootstrap_macro="$COMPILER_B_ROOT/Sources/CompilerB/Bootstrap/Integer.range"
+backend_model="$COMPILER_B_ROOT/Sources/CompilerB/Backend.range"
+byte_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Byte.range"
+string_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/String.range"
+host_runtime="$COMPILER_B_ROOT/Runtime/RangeCompilerHost.c"
+
+grep -F 'construct FileManager {' "$file_api" >/dev/null || fail "missing Range-owned FileManager"
+grep -F 'function filePrimitiveOpen(path: String, mode: Int): FileHandle' "$file_api" >/dev/null || fail "missing file-open primitive"
+grep -F 'function opendir(path: NativeCString): DirectoryHandle' "$file_api" >/dev/null || fail "missing direct libc opendir declaration"
+grep -F 'function readdir(directory: DirectoryHandle): DirectoryEntry' "$file_api" >/dev/null || fail "missing direct libc readdir declaration"
+grep -F 'function directoryPrimitiveOpen(path: String): DirectoryHandle {' "$file_api" >/dev/null || fail "directory open is not Range-owned"
+grep -F 'let tokens: TokenSpan' "$syntax_model" >/dev/null || fail "common syntax node does not retain a token span"
+if grep -F 'SyntaxNodeKind' "$syntax_model" >/dev/null; then
+    fail "common syntax node still owns a closed syntax-kind enum"
+fi
+grep -F 'function compilerBFunctionDeclarationQueryExecute(' "$syntax_query_api" >/dev/null || fail "missing individual Function.Declaration query pipeline"
+grep -F 'function compilerBConstructDeclarationQueryExecute(' "$syntax_query_api" >/dev/null || fail "missing individual Construct.Declaration query pipeline"
+grep -F 'function compilerBMacroDeclarationQueryExecute(' "$syntax_query_api" >/dev/null || fail "missing individual Macro.Declaration query pipeline"
+grep -F 'function compilerBMemberQueryExecute(' "$syntax_query_api" >/dev/null || fail "missing typed Member query pipeline"
+grep -F 'function compilerBResolveMacroApplications(' "$syntax_parser" >/dev/null || fail "missing compile-time macro application resolution"
+grep -F 'let parameterIdentityTokenIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro signatures do not retain parameter identities"
+grep -F 'let argumentValueExpressionSyntaxIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro applications do not retain argument expressions"
+grep -F 'function compilerBMacroParameterBindingStatus(' "$syntax_query_api" >/dev/null || fail "missing typed macro parameter binding"
+grep -F 'function compilerBMacroRelationshipCount(' "$syntax_query_api" >/dev/null || fail "missing identity-indexed macro relationship query"
+grep -F 'function compilerBFunctionCardinalityQueryExecute(' "$syntax_query_api" >/dev/null || fail "missing identity-indexed function cardinality query"
+if grep -F 'CompilerBMacroAttachmentIndex' "$syntax_model" "$syntax_parser" "$syntax_query_api" >/dev/null; then
+    fail "macro relationships are duplicated into a separate attachment index"
+fi
+if rg -n 'CompilerB(Generic|TypeParameter|Specialization)' "$COMPILER_B_ROOT/Sources/CompilerB" >/dev/null; then
+    fail "Compiler B still contains an explicit generic syntax or specialization model"
+fi
+grep -F 'function compilerBParseMacroApplicationChain(' "$syntax_parser" >/dev/null || fail "syntax parser does not own macro application discovery"
+grep -F 'function compilerBParseMemberFacet(' "$syntax_parser" >/dev/null || fail "syntax parser does not retain Member facets"
+grep -F 'function compilerBParseFunctionFacets(' "$syntax_parser" >/dev/null || fail "syntax parser does not own function signature and return discovery"
+if rg -n 'environment in|compilerBExecuteSelfMacro|CompilerBEnvironmentAccess' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
+    fail "Compiler B still contains the retired explicit environment binder or inspect executor"
+fi
+grep -F 'macro collectionModifier(): Function {}' "$bool_macro" >/dev/null || fail "missing collection-modifier marker declaration"
+grep -F '@collectionModifier' "$bool_macro" >/dev/null || fail "filter is not marked as a collection modifier"
+grep -F 'function filter(named: String): @many -> @any {' "$bool_macro" >/dev/null || fail "filter does not declare its cardinality transform"
+grep -F 'function map(transform: Function): @many -> @many {' "$bool_macro" >/dev/null || fail "map does not declare its cardinality-preserving transform"
+grep -F 'state input: #environment.target.root()' "$bool_macro" >/dev/null || fail "filter does not consume its attached predecessor root"
+grep -F 'revision.functionDeclarations.syntaxIDs.element(index: declarationRow)' "$backend_model" >/dev/null || fail "backend does not query canonical Function identities"
+grep -F 'revision.functionSignatures.returnTypeTokenIDs.element(' "$backend_model" >/dev/null || fail "backend does not query canonical function signatures"
+if grep -F 'revision.returns' "$representation_model" >/dev/null; then
+    fail "macro execution still consumes function Return relationships"
+fi
+grep -F 'revision.returns.firstValueTokenIDs.element(index: returnRow)' "$backend_model" >/dev/null || fail "backend does not query canonical Return relationships"
+grep -F 'let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: source))' "$backend_model" >/dev/null || fail "backend does not enter through one canonical syntax revision"
+if grep -E 'CompilerB(FunctionIndex|IRFunctionStore|IndexedProgram|IntegerLiteralStore|IntegerRepresentationStore)' "$backend_model" "$representation_model" >/dev/null; then
+    fail "backend still copies graph facts into a parallel program or IR store"
+fi
+if rg -n 'compilerB(ParseDecimalToken|ExecuteIntegerRepresentationApplications)' "$representation_model" "$backend_model" >/dev/null; then
+    fail "integer lowering still reparses tokens or copies representation facts"
+fi
+if rg -n 'expected: "integer"|name == "integer"|name != "integer"' "$representation_model" "$backend_model" >/dev/null; then
+    fail "Compiler B still dispatches macro execution by the integer macro name"
+fi
+if rg -n 'compilerB(IntegerRepresentation|ExecuteIntegerRepresentation|ParseDecimalToken)' "$representation_model" "$backend_model" >/dev/null; then
+    fail "integer semantics still use the retired compiler-owned representation path"
+fi
+grep -F 'function compilerBParseProcessFacets(' "$syntax_parser" >/dev/null || fail "functions and macros do not share one process parser"
+grep -F 'construct CompilerBLocalBindingFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain local bindings"
+grep -F 'construct CompilerBNoValueFallbackFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain no-value fallbacks"
+grep -F 'construct CompilerBConditionalFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain conditionals"
+grep -F 'construct CompilerBGraphEffectFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain graph effects"
+grep -F 'construct CompilerBMemberCompositionFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain direct member compositions"
+grep -F 'function compilerBExecuteMacroApplicationInto(' "$representation_model" >/dev/null || fail "missing shared macro process executor"
+grep -F 'macro integer(): Construct -> LLVM {' "$integer_macro" >/dev/null || fail "missing Range-owned Core integer macro body"
+grep -F 'macro many(count: Int): Member -> LLVM {' "$many_macro" >/dev/null || fail "missing Range-owned Core many macro body"
+grep -F 'let modifiers: #environment.graph.functions.filter(all: @collectionModifier)' "$many_macro" >/dev/null || fail "many macro does not query collection modifiers from the graph"
+grep -F 'extension #environment.target.identity {' "$many_macro" >/dev/null || fail "many macro does not compose modifiers onto its target identity"
+grep -F '#modifier' "$many_macro" >/dev/null || fail "many macro does not splice the canonical modifier syntax identity"
+if grep -F 'asAttachedMember' "$many_macro" >/dev/null; then
+    fail "many macro hides direct modifier composition behind an attachment helper"
+fi
+grep -F 'LLVM.type(' "$many_macro" >/dev/null || fail "many macro is missing its LLVM type execution"
+grep -F 'LLVM.value(' "$many_macro" >/dev/null || fail "many macro is missing its LLVM value execution"
+if grep -F 'return LLVM(' "$many_macro" >/dev/null; then
+    fail "many macro still hides multiple executions in one LLVM aggregate"
+fi
+grep -Fx 'macro integer(): Construct -> Void {}' "$integer_bootstrap_macro" >/dev/null || fail "missing accepted-A integer bootstrap signature"
+if rg -n '^macro integer\(' "$representation_model" >/dev/null; then
+    fail "integer macro declaration is still embedded in representation execution"
+fi
+if rg -n 'LLVM\.Integer|return LLVM\(' "$representation_model" "$integer_macro" "$many_macro" "$REPO_ROOT/Testing/CompilerB/Pass/MacroProductIdentity.range" >/dev/null; then
+    fail "Compiler B still contains the returned-LLVM compatibility path"
+fi
+grep -F 'first: "LLVM"' "$representation_model" >/dev/null || fail "macro execution does not dispatch through its returned LLVM product"
+if grep -F 'compilerBCaptureMacroApplications' "$representation_model" "$backend_model" >/dev/null; then
+    fail "macro applications are still rediscovered outside the syntax parser"
+fi
+if grep -F 'compilerBIndexRetainedFunctionsPass' "$backend_model" >/dev/null; then
+    fail "backend still owns the retired retained-token function scanner"
+fi
+if grep -E 'expected: "(function|construct|return)"' "$backend_model" >/dev/null; then
+    fail "backend still classifies structural syntax keywords"
+fi
+grep -F '@integer' "$byte_model" >/dev/null || fail "Byte is missing its integer representation macro"
+grep -F 'let bits: Int(8)' "$byte_model" >/dev/null || fail "Byte does not own its bit width"
+grep -F 'let signed: Bool(false)' "$byte_model" >/dev/null || fail "Byte does not own its signedness"
+grep -F 'state bytes: Buffer<Byte>' "$string_model" >/dev/null || fail "String storage is not modeled as Buffer<Byte>"
+if grep -Eq '^(void \*|int32_t) (readFile|writeFile|listFiles|firstRangeFile)\(' "$host_runtime"; then
+    fail "host runtime still owns a high-level file operation"
+fi
+if grep -Eq '^(void \*|int32_t) directoryPrimitive(Open|Advance|EntryName|EntryKind|Close)\(' "$host_runtime"; then
+    fail "host runtime still owns directory execution"
+fi
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$direct_directory_fixture" "$REPO_ROOT/Testing/CompilerB/Pass"
+direct_missing_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$direct_directory_fixture" "$work_root/missing-directory" || direct_missing_status=$?
+[[ "$direct_missing_status" -eq 66 ]] || fail "direct libc opendir did not preserve missing-directory failure"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$token_identity_fixture" "$fixture"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$syntax_revision_fixture" "$syntax_revision_fixture" > "$syntax_revision_output"
+grep -F $'syntaxSignal\tchange=removed\trevision=previous\tidentity=40' "$syntax_revision_output" >/dev/null || fail "removed syntax signal is incorrect"
+grep -F $'graphQuery\ttype=Construct.Declaration\trevision=previous\tidentity=40\tfound=true\tname=Old\tbody=54' "$syntax_revision_output" >/dev/null || fail "previous-revision Construct.Declaration query did not resolve its rich facet"
+grep -F $'syntaxSignal\tchange=changed\trevision=current\tidentity=39' "$syntax_revision_output" >/dev/null || fail "changed syntax signal did not retain its shifted identity"
+grep -F $'graphQuery\ttype=Function.Declaration\trevision=current\tidentity=39\tfound=true\tname=alpha\tbody=61' "$syntax_revision_output" >/dev/null || fail "shifted current-revision Function.Declaration query did not resolve its rich facet"
+grep -F $'syntaxSignal\tchange=added\trevision=current\tidentity=0' "$syntax_revision_output" >/dev/null || fail "added syntax signal is incorrect"
+grep -F $'graphQuery\ttype=Function.Declaration\trevision=current\tidentity=0\tfound=true\tname=beta\tbody=21' "$syntax_revision_output" >/dev/null || fail "added current-revision Function.Declaration query did not resolve its rich facet"
+grep -F $'syntaxDeltaCount=3\tadded=1\tremoved=1\tchanged=1\tvalid=true' "$syntax_revision_output" >/dev/null || fail "syntax revision diff summary is incorrect"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$member_macro_fixture" > "$member_macro_output"
+grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=state\tname=count\ttype=Int\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "owned state Member facet is incorrect"
+grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=-1\tkind=let\tname=seed\ttype=Int\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "top-level let Member facet is incorrect"
+[[ "$(grep -c $'^macroRelationship\tapplication=[0-9].*\tdeclaration=[0-9].*\ttarget=[0-9]' "$member_macro_output")" -eq 2 ]] || fail "@print applications did not expose two graph relationships"
+grep -E $'^macroTargetIndex\tdeclaration=[0-9]+\ttargets=2$' "$member_macro_output" >/dev/null || fail "@print target index does not contain both Members"
+if grep -F $'macroExecution\t' "$member_macro_output" >/dev/null; then
+    fail "marker @print unexpectedly executed a macro body"
+fi
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$member_macro_mismatch_fixture" > "$member_macro_mismatch_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro target does not satisfy declared type' "$member_macro_mismatch_output" >/dev/null || fail "non-Member @print target rejected at the wrong boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_relationship_fixture" > "$macro_relationship_output"
+grep -E $'^syntaxNode\tmarker=macro\tid=[0-9]+\tparent=-1\tname=extern\ttarget=Function\tresult=\tstart=[0-9]+\tend=[0-9]+$' "$macro_relationship_output" >/dev/null || fail "empty extern marker macro signature is incorrect"
+[[ "$(grep -c $'^macroRelationship\tapplication=[0-9].*\tdeclaration=[0-9].*\ttarget=[0-9]' "$macro_relationship_output")" -eq 2 ]] || fail "extern applications do not expose two resolved graph relationships"
+grep -E $'^macroTargetIndex\tdeclaration=[0-9]+\ttargets=2$' "$macro_relationship_output" >/dev/null || fail "extern relationship query does not contain both Functions"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_fixture" > "$macro_argument_output"
+[[ "$(grep -c $'^macroParameter\t' "$macro_argument_output")" -eq 3 ]] || fail "macro declaration did not retain all typed parameters"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=count\ttype=Int\tordinal=0$' "$macro_argument_output" >/dev/null || fail "Int macro parameter is incorrect"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=enabled\ttype=Bool\tordinal=1$' "$macro_argument_output" >/dev/null || fail "Bool macro parameter is incorrect"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=label\ttype=String\tordinal=2$' "$macro_argument_output" >/dev/null || fail "String macro parameter is incorrect"
+[[ "$(grep -c $'^macroArgument\t' "$macro_argument_output")" -eq 3 ]] || fail "macro application did not retain exactly three arguments"
+grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=count\tvalue=[0-9]+\tkind=integer\tordinal=0$' "$macro_argument_output" >/dev/null || fail "Int macro argument is incorrect"
+grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=enabled\tvalue=[0-9]+\tkind=boolean\tordinal=1$' "$macro_argument_output" >/dev/null || fail "Bool macro argument is incorrect"
+grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=label\tvalue=[0-9]+\tkind=string\tordinal=2$' "$macro_argument_output" >/dev/null || fail "String macro argument is incorrect"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$macro_argument_output" >/dev/null || fail "valid typed macro arguments were rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_missing_fixture" > "$macro_argument_failure_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro argument is missing' "$macro_argument_failure_output" >/dev/null || fail "missing macro argument rejected at the wrong boundary"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_type_fixture" > "$macro_argument_failure_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro argument does not satisfy parameter type' "$macro_argument_failure_output" >/dev/null || fail "mistyped macro argument rejected at the wrong boundary"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_unknown_fixture" > "$macro_argument_failure_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro argument label is not declared' "$macro_argument_failure_output" >/dev/null || fail "unknown macro argument rejected at the wrong boundary"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_duplicate_fixture" > "$macro_argument_failure_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro argument is duplicated' "$macro_argument_failure_output" >/dev/null || fail "duplicate macro argument rejected at the wrong boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$bool_macro" > "$bool_macro_output"
+grep -E $'^functionCardinality\tfunction=[0-9]+\tinput=many\toutput=any$' "$bool_macro_output" >/dev/null || fail "filter cardinality transform was not retained"
+grep -E $'^functionCardinality\tfunction=[0-9]+\tinput=many\toutput=many$' "$bool_macro_output" >/dev/null || fail "map cardinality transform was not retained"
+grep -E $'^functionModifier\tapplication=[0-9]+\tmarker=[0-9]+\tfunction=[0-9]+\tinput=many\toutput=any$' "$bool_macro_output" >/dev/null || fail "collection modifier was not collected by resolved graph identity"
+grep -E $'^functionModifier\tapplication=[0-9]+\tmarker=[0-9]+\tfunction=[0-9]+\tinput=many\toutput=many$' "$bool_macro_output" >/dev/null || fail "map was not collected as a cardinality-preserving modifier"
+grep -E $'^callRoot\texpression=[0-9]+\trootStart=[0-9]+\trootEnd=[0-9]+\troot=#environment\.target\tfunction=root$' "$bool_macro_output" >/dev/null || fail "modifier input does not retain the environment target root"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$bool_macro_output" >/dev/null || fail "canonical collection modifier source did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$collection_modifier_root_fixture" > "$collection_modifier_root_output"
+grep -E $'^callRoot\texpression=[0-9]+\trootStart=[0-9]+\trootEnd=[0-9]+\troot=Something\.something\tfunction=filter$' "$collection_modifier_root_output" >/dev/null || fail "qualified collection modifier call did not retain its exact predecessor root"
+grep -E $'^callRoot\texpression=[0-9]+\trootStart=[0-9]+\trootEnd=[0-9]+\troot=Something\.something\tfunction=map$' "$collection_modifier_root_output" >/dev/null || fail "qualified map call did not retain its exact predecessor root"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$collection_modifier_root_output" >/dev/null || fail "qualified collection modifier root fixture did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$collection_modifier_cardinalities_fixture" > "$collection_modifier_cardinalities_output"
+[[ "$(grep -c $'^functionModifier\t' "$collection_modifier_cardinalities_output")" -eq 2 ]] || fail "collection modifier marker did not collect both cardinality functions"
+grep -E $'^functionModifier\tapplication=[0-9]+\tmarker=[0-9]+\tfunction=[0-9]+\tinput=many\toutput=some$' "$collection_modifier_cardinalities_output" >/dev/null || fail "many-to-some collection mapping was not retained"
+grep -E $'^functionModifier\tapplication=[0-9]+\tmarker=[0-9]+\tfunction=[0-9]+\tinput=some\toutput=many$' "$collection_modifier_cardinalities_output" >/dev/null || fail "some-to-many collection mapping was not retained"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$collection_modifier_cardinalities_output" >/dev/null || fail "collection modifier cardinality fixture did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$integer_macro" > "$integer_macro_output"
+grep -F $'token\tid=28\tkind=string\ttext="bits"' "$integer_macro_output" >/dev/null || fail "integer macro query string was not retained as one token"
+[[ "$(grep -c $'^processLocal\t.*\tnoValueFallback=true\trhsKind=string$' "$integer_macro_output")" -eq 2 ]] || fail "integer macro did not retain its two diagnostic no-value bindings"
+[[ "$(grep -c $'^processIf\t' "$integer_macro_output")" -eq 2 ]] || fail "diagnostic macro did not retain both conditional operations"
+[[ "$(grep -c $'^graphEffect\t.*\tname=diagnostic\t' "$integer_macro_output")" -eq 2 ]] || fail "diagnostic macro did not retain both graph effects"
+[[ "$(grep -c $'^processExecution\t' "$integer_macro_output")" -eq 2 ]] || fail "integer macro did not retain separate LLVM type and value executions"
+grep -E $'^processExecution\t.*\tordinal=0\tfunction=LLVM\.type$' "$integer_macro_output" >/dev/null || fail "integer macro LLVM.type execution is missing or unordered"
+grep -E $'^processExecution\t.*\tordinal=1\tfunction=LLVM\.value$' "$integer_macro_output" >/dev/null || fail "integer macro LLVM.value execution is missing or unordered"
+[[ "$(grep -c $'^macroRelationship\t' "$integer_macro_output")" -eq 2 ]] || fail "@diagnostic did not resolve against both local bindings"
+grep -E $'^macroTargetIndex\tdeclaration=[0-9]+\ttargets=2$' "$integer_macro_output" >/dev/null || fail "diagnostic macro target index is not identity-unique"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$integer_macro_output" >/dev/null || fail "canonical Integer macro source did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_macro" > "$many_macro_output"
+grep -E $'^callRoot\texpression=[0-9]+\trootStart=[0-9]+\trootEnd=[0-9]+\troot=#environment\.graph\.functions\tfunction=filter$' "$many_macro_output" >/dev/null || fail "many macro graph modifier query was not retained as a canonical call"
+grep -E $'^processLocal\t.*\tname=modifiers\t.*\tnoValueFallback=false\trhsKind=$' "$many_macro_output" >/dev/null || fail "many macro modifier query result was not retained as a local value"
+grep -E $'^memberComposition\tid=[0-9]+\towner=[0-9]+\ttarget=#environment\.target\.identity\tsource=modifier$' "$many_macro_output" >/dev/null || fail "many macro direct modifier syntax composition was not retained"
+[[ "$(grep -c $'^processExecution\t' "$many_macro_output")" -eq 2 ]] || fail "many macro did not retain two independent execution states"
+grep -E $'^processExecution\t.*\tordinal=0\tfunction=LLVM\.type$' "$many_macro_output" >/dev/null || fail "many macro LLVM.type execution is missing or unordered"
+grep -E $'^processExecution\t.*\tordinal=1\tfunction=LLVM\.value$' "$many_macro_output" >/dev/null || fail "many macro LLVM.value execution is missing or unordered"
+[[ "$(grep -c $'^processIf\t' "$many_macro_output")" -eq 1 ]] || fail "many macro did not retain its count validation"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$many_macro_output" >/dev/null || fail "canonical many macro source did not produce a valid B graph"
+
+{
+    cat "$integer_macro"
+    cat "$backend_int_representation_fixture"
+    cat "$backend_product_fixture"
+} > "$backend_int_source"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_int_source" > "$backend_llvm"
+grep -F '; range-b canonical-functions=1 macro-applications=3 macro-emissions=1' "$backend_llvm" >/dev/null || fail "missing canonical macro graph-to-LLVM function query proof"
+grep -E '^; range-b macro-application identity=[0-9]+ declaration=[0-9]+ name=integer target=[0-9]+ ordinal=0$' "$backend_llvm" >/dev/null || fail "Int macro relationship is incorrect"
+grep -E '^; range-b macro-execution application=[0-9]+ target=[0-9]+ product=LLVM$' "$backend_llvm" >/dev/null || fail "Int macro body did not execute into an LLVM product"
+grep -E '^; range-b application-value identity=[0-9]+ token=[0-9]+ value=42 macro=[0-9]+$' "$backend_llvm" >/dev/null || fail "Int application value did not flow through macro execution"
+grep -F '%Range.Int = type { i32 }' "$backend_llvm" >/dev/null || fail "B did not emit Int's nominal LLVM type"
+[[ "$(grep -c '^define %Range.Int @answer()' "$backend_llvm")" -eq 1 ]] || fail "B did not emit exactly one canonical answer definition"
+grep -F '  ret %Range.Int { i32 42 }' "$backend_llvm" >/dev/null || fail "B did not lower the Int application value into LLVM"
+grep -F '  %scalar = extractvalue %Range.Int %aggregate, 0' "$backend_llvm" >/dev/null || fail "B did not extract Int's process result"
+clang -O0 -Wno-override-module "$backend_llvm" -o "$backend_executable"
+backend_product_status=0
+"$backend_executable" || backend_product_status=$?
+[[ "$backend_product_status" -eq 42 ]] || fail "B-emitted runtime-free LLVM product did not exit 42"
+if nm -u "$backend_executable" | grep -E '(range|Range|CompilerHost)' >/dev/null; then
+    fail "B-emitted product still depends on a Range C runtime symbol"
+fi
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_product_identity_fixture" > "$backend_product_identity_output"
+grep -E '^; range-b macro-application identity=[0-9]+ declaration=[0-9]+ name=scalar target=[0-9]+ ordinal=0$' "$backend_product_identity_output" >/dev/null || fail "renamed scalar macro relationship is incorrect"
+grep -F '%Range.Tiny = type { i8 }' "$backend_product_identity_output" >/dev/null || fail "macro execution still depends on the integer macro name"
+grep -F '  ret %Range.Tiny { i8 42 }' "$backend_product_identity_output" >/dev/null || fail "renamed scalar macro did not emit its application value"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_macro_argument_fixture" > "$backend_macro_argument_output"
+grep -F '%Range.Tiny = type { i8 }' "$backend_macro_argument_output" >/dev/null || fail "bound macro argument did not interpolate into LLVM.type"
+grep -F '  ret %Range.Tiny { i8 42 }' "$backend_macro_argument_output" >/dev/null || fail "bound macro argument did not interpolate into LLVM.value"
+clang -O0 -Wno-override-module "$backend_macro_argument_output" -o "$backend_macro_argument_executable"
+backend_macro_argument_status=0
+"$backend_macro_argument_executable" || backend_macro_argument_status=$?
+[[ "$backend_macro_argument_status" -eq 42 ]] || fail "macro-argument LLVM product did not exit 42"
+
+backend_returned_product_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_returned_product_fixture" > "$backend_returned_product_output" || backend_returned_product_status=$?
+[[ "$backend_returned_product_status" -eq 65 ]] || fail "returned LLVM aggregate did not reject with exit 65"
+grep -F $'compilerBBackendError\tmacro execution is missing' "$backend_returned_product_output" >/dev/null || fail "returned LLVM aggregate rejected at the wrong boundary"
+
+{
+    cat "$integer_macro"
+    cat "$byte_model"
+    cat "$backend_byte_product_fixture"
+} > "$backend_byte_source"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_byte_source" > "$backend_byte_llvm"
+grep -E '^; range-b macro-application identity=[0-9]+ declaration=[0-9]+ name=integer target=[0-9]+ ordinal=0$' "$backend_byte_llvm" >/dev/null || fail "Byte macro relationship is incorrect"
+grep -E '^; range-b macro-execution application=[0-9]+ target=[0-9]+ product=LLVM$' "$backend_byte_llvm" >/dev/null || fail "Byte macro body did not execute into an LLVM product"
+grep -E '^; range-b application-value identity=[0-9]+ token=[0-9]+ value=42 macro=[0-9]+$' "$backend_byte_llvm" >/dev/null || fail "Byte application value did not flow through macro execution"
+grep -F '%Range.Byte = type { i8 }' "$backend_byte_llvm" >/dev/null || fail "B did not lower Byte to one LLVM byte"
+grep -F 'define %Range.Byte @answer()' "$backend_byte_llvm" >/dev/null || fail "B did not emit Byte's nominal result"
+grep -F '  ret %Range.Byte { i8 42 }' "$backend_byte_llvm" >/dev/null || fail "B did not emit the Byte application value"
+grep -F '  %scalar = extractvalue %Range.Byte %aggregate, 0' "$backend_byte_llvm" >/dev/null || fail "B did not extract Byte's process result"
+grep -F '  %result = zext i8 %scalar to i32' "$backend_byte_llvm" >/dev/null || fail "B did not widen the Byte process result"
+clang -O0 -Wno-override-module "$backend_byte_llvm" -o "$backend_byte_executable"
+backend_byte_product_status=0
+"$backend_byte_executable" || backend_byte_product_status=$?
+[[ "$backend_byte_product_status" -eq 42 ]] || fail "B-emitted runtime-free Byte LLVM product did not exit 42"
+if nm -u "$backend_byte_executable" | grep -E '(range|Range|CompilerHost)' >/dev/null; then
+    fail "B-emitted Byte product still depends on a Range C runtime symbol"
+fi
+
+backend_rejection_status=0
+{
+    cat "$integer_macro"
+    cat "$backend_int_representation_fixture"
+    cat "$backend_rejection_fixture"
+} > "$backend_rejection_source"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_rejection_source" > "$backend_rejection_output" || backend_rejection_status=$?
+[[ "$backend_rejection_status" -eq 65 ]] || fail "unsupported B return expression did not reject with exit 65"
+grep -F $'compilerBBackendError\tfirst backend slice requires return <integer> as the complete body' "$backend_rejection_output" >/dev/null || fail "unsupported B return expression rejected at the wrong boundary"
+
+backend_byte_overflow_status=0
+{
+    cat "$integer_macro"
+    cat "$byte_model"
+    cat "$backend_byte_overflow_fixture"
+} > "$backend_byte_overflow_source"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_byte_overflow_source" > "$backend_byte_overflow_output" || backend_byte_overflow_status=$?
+[[ "$backend_byte_overflow_status" -eq 65 ]] || fail "out-of-range Byte literal did not reject with exit 65"
+grep -F $'compilerBBackendError\tinteger literal does not fit represented type' "$backend_byte_overflow_output" >/dev/null || fail "out-of-range Byte literal rejected at the wrong boundary"
+
+backend_missing_representation_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_missing_representation_fixture" > "$backend_missing_representation_output" || backend_missing_representation_status=$?
+[[ "$backend_missing_representation_status" -eq 65 ]] || fail "unrepresented Int did not reject with exit 65"
+grep -F $'compilerBBackendError\tfunction return type has no macro emission' "$backend_missing_representation_output" >/dev/null || fail "unrepresented Int rejected at the wrong boundary"
+
+backend_invalid_representation_status=0
+{
+    cat "$integer_macro"
+    cat "$backend_invalid_representation_fixture"
+} > "$backend_invalid_representation_source"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_invalid_representation_source" > "$backend_invalid_representation_output" || backend_invalid_representation_status=$?
+[[ "$backend_invalid_representation_status" -eq 65 ]] || fail "invalid integer representation did not reject with exit 65"
+grep -F $'compilerBBackendError\tinteger LLVM bits must be byte-aligned and at most 32' "$backend_invalid_representation_output" >/dev/null || fail "invalid integer representation rejected at the wrong boundary"
+
+backend_missing_metadata_status=0
+{
+    cat "$integer_macro"
+    cat "$backend_missing_metadata_fixture"
+} > "$backend_missing_metadata_source"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_missing_metadata_source" > "$backend_missing_metadata_output" || backend_missing_metadata_status=$?
+[[ "$backend_missing_metadata_status" -eq 65 ]] || fail "incomplete integer representation did not reject with exit 65"
+grep -F $'compilerBBackendError\tinteger LLVM execution requires a boolean signed query' "$backend_missing_metadata_output" >/dev/null || fail "incomplete integer representation rejected at the wrong boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$fixture" > "$output"
+
+grep -F "route=$fixture" "$output" >/dev/null || fail "missing route output"
+grep -F $'lex	valid=true' "$output" >/dev/null || fail "missing valid lexer output"
+grep -F $'tokenCount=' "$output" >/dev/null || fail "missing lexer token count"
+grep -F $'token\tid=0\tkind=identity' "$output" >/dev/null || fail "lexer did not render retained token identity and concrete kind"
+grep -F $'syntax	valid=true' "$output" >/dev/null || fail "missing valid syntax summary"
+grep -F $'syntaxNode	marker=function	id=0	parent=-1	name=first' "$output" >/dev/null || fail "missing first function syntax identity"
+grep -F $'syntaxNode	marker=block	id=22	parent=0' "$output" >/dev/null || fail "first function block does not reference its declaration identity"
+grep -F $'syntaxNode	marker=construct	id=40	parent=-1	name=Point' "$output" >/dev/null || fail "missing construct syntax identity"
+grep -F $'syntaxNode	marker=block	id=56	parent=40' "$output" >/dev/null || fail "construct block does not reference its declaration identity"
+grep -F $'syntaxNode	marker=function	id=76	parent=-1	name=second' "$output" >/dev/null || fail "missing second function syntax identity"
+grep -F $'syntaxNode	marker=block	id=99	parent=76' "$output" >/dev/null || fail "second function block does not reference its declaration identity"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$token_syntax_fixture" > "$token_syntax_output"
+grep -F $'token	id=1	kind=identity	text=value2' "$token_syntax_output" >/dev/null || fail "digit-bearing declaration name was not retained as one identity token"
+grep -F $'syntaxNode	marker=function	id=0	parent=-1	name=value2' "$token_syntax_output" >/dev/null || fail "syntax parser did not consume the retained digit-bearing identity"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_declaration_fixture" > "$generic_declaration_output"
+grep -F $'syntax	valid=false	diagnostic=Compiler B does not accept generic syntax; express the relationship through the graph' "$generic_declaration_output" >/dev/null || fail "generic declaration syntax did not reject at the graph-relationship boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_member_fixture" > "$generic_member_output"
+grep -F $'syntax	valid=false	diagnostic=Compiler B does not accept generic syntax; express the relationship through the graph' "$generic_member_output" >/dev/null || fail "generic member type syntax did not reject at the graph-relationship boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_function_type_fixture" > "$generic_function_type_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=Compiler B does not accept generic syntax; express the relationship through the graph' "$generic_function_type_output" >/dev/null || fail "generic function type syntax did not reject at the graph-relationship boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$REPO_ROOT/Testing/CompilerB/Pass" > "$directory_output"
+grep -F "route=$REPO_ROOT/Testing/CompilerB/Pass" "$directory_output" >/dev/null || fail "missing directory route output"
+grep -F "$REPO_ROOT/Testing/CompilerB/Pass/SyntaxNodes.range" "$directory_output" >/dev/null || fail "directory cursor missed SyntaxNodes.range"
+grep -F "$REPO_ROOT/Testing/CompilerB/Pass/SourceGraphFunction.range" "$directory_output" >/dev/null || fail "directory cursor missed SourceGraphFunction.range"
+grep -F $'syntax	valid=true' "$directory_output" >/dev/null || fail "directory-selected source did not parse"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$file_manager_fixture" "$file_manager_output"
+[[ "$(<"$file_manager_output")" == "alpha-beta" ]] || fail "FileManager write/append/read round trip did not persist expected text"
+
+echo "range compiler b check: pass (file routes, IO round trip, string-aware lexer, syntax revisions/deltas, typed macro arguments, cardinality fallbacks, diagnostic-effect graph facts, canonical source-template LLVM products, and runtime-free Byte/Int slices)"

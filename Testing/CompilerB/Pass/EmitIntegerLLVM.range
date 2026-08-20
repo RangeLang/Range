@@ -1,0 +1,17 @@
+function compilerBEmitIntegerLLVMEntry(): Int {
+    if commandLineArgumentCount() != 1 {
+        return 64
+    }
+    let source: String(fileManagerReadFile(path: commandLineArgument(index: 0)))
+    let module: CompilerBLLVMModule(compilerBEmitLLVM(source: source))
+    if !module.valid {
+        print(value: "compilerBBackendError\t\(module.diagnostic)")
+        return 65
+    }
+    print(value: module.text)
+    return 0
+}
+
+@main {
+    return compilerBEmitIntegerLLVMEntry()
+}

@@ -1,0 +1,13 @@
+function createHashingSound(audio: Audio, frame: Buffer<Number>){
+  //filter code
+  audio.bandpass: Filter {
+
+    bandpass.frequency: frame.map { position in
+      900 + easeInOut(position) * 1000
+    }
+  }
+
+  audio.frequency: 1900
+  audio.gain: 0.05
+
+}

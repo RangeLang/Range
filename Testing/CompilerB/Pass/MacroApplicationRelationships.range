@@ -1,0 +1,11 @@
+macro extern(): Function {}
+
+@extern
+function firstNative(): Int {
+    return 0
+}
+
+@extern
+function secondNative(): Int {
+    return 0
+}

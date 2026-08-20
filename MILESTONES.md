@@ -63,28 +63,35 @@ Outcome:
 
 This invariant applies to every later milestone.
 
-## Active compiler fork node — Complete Compiler B
+## Active compiler fork node — Greenfield Compiler B
 
-Compiler B is a complete fork under `RangeCompilerB/`, not a fixture-shaped
-lexer or a second set of phases embedded into Compiler A. Compiler A is frozen
-and produces B once; B then compiles the same B source revision. Byte-identical
-candidate/reproduction LLVM and executables are B's first acceptance boundary.
-RangeView is the first independent product only after that self-hosting proof.
+Status: active, pre-self-hosting.
 
-The fork includes B-owned Core, Foundation, compiler, and runtime sources while
-excluding any copied bootstrap. All compiler evolution now belongs to B. Its
-first architectural replacement is project/file gathering in the Range driver;
-later graph-native phases delete inherited tables, reparsing, body arenas, and
-serialized compatibility records one proven vertical slice at a time.
+Compiler B is a minimal B-owned compiler under `Projects/RangeCompilerB/`.
+Compiler A is the frozen accepted bootstrap that builds B; it does not hand B
+typed syntax or later compiler products. B grows through focused runnable
+slices and does not inherit A's compiler tree, body arenas, or phase tables.
+
+Current checkpoint: self-source lexical and syntax correctness.
 
 Exit proof:
 
-- accepted A builds the complete B project;
-- the resulting B builds the same B source revision;
-- both LLVM artifacts and linked executables compare byte for byte; and
-- the reproduced B compiles and runs the first independent RangeView product.
+- accepted A builds and runs the current B slice;
+- B retains string- and comment-aware tokens with typed identities and source
+  ranges;
+- B parses its own `Main.range` and `Lexer.range` from those retained tokens;
+  and
+- the focused check asserts the exact expected top-level declarations and Block
+  relationships for both files.
+
+Self-compilation, byte-identical B candidate/reproduction artifacts, and an
+independent RangeView product are later milestones. They are not claims or
+requirements of the current checkpoint.
 
 ## Milestone 1 — Reduce Typed Function Reconstruction in V1
+
+Status: historical Compiler A work; frozen unless reactivated through the
+Compiler A escape valve.
 
 Outcome:
 

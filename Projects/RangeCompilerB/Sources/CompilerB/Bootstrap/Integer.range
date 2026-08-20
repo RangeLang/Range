@@ -1,0 +1,4 @@
+// Accepted Compiler A only needs this signature while it builds Compiler B.
+// Compiler B parses and owns Core/Macros/Integer.range as language input.
+macro storage(): Construct -> Void {}
+macro integer(): Construct -> Void {}

@@ -1,0 +1,14 @@
+function directDirectoryLLVMEntry(path: String): Int {
+    let directory: DirectoryHandle(opendir(path: rangeStringData(value: path)))
+    if nativeDirectoryHandleIsValid(handle: directory) == 0 {
+        return 66
+    }
+    return closedir(directory: directory)
+}
+
+@main {
+    if commandLineArgumentCount() != 1 {
+        return 64
+    }
+    return directDirectoryLLVMEntry(path: commandLineArgument(index: 0))
+}

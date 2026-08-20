@@ -1,0 +1,69 @@
+function compilerBSyntaxRevisionSignalValuesAreValid(
+    delta: CompilerBSyntaxDelta
+): Bool {
+    let removed: CompilerBSyntaxDeltaSignal(compilerBSyntaxDeltaSignal(
+        delta: delta,
+        row: 0
+    ))
+    let changed: CompilerBSyntaxDeltaSignal(compilerBSyntaxDeltaSignal(
+        delta: delta,
+        row: 1
+    ))
+    let added: CompilerBSyntaxDeltaSignal(compilerBSyntaxDeltaSignal(
+        delta: delta,
+        row: 2
+    ))
+    if removed.change != .removed
+        || removed.revision != .previous
+        || removed.identity.value != 40 { return false }
+    if changed.change != .changed
+        || changed.revision != .current
+        || changed.identity.value != 39 { return false }
+    if added.change != .added
+        || added.revision != .current
+        || added.identity.value != 0 { return false }
+    return true
+}
+
+function compilerBSyntaxRevisionDifferenceRun(
+    previousSource: String,
+    currentSource: String
+): Int {
+    let previous: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: previousSource))
+    let current: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: currentSource))
+    let delta: CompilerBSyntaxDelta(compilerBSyntaxRevisionsApply(
+        previous: previous,
+        current: current,
+        operation: .difference
+    ))
+
+    print(value: compilerBRenderSyntaxDelta(
+        previous: previous,
+        current: current,
+        delta: delta
+    ))
+
+    state result: Int(0)
+    if !previous.valid || !current.valid || !delta.valid { result: 1 }
+    if result == 0 && delta.addedCount != 1 { result: 2 }
+    if result == 0 && delta.removedCount != 1 { result: 3 }
+    if result == 0 && delta.changedCount != 1 { result: 4 }
+    if result == 0 && !compilerBSyntaxRevisionSignalValuesAreValid(delta: delta) {
+        result: 5
+    }
+    if compilerBSyntaxDeltaDestroy(delta: delta) != 0 { result: 10 }
+    if compilerBSyntaxRevisionDestroy(revision: current) != 0 { result: 11 }
+    if compilerBSyntaxRevisionDestroy(revision: previous) != 0 { result: 12 }
+    return result
+}
+
+function compilerBSyntaxRevisionDifferenceEntry(): Int {
+    return compilerBSyntaxRevisionDifferenceRun(
+        previousSource: "function alpha(): Int {\n    return 1\n}\n\nconstruct Old {\n}\n",
+        currentSource: "function beta(): Int {\n    return 3\n}\n\nfunction alpha(): Int {\n    return 2\n}\n"
+    )
+}
+
+@main {
+    return compilerBSyntaxRevisionDifferenceEntry()
+}
