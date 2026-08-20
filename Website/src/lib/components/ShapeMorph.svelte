@@ -40,26 +40,21 @@
    * One turn of a recursive morph and zoom, in flat colour with no strokes.
    *
    * The active blue circle is also the crop. It morphs into a triangle while
-   * the paired paper triangle morphs into a circle. The alternating stack then
-   * scales from one to four. Its next blue circle grows from the triangle's
-   * incircle to the full outer radius and joins the clip as it grows, becoming
-   * the following turn's active mask without a visible reset.
+   * the paired paper triangle morphs into a circle and scales outward. No
+   * additional recursive shapes are painted inside that pair.
    */
   const unit = 200;
   /*
    * The inner triangle is half the crop's circumradius and reaches the crop at
-   * two times scale. The zoom continues to four times, when the blue circle
-   * nested inside that triangle reaches the same boundary.
+   * two times scale.
    */
   const cropRadius = 0.985;
   const radius = cropRadius / 2;
   /** 0 while the crop is a circle, 1 once it is a triangle. */
   let progress = $state(0);
-  /** Normalized progress from 1x to the completed 4x nested-stack zoom. */
+  /** Normalized progress from 1x to the completed 4x paired-shape zoom. */
   let zoomed = $state(0);
   let zoomScale = $derived(1 + zoomed * 3);
-  /** The promoted blue circle itself, used as the incoming half of the clip. */
-  let handoffRadius = $derived((cropRadius / 4) * zoomScale);
 
   function morphPath(localRadius: number, amount: number) {
     const circleOutline = shapeOutline(
@@ -83,30 +78,6 @@
 
   let cropPath = $derived(morphPath(cropRadius, progress));
   let innerPath = $derived(morphPath(radius, 1 - progress));
-
-  /*
-   * Every triangle's incircle has half its circumradius. Alternating a circle
-   * and triangle at that exact ratio makes the construction recursive. Ten
-   * visible layers take the stack below a rendered pixel. Deeper levels remain
-   * alternating circle/triangle masks during the current step instead of
-   * duplicating the active morph at every depth.
-   *
-   * These are the actual nested figures. None is a flash or cutout overlay.
-   */
-  let nestedLayers = $derived(
-    Array.from({ length: 10 }, (_, index) => {
-      const nestedRadius = radius / 2 ** (index + 1);
-      const fieldLayer = index % 2 === 0;
-      const kind = fieldLayer ? "circle" : "triangle";
-      return {
-        fieldLayer,
-        path: pathFromOutline(
-          shapeOutline(shapeCorners[kind], samples, nestedRadius),
-          unit / 2,
-        ),
-      };
-    }),
-  );
 
   const fieldColour = "var(--range)";
   const shapeColour = "var(--paper)";
@@ -241,19 +212,12 @@
     <defs>
       <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
         <path d={cropPath} />
-        <circle cx="0" cy="0" r={handoffRadius} />
       </clipPath>
     </defs>
     <g clip-path={`url(#${clipId})`}>
       <path d={cropPath} fill={fieldColour} />
       <g transform={`scale(${zoomScale})`}>
         <path d={innerPath} fill={shapeColour} />
-        {#each nestedLayers as layer}
-          <path
-            d={layer.path}
-            fill={layer.fieldLayer ? fieldColour : shapeColour}
-          />
-        {/each}
       </g>
     </g>
   </svg>

@@ -16,9 +16,15 @@ macro bool(): Construct {
 
 }
 
-macro collectionModifier(): Macro {}
+macro collection(): Macro {
 
-@collectionModifier
+  #modifier {
+
+
+  }
+}
+
+@collection.modifier
 macro filter(named: String): @many -> @any {
     state input: #environment.target
     state output: @any(capacity: input.capacity)
@@ -37,7 +43,7 @@ macro filter(named: String): @many -> @any {
     output
 }
 
-@collectionModifier
+@collection.modifier
 macro map(transform: Function): @many -> @many {
     state input: #environment.target
     state output: @many(capacity: input.count)

@@ -4,10 +4,15 @@ macro member(): Let | State | Derived | Binding -> Void {}
 macro many(): @member {}
 
 macro scalar(): Construct {
-    @diagnostic
-    let bits: #environment.target.Declaration.members.filter(named: "bits").first ? "Construct must specify bits"
-    @diagnostic
-    let signed: #environment.target.Declaration.members.filter(named: "signed").first ? "Construct must specify signed"
+    let bits: #environment.target.Declaration.members.filter(named: "bits").first
+    let signed: #environment.target.Declaration.members.filter(named: "signed").first
+
+    if !bits.isTarget {
+        #environment.diagnostic("Construct must specify bits")
+    }
+    if !signed.isTarget {
+        #environment.diagnostic("Construct must specify signed")
+    }
 
     #environment {
         extension #environment.target.Declaration {
@@ -18,8 +23,6 @@ macro scalar(): Construct {
         }
     }
 }
-
-macro diagnostic(): @member -> Void {}
 
 @scalar
 construct Tiny {

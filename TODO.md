@@ -144,13 +144,14 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         the projections must not fork into independent comparison code.
       - Observation code keeps no diagnostic channel: both sides of the step
         are already-valid graphs, so every rendered fact is graph knowledge.
-    - [ ] Sweep the remaining Core macros (`Bool.range`, `Integer`,
-      `Diagnostic.range`) for the Many.range diagnostic principle: graph-known
+    - [ ] Sweep the remaining Core macros (`Bool.range`, `Integer.range`) for
+      the Many.range diagnostic principle: graph-known
       facts are read without diagnostic fallbacks; only value-level facts the
       graph cannot know emit `#environment.diagnostic(...)`.
       - Extend `scripts/check-range-compiler-b` with per-macro assertions
-        mirroring the existing Many.range checks (no `@diagnostic` fallback on
-        guaranteed knowledge, diagnostics through the environment gate).
+        mirroring the existing Many.range checks (no optional String fallback
+        on guaranteed knowledge, diagnostics through ordinary `if` control
+        flow and the environment gate).
     - [ ] Rebuild the Compiler B gate around one produced compiler instead of
       per-fixture entry compilation.
       - [ ] Route fixtures into a B executable as input data (a parse/emit
@@ -281,15 +282,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             missing, duplicate, unknown, and mistyped `Int`, `Bool`, and
             `String` bindings, and expose bound scalar values to LLVM source
             template interpolation without macro-name dispatch.
-      - [x] Retain the first annotation-driven local process graph from the
+      - [x] Retain the first validation-driven local process graph from the
         canonical `Core/Macros/Integer.range` source.
-        - Two `@diagnostic` local bindings retain no-value RHS relationships
-          separately from one-value and many-value cardinality, resolve by
-          application/declaration/target identity, and expose String RHS facts.
-          The `diagnostic` macro retains two `if`
-          operations and two environment diagnostic effects without lowering or
-          executing them yet. A bootstrap-only empty `integer` signature lets
-          frozen Compiler A build B without making it the V3 macro authority.
+        - Two direct local graph queries resolve by
+          application/declaration/target identity. Ordinary `if` operations
+          guard two direct environment diagnostic effects; the redundant
+          diagnostic annotation applications, optional String fallback values, and
+          `diagnostic` Macro are removed. A bootstrap-only empty `integer`
+          signature lets frozen Compiler A build B without making it the V3
+          macro authority.
         - [x] Lower the canonical macro's independent `LLVM(type: ...)` and
           `LLVM(value: ...)` Environment nodes through graph identity. `\(bits)`
           resolves the local query to one Member and renders its scalar
@@ -353,7 +354,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
               parser retains calls as environment effects instead of a
               conflicting `graphEffects` lane. `many` reads its guaranteed
               declaration element type directly and no longer marks that query
-              with `@diagnostic` or an optional String fallback.
+              with a diagnostic annotation or an optional String fallback.
         - [ ] Execute the modifier process over the selected graph collection
           and materialize its bounded `@any` output; this checkpoint proves
           collection and query shape, not `while`/`append` evaluation.
@@ -384,8 +385,8 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             collection by walking every selected AST Macro Application.
             - Products retain both source Application and destination
               production identity. A focused two-Construct proof produces two
-              LLVM collection products, while unrelated `@diagnostic` and
-              `@many` Applications produce no placeholder rows. This also
+              LLVM collection products, while unrelated `@many` Applications
+              produce no placeholder rows. This also
               removes the former Application-row/product-row alignment
               dependency.
         - [ ] Move the remaining execution outputs (`status`, emitted LLVM,

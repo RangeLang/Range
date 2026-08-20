@@ -62,8 +62,9 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   `#environment.target`, `#environment.macros`, and
   `#environment.diagnostic(...)` are direct accesses rather than members of a
   second `#environment.graph` object. The process graph retains imperative
-  calls as environment effects; `@diagnostic` remains an ordinary Macro
-  relationship only where a fallible local query actually needs it.
+  calls as environment effects. Validation uses ordinary `if` control flow
+  with direct `#environment.diagnostic(...)` effects; there is no separate
+  diagnostic Macro or optional-fallback registration convention.
 - Representation macros emit ordinary initializer applications inside
   target-owned `#environment` extensions. `LLVM(type: ...)` belongs to the
   target Declaration and `LLVM(value: ...)` belongs to its Application; there
