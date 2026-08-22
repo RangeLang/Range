@@ -52,6 +52,23 @@ macro_argument_duplicate_fixture="$REPO_ROOT/Testing/CompilerB/Fail/DuplicateMac
 macro_argument_failure_output="$work_root/macro-argument-failure.out"
 application_execution_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ApplicationExecution.range"
 application_execution_output="$work_root/application-execution.out"
+enum_switch_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EnumSwitchGraph.range"
+enum_switch_output="$work_root/enum-switch.out"
+many_switch_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ManySwitchEnvironment.range"
+many_switch_output="$work_root/many-switch.out"
+many_switch_error_output="$work_root/many-switch.err"
+one_cardinality_fixture="$REPO_ROOT/Testing/CompilerB/Pass/OneCardinality.range"
+one_cardinality_output="$work_root/one-cardinality.out"
+llvm_collection_fixture="$REPO_ROOT/Testing/CompilerB/Pass/LLVMCollectionAfterExpansion.range"
+llvm_collection_output="$work_root/llvm-collection.out"
+freestanding_print_fixture="$REPO_ROOT/Testing/CompilerB/Pass/FreestandingPrintMacro.range"
+freestanding_print_output="$work_root/freestanding-print.out"
+many_print_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ManyPrintMacro.range"
+many_print_output="$work_root/many-print.out"
+many_print_mismatch_fixture="$REPO_ROOT/Testing/CompilerB/Fail/ManyPrintRequiresCollection.range"
+many_print_mismatch_output="$work_root/many-print-mismatch.out"
+freestanding_target_fixture="$REPO_ROOT/Testing/CompilerB/Fail/FreestandingMacroRequiresVoid.range"
+freestanding_target_output="$work_root/freestanding-target.out"
 backend_entry_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EmitIntegerLLVM.range"
 backend_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntegerReturnProduct.range"
 backend_integer_collection_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntegerLLVMCollection.range"
@@ -104,8 +121,13 @@ syntax_parser="$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/Parser.range"
 representation_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Representation.range"
 integer_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Integer.range"
 many_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Many.range"
+one_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/_Experiments/One.range"
+llvm_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/LLVM.range"
+diagnostic_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Diagnostic.range"
 member_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Member.range"
 bool_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Bool.range"
+print_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Print.range"
+command_group_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/CommandGroup.range"
 integer_bootstrap_macro="$COMPILER_B_ROOT/Sources/CompilerB/Bootstrap/Integer.range"
 backend_model="$COMPILER_B_ROOT/Sources/CompilerB/Backend.range"
 byte_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Byte.range"
@@ -130,8 +152,15 @@ grep -F 'function compilerBResolveMacroApplications(' "$syntax_parser" >/dev/nul
 grep -F 'let parameterIdentityTokenIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro signatures do not retain parameter identities"
 grep -F 'let afterLastTargetTypeTokenIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro signatures do not retain complete target alternatives"
 grep -F 'let argumentValueExpressionSyntaxIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro applications do not retain argument expressions"
+grep -F 'let parameterDefaultFirstTokenIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro signatures do not retain parameter defaults"
+grep -F 'let parameterOptionalValues: Buffer<Int>' "$syntax_model" >/dev/null || fail "macro signatures do not retain parameter optionality"
 grep -F 'function compilerBMacroParameterBindingStatus(' "$syntax_query_api" >/dev/null || fail "missing typed macro parameter binding"
 grep -F 'function compilerBMacroRelationshipCount(' "$syntax_query_api" >/dev/null || fail "missing identity-indexed macro relationship query"
+grep -F 'function compilerBExpandedMacroRelationshipCount(' "$syntax_query_api" >/dev/null || fail "missing post-expansion relationship count query"
+grep -F 'function compilerBExpandedMacroRelationshipQueryExecute(' "$syntax_query_api" >/dev/null || fail "missing post-expansion relationship query"
+if rg -n 'expected: "llvm"|name == "llvm"' "$syntax_query_api" "$syntax_parser" >/dev/null; then
+    fail "post-expansion relationship collection special-cases the llvm spelling"
+fi
 grep -F 'function compilerBTargetMatchesMacroFamily(' "$syntax_query_api" >/dev/null || fail "macro targets cannot resolve an abstract macro family"
 grep -Fx 'macro member(): Let | State | Derived | Binding -> Void {}' "$member_macro" >/dev/null || fail "@member does not connect the four concrete property forms"
 if rg -n 'expected: "Member"|construct Member \{\}|: Member([[:space:]]|$)' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
@@ -150,8 +179,32 @@ grep -F 'function compilerBParseFunctionFacets(' "$syntax_parser" >/dev/null || 
 if rg -n 'environment in|compilerBExecuteSelfMacro|CompilerBEnvironmentAccess' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
     fail "Compiler B still contains the retired explicit environment binder or inspect executor"
 fi
-grep -F 'macro collectionModifier(): Macro {}' "$bool_macro" >/dev/null || fail "missing collection-modifier marker declaration"
-grep -F '@collectionModifier' "$bool_macro" >/dev/null || fail "filter is not marked as a collection modifier"
+grep -F 'macro collection(): Macro {' "$bool_macro" >/dev/null || fail "missing collection macro declaration"
+grep -F 'macro one(): @member {' "$one_macro" >/dev/null || fail "missing scalar cardinality macro"
+if grep -F 'extension #environment.target.Application {' "$one_macro" >/dev/null; then
+    fail "@one duplicates the element representation's Application value lowering"
+fi
+grep -F 'macro llvm(): Let {' "$llvm_macro" >/dev/null || fail "missing LLVM member marker macro"
+grep -F 'let value: String(#environment.target.value)' "$llvm_macro" >/dev/null || fail "@llvm does not constrain its marked value to String"
+grep -F 'let parent: #environment.target.parent' "$llvm_macro" >/dev/null || fail "@llvm does not retain its containment dependency"
+grep -F '            @llvm' "$one_macro" >/dev/null || fail "@one does not mark its declaration representation with @llvm"
+grep -F '            let type: String(' "$one_macro" >/dev/null || fail "@one does not emit its declaration representation as a String member"
+if grep -F 'LLVM(' "$one_macro" >/dev/null; then
+    fail "@one still manufactures a nominal LLVM product"
+fi
+grep -F 'macro print(nodes: @many): Void {' "$print_macro" >/dev/null || fail "print does not expose its plural cardinality overload"
+grep -F '  nodes.each { node in' "$print_macro" >/dev/null || fail "plural print does not explicitly traverse its nodes"
+grep -F '    stringPrint(value: node)' "$print_macro" >/dev/null || fail "plural print does not print its current node"
+if grep -F 'stringPrint(value: nodes)' "$print_macro" >/dev/null; then
+    fail "plural print passes the complete collection to the scalar primitive"
+fi
+grep -F 'macro commandGroup(): Construct {' "$command_group_macro" >/dev/null || fail "missing structural command-group macro"
+grep -F '  @many' "$command_group_macro" >/dev/null || fail "command-group collection does not carry @many cardinality"
+grep -F '  let commands: #environment.target.Declaration.members.filter(all: Function.Declaration)' "$command_group_macro" >/dev/null || fail "command-group does not derive commands from owned Function.Declaration members"
+if grep -F 'macro command(' "$command_group_macro" >/dev/null; then
+    fail "command-group still requires a redundant per-function command macro"
+fi
+grep -F '@collection.modifier' "$bool_macro" >/dev/null || fail "filter is not marked as a collection modifier"
 grep -F 'macro filter(named: String): @many -> @any {' "$bool_macro" >/dev/null || fail "filter does not declare its cardinality transform"
 grep -F 'macro map(transform: Function): @many -> @many {' "$bool_macro" >/dev/null || fail "map does not declare its cardinality-preserving transform"
 grep -F 'state input: #environment.target' "$bool_macro" >/dev/null || fail "modifier does not consume its predecessor Application"
@@ -181,7 +234,12 @@ grep -F 'function compilerBParseProcessFacets(' "$syntax_parser" >/dev/null || f
 grep -F 'construct CompilerBLocalBindingFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain local bindings"
 grep -F 'construct CompilerBNoValueFallbackFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain no-value fallbacks"
 grep -F 'construct CompilerBConditionalFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain conditionals"
-grep -F 'construct CompilerBEnvironmentEffectFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain environment effects"
+grep -F 'construct CompilerBSwitchFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain switches"
+grep -F 'construct CompilerBSwitchCaseFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain switch cases"
+grep -F 'construct CompilerBEnumCaseFacetStore {' "$syntax_model" >/dev/null || fail "enum declarations do not retain their cases"
+if grep -F 'construct CompilerBEnvironmentEffectFacetStore {' "$syntax_model" >/dev/null; then
+    fail "process graph still has a separate environment-effect representation"
+fi
 grep -F 'construct CompilerBApplicationFacetStore {' "$syntax_model" >/dev/null || fail "process graph does not retain canonical Applications"
 grep -F 'let predecessorSyntaxIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "Applications do not retain predecessor identity"
 grep -F 'let declarationSyntaxIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "Applications do not retain resolved declarations"
@@ -204,13 +262,15 @@ if grep -F 'let targetSyntaxIDs: Buffer<Int>' "$representation_model" >/dev/null
 fi
 grep -F 'macro integer(): Construct {' "$integer_macro" >/dev/null || fail "missing Range-owned Core integer macro body"
 grep -F 'macro many(' "$many_macro" >/dev/null || fail "missing Range-owned Core many macro body"
+grep -F 'macro diagnostic(message: String): Void {' "$diagnostic_macro" >/dev/null || fail "missing Range-owned freestanding diagnostic macro"
+grep -F 'stringDiagnostic(value: message)' "$diagnostic_macro" >/dev/null || fail "diagnostic macro does not use the temporary extern sink"
 grep -F 'let element: #environment.target.Declaration.type' "$many_macro" >/dev/null || fail "many macro does not read its guaranteed element type directly from the environment"
-if grep -F '@diagnostic' "$many_macro" >/dev/null || grep -F 'Many member must specify an element type' "$many_macro" >/dev/null; then
+if grep -F 'Many member must specify an element type' "$many_macro" >/dev/null; then
     fail "many macro still treats guaranteed declaration type knowledge as a diagnostic fallback"
 fi
-grep -F '#environment.diagnostic(' "$many_macro" >/dev/null || fail "many macro does not emit diagnostics through its environment"
-if rg -n '@diagnostic|macro diagnostic' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
-    fail "Compiler B still contains the retired diagnostic Macro convention"
+grep -F '@diagnostic(' "$many_macro" >/dev/null || fail "many macro does not invoke the freestanding diagnostic macro"
+if rg -n '#environment\.diagnostic' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
+    fail "Compiler B still contains the special environment diagnostic effect"
 fi
 grep -F 'let modifiers: #environment.macros.filter(all: @collectionModifier)' "$many_macro" >/dev/null || fail "many macro does not query collection modifier macros directly from its environment"
 grep -F 'extension #environment.target.Application {' "$many_macro" >/dev/null || fail "many macro does not provision its target Application"
@@ -284,7 +344,7 @@ grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=state\tname
 grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=-1\tkind=let\tname=seed\ttype=Int\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "top-level let Member facet is incorrect"
 grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=binding\tname=selected\ttype=Int\t' "$member_macro_output" >/dev/null || fail "binding property did not materialize its concrete facet"
 grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=derived\tname=labels\ttype=String\t' "$member_macro_output" >/dev/null || fail "derived property did not materialize its concrete facet"
-[[ "$(grep -c $'^macroRelationship\tapplication=[0-9].*\tdeclaration=[0-9].*\ttarget=[0-9]' "$member_macro_output")" -eq 5 ]] || fail "abstract member fixture did not expose its five property relationships"
+[[ "$(grep -c $'^macroRelationship\t' "$member_macro_output")" -eq 5 ]] || fail "abstract member fixture did not expose its five property relationships"
 grep -E $'^macroTargetIndex\tdeclaration=[0-9]+\ttargets=4$' "$member_macro_output" >/dev/null || fail "@print target index does not contain all four properties"
 if grep -F $'macroExecution\t' "$member_macro_output" >/dev/null; then
     fail "marker @print unexpectedly executed a macro body"
@@ -300,9 +360,9 @@ grep -E $'^macroTargetIndex\tdeclaration=[0-9]+\ttargets=2$' "$macro_relationshi
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_fixture" > "$macro_argument_output"
 [[ "$(grep -c $'^macroParameter\t' "$macro_argument_output")" -eq 3 ]] || fail "macro declaration did not retain all typed parameters"
-grep -E $'^macroParameter\tmacro=[0-9]+\tname=count\ttype=Int\tordinal=0$' "$macro_argument_output" >/dev/null || fail "Int macro parameter is incorrect"
-grep -E $'^macroParameter\tmacro=[0-9]+\tname=enabled\ttype=Bool\tordinal=1$' "$macro_argument_output" >/dev/null || fail "Bool macro parameter is incorrect"
-grep -E $'^macroParameter\tmacro=[0-9]+\tname=label\ttype=String\tordinal=2$' "$macro_argument_output" >/dev/null || fail "String macro parameter is incorrect"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=count\ttype=Int\toptional=false\tdefault=\tordinal=0$' "$macro_argument_output" >/dev/null || fail "Int macro parameter is incorrect"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=enabled\ttype=Bool\toptional=false\tdefault=\tordinal=1$' "$macro_argument_output" >/dev/null || fail "Bool macro parameter is incorrect"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=label\ttype=String\toptional=false\tdefault=\tordinal=2$' "$macro_argument_output" >/dev/null || fail "String macro parameter is incorrect"
 [[ "$(grep -c $'^macroArgument\t' "$macro_argument_output")" -eq 3 ]] || fail "macro application did not retain exactly three arguments"
 grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=count\tvalue=[0-9]+\tkind=integer\tordinal=0$' "$macro_argument_output" >/dev/null || fail "Int macro argument is incorrect"
 grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=enabled\tvalue=[0-9]+\tkind=boolean\tordinal=1$' "$macro_argument_output" >/dev/null || fail "Bool macro argument is incorrect"
@@ -318,6 +378,67 @@ grep -F $'syntax\tvalid=false\tdiagnostic=macro argument label is not declared' 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_duplicate_fixture" > "$macro_argument_failure_output"
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument is duplicated' "$macro_argument_failure_output" >/dev/null || fail "duplicate macro argument rejected at the wrong boundary"
 
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$enum_switch_fixture" > "$enum_switch_output"
+[[ "$(grep -c $'^syntaxNode\tmarker=enumCase\t' "$enum_switch_output")" -eq 2 ]] || fail "enum declaration did not retain both cases"
+[[ "$(grep -c $'^processSwitchCase\t' "$enum_switch_output")" -eq 2 ]] || fail "switch process did not retain both cases"
+[[ "$(grep -c $'^processComparison\t' "$enum_switch_output")" -eq 1 ]] || fail "switch case was not materialized as one canonical comparison expression"
+grep -E $'^processComparison\tid=[0-9]+\tleft=[0-9]+\tright=[0-9]+\toperator=equal$' "$enum_switch_output" >/dev/null || fail "exact switch case did not retain equality in the expression graph"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$enum_switch_output" >/dev/null || fail "enum and switch graph fixture was rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_switch_fixture" > "$many_switch_output" 2> "$many_switch_error_output"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=count\ttype=Int\toptional=true\tdefault=\tordinal=0$' "$many_switch_output" >/dev/null || fail "many count optionality was not retained"
+[[ "$(grep -c $'^macroEnvironment\t' "$many_switch_output")" -eq 2 ]] || fail "dynamic and fixed many applications did not select their switch environments"
+[[ "$(grep -c $'^processComparison\t' "$many_switch_output")" -eq 2 ]] || fail "many switch did not retain its two canonical comparison expressions"
+grep -E $'^processComparison\tid=[0-9]+\tleft=[0-9]+\tright=[0-9]+\toperator=less$' "$many_switch_output" >/dev/null || fail "relational switch case did not retain its ordinary comparison"
+grep -E $'^processComparison\tid=[0-9]+\tleft=[0-9]+\tright=-1\toperator=none$' "$many_switch_output" >/dev/null || fail "optional switch case did not retain its absence comparison"
+dynamic_target="$(sed -n $'s/^syntaxNode\tmarker=member\tid=\([0-9][0-9]*\)\tparent=-1\tkind=state\tname=dynamicValues\t.*/\\1/p' "$many_switch_output" | head -1)"
+fixed_target="$(sed -n $'s/^syntaxNode\tmarker=member\tid=\([0-9][0-9]*\)\tparent=-1\tkind=state\tname=fixedValues\t.*/\\1/p' "$many_switch_output" | head -1)"
+negative_target="$(sed -n $'s/^syntaxNode\tmarker=member\tid=\([0-9][0-9]*\)\tparent=-1\tkind=state\tname=negativeValues\t.*/\\1/p' "$many_switch_output" | head -1)"
+dynamic_application="$(sed -n $'s/^macroRelationship\tapplication=\([0-9][0-9]*\)\tdeclaration=[0-9][0-9]*\ttarget='"$dynamic_target"$'/\\1/p' "$many_switch_output")"
+fixed_application="$(sed -n $'s/^macroRelationship\tapplication=\([0-9][0-9]*\)\tdeclaration=[0-9][0-9]*\ttarget='"$fixed_target"$'/\\1/p' "$many_switch_output")"
+negative_application="$(sed -n $'s/^macroRelationship\tapplication=\([0-9][0-9]*\)\tdeclaration=[0-9][0-9]*\ttarget='"$negative_target"$'/\\1/p' "$many_switch_output")"
+dynamic_environment="$(sed -n $'s/^environment\tid=\([0-9][0-9]*\)\towner=.*/\\1/p' "$many_switch_output" | sed -n '1p')"
+fixed_environment="$(sed -n $'s/^environment\tid=\([0-9][0-9]*\)\towner=.*/\\1/p' "$many_switch_output" | sed -n '2p')"
+[[ -n "$dynamic_application" && -n "$fixed_application" && -n "$negative_application" && -n "$dynamic_environment" && -n "$fixed_environment" ]] || fail "many switch fixture identities were not retained"
+if grep -E $'^macroEnvironment\tapplication='"$negative_application"$'\t' "$many_switch_output" >/dev/null; then
+    fail "negative many application unexpectedly emitted an LLVM environment"
+fi
+[[ "$(grep -c '^Many count must not be negative$' "$many_switch_error_output")" -eq 1 ]] || fail "negative many application did not execute one inline diagnostic"
+grep -E $'^macroEnvironment\tapplication='"$dynamic_application"$'\tenvironment='"$dynamic_environment"$'\tordinal=0$' "$many_switch_output" >/dev/null || fail "default many application did not select the dynamic environment"
+grep -E $'^macroEnvironment\tapplication='"$fixed_application"$'\tenvironment='"$fixed_environment"$'\tordinal=0$' "$many_switch_output" >/dev/null || fail "counted many application did not select the fixed environment"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$many_switch_output" >/dev/null || fail "many switch environment fixture was rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$one_cardinality_fixture" > "$one_cardinality_output"
+one_macro_id="$(sed -n $'s/^syntaxNode\tmarker=macro\tid=\([0-9][0-9]*\)\tparent=-1\tname=one\t.*/\\1/p' "$one_cardinality_output")"
+llvm_macro_id="$(sed -n $'s/^syntaxNode\tmarker=macro\tid=\([0-9][0-9]*\)\tparent=-1\tname=llvm\t.*/\\1/p' "$one_cardinality_output")"
+value_member_id="$(sed -n $'s/^syntaxNode\tmarker=member\tid=\([0-9][0-9]*\)\tparent=[0-9][0-9]*\tkind=let\tname=value\ttype=Int\t.*/\\1/p' "$one_cardinality_output" | head -1)"
+llvm_member_id="$(sed -n $'s/^syntaxNode\tmarker=member\tid=\([0-9][0-9]*\)\tparent=[0-9][0-9]*\tkind=let\tname=type\ttype=String\t.*/\\1/p' "$one_cardinality_output" | head -1)"
+llvm_extension_id="$(sed -n $'s/^environmentNode\tenvironment=[0-9][0-9]*\tid=\([0-9][0-9]*\)\tparent=[0-9][0-9]*\tordinal=0\tkind=extension\tvalue=$/\\1/p' "$one_cardinality_output" | head -1)"
+[[ -n "$one_macro_id" && -n "$llvm_macro_id" && -n "$value_member_id" && -n "$llvm_member_id" && -n "$llvm_extension_id" ]] || fail "@one LLVM marker fixture identities were not retained"
+grep -E $'^macroRelationship\tapplication=[0-9]+\tdeclaration='"$one_macro_id"$'\ttarget='"$value_member_id"'$' "$one_cardinality_output" >/dev/null || fail "explicit @one did not attach to its member identity"
+grep -E $'^macroRelationship\tapplication=[0-9]+\tdeclaration='"$llvm_macro_id"$'\ttarget='"$llvm_member_id"'$' "$one_cardinality_output" >/dev/null || fail "generated @llvm did not attach to its emitted String member"
+[[ "$(grep -c $'^macroEnvironment\t' "$one_cardinality_output")" -eq 1 ]] || fail "explicit @one did not select exactly one declaration-layout environment"
+[[ "$(grep -c $'^environmentNode\t.*\tkind=extension\tvalue=$' "$one_cardinality_output")" -eq 1 ]] || fail "@one did not retain exactly one declaration extension"
+grep -E $'^environmentNode\tenvironment=[0-9]+\tid='"$llvm_member_id"$'\tparent='"$llvm_extension_id"$'\tordinal=0\tkind=member\tvalue=type$' "$one_cardinality_output" >/dev/null || fail "@one LLVM String member did not retain its extension parent and ordinal"
+[[ "$(grep -c $'^environmentNode\t.*\tkind=application\tvalue=LLVM$' "$one_cardinality_output")" -eq 0 ]] || fail "@one retained a nominal LLVM application"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$one_cardinality_output" >/dev/null || fail "explicit @one cardinality fixture was rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$llvm_collection_fixture" > "$llvm_collection_output"
+llvm_collection_macro_id="$(sed -n $'s/^syntaxNode\tmarker=macro\tid=\([0-9][0-9]*\)\tparent=-1\tname=llvm\t.*/\\1/p' "$llvm_collection_output")"
+scalar_collection_macro_id="$(sed -n $'s/^syntaxNode\tmarker=macro\tid=\([0-9][0-9]*\)\tparent=-1\tname=scalar\t.*/\\1/p' "$llvm_collection_output")"
+scalar_collection_target_id="$(sed -n $'s/^syntaxNode\tmarker=construct\tid=\([0-9][0-9]*\)\tparent=-1\tname=Int\t.*/\\1/p' "$llvm_collection_output")"
+scalar_collection_application_id="$(sed -n $'s/^macroRelationship\tapplication=\([0-9][0-9]*\)\tdeclaration='"$scalar_collection_macro_id"$'\ttarget='"$scalar_collection_target_id"$'$/\\1/p' "$llvm_collection_output")"
+[[ -n "$llvm_collection_macro_id" && -n "$scalar_collection_macro_id" && -n "$scalar_collection_target_id" && -n "$scalar_collection_application_id" ]] || fail "post-expansion LLVM collection identities were not retained"
+[[ "$(grep -c $'^expandedMacroRelationship\t' "$llvm_collection_output")" -eq 2 ]] || fail "post-expansion query did not collect exactly two marked emissions"
+grep -E $'^environmentNode\tenvironment=[0-9]+\tid=[0-9]+\tparent=[0-9]+\tordinal=1\tkind=member\tvalue=ignored$' "$llvm_collection_output" >/dev/null || fail "unmarked control member was not retained in the expanded environment"
+if grep -E $'^expandedMacroRelationship\t.*\tname=ignored\t' "$llvm_collection_output" >/dev/null; then
+    fail "post-expansion query collected an unmarked String member"
+fi
+grep -E $'^expandedMacroRelationship\tapplication='"$scalar_collection_application_id"$'\tenvironment=[0-9]+\textension=[0-9]+\tchannel=Declaration\temission=[0-9]+\tname=layout\tmarkerApplication=[0-9]+\tdeclaration='"$llvm_collection_macro_id"$'\tordinal=0$' "$llvm_collection_output" >/dev/null || fail "declaration expansion did not collect its @llvm String member"
+grep -E $'^expandedMacroRelationship\tapplication='"$scalar_collection_application_id"$'\tenvironment=[0-9]+\textension=[0-9]+\tchannel=Application\temission=[0-9]+\tname=value\tmarkerApplication=[0-9]+\tdeclaration='"$llvm_collection_macro_id"$'\tordinal=0$' "$llvm_collection_output" >/dev/null || fail "application expansion did not collect its @llvm String member"
+[[ "$(grep -Ec $'^macroRelationship\tapplication=[0-9]+\tdeclaration='"$llvm_collection_macro_id"$'\ttarget=[0-9]+$' "$llvm_collection_output")" -eq 2 ]] || fail "collected LLVM members are not backed by resolved marker relationships"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$llvm_collection_output" >/dev/null || fail "post-expansion LLVM collection fixture was rejected"
+
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$bool_macro" > "$bool_macro_output"
 grep -E $'^macroCardinality\tmacro=[0-9]+\tinput=many\toutput=any$' "$bool_macro_output" >/dev/null || fail "filter macro cardinality transform was not retained"
 grep -E $'^macroCardinality\tmacro=[0-9]+\tinput=many\toutput=many$' "$bool_macro_output" >/dev/null || fail "map macro cardinality transform was not retained"
@@ -332,6 +453,29 @@ filter_application_id="$(sed -n $'s/^application\tid=\([0-9][0-9]*\)\tpredecesso
 grep -E $'^application\tid=[0-9]+\tpredecessor='"$filter_application_id"$'\tdeclaration=[0-9]+\tkind=macro\tname=map\tinput=any\toutput=many$' "$application_execution_output" >/dev/null || fail "map Macro.Application did not consume the filter result Application"
 [[ "$(grep -c $'^macroRelationship\t' "$application_execution_output")" -eq 2 ]] || fail "collection modifier capability relationships are not identity-backed"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$application_execution_output" >/dev/null || fail "Application execution fixture did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$freestanding_print_fixture" > "$freestanding_print_output"
+[[ "$(grep -c '^freestanding print executed$' "$freestanding_print_output")" -eq 1 ]] || fail "freestanding print macro did not execute exactly once"
+if grep -F 'unselected print executed' "$freestanding_print_output" | grep -v $'^token\t' >/dev/null; then
+    fail "freestanding print macro executed an unselected branch"
+fi
+[[ "$(grep -c $'^processExecution\t.*\tfunction=@print$' "$freestanding_print_output")" -eq 2 ]] || fail "freestanding print applications are not ordered process executions"
+[[ "$(grep -c $'^macroRelationship\t.*\ttarget=-1$' "$freestanding_print_output")" -eq 2 ]] || fail "freestanding print applications acquired a target node"
+[[ "$(grep -c $'^macroArgument\t.*\tlabel=_\t.*\tkind=string\t' "$freestanding_print_output")" -eq 2 ]] || fail "freestanding positional String arguments were not retained"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$freestanding_print_output" >/dev/null || fail "freestanding print fixture did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_print_fixture" > "$many_print_output"
+[[ "$(grep -c '^construct Ada {}$' "$many_print_output")" -eq 1 ]] || fail "plural print did not recall Ada exactly once"
+[[ "$(grep -c '^construct Linus {}$' "$many_print_output")" -eq 1 ]] || fail "plural print did not recall Linus exactly once"
+grep -E $'^macroParameter\tmacro=[0-9]+\tname=nodes\ttype=@many\toptional=false\tdefault=\tordinal=0$' "$many_print_output" >/dev/null || fail "plural print parameter did not retain @many cardinality"
+grep -E $'^macroRelationship\tapplication=[0-9]+\tdeclaration=[0-9]+\ttarget=-1$' "$many_print_output" >/dev/null || fail "plural print did not resolve as a freestanding macro overload"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$many_print_output" >/dev/null || fail "plural print fixture did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_print_mismatch_fixture" > "$many_print_mismatch_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro application does not match any declaration' "$many_print_mismatch_output" >/dev/null || fail "plural print accepted a value without @many cardinality"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$freestanding_target_fixture" > "$freestanding_target_output"
+grep -F $'syntax\tvalid=false\tdiagnostic=macro target does not satisfy declared type' "$freestanding_target_output" >/dev/null || fail "target-requiring macro executed without a target node"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$collection_production_fixture" > "$collection_production_output"
 integer_collection_id="$(sed -n $'s/^collection\tid=\([0-9][0-9]*\)\tselector=[0-9][0-9]*\tmarker=integer$/\\1/p' "$collection_production_output")"
@@ -360,7 +504,7 @@ grep -F '%Range.Word = type { i16 }' "$collection_production_population_output" 
 grep -E $'^token\tid=[0-9]+\tkind=string\ttext="bits"\t' "$integer_macro_output" >/dev/null || fail "integer macro query string was not retained as one token"
 [[ "$(grep -c $'^processLocal\t.*\tnoValueFallback=false\trhsKind=$' "$integer_macro_output")" -eq 2 ]] || fail "integer macro did not retain its two direct graph-query bindings"
 [[ "$(grep -c $'^processIf\t' "$integer_macro_output")" -eq 2 ]] || fail "integer macro did not retain both validation branches"
-[[ "$(grep -c $'^environmentEffect\t.*\tname=diagnostic\t' "$integer_macro_output")" -eq 2 ]] || fail "integer macro did not retain both direct diagnostic effects"
+[[ "$(grep -c $'^processExecution\t.*\tfunction=@diagnostic$' "$integer_macro_output")" -eq 2 ]] || fail "integer macro did not retain both inline diagnostic executions"
 [[ "$(grep -c $'^environment\t.*\towner=' "$integer_macro_output")" -eq 1 ]] || fail "integer macro did not collect its environment"
 [[ "$(grep -c $'^environmentNode\t.*\tkind=application\tvalue=LLVM$' "$integer_macro_output")" -eq 2 ]] || fail "integer environment did not retain both LLVM Application nodes"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$integer_macro_output" >/dev/null || fail "canonical Integer macro source did not produce a valid B graph"
@@ -371,7 +515,7 @@ grep -E $'^processLocal\t.*\tname=modifiers\t.*\tnoValueFallback=false\trhsKind=
 grep -E $'^applicationProvision\tid=[0-9]+\towner=[0-9]+\ttarget=[0-9]+\tsourceIdentity=[0-9]+\tsource=modifiers$' "$many_macro_output" >/dev/null || fail "many macro plural Application provision was not retained by identity"
 [[ "$(grep -c $'^environment\t.*\towner=' "$many_macro_output")" -eq 1 ]] || fail "many macro did not collect its environment"
 [[ "$(grep -c $'^environmentNode\t.*\tkind=application\tvalue=LLVM$' "$many_macro_output")" -eq 2 ]] || fail "many environment did not retain both LLVM Application nodes"
-[[ "$(grep -c $'^processIf\t' "$many_macro_output")" -eq 1 ]] || fail "many macro did not retain its count validation"
+[[ "$(grep -c $'^processExecution\t.*\tfunction=@diagnostic$' "$many_macro_output")" -eq 1 ]] || fail "many macro did not retain its inline diagnostic execution"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$many_macro_output" >/dev/null || fail "canonical many macro source did not produce a valid B graph"
 
 {

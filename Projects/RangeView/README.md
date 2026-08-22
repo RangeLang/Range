@@ -72,18 +72,19 @@ Stack(axis: .vertical, spacing: 10) {
 values appear inside the builder closure; the macro annotation itself does
 not appear at the call site.
 
-Every `@component` declaration owns exactly one derived component view:
+Every `@component` declaration owns exactly one derived drawable value:
 
 ```range
-derived view: [@component] {
-    // zero or more component values
+derived view: @view {
+    // zero or more drawable values
 }
 ```
 
 The `@component` macro queries the underlying construct and rejects a missing
-view, duplicate view, or a view whose type is not `[@component]`. Primitive
-leaf components still declare an empty view. `@page` retains its separate
-`derived body` contract until the page surface moves to the same model.
+view, duplicate view, or a view whose type is not `@view`. Applying
+`@component` also contributes the general `@view` relationship. Shapes gain
+the same relationship through `@shape`, while leaf values such as
+`Text("Hello")` carry `@view` directly.
 
 The earlier Neat builder separated expression, block, optional, either, and
 array collection. RangeView should recover those general builder operations
@@ -97,7 +98,7 @@ result is backend-neutral `LayoutRect` data, not HTML or native drawing calls.
 
 The trailing closure is the component's direct view construction input. The
 `@component` macro validates that the construct exposes exactly one
-`derived view: [@component]`; the result is compile-time builder syntax and is
+`derived view: @view`; the result is an ordinary derived Range value and is
 consumed before runtime memory layout.
 
 ## Routes
@@ -145,7 +146,8 @@ construct Rectangle {
 
 @page
 construct RangeViewHome {
-    derived body: [@component] {
+    derived body: @view {
+        Text("RangeView")
         Stack(.vertical, spacing: 10) {
             Rectangle().fill(.cyan)
         }
@@ -239,25 +241,25 @@ and `MatrixPosition` directly into its output representation.
 and size. The native checkpoint fills rectangles with horizontal scanlines
 until a direct native rectangle ABI is proven.
 
-Shapes expose one explicit drawing representation:
+Shapes are their ordered points. `@shape` contributes `@view`, and the ordered
+`@many` value is the path that Compiler B lowers directly:
 
 ```range
 @shape
 construct Triangle {
     @many(3)
-    let points: Point
-
-    function draw(): ShapeRepresentation {
-        return ShapeRepresentation(points: points)
-    }
+    let points: Point(
+        Point(x: 0, y: 100),
+        Point(x: 50, y: 0),
+        Point(x: 100, y: 100)
+    )
 }
 ```
 
-The `@shape` macro currently requires exactly one zero-argument `draw`
-function with an explicit return type. Exact return-type identity and general
-relationship-backed member materialization remain compiler work. `@many(3)`
-already expresses Triangle cardinality; the compiler must consume that fact
-without a Triangle-specific lowering.
+The first point is GPUI's move target, each successor is a line target, and the
+path closes after the final point. There is no `draw()` registration wrapper
+and no Triangle-specific backend rule; the exact `@shape` and `@many`
+relationships select the canonical applications.
 
 `Color` is ordinary open data, and palettes are ordinary compositions of those
 values:

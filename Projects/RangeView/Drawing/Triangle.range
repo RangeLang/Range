@@ -2,8 +2,4 @@
 construct Triangle {
     @many(3)
     let points: Point
-
-    function draw(): ShapeRepresentation {
-        return ShapeRepresentation(points: points)
-    }
 }

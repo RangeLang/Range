@@ -1,33 +1,53 @@
 macro many(count: Int?, ordering: Ordering: .ordered): @member {
   let element: #environment.target.Declaration.type
 
-  if count < 0 {
-    #environment.diagnostic(
-      "Many count must not be negative"
-    )
-  }
-
   let modifiers: #environment.macros.filter(all: @collectionModifier)
 
-  #environment {
-    extension #environment.target.Declaration {
-      LLVM(
-        type: "[\(count) x %Range.\(element.identity)]"
-      )
+  switch count {
+  case < 0:
+    @diagnostic(
+      "Many count must not be negative"
+    )
+
+  case .none:
+    #environment {
+      extension #environment.target.Declaration {
+        LLVM(
+          type: "%Range.Many.\(element.identity) = type { ptr, i32, i32 }"
+        )
+      }
+
+      extension #environment.target.Application {
+        #modifiers
+
+        LLVM(
+          value: "%Range.Many.\(element.identity) \(#environment.target.Application.values)"
+        )
+      }
     }
 
-    extension #environment.target.Application {
-      #modifiers
+  default:
+    #environment {
+      extension #environment.target.Declaration {
+        LLVM(
+          type: "[\(count) x %Range.\(element.identity)]"
+        )
+      }
 
-      LLVM(
-        value: "[\(count) x %Range.\(element.identity)] \(#environment.target.Application.values)"
-      )
+      extension #environment.target.Application {
+        #modifiers
+
+        LLVM(
+          value: "[\(count) x %Range.\(element.identity)] \(#environment.target.Application.values)"
+        )
+      }
     }
   }
 }
 
+
 enum Ordering {
-case ordered
-case unordered
+  case ordered
+  case unordered
 
 }

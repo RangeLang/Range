@@ -1,0 +1,10 @@
+[package]
+name = "range-view-gpui"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+gpui = { version = "=0.2.2", features = ["runtime_shaders"] }

@@ -1,0 +1,26 @@
+macro llvm(): Let {
+    let value: String(#environment.target.value)
+    let parent: #environment.target.parent
+}
+
+macro member(): Let | State | Derived | Binding {}
+
+macro one(): @member {
+    let element: #environment.target.Declaration.type
+
+    #environment {
+        extension #environment.target.Declaration {
+            @llvm
+            let type: String(
+                "%Range.\(element.identity)"
+            )
+        }
+    }
+}
+
+construct Int {}
+
+construct Container {
+    @one
+    let value: Int
+}

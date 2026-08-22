@@ -1,0 +1,965 @@
+construct CompilerBRangeViewGPUILLVMModule {
+    let text: String
+    let rootCount: Int
+    let viewCount: Int
+    let valid: Bool
+    let diagnostic: String
+}
+
+construct CompilerBCompileTimeString {
+    let found: Bool
+    let value: String
+}
+
+construct CompilerBRangeViewPoint {
+    let found: Bool
+    let x: Int
+    let y: Int
+}
+
+function compilerBMacroDeclarationSyntaxIDNamed(
+    revision: CompilerBSyntaxRevision,
+    name: String
+): Int {
+    state result: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.macroDeclarations.syntaxIDs.count {
+        let identity: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(
+                value: revision.macroDeclarations.identityTokenIDs.element(index: row)
+            )
+        ))
+        if compilerBTokenMatchesBytes(
+            source: revision.source,
+            token: identity,
+            expected: name
+        ) {
+            result: revision.macroDeclarations.syntaxIDs.element(index: row)
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return result
+}
+
+function compilerBRangeViewMacroIntegerArgument(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    ordinal: Int
+): CompilerBCompileTimeInteger {
+    state expressionSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.macroApplications.argumentApplicationSyntaxIDs.count {
+        if revision.macroApplications.argumentApplicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID
+            && revision.macroApplications.argumentOrdinals.element(index: row) == ordinal {
+            expressionSyntaxID: revision.macroApplications.argumentValueExpressionSyntaxIDs.element(
+                index: row
+            )
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 {
+        return CompilerBCompileTimeInteger(found: false, hasValue: false, value: 0)
+    }
+    let expressionRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.expressions.syntaxIDs,
+        syntaxID: expressionSyntaxID
+    ))
+    if expressionRow < 0
+        || revision.process.expressions.kindCodes.element(index: expressionRow)
+            != compilerBParserExpressionKindIntegerCode() {
+        return CompilerBCompileTimeInteger(found: false, hasValue: false, value: 0)
+    }
+    return CompilerBCompileTimeInteger(
+        found: true,
+        hasValue: true,
+        value: revision.process.expressions.integerValues.element(index: expressionRow)
+    )
+}
+
+function compilerBRangeViewConstructHasMacro(
+    revision: CompilerBSyntaxRevision,
+    macroSyntaxID: Int,
+    constructSyntaxID: Int
+): Bool {
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.macroApplications.syntaxIDs.count {
+        if revision.macroApplications.macroDeclarationSyntaxIDs.element(index: row)
+            == macroSyntaxID
+            && revision.macroApplications.targetSyntaxIDs.element(index: row)
+                == constructSyntaxID {
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count == 1
+}
+
+function compilerBRangeViewRendererKind(
+    revision: CompilerBSyntaxRevision,
+    rendererMacroSyntaxID: Int,
+    constructSyntaxID: Int
+): CompilerBCompileTimeInteger {
+    state applicationSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.macroApplications.syntaxIDs.count {
+        if revision.macroApplications.macroDeclarationSyntaxIDs.element(index: row)
+            == rendererMacroSyntaxID
+            && revision.macroApplications.targetSyntaxIDs.element(index: row)
+                == constructSyntaxID {
+            applicationSyntaxID: revision.macroApplications.syntaxIDs.element(index: row)
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 {
+        return CompilerBCompileTimeInteger(found: false, hasValue: false, value: 0)
+    }
+    return compilerBRangeViewMacroIntegerArgument(
+        revision: revision,
+        applicationSyntaxID: applicationSyntaxID,
+        ordinal: 0
+    )
+}
+
+function compilerBRangeViewApplicationIntegerArgument(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    ordinal: Int
+): CompilerBCompileTimeInteger {
+    state expressionSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID
+            && revision.process.arguments.ordinals.element(index: row) == ordinal {
+            expressionSyntaxID: revision.process.arguments.valueExpressionSyntaxIDs.element(
+                index: row
+            )
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 {
+        return CompilerBCompileTimeInteger(found: false, hasValue: false, value: 0)
+    }
+    let expressionRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.expressions.syntaxIDs,
+        syntaxID: expressionSyntaxID
+    ))
+    if expressionRow < 0
+        || revision.process.expressions.kindCodes.element(index: expressionRow)
+            != compilerBParserExpressionKindIntegerCode() {
+        return CompilerBCompileTimeInteger(found: false, hasValue: false, value: 0)
+    }
+    return CompilerBCompileTimeInteger(
+        found: true,
+        hasValue: true,
+        value: revision.process.expressions.integerValues.element(index: expressionRow)
+    )
+}
+
+function compilerBRangeViewApplicationArgumentCount(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBRangeViewApplicationArgumentExpressionSyntaxID(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    ordinal: Int
+): Int {
+    state expressionSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID
+            && revision.process.arguments.ordinals.element(index: row) == ordinal {
+            expressionSyntaxID: revision.process.arguments.valueExpressionSyntaxIDs.element(
+                index: row
+            )
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return expressionSyntaxID
+}
+
+function compilerBRangeViewApplicationDeclarationSyntaxID(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    let applicationRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.applications.syntaxIDs,
+        syntaxID: applicationSyntaxID
+    ))
+    if applicationRow < 0 { return 0 - 1 }
+    return revision.process.applications.declarationSyntaxIDs.element(
+        index: applicationRow
+    )
+}
+
+function compilerBRangeViewPointApplication(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    pointDeclarationSyntaxID: Int
+): CompilerBRangeViewPoint {
+    if compilerBRangeViewApplicationDeclarationSyntaxID(
+        revision: revision,
+        applicationSyntaxID: applicationSyntaxID
+    ) != pointDeclarationSyntaxID
+        || compilerBRangeViewApplicationArgumentCount(
+            revision: revision,
+            applicationSyntaxID: applicationSyntaxID
+        ) != 2 {
+        return CompilerBRangeViewPoint(found: false, x: 0, y: 0)
+    }
+    let x: CompilerBCompileTimeInteger(compilerBRangeViewApplicationIntegerArgument(
+        revision: revision,
+        applicationSyntaxID: applicationSyntaxID,
+        ordinal: 0
+    ))
+    let y: CompilerBCompileTimeInteger(compilerBRangeViewApplicationIntegerArgument(
+        revision: revision,
+        applicationSyntaxID: applicationSyntaxID,
+        ordinal: 1
+    ))
+    if !x.found || !y.found {
+        return CompilerBRangeViewPoint(found: false, x: 0, y: 0)
+    }
+    return CompilerBRangeViewPoint(found: true, x: x.value, y: y.value)
+}
+
+function compilerBRangeViewConstructCollectionMember(
+    revision: CompilerBSyntaxRevision,
+    constructSyntaxID: Int,
+    collectionMacroSyntaxID: Int
+): Int {
+    state memberSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        let candidateSyntaxID: Int(revision.members.syntaxIDs.element(index: row))
+        if revision.members.ownerSyntaxIDs.element(index: row) == constructSyntaxID
+            && compilerBRangeViewConstructHasMacro(
+                revision: revision,
+                macroSyntaxID: collectionMacroSyntaxID,
+                constructSyntaxID: candidateSyntaxID
+            ) {
+            memberSyntaxID: candidateSyntaxID
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return memberSyntaxID
+}
+
+function compilerBRangeViewApplicationArgumentDeclarationWithMacro(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    macroSyntaxID: Int
+): Int {
+    state declarationSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID {
+            let expressionSyntaxID: Int(
+                revision.process.arguments.valueExpressionSyntaxIDs.element(index: row)
+            )
+            let candidateSyntaxID: Int(
+                compilerBRangeViewApplicationDeclarationSyntaxID(
+                    revision: revision,
+                    applicationSyntaxID: expressionSyntaxID
+                )
+            )
+            if candidateSyntaxID >= 0
+                && compilerBRangeViewConstructHasMacro(
+                    revision: revision,
+                    macroSyntaxID: macroSyntaxID,
+                    constructSyntaxID: candidateSyntaxID
+                ) {
+                declarationSyntaxID: candidateSyntaxID
+                count: count + 1
+            }
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return declarationSyntaxID
+}
+
+function compilerBRangeViewConstructDerivedCollectionMember(
+    revision: CompilerBSyntaxRevision,
+    constructSyntaxID: Int,
+    selectorMacroSyntaxID: Int
+): Int {
+    state memberSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        let candidateSyntaxID: Int(revision.members.syntaxIDs.element(index: row))
+        if revision.members.ownerSyntaxIDs.element(index: row) == constructSyntaxID
+            && revision.members.kindCodes.element(index: row)
+                == compilerBParserMemberKindDerivedCode() {
+            let collectionRow: Int(compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.collections.syntaxIDs,
+                syntaxID: candidateSyntaxID
+            ))
+            if collectionRow >= 0
+                && revision.process.collections.selectorMacroSyntaxIDs.element(
+                    index: collectionRow
+                ) == selectorMacroSyntaxID {
+                memberSyntaxID: candidateSyntaxID
+                count: count + 1
+            }
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return memberSyntaxID
+}
+
+function compilerBRangeViewMemberTerminalApplication(
+    revision: CompilerBSyntaxRevision,
+    memberSyntaxID: Int
+): Int {
+    state applicationSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.executions.syntaxIDs.count {
+        if revision.process.executions.ownerSyntaxIDs.element(index: row)
+            == memberSyntaxID {
+            let expressionSyntaxID: Int(
+                revision.process.executions.expressionSyntaxIDs.element(index: row)
+            )
+            if compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.applications.syntaxIDs,
+                syntaxID: expressionSyntaxID
+            ) >= 0 {
+                applicationSyntaxID: expressionSyntaxID
+                count: count + 1
+            }
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - count - 1 }
+    return applicationSyntaxID
+}
+
+function compilerBRangeViewApplicationStringArgument(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    ordinal: Int
+): CompilerBCompileTimeString {
+    state expressionSyntaxID: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID
+            && revision.process.arguments.ordinals.element(index: row) == ordinal {
+            expressionSyntaxID: revision.process.arguments.valueExpressionSyntaxIDs.element(
+                index: row
+            )
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return CompilerBCompileTimeString(found: false, value: "") }
+    let expressionRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.expressions.syntaxIDs,
+        syntaxID: expressionSyntaxID
+    ))
+    if expressionRow < 0
+        || revision.process.expressions.kindCodes.element(index: expressionRow)
+            != compilerBParserExpressionKindStringCode() {
+        return CompilerBCompileTimeString(found: false, value: "")
+    }
+    let firstTokenID: Int(
+        revision.process.expressions.firstTokenIDs.element(index: expressionRow)
+    )
+    if revision.process.expressions.afterLastTokenIDs.element(index: expressionRow)
+        != firstTokenID + 1 {
+        return CompilerBCompileTimeString(found: false, value: "")
+    }
+    let token: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: firstTokenID)
+    ))
+    if token.kind != .string || token.end <= token.start + 1 {
+        return CompilerBCompileTimeString(found: false, value: "")
+    }
+    return CompilerBCompileTimeString(
+        found: true,
+        value: revision.source.substring(start: token.start + 1, end: token.end - 1)
+    )
+}
+
+function compilerBEmitRangeViewGPUI(source: String): CompilerBRangeViewGPUILLVMModule {
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: source))
+    state diagnostic: String(revision.diagnostic)
+    if revision.valid { diagnostic: "" }
+
+    state appDeclarationSyntaxID: Int(0 - 1)
+    state viewDeclarationSyntaxID: Int(0 - 1)
+    state rendererDeclarationSyntaxID: Int(0 - 1)
+    state shapeDeclarationSyntaxID: Int(0 - 1)
+    state manyDeclarationSyntaxID: Int(0 - 1)
+    state materialDeclarationSyntaxID: Int(0 - 1)
+    state shaderDeclarationSyntaxID: Int(0 - 1)
+    if diagnostic == "" {
+        appDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "app"
+        )
+        if appDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one app macro declaration"
+        } else if appDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one app macro declaration"
+        }
+    }
+    if diagnostic == "" {
+        viewDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "view"
+        )
+        if viewDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one view macro declaration"
+        } else if viewDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one view macro declaration"
+        }
+    }
+    if diagnostic == "" {
+        rendererDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "gpui"
+        )
+        if rendererDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one gpui macro declaration"
+        } else if rendererDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one gpui macro declaration"
+        }
+    }
+    if diagnostic == "" {
+        shapeDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "shape"
+        )
+        if shapeDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one shape macro declaration"
+        } else if shapeDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one shape macro declaration"
+        }
+    }
+    if diagnostic == "" {
+        manyDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "many"
+        )
+        if manyDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one many macro declaration"
+        } else if manyDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one many macro declaration"
+        }
+    }
+    if diagnostic == "" {
+        materialDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "material"
+        )
+        if materialDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one material macro declaration"
+        } else if materialDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one material macro declaration"
+        }
+    }
+    if diagnostic == "" {
+        shaderDeclarationSyntaxID: compilerBMacroDeclarationSyntaxIDNamed(
+            revision: revision,
+            name: "shader"
+        )
+        if shaderDeclarationSyntaxID == 0 - 1 {
+            diagnostic: "RangeView GPUI lowering requires one shader macro declaration"
+        } else if shaderDeclarationSyntaxID < 0 {
+            diagnostic: "RangeView GPUI lowering requires exactly one shader macro declaration"
+        }
+    }
+
+    state rootCount: Int(0)
+    state rootTargetSyntaxID: Int(0 - 1)
+    state applicationRow: Int(0)
+    while applicationRow < revision.macroApplications.syntaxIDs.count
+        && diagnostic == "" {
+        if revision.macroApplications.macroDeclarationSyntaxIDs.element(
+            index: applicationRow
+        ) == appDeclarationSyntaxID {
+            rootCount: rootCount + 1
+            rootTargetSyntaxID: revision.macroApplications.targetSyntaxIDs.element(
+                index: applicationRow
+            )
+        }
+        applicationRow: applicationRow + 1
+    }
+    if diagnostic == "" && rootCount != 1 {
+        diagnostic: "RangeView GPUI lowering requires exactly one resolved @app root"
+    }
+
+    state rootName: String("")
+    if diagnostic == "" {
+        let constructRow: Int(compilerBFacetRowForSyntaxID(
+            syntaxIDs: revision.constructDeclarations.syntaxIDs,
+            syntaxID: rootTargetSyntaxID
+        ))
+        if constructRow < 0 {
+            diagnostic: "RangeView @app must target a construct"
+        } else {
+            rootName: compilerBDeclarationName(
+                revision: revision,
+                declarations: revision.constructDeclarations,
+                row: constructRow
+            )
+        }
+    }
+
+    state bodyMemberSyntaxID: Int(0 - 1)
+    state bodyCount: Int(0)
+    state memberRow: Int(0)
+    while memberRow < revision.members.syntaxIDs.count && diagnostic == "" {
+        let memberSyntaxID: Int(revision.members.syntaxIDs.element(index: memberRow))
+        if revision.members.ownerSyntaxIDs.element(index: memberRow) == rootTargetSyntaxID
+            && revision.members.kindCodes.element(index: memberRow)
+                == compilerBParserMemberKindDerivedCode() {
+            let collectionRow: Int(compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.collections.syntaxIDs,
+                syntaxID: memberSyntaxID
+            ))
+            if collectionRow >= 0
+                && revision.process.collections.selectorMacroSyntaxIDs.element(
+                    index: collectionRow
+                ) == viewDeclarationSyntaxID {
+                bodyMemberSyntaxID: memberSyntaxID
+                bodyCount: bodyCount + 1
+            }
+        }
+        memberRow: memberRow + 1
+    }
+    if diagnostic == "" && bodyCount != 1 {
+        diagnostic: "RangeView @app requires exactly one derived @view body"
+    }
+
+    state viewCount: Int(0)
+    state viewRecords: String("")
+    state pointGlobals: String("")
+    state textGlobals: String("")
+    state executionRow: Int(0)
+    while executionRow < revision.process.executions.syntaxIDs.count
+        && diagnostic == "" {
+        if revision.process.executions.ownerSyntaxIDs.element(index: executionRow)
+            == bodyMemberSyntaxID {
+            let applicationSyntaxID: Int(
+                revision.process.executions.expressionSyntaxIDs.element(index: executionRow)
+            )
+            let valueApplicationRow: Int(compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.applications.syntaxIDs,
+                syntaxID: applicationSyntaxID
+            ))
+            if valueApplicationRow < 0 {
+                diagnostic: "RangeView derived @view body requires view applications"
+            } else {
+                let constructSyntaxID: Int(
+                    revision.process.applications.declarationSyntaxIDs.element(
+                        index: valueApplicationRow
+                    )
+                )
+                let constructRow: Int(compilerBFacetRowForSyntaxID(
+                    syntaxIDs: revision.constructDeclarations.syntaxIDs,
+                    syntaxID: constructSyntaxID
+                ))
+                let isView: Bool(compilerBRangeViewConstructHasMacro(
+                    revision: revision,
+                    macroSyntaxID: viewDeclarationSyntaxID,
+                    constructSyntaxID: constructSyntaxID
+                ))
+                let isShape: Bool(compilerBRangeViewConstructHasMacro(
+                    revision: revision,
+                    macroSyntaxID: shapeDeclarationSyntaxID,
+                    constructSyntaxID: constructSyntaxID
+                ))
+                let kind: CompilerBCompileTimeInteger(compilerBRangeViewRendererKind(
+                    revision: revision,
+                    rendererMacroSyntaxID: rendererDeclarationSyntaxID,
+                    constructSyntaxID: constructSyntaxID
+                ))
+                if constructRow < 0 || (!isView && !isShape) {
+                    diagnostic: "RangeView body value must resolve to an @view construct"
+                } else if isShape {
+                    let pointsMemberSyntaxID: Int(
+                        compilerBRangeViewConstructCollectionMember(
+                            revision: revision,
+                            constructSyntaxID: constructSyntaxID,
+                            collectionMacroSyntaxID: manyDeclarationSyntaxID
+                        )
+                    )
+                    if pointsMemberSyntaxID < 0 {
+                        diagnostic: "RangeView @shape requires exactly one @many point member"
+                    } else {
+                        let pointsMemberRow: Int(compilerBFacetRowForSyntaxID(
+                            syntaxIDs: revision.members.syntaxIDs,
+                            syntaxID: pointsMemberSyntaxID
+                        ))
+                        let pointsApplicationSyntaxID: Int(
+                            revision.members.initializerExpressionSyntaxIDs.element(
+                                index: pointsMemberRow
+                            )
+                        )
+                        let pointDeclarationSyntaxID: Int(
+                            compilerBRangeViewApplicationDeclarationSyntaxID(
+                                revision: revision,
+                                applicationSyntaxID: pointsApplicationSyntaxID
+                            )
+                        )
+                        let pointCount: Int(compilerBRangeViewApplicationArgumentCount(
+                            revision: revision,
+                            applicationSyntaxID: pointsApplicationSyntaxID
+                        ))
+                        let declaredPointCount: CompilerBCompileTimeInteger(
+                            compilerBRangeViewRendererKind(
+                                revision: revision,
+                                rendererMacroSyntaxID: manyDeclarationSyntaxID,
+                                constructSyntaxID: pointsMemberSyntaxID
+                            )
+                        )
+                        if pointDeclarationSyntaxID < 0 || pointCount < 3 {
+                            diagnostic: "RangeView @shape requires at least three ordered Point values"
+                        } else if !declaredPointCount.found
+                            || !declaredPointCount.hasValue
+                            || declaredPointCount.value != pointCount {
+                            diagnostic: "RangeView @shape point count must match @many count"
+                        } else {
+                            let materialConstructSyntaxID: Int(
+                                compilerBRangeViewApplicationArgumentDeclarationWithMacro(
+                                    revision: revision,
+                                    applicationSyntaxID: applicationSyntaxID,
+                                    macroSyntaxID: materialDeclarationSyntaxID
+                                )
+                            )
+                            if materialConstructSyntaxID < 0 {
+                                diagnostic: "RangeView @shape requires exactly one @material application"
+                            } else {
+                                let outputMemberSyntaxID: Int(
+                                    compilerBRangeViewConstructDerivedCollectionMember(
+                                        revision: revision,
+                                        constructSyntaxID: materialConstructSyntaxID,
+                                        selectorMacroSyntaxID: shaderDeclarationSyntaxID
+                                    )
+                                )
+                                let emissionApplicationSyntaxID: Int(
+                                    compilerBRangeViewMemberTerminalApplication(
+                                        revision: revision,
+                                        memberSyntaxID: outputMemberSyntaxID
+                                    )
+                                )
+                                let emissionDeclarationSyntaxID: Int(
+                                    compilerBRangeViewApplicationDeclarationSyntaxID(
+                                        revision: revision,
+                                        applicationSyntaxID: emissionApplicationSyntaxID
+                                    )
+                                )
+                                let emissionKind: CompilerBCompileTimeInteger(
+                                    compilerBRangeViewRendererKind(
+                                        revision: revision,
+                                        rendererMacroSyntaxID: rendererDeclarationSyntaxID,
+                                        constructSyntaxID: emissionDeclarationSyntaxID
+                                    )
+                                )
+                                if outputMemberSyntaxID < 0
+                                    || emissionApplicationSyntaxID < 0
+                                    || emissionDeclarationSyntaxID < 0
+                                    || !compilerBRangeViewConstructHasMacro(
+                                        revision: revision,
+                                        macroSyntaxID: shaderDeclarationSyntaxID,
+                                        constructSyntaxID: emissionDeclarationSyntaxID
+                                    )
+                                    || !emissionKind.found
+                                    || emissionKind.value != 4
+                                    || compilerBRangeViewApplicationArgumentCount(
+                                        revision: revision,
+                                        applicationSyntaxID: emissionApplicationSyntaxID
+                                    ) != 2 {
+                                    diagnostic: "RangeView @material requires one @shader emission output"
+                                } else {
+                                    let gradientApplicationSyntaxID: Int(
+                                        compilerBRangeViewApplicationArgumentExpressionSyntaxID(
+                                            revision: revision,
+                                            applicationSyntaxID: emissionApplicationSyntaxID,
+                                            ordinal: 0
+                                        )
+                                    )
+                                    let gradientDeclarationSyntaxID: Int(
+                                        compilerBRangeViewApplicationDeclarationSyntaxID(
+                                            revision: revision,
+                                            applicationSyntaxID: gradientApplicationSyntaxID
+                                        )
+                                    )
+                                    let gradientKind: CompilerBCompileTimeInteger(
+                                        compilerBRangeViewRendererKind(
+                                            revision: revision,
+                                            rendererMacroSyntaxID: rendererDeclarationSyntaxID,
+                                            constructSyntaxID: gradientDeclarationSyntaxID
+                                        )
+                                    )
+                                    if gradientDeclarationSyntaxID < 0
+                                        || !compilerBRangeViewConstructHasMacro(
+                                            revision: revision,
+                                            macroSyntaxID: shaderDeclarationSyntaxID,
+                                            constructSyntaxID: gradientDeclarationSyntaxID
+                                        )
+                                        || !gradientKind.found
+                                        || gradientKind.value != 3
+                                        || compilerBRangeViewApplicationArgumentCount(
+                                            revision: revision,
+                                            applicationSyntaxID: gradientApplicationSyntaxID
+                                        ) != 3 {
+                                        diagnostic: "RangeView emission color requires one GPUI gradient node"
+                                    } else {
+                                        let firstColor: CompilerBCompileTimeInteger(
+                                            compilerBRangeViewApplicationIntegerArgument(
+                                                revision: revision,
+                                                applicationSyntaxID: gradientApplicationSyntaxID,
+                                                ordinal: 0
+                                            )
+                                        )
+                                        let secondColor: CompilerBCompileTimeInteger(
+                                            compilerBRangeViewApplicationIntegerArgument(
+                                                revision: revision,
+                                                applicationSyntaxID: gradientApplicationSyntaxID,
+                                                ordinal: 1
+                                            )
+                                        )
+                                        let angle: CompilerBCompileTimeInteger(
+                                            compilerBRangeViewApplicationIntegerArgument(
+                                                revision: revision,
+                                                applicationSyntaxID: gradientApplicationSyntaxID,
+                                                ordinal: 2
+                                            )
+                                        )
+                                        let strength: CompilerBCompileTimeInteger(
+                                            compilerBRangeViewApplicationIntegerArgument(
+                                                revision: revision,
+                                                applicationSyntaxID: emissionApplicationSyntaxID,
+                                                ordinal: 1
+                                            )
+                                        )
+                                        if !firstColor.found || !secondColor.found
+                                            || !angle.found || !strength.found {
+                                            diagnostic: "RangeView gradient emission requires integer colors, angle, and strength"
+                                        } else {
+                                            state pointRecords: String("")
+                                            state pointOrdinal: Int(0)
+                                            while pointOrdinal < pointCount
+                                                && diagnostic == "" {
+                                                let pointApplicationSyntaxID: Int(
+                                                    compilerBRangeViewApplicationArgumentExpressionSyntaxID(
+                                                        revision: revision,
+                                                        applicationSyntaxID: pointsApplicationSyntaxID,
+                                                        ordinal: pointOrdinal
+                                                    )
+                                                )
+                                                let point: CompilerBRangeViewPoint(
+                                                    compilerBRangeViewPointApplication(
+                                                        revision: revision,
+                                                        applicationSyntaxID: pointApplicationSyntaxID,
+                                                        pointDeclarationSyntaxID: pointDeclarationSyntaxID
+                                                    )
+                                                )
+                                                if !point.found {
+                                                    diagnostic: "RangeView @shape points require two integer coordinates"
+                                                } else {
+                                                    if pointOrdinal != 0 {
+                                                        pointRecords.append(text: ", ")
+                                                    }
+                                                    pointRecords.append(text: "%RangeViewPoint { i32 \(point.x), i32 \(point.y) }")
+                                                }
+                                                pointOrdinal: pointOrdinal + 1
+                                            }
+                                            if diagnostic == "" {
+                                                pointGlobals.append(text: "@.rangeViewPoints\(viewCount) = private constant [\(pointCount) x %RangeViewPoint] [\(pointRecords)], align 4\n")
+                                                if viewCount != 0 {
+                                                    viewRecords.append(text: ",\n")
+                                                }
+                                                viewRecords.append(text: "  %RangeViewValue { i32 1, ptr getelementptr inbounds ([\(pointCount) x %RangeViewPoint], ptr @.rangeViewPoints\(viewCount), i64 0, i64 0), i64 \(pointCount), i32 \(emissionKind.value), i32 \(gradientKind.value), i32 \(firstColor.value), i32 \(secondColor.value), i32 \(angle.value), i32 \(strength.value), ptr null, i64 0 }")
+                                                viewCount: viewCount + 1
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if !kind.found || !kind.hasValue {
+                    diagnostic: "RangeView @view construct requires one @gpui renderer"
+                } else if kind.value == 2 {
+                    if compilerBRangeViewApplicationArgumentCount(
+                        revision: revision,
+                        applicationSyntaxID: applicationSyntaxID
+                    ) != 1 {
+                        diagnostic: "RangeView text view requires one String value"
+                    } else {
+                        let text: CompilerBCompileTimeString(
+                            compilerBRangeViewApplicationStringArgument(
+                                revision: revision,
+                                applicationSyntaxID: applicationSyntaxID,
+                                ordinal: 0
+                            )
+                        )
+                        if !text.found {
+                            diagnostic: "RangeView text view requires one String value"
+                        } else {
+                            let storageCount: Int(text.value.count + 1)
+                            textGlobals.append(text: "@.rangeViewText\(viewCount) = private unnamed_addr constant [\(storageCount) x i8] c\"\(text.value)\\00\", align 1\n")
+                            if viewCount != 0 { viewRecords.append(text: ",\n") }
+                            viewRecords.append(text: "  %RangeViewValue { i32 2, ptr null, i64 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, ptr getelementptr inbounds ([\(storageCount) x i8], ptr @.rangeViewText\(viewCount), i64 0, i64 0), i64 \(text.value.count) }")
+                            viewCount: viewCount + 1
+                        }
+                    }
+                } else {
+                    diagnostic: "RangeView @gpui renderer kind is unsupported"
+                }
+            }
+        }
+        executionRow: executionRow + 1
+    }
+    if diagnostic == "" && viewCount == 0 {
+        diagnostic: "RangeView derived @view body must produce at least one value"
+    }
+
+    state output: String("")
+    if diagnostic == "" {
+        let titleStorageCount: Int(rootName.count + 1)
+        output.append(text: "; range-b backend=rangeview-gpui roots=1 root=\(rootName) views=\(viewCount)\n")
+        output.append(text: "%RangeViewPoint = type { i32, i32 }\n")
+        output.append(text: "%RangeViewValue = type { i32, ptr, i64, i32, i32, i32, i32, i32, i32, ptr, i64 }\n")
+        output.append(text: "@.rangeViewTitle = private unnamed_addr constant [\(titleStorageCount) x i8] c\"\(rootName)\\00\", align 1\n")
+        output.append(text: "\(pointGlobals)\(textGlobals)\n")
+        output.append(text: "@.rangeViewValues = private constant [\(viewCount) x %RangeViewValue] [\n\(viewRecords)\n], align 8\n\n")
+        output.append(text: "declare i32 @rangeGPUIRun(ptr, i64, ptr, i64)\n\n")
+        output.append(text: "define i32 @main() {\nentry:\n")
+        output.append(text: "  %title = getelementptr inbounds [\(titleStorageCount) x i8], ptr @.rangeViewTitle, i64 0, i64 0\n")
+        output.append(text: "  %views = getelementptr inbounds [\(viewCount) x %RangeViewValue], ptr @.rangeViewValues, i64 0, i64 0\n")
+        output.append(text: "  %status = call i32 @rangeGPUIRun(ptr %title, i64 \(rootName.count), ptr %views, i64 \(viewCount))\n")
+        output.append(text: "  ret i32 %status\n}\n")
+    }
+
+    let valid: Bool(diagnostic == "")
+    compilerBSyntaxRevisionDestroy(revision: revision)
+    if !valid { output: "" }
+    return CompilerBRangeViewGPUILLVMModule(
+        text: output,
+        rootCount: rootCount,
+        viewCount: viewCount,
+        valid: valid,
+        diagnostic: diagnostic
+    )
+}
+
+function compilerBWriteLinkRunRangeViewGPUI(
+    viewSourcePath: String,
+    rendererSourcePath: String,
+    sourcePath: String,
+    llvmPath: String,
+    gpuiLibraryPath: String,
+    executablePath: String
+): Int {
+    let viewSource: String(fileManagerReadFile(path: viewSourcePath))
+    let rendererSource: String(fileManagerReadFile(path: rendererSourcePath))
+    let appSource: String(fileManagerReadFile(path: sourcePath))
+    let source: String("\(viewSource)\n\(rendererSource)\n\(appSource)")
+    let module: CompilerBRangeViewGPUILLVMModule(
+        compilerBEmitRangeViewGPUI(source: source)
+    )
+    if !module.valid {
+        print(value: "compilerBRangeViewBackendError\t\(module.diagnostic)")
+        return 65
+    }
+    let writeStatus: Int(fileManagerWriteFile(
+        path: llvmPath,
+        text: module.text,
+        mode: 1
+    ))
+    if writeStatus != 0 { return writeStatus }
+
+    state linker: ProcessPlan(processPlan(executable: "clang"))
+    linker: processPlanAppendingArgument(plan: linker, argument: "-O0")
+    linker: processPlanAppendingArgument(
+        plan: linker,
+        argument: "-Wno-override-module"
+    )
+    linker: processPlanAppendingArgument(plan: linker, argument: llvmPath)
+    linker: processPlanAppendingArgument(plan: linker, argument: gpuiLibraryPath)
+    linker: compilerBRangeViewGPUIAppendingFramework(
+        plan: linker,
+        name: "ApplicationServices"
+    )
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "CoreFoundation")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "CoreVideo")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "CoreText")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "Carbon")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "Security")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "CoreGraphics")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "AppKit")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "System")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "QuartzCore")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "Foundation")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "Metal")
+    linker: compilerBRangeViewGPUIAppendingFramework(plan: linker, name: "OpenGL")
+    linker: compilerBRangeViewGPUIAppendingFramework(
+        plan: linker,
+        name: "SystemConfiguration"
+    )
+    linker: processPlanAppendingArgument(plan: linker, argument: "-lobjc")
+    linker: processPlanAppendingArgument(plan: linker, argument: "-liconv")
+    linker: processPlanAppendingArgument(plan: linker, argument: "-lc")
+    linker: processPlanAppendingArgument(plan: linker, argument: "-lm")
+    linker: processPlanAppendingArgument(plan: linker, argument: "-o")
+    linker: processPlanAppendingArgument(plan: linker, argument: executablePath)
+    let linkStatus: Int(processPlanRun(plan: linker))
+    if linkStatus != 0 { return linkStatus }
+
+    print(value: "rangeViewLLVM\t\(llvmPath)")
+    print(value: "rangeViewExecutable\t\(executablePath)")
+    return processPlanRun(plan: processPlan(executable: executablePath))
+}
+
+function compilerBRangeViewGPUIAppendingFramework(
+    plan: ProcessPlan,
+    name: String
+): ProcessPlan {
+    let marker: ProcessPlan(processPlanAppendingArgument(
+        plan: plan,
+        argument: "-framework"
+    ))
+    return processPlanAppendingArgument(plan: marker, argument: name)
+}

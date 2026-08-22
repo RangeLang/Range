@@ -1,0 +1,33 @@
+macro extern(): Function {}
+
+@extern
+function stringPrint(value: String): Int {}
+
+macro member(): Let | State | Derived | Binding -> Void {}
+macro many(): @member {}
+
+macro print(message: String): Void {
+    stringPrint(value: message)
+}
+
+macro print(nodes: @many): Void {
+    stringPrint(value: nodes)
+}
+
+macro user(): Construct {}
+
+@user
+construct Ada {}
+
+@user
+construct Linus {}
+
+@many
+state users: @user
+
+macro recall(): Construct {
+    @print(users)
+}
+
+@recall
+construct Program {}

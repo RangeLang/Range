@@ -1,0 +1,13 @@
+enum Ordering {
+    case ordered
+    case unordered
+}
+
+macro choose(count: Int): Construct {
+    switch count {
+    case 0:
+        let selected: Int(0)
+    default:
+        let selected: Int(1)
+    }
+}

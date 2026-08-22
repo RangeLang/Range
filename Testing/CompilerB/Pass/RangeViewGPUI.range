@@ -1,0 +1,64 @@
+macro app(): Construct -> Void {}
+macro shape(): Construct -> Void {}
+macro many(count: Int): Let -> Void {}
+macro material(): Construct -> Void {}
+macro shader(): Construct -> Void {}
+
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+@shader
+@gpui(kind: 3)
+construct LinearGradient {
+    let firstColor: Int
+    let secondColor: Int
+    let angle: Int
+}
+
+@shader
+@gpui(kind: 4)
+construct Emission {
+    let color: LinearGradient
+    let strength: Int
+}
+
+@material
+construct Aero {
+    derived output: @shader {
+        Emission(
+            color: LinearGradient(
+                firstColor: 2584305,
+                secondColor: 3003583,
+                angle: 135
+            ),
+            strength: 100
+        )
+    }
+}
+
+@shape
+construct Rectangle {
+    @many(4)
+    let points: Point(
+        Point(x: 120, y: 90),
+        Point(x: 680, y: 90),
+        Point(x: 680, y: 430),
+        Point(x: 120, y: 430)
+    )
+}
+
+@view
+@gpui(kind: 2)
+construct Text {
+    let value: String
+}
+
+@app
+construct RangeViewHello {
+    derived body: @view {
+        Rectangle(material: Aero())
+        Text("Range draws ordered points.")
+    }
+}

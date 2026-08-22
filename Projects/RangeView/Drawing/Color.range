@@ -11,6 +11,7 @@ enum Color {
     case lime: OKLCH(lightness: 0.890657071, chroma: 0.264361396, hue: 135.892351661, alpha: 1)
     case green: OKLCH(lightness: 0.866439612, chroma: 0.294827240, hue: 142.495338889, alpha: 1)
     case springGreen: OKLCH(lightness: 0.875074237, chroma: 0.234440371, hue: 151.184826985, alpha: 1)
+    case teal: OKLCH(lightness: 0.704, chroma: 0.123, hue: 180.5, alpha: 1)
     case cyan: OKLCH(lightness: 0.905399230, chroma: 0.154550011, hue: 194.768948, alpha: 1)
     case azure: OKLCH(lightness: 0.615165359, chroma: 0.210818910, hue: 256.098957652, alpha: 1)
     case blue: OKLCH(lightness: 0.452013718, chroma: 0.313214372, hue: 264.052020638, alpha: 1)

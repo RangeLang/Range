@@ -1,8 +1,9 @@
 @page
 construct HomePage {
-    derived body: [@component] {
+    derived body: @view {
+        Text("Home")
         Stack(.vertical, spacing: 10) {
-            Rectangle().fill(.cyan)
+            Rectangle(material: Aero())
         }
     }
 }

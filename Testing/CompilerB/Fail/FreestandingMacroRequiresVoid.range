@@ -1,0 +1,8 @@
+macro marker(): Construct {}
+
+macro announce(): Construct {
+    @marker()
+}
+
+@announce
+construct Program {}

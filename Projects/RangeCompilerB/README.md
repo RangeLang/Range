@@ -41,9 +41,18 @@ Compiler B is the new compiler. Build it out in small runnable slices.
 - Macro declarations are retained as their own declaration facet, and their
   target constraints are checked at each resolved application. Compiler
   B deliberately has no authored `{ environment in ... }` binder and no
-  special `inspect` interpreter. A future executable macro body receives its
-  compile-time context implicitly and runs through the same typed body/process
-  representation used for ordinary functions.
+  special `inspect` interpreter. Executable macro bodies receive their
+  compile-time context implicitly and run through the same typed body/process
+  representation used for ordinary functions. A freestanding
+  `@print("message")` is a targetless Application: its enclosing process owns
+  execution order and control flow but is not its target. The `Void` macro
+  executes an ordinary call to an `@extern` String function, and only selected
+  branches perform the effect.
+- Enum declarations retain ordered case identities, and macro-process switches
+  retain their subject plus exact/default case regions. Compile-time macro
+  arguments select which authored Environment is related to each Application;
+  an absent `many` count therefore selects dynamic storage while present counts
+  select fixed storage without compiler-owned `many` dispatch.
 - `@member` is an authored macro family, not a nominal `Member` construct. Its
   target alternatives are `Let | State | Derived | Binding`; transforms such
   as `macro print(): @member {}` resolve that family through the retained macro
@@ -59,12 +68,12 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   application relationships directly; B does not copy them into an attachment
   registry. Explicit `#environment: extern()` registration is not part of the
   model. The macro environment is the graph-scoped capability surface:
-  `#environment.target`, `#environment.macros`, and
-  `#environment.diagnostic(...)` are direct accesses rather than members of a
-  second `#environment.graph` object. The process graph retains imperative
-  calls as environment effects. Validation uses ordinary `if` control flow
-  with direct `#environment.diagnostic(...)` effects; there is no separate
-  diagnostic Macro or optional-fallback registration convention.
+  `#environment.target` and `#environment.macros` are direct accesses rather
+  than members of a second `#environment.graph` object. Validation uses
+  ordinary control flow and the freestanding `@diagnostic(...)` Macro. Its
+  temporary host sink is extern-backed like `@print`; the process graph keeps
+  only the ordinary Macro Application and execution relationships, not a
+  parallel environment-effect representation.
 - Representation macros emit ordinary initializer applications inside
   target-owned `#environment` extensions. `LLVM(type: ...)` belongs to the
   target Declaration and `LLVM(value: ...)` belongs to its Application; there

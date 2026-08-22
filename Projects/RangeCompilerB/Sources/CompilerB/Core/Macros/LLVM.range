@@ -1,0 +1,4 @@
+macro llvm(): Let {
+    let value: String(#environment.target.value)
+    let parent: #environment.target.parent
+}

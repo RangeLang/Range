@@ -1,0 +1,42 @@
+macro extern(): Function {}
+
+@extern
+function stringDiagnostic(value: String): Int {}
+
+macro diagnostic(message: String): Void {
+    stringDiagnostic(value: message)
+}
+
+macro member(): Let | State | Derived | Binding {}
+
+construct LLVM {
+    let type: String
+}
+
+macro many(count: Int?): @member {
+    switch count {
+    case < 0:
+        @diagnostic("Many count must not be negative")
+    case .none:
+        #environment {
+            extension #environment.target.Declaration {
+                LLVM(type: "dynamic")
+            }
+        }
+    default:
+        #environment {
+            extension #environment.target.Declaration {
+                LLVM(type: "fixed")
+            }
+        }
+    }
+}
+
+@many
+state dynamicValues: Int
+
+@many(count: 4)
+state fixedValues: Int
+
+@many(count: -1)
+state negativeValues: Int

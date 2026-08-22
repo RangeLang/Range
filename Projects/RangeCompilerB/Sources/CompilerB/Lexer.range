@@ -27,6 +27,10 @@ function compilerBParse(source: String): CompilerBSyntaxSummary {
             diagnostic: macroValidation.diagnostic
         }
     }
+    if valid && compilerBRunFreestandingMacros(revision: revision) != 0 {
+        valid: false
+        diagnostic: "unable to execute freestanding macro"
+    }
     if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
         valid: false
         diagnostic: "unable to destroy syntax revision"

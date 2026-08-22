@@ -1,0 +1,12 @@
+macro one(): @member {
+    let element: #environment.target.Declaration.type
+
+    #environment {
+        extension #environment.target.Declaration {
+            @llvm
+            let type: String(
+                "%Range.\(element.identity)"
+            )
+        }
+    }
+}

@@ -1,0 +1,3 @@
+macro material(): Construct -> Void {}
+
+macro shader(): Construct -> Void {}

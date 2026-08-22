@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <crt_externs.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <sys/stat.h>
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
@@ -277,6 +278,25 @@ int32_t stringTransientRegionReset(int32_t mark) {
 
 int32_t stringPrint(void *value) {
     return puts(rangeStringData(value));
+}
+
+int32_t stringDiagnostic(void *value) {
+    const char *message = rangeStringData(value);
+    if (!message) return 74;
+    return fprintf(stderr, "%s\n", message) < 0 ? 74 : 0;
+}
+
+int32_t invokeExternStringToInt(void *opaqueIdentity, void *value) {
+    const char *identity = rangeStringData(opaqueIdentity);
+    if (!identity || identity[0] == 0) {
+        return 64;
+    }
+    void *symbol = dlsym(RTLD_DEFAULT, identity);
+    if (!symbol) {
+        return 69;
+    }
+    int32_t (*function)(void *) = (int32_t (*)(void *))symbol;
+    return function(value);
 }
 
 bool stringHasPrefix(void *opaqueSource, int32_t start, void *opaquePrefix) {

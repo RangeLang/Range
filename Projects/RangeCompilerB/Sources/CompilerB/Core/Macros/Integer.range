@@ -3,13 +3,13 @@ macro integer(): Construct {
   let signed: #environment.target.Declaration.members.filter(named: "signed").first
 
   if !bits.isTarget {
-    #environment.diagnostic(
+    @diagnostic(
       "Construct must specify bits"
     )
   }
 
   if !signed.isTarget {
-    #environment.diagnostic(
+    @diagnostic(
       "Construct must specify signed"
     )
   }

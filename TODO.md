@@ -86,6 +86,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         product store. The backend selects products by target identity and
         never by the `integer` macro name; returned LLVM aggregates and
         redundant `-> LLVM` promises are not execution paths.
+    - [x] Materialize switch cases as ordinary comparison expressions in the
+      canonical process graph before selecting compile-time macro environments.
+      - A case stores one condition expression identity; it does not retain a
+        token range for a later pattern interpreter. Partial arithmetic cases
+      such as `case < 0` receive the switch subject as their left operand,
+      `.none` is an absence comparison, and `default` has no condition.
     - [ ] Replace the bootstrap-bounded `Buffer<Int>` scalar value column in
       the canonical Return facet with a canonical arbitrary-precision value
       identity. Token and literal identities are already separate; this is
@@ -147,11 +153,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Sweep the remaining Core macros (`Bool.range`, `Integer.range`) for
       the Many.range diagnostic principle: graph-known
       facts are read without diagnostic fallbacks; only value-level facts the
-      graph cannot know emit `#environment.diagnostic(...)`.
+      graph cannot know invoke the freestanding `@diagnostic(...)` macro.
       - Extend `scripts/check-range-compiler-b` with per-macro assertions
         mirroring the existing Many.range checks (no optional String fallback
         on guaranteed knowledge, diagnostics through ordinary `if` control
-        flow and the environment gate).
+        flow and the shared freestanding macro executor).
     - [ ] Rebuild the Compiler B gate around one produced compiler instead of
       per-fixture entry compilation.
       - [ ] Route fixtures into a B executable as input data (a parse/emit
@@ -177,6 +183,15 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         not where execution begins.
     - [ ] Complete the macro-family target model promoted ahead of the
       self-source syntax checkpoint:
+      - [x] Author Compiler B's `@commandGroup` as structural membership: an
+        `@many` local graph value queries the target declaration's complete
+        `Function.Declaration` set, so no per-function `@command` macro exists.
+      - [ ] Materialize macro-local `let` bindings as ordinary Let/@member
+        graph nodes so attached macros such as `@many` execute against them.
+        - Compiler B currently retains the `@many` application and the full
+          `#environment.target.Declaration.members.filter(all: Function.Declaration)`
+          expression, but macro execution rejects because the local binding is
+          not yet an admissible member target.
       - [x] Retain macro target unions and use them for admission before body
         execution. `@member` is authored as
         `Let | State | Derived | Binding`, and a transform targeting `@member`
@@ -286,9 +301,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         canonical `Core/Macros/Integer.range` source.
         - Two direct local graph queries resolve by
           application/declaration/target identity. Ordinary `if` operations
-          guard two direct environment diagnostic effects; the redundant
-          diagnostic annotation applications, optional String fallback values, and
-          `diagnostic` Macro are removed. A bootstrap-only empty `integer`
+          guard two freestanding `@diagnostic(...)` Applications; optional
+          String fallback values and diagnostic annotations on local bindings
+          remain removed. A bootstrap-only empty `integer`
           signature lets frozen Compiler A build B without making it the V3
           macro authority.
         - [x] Lower the canonical macro's independent `LLVM(type: ...)` and
@@ -297,8 +312,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           initializer, while target identity and application value projections
           transfer their retained facts into the template. Runtime-free Int
           and Byte products now use this canonical Core macro, link, and exit
-          42; local Void diagnostic applications remain non-emitting graph
-          effects.
+          42. Diagnostic execution is independent of LLVM product emission.
       - [x] Retain `let` and `state` as canonical Member facets and permit
         ordered macro applications to target their shared syntax identities.
         - Members retain owner, keyword, identifier, type, and initializer
@@ -314,6 +328,36 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           two Function targets without body execution. Explicit
           `#environment: extern()` registration is not part of this
           architecture; ordinary macro graph queries remain available.
+      - [x] Execute freestanding macros as targetless process applications.
+        - `macro print(message: String): Void` has no target node. Its
+          `@print("...")` Applications retain positional String arguments,
+          process ownership, and control-flow ordering; selected `if` branches
+          execute its ordinary `stringPrint(value:)` call through the
+          function's `@extern` relationship, while unselected branches remain
+          silent. A non-Void target signature rejects when invoked
+          freestanding.
+        - `macro diagnostic(message: String): Void` uses the same execution
+          path. Its temporary `stringDiagnostic(value:)` extern writes to the
+          host diagnostic sink; switch cases retain nested freestanding
+          Applications and select them through the canonical comparison graph.
+        - [x] Resolve freestanding macro overloads from argument cardinality
+          and lift plural execution over the selected graph collection.
+          - `macro print(nodes: @many): Void` now coexists with the scalar
+            String print declaration. `@print(users)` resolves from the
+            `users` collection identity, executes the authored print process
+            once per selected graph node, and recalls each node's exact source
+            representation without compiler dispatch on the `print` name.
+      - [x] Retain enum cases and switch-selected macro environments in Compiler B.
+        - Enum declarations retain ordered case identities. Macro processes retain
+          `switch` subjects and ordered exact/default cases as canonical graph
+          facets. Macro parameter optionality and defaults are retained, and each
+          resolved Macro Application links only the Environment selected by its
+          compile-time argument or absence.
+        - `many` now switches over optional `count`: `.none` authors a dynamic
+          `{ ptr, i32, i32 }` LLVM representation, while positive counts author
+          fixed LLVM arrays. Negative-count diagnostic execution remains part of
+          the general macro control-flow executor rather than a `many` compiler
+          special case.
       - [x] Collect collection modifiers as canonical macro relationships and
         retain their cardinality transforms on Applications.
         - `@collectionModifier` resolves to the exact marked Macro identity;
@@ -326,6 +370,36 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           graph carries cardinality and predecessor correspondence.
         - Cardinalities remain source-token identities rather than a closed
           compiler enum.
+        - [x] Author and retain explicit scalar `@one` layout forwarding
+          without duplicating Application value ownership.
+          - `@one` extends only its target member Declaration with the element
+            type's LLVM reference as an `@llvm`-marked String member. The
+            element representation macro remains the sole owner of concrete
+            Application value LLVM. The focused `OneCardinality` graph proof
+            resolves `@one` onto a member, retains the generated Let beneath
+            its extension, and resolves `@llvm` onto that exact Let identity.
+        - [x] Make LLVM emission a graph marker rather than a nominal product.
+          - `@llvm` targets a Let, constrains its value through a typed String
+            local, and retains the target's parent dependency. Any member name
+            is valid; containment and stable child ordinal supply grouping and
+            order rather than compiler-known `type` or `value` dispatch.
+        - [ ] Execute `@llvm` validation and consume marked String members in
+          the lowering pipeline.
+          - [x] Query emitted marker relationships after macro expansion.
+            - The generic query walks each resolved outer Macro Application's
+              selected Environment, extension target, emitted node, and inner
+              resolved Macro Application. `LLVMCollectionAfterExpansion`
+              selects `@llvm` by declaration identity and proves both the
+              Declaration and Application channels without a duplicate store.
+          - [ ] Execute the typed String constraint, then have the backend
+            consume resolved `@llvm` relationships instead of nominal LLVM
+            applications or product stores.
+        - [ ] Derive `@one` as the default member cardinality from a
+          Core-authored default-cardinality relationship.
+          - Do this after Compiler B loads its Core macros and target source
+            into one graph. Do not synthesize the relationship by comparing a
+            macro identity's source spelling to `one`; an explicit non-default
+            cardinality must suppress the derived scalar relationship.
         - [x] Stabilize member access and chained execution as one canonical
           Application relationship.
           - Every Application retains its own syntax identity, predecessor
@@ -349,15 +423,32 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             Application-provision facet. Materializing the selected identities
             into deduplicated graph relationships remains pending.
           - [x] Make the macro environment itself the graph capability surface.
-            - Graph collections and effects are direct `#environment` members:
-              `#environment.macros` and `#environment.diagnostic(...)`. The
-              parser retains calls as environment effects instead of a
-              conflicting `graphEffects` lane. `many` reads its guaranteed
-              declaration element type directly and no longer marks that query
-              with a diagnostic annotation or an optional String fallback.
+            - Graph collections are direct `#environment` members such as
+              `#environment.macros`. Diagnostics are ordinary freestanding
+              macro Applications rather than a privileged environment effect.
+              `many` reads its guaranteed declaration element type directly and
+              no longer marks that query with a diagnostic annotation or an
+              optional String fallback.
         - [ ] Execute the modifier process over the selected graph collection
           and materialize its bounded `@any` output; this checkpoint proves
           collection and query shape, not `while`/`append` evaluation.
+        - [ ] Let graph relationships contribute a value's generic switch
+          domain, then prove direct plural switching without compiler knowledge
+          of the nominal `many` spelling.
+          - `switch shapes` where `shapes` carries `@many` partitions the whole
+            collection through ordered facet/relation patterns. A branch such
+            as `case Circle: circles` binds the complete narrowed Circle subset,
+            not one hidden execution per element and not a separate `each`
+            traversal.
+          - Scalar values contribute themselves as the identity switch domain.
+            Empty plural domains execute no element branch, and cardinality
+            inspection remains an explicit switch over cardinality rather than
+            an ambiguity in element-pattern cases.
+          - Ordered first-match cases produce disjoint subsets and `default`
+            binds the remainder. Prove ordered and unordered behavior,
+            graph-set intersection patterns, empty-partition activation,
+            subset cardinality, and value-producing partition operations
+            before treating this as compiled Range behavior.
       - [ ] Remove the A-facing `ExternRegistration` bootstrap adapter once B
         compiles its own Core extern declarations. Until then accepted Compiler
         A requires the nominal macro result to register the foreign ABI; B's
@@ -1202,11 +1293,54 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
 
 ## RangeView
 
+  - [x] Compose and draw the first Compiler B derived `@view` value.
+    - Compiler B retains a derived builder body as a normal Member/Process
+      identity and retains each value-producing call as an ordered execution
+      Application. Construct calls use the shared Application relationship.
+    - RangeView owns the abstract `@view` relationship in `Macros/View.range`;
+      `@component` and `@shape` contribute it, while `Text` carries it directly
+      and accepts one unlabeled String value. The focused fixture authors its
+      own ordinary Rectangle and Text declarations.
+    - An app composes both through one ordinary
+      `derived body: @view { ... }` value. The backend selects exact `@view`
+      relationships plus the GPUI adapter's separate `@gpui(kind:)`
+      relationship and never checks the `Rectangle` or `Text` spelling.
+    - `scripts/check-range-compiler-b-rangeview-gpui` proves one closed
+      four-point `@shape` path plus Text, native link/execution, exact LLVM
+      point order, cardinality mismatch rejection, and the unmarked-view
+      rejection boundary.
+    - [x] Retain nested typed initializer Applications and lower one ordered
+      `@many` point member directly to a closed GPUI path. GPUI paints the
+      lowered points and does not reconstruct Rectangle fields or Range graph
+      meaning.
+  - [x] Prove the first Compiler B RangeView-to-GPUI artifact route.
+    - A focused source graph resolves exactly one `@app` relationship and uses
+      its Construct identity as the first window title/value.
+    - Compiler B emits LLVM directly; Range writes the `.ll` file, invokes
+      `clang`, links the precompiled GPUI boundary, and executes the resulting
+      native product. Rust is not a generated compiler output or intermediate
+      representation.
+    - `scripts/check-range-compiler-b-rangeview-gpui` owns the repeatable
+      headless link/execution proof. A manual launch additionally verified the
+      native GPUI window and event loop.
+    - Component, route, and render-tree lowering remain later graph-to-GPUI
+      slices; this checkpoint proves only the app-root artifact pipeline.
   - [x] Establish `@app`, `@component`, and `@page` as the minimal
     framework marker surface.
   - [x] Move every foundational macro into `Macros/Core.range` and make
     `Macros/` the ownership boundary for future concern-specific RangeView
     macro files.
+  - [x] Remove framework registration objects and Compiler B shadow
+    declarations from the RangeView path.
+    - The obsolete iterable registration macro and wrapper are deleted; no
+      RangeView proof bundle imports a traversal-registration source.
+    - Compiler B no longer compiles a private RangeView source prelude.
+      RangeView owns `@view`, the GPUI adapter owns `@gpui`, and focused
+      fixtures declare only the ordinary values and minimal `@app` relation
+      they exercise.
+    - [ ] Admit the collection/generic graph-query syntax in the real
+      `Projects/RangeView/Macros/Core.range`, then replace the focused fixture's
+      minimal `@app` declaration with the executable framework macro body.
   - [ ] Emit `.html`, `.css`, and `.js` files from ordinary Range strings once
     that backend has a compiler-owned artifact boundary.
   - [ ] Add an executable RangeView command only after the relevant framework
@@ -1217,7 +1351,7 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
   - [x] Replace the prototype declaration with the intended declaration-first
     surface, even though compiler support remains pending:
     `state spacing: Float` plus
-    `binding _ children: () -> [@component]`.
+    `binding _ children: () -> @view`.
   - [ ] Make `@app` discover `@page` declarations and generate the site entry
     point once framework dependencies and emitted artifacts have a supported
     project-graph consumer.
@@ -1241,9 +1375,10 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
         declaration if needed.
   - [ ] Make `@component` generate or select its artifact lowering so callers
     express `VStack` composition without invoking framework lowering functions.
-    - [x] Declare the macro contract requiring exactly one
-      `derived body: [@component]` on every component and page.
-    - [ ] Execute the typed `Derived<[@component]>` query and its missing,
+    - [x] Declare the macro contract requiring exactly one ordinary
+      `derived view: @view` or `derived body: @view` value on every component
+      and page.
+    - [ ] Execute the typed `Derived<[@view]>` query and its missing,
       duplicate, and wrong-type diagnostics through the current macro compiler.
     - [ ] Admit constructing `VStack(spacing:)` and projecting its spacing into
       the renderer; the first local instance attempt currently rejects during
@@ -1255,9 +1390,9 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
       - [ ] Add independent external and local names to stored/binding
         declarations so `binding _ children` parses; the literal form currently
         rejects during top-level declaration capture.
-      - [ ] Admit a builder closure binding with type `() -> [@component]`;
+      - [ ] Admit a builder closure binding with type `() -> @view`;
         `() -> [Int]` currently parses but rejects during enum-payload type
-        linking, while direct `[@component]` reaches
+        linking, while the earlier direct `[@component]` surface reached
         `invalidMacroFamilyMemoryGraph`.
       - [ ] Consume the component-family result as compile-time child syntax
         before runtime layout instead of storing it in every `VStack`.
@@ -3339,7 +3474,8 @@ Discarded roadmap assumptions:
         compilation accepts `@color` on `RGBA` and `OKLCH`.
       - [ ] Admit homogeneous value enum cases generally, making
         `Color.red` an `@color` value and the enum's ordered case field directly
-        mappable without `@iterable` or a separately maintained collection.
+        mappable without a traversal marker or separately maintained
+        collection.
         - [x] Capture `case name: expression` through the existing enum-case
           `value: @syntax?` slot and admit cases added by enum extensions.
           - The unpromoted compiler candidate compiles

@@ -29,6 +29,13 @@ construct CompilerBBlockFacetStore {
     let parentSyntaxIDs: Buffer<Int>
 }
 
+construct CompilerBEnumCaseFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: Buffer<Int>
+    let identityTokenIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
 construct CompilerBMacroApplicationStore {
     let syntaxIDs: Buffer<Int>
     let identityTokenIDs: Buffer<Int>
@@ -126,12 +133,32 @@ construct CompilerBConditionalFacetStore {
     let bodySyntaxIDs: Buffer<Int>
 }
 
-construct CompilerBEnvironmentEffectFacetStore {
+construct CompilerBSwitchFacetStore {
     let syntaxIDs: Buffer<Int>
     let ownerSyntaxIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let firstArgumentTokenIDs: Buffer<Int>
-    let afterLastArgumentTokenIDs: Buffer<Int>
+    let subjectExpressionSyntaxIDs: Buffer<Int>
+}
+
+construct CompilerBSwitchCaseFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let switchSyntaxIDs: Buffer<Int>
+    let conditionExpressionSyntaxIDs: Buffer<Int>
+    let firstBodyTokenIDs: Buffer<Int>
+    let afterLastBodyTokenIDs: Buffer<Int>
+    let ordinals: Buffer<Int>
+}
+
+construct CompilerBComparisonFacetStore {
+    let syntaxIDs: Buffer<Int>
+    let leftExpressionSyntaxIDs: Buffer<Int>
+    let rightExpressionSyntaxIDs: Buffer<Int>
+    let operatorCodes: Buffer<Int>
+}
+
+construct CompilerBCompileTimeInteger {
+    let found: Bool
+    let hasValue: Bool
+    let value: Int
 }
 
 construct CompilerBApplicationProvisionFacetStore {
@@ -188,7 +215,9 @@ construct CompilerBProcessGraph {
     let locals: CompilerBLocalBindingFacetStore
     let noValueFallbacks: CompilerBNoValueFallbackFacetStore
     let conditionals: CompilerBConditionalFacetStore
-    let environmentEffects: CompilerBEnvironmentEffectFacetStore
+    let switches: CompilerBSwitchFacetStore
+    let switchCases: CompilerBSwitchCaseFacetStore
+    let comparisons: CompilerBComparisonFacetStore
     let applicationProvisions: CompilerBApplicationProvisionFacetStore
     let environments: CompilerBEnvironmentFacetStore
     let environmentNodes: CompilerBEnvironmentNodeFacetStore
@@ -208,6 +237,10 @@ construct CompilerBMacroSignatureFacetStore {
     let parameterMacroSyntaxIDs: Buffer<Int>
     let parameterIdentityTokenIDs: Buffer<Int>
     let parameterTypeTokenIDs: Buffer<Int>
+    let parameterCardinalityValues: Buffer<Int>
+    let parameterOptionalValues: Buffer<Int>
+    let parameterDefaultFirstTokenIDs: Buffer<Int>
+    let parameterDefaultAfterLastTokenIDs: Buffer<Int>
     let parameterOrdinals: Buffer<Int>
 }
 
@@ -220,6 +253,8 @@ construct CompilerBMemberFacetStore {
     let typeTokenIDs: Buffer<Int>
     let firstInitializerTokenIDs: Buffer<Int>
     let afterLastInitializerTokenIDs: Buffer<Int>
+    let initializerExpressionSyntaxIDs: Buffer<Int>
+    let bodySyntaxIDs: Buffer<Int>
     let initializerKindCodes: Buffer<Int>
     let initializerValues: Buffer<Int>
 }
@@ -238,6 +273,7 @@ enum CompilerBExpressionKind {
     case call
     case string
     case noValueFallback
+    case comparison
 }
 
 construct CompilerBSyntaxSummary {
@@ -253,6 +289,7 @@ construct CompilerBSyntaxRevision {
     let functionDeclarations: CompilerBDeclarationFacetStore
     let constructDeclarations: CompilerBDeclarationFacetStore
     let enumDeclarations: CompilerBDeclarationFacetStore
+    let enumCases: CompilerBEnumCaseFacetStore
     let macroDeclarations: CompilerBDeclarationFacetStore
     let blocks: CompilerBBlockFacetStore
     let macroApplications: CompilerBMacroApplicationStore
@@ -327,6 +364,8 @@ construct CompilerBMemberQueryResult {
     let type: TokenID
     let typeName: String
     let initializer: TokenSpan
+    let initializerExpression: SyntaxNodeID
+    let body: SyntaxNodeID
     let initializerKind: CompilerBScalarKind
     let initializerInteger: Int
     let initializerBoolean: Bool
@@ -341,6 +380,18 @@ construct CompilerBFunctionCardinalityQueryResult {
 construct CompilerBMacroValidationResult {
     let valid: Bool
     let diagnostic: String
+}
+
+construct CompilerBExpandedMacroRelationshipQueryResult {
+    let found: Bool
+    let application: SyntaxNodeID
+    let environment: SyntaxNodeID
+    let extension: SyntaxNodeID
+    let extensionTarget: SyntaxNodeID
+    let emission: SyntaxNodeID
+    let markerApplication: SyntaxNodeID
+    let markerDeclaration: SyntaxNodeID
+    let ordinal: Int
 }
 
 

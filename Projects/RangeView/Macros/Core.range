@@ -33,6 +33,8 @@ macro component(): Construct -> Void {
 
     #environment {
         extension #environment.target.Declaration.identity {
+            @view
+
             @many
             let modifiers: @modifier
         }
@@ -50,8 +52,8 @@ macro requireView(owner: String): Construct {
             property.identifier.name == "view"
         }
     )
-    let componentViews: [Derived<[@component]>](
-        #environment.target.Declaration.members.filter(all: Derived<[@component]>) { property in
+    let drawableViews: [Derived<[@view]>](
+        #environment.target.Declaration.members.filter(all: Derived<[@view]>) { property in
             property.identifier.name == "view"
         }
     )
@@ -59,8 +61,8 @@ macro requireView(owner: String): Construct {
     if namedViews.count != 1 {
         #environment.error("@\(owner) requires exactly one derived view.")
     }
-    if namedViews.count == 1 && componentViews.count != 1 {
-        #environment.error("@\(owner) view must have type [@component].")
+    if namedViews.count == 1 && drawableViews.count != 1 {
+        #environment.error("@\(owner) view must have type @view.")
     }
 }
 
@@ -71,8 +73,8 @@ macro requireBody(owner: String): Construct {
             property.identifier.name == "body"
         }
     )
-    let componentBodies: [Derived<[@component]>](
-        #environment.target.Declaration.members.filter(all: Derived<[@component]>) { property in
+    let drawableBodies: [Derived<[@view]>](
+        #environment.target.Declaration.members.filter(all: Derived<[@view]>) { property in
             property.identifier.name == "body"
         }
     )
@@ -80,7 +82,7 @@ macro requireBody(owner: String): Construct {
     if namedBodies.count != 1 {
         #environment.error("@\(owner) requires exactly one derived body.")
     }
-    if namedBodies.count == 1 && componentBodies.count != 1 {
-        #environment.error("@\(owner) body must have type [@component].")
+    if namedBodies.count == 1 && drawableBodies.count != 1 {
+        #environment.error("@\(owner) body must have type @view.")
     }
 }

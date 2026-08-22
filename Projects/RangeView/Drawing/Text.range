@@ -1,0 +1,4 @@
+@view
+construct Text {
+    let _ value: String
+}

@@ -1,1 +1,4 @@
-macro member(): Let | State | Derived | Binding -> Void {}
+macro member(): Let | State | Derived | Binding -> Value {
+  let value:
+
+}

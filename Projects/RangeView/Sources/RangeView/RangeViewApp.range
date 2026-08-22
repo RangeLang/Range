@@ -14,24 +14,21 @@ construct RangeViewApp {
 construct Rectangle {
     @many(4)
     let points: Point(
-        Point(x: 96, y: 64),
-        Point(x: 704, y: 64),
-        Point(x: 704, y: 152),
-        Point(x: 96, y: 152)
+        Point(x: 0, y: 0),
+        Point(x: 100, y: 0),
+        Point(x: 100, y: 100),
+        Point(x: 0, y: 100)
     )
 
-    function draw(): ShapeRepresentation {
-        return ShapeRepresentation(points: points)
-    }
-
-    derived view: [@component] {}
+    let material: @material?
 }
 
 @page
 construct RangeViewHome {
-    derived body: [@component] {
+    derived body: @view {
+        Text("RangeView draws regular values.")
         Stack(.vertical, spacing: 10) {
-            Rectangle().fill(.cyan)
+            Rectangle(material: Aero())
         }
     }
 }

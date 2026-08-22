@@ -11,77 +11,64 @@
   import { pathFromOutline, shapeCorners, shapeOutline } from "$lib/design-knots";
 
   let {
-    samples = 160,
-    hold = 2,
-    morph = 2.5,
-    settle = 2.5,
-    zoom = 5,
+    samples = 192,
+    halfCycle = 6,
     strikeLead = 0.5,
   }: {
     samples?: number;
     /*
-     * Phases are counted in beats, not milliseconds, and they sum to twelve —
-     * the master cycle every other layer divides into. The strike then falls
-     * on beat four of that cycle, which is why it can sit with the rest.
+     * Circle peak to triangle peak takes six beats; the return makes the
+     * twelve-beat master cycle. The peaks turn immediately with no dwell.
      */
-    /** Beats the promoted circle rests before it starts morphing. */
-    hold?: number;
-    /** Beats the circle takes to become the triangle. */
-    morph?: number;
-    /** Beats the completed outer triangle settles before the zoom. */
-    settle?: number;
-    /** Beats the nested stack takes to scale into its next level. */
-    zoom?: number;
-    /** Beats the gong strike leads the finished outer morph by. */
+    /** Beats between the circle and triangle peaks. */
+    halfCycle?: number;
+    /** Beats the gong strike leads the triangle peak by. */
     strikeLead?: number;
   } = $props();
 
-  /*
-   * One turn of a recursive morph and zoom, in flat colour with no strokes.
-   *
-   * The active blue circle is also the crop. It morphs into a triangle while
-   * the paired paper triangle morphs into a circle and scales outward. No
-   * additional recursive shapes are painted inside that pair.
-   */
+  /** A circle yields only where the three eventual triangle edges press it. */
   const unit = 200;
-  /*
-   * The inner triangle is half the crop's circumradius and reaches the crop at
-   * two times scale.
-   */
-  const cropRadius = 0.985;
-  const radius = cropRadius / 2;
-  /** 0 while the crop is a circle, 1 once it is a triangle. */
+  const radius = 0.985;
+  /** 0 at the circle, 1 at the equilateral triangle. */
   let progress = $state(0);
-  /** Normalized progress from 1x to the completed 4x paired-shape zoom. */
-  let zoomed = $state(0);
-  let zoomScale = $derived(1 + zoomed * 3);
+  /** Tracks the triangle spokes from the first moment of the shape morph. */
+  let detailProgress = $state(0);
+  /** The solid cube shares the shape's breath exactly. */
+  let cubeScale = $state(0);
+  const traceCount = 5;
+  const traceSpacingBeats = 0.3;
+  let traceProgresses = $state<number[]>(Array(traceCount).fill(0));
 
-  function morphPath(localRadius: number, amount: number) {
-    const circleOutline = shapeOutline(
-      shapeCorners.circle,
-      samples,
-      localRadius,
-    );
-    const triangleOutline = shapeOutline(
-      shapeCorners.triangle,
-      samples,
-      localRadius,
-    );
-    return pathFromOutline(
-      circleOutline.map((point, index) => ({
-        x: point.x + (triangleOutline[index].x - point.x) * amount,
-        y: point.y + (triangleOutline[index].y - point.y) * amount,
-      })),
-      unit / 2,
-    );
+  function morphOutline(amount: number) {
+    const startingOutline = shapeOutline(shapeCorners.circle, samples, radius);
+    const endingOutline = shapeOutline(shapeCorners.triangle, samples, radius);
+    return startingOutline.map((point, index) => ({
+      x: point.x + (endingOutline[index].x - point.x) * amount,
+      y: point.y + (endingOutline[index].y - point.y) * amount,
+    }));
   }
 
-  let cropPath = $derived(morphPath(cropRadius, progress));
-  let innerPath = $derived(morphPath(radius, 1 - progress));
-
+  let currentOutline = $derived(morphOutline(progress));
+  let shapePath = $derived(pathFromOutline(currentOutline, unit / 2));
+  let tracePaths = $derived(
+    traceProgresses.map((amount, index) => ({
+      path: pathFromOutline(morphOutline(amount), unit / 2),
+      opacity: 0.28 * (1 - index / traceCount),
+    })),
+  );
+  /* The cube is layered above these spokes and masks their center endpoints. */
+  let vertexSpokes = $derived(
+    Array.from({ length: 3 }, (_, index) => {
+      const vertex = currentOutline[(index * samples) / 3];
+      return {
+        x1: vertex.x * (unit / 2),
+        y1: vertex.y * (unit / 2),
+        x2: vertex.x * (1 - detailProgress) * (unit / 2),
+        y2: vertex.y * (1 - detailProgress) * (unit / 2),
+      };
+    }),
+  );
   const fieldColour = "var(--range)";
-  const shapeColour = "var(--paper)";
-  const clipId = "design-knot-morph-clip";
 
   const soundManager = getContext<RangeSoundManager | undefined>(
     RANGE_SOUND_MANAGER_CONTEXT,
@@ -121,21 +108,17 @@
     }
 
     let frame = 0;
-    // Phases arrive in beats; everything below the clock works in milliseconds.
+    // Timing arrives in beats; everything below the clock works in milliseconds.
     const beatMs = KNOT_BEAT_SECONDS * 1_000;
-    const holdMs = hold * beatMs;
-    const morphMs = morph * beatMs;
-    const settleMs = settle * beatMs;
-    const zoomMs = zoom * beatMs;
-    const cycle = holdMs + morphMs + settleMs + zoomMs;
-    const zoomStart = holdMs + morphMs + settleMs;
-    const revealPoint = holdMs + morphMs - strikeLead * beatMs;
+    const trianglePeak = halfCycle * beatMs;
+    const cycle = trianglePeak * 2;
+    const revealPoint = trianglePeak - strikeLead * beatMs;
 
     /*
      * The animation runs on performance.now() and the music runs on the audio
      * clock; nothing lines them up on its own. Offset the start so the morph's
-     * strike lands on a beat of audio time; every later forward-only turn has
-     * the same twelve-beat length.
+     * strike lands on a beat of audio time; every later oscillation has the
+     * same twelve-beat length.
      */
     let start = performance.now();
     let firstStrike = 0;
@@ -148,26 +131,22 @@
     // the gong that lands once per turn as the triangle resolves.
     let struckTurn = -1;
     const cycleSeconds = cycle / 1_000;
-    const ease = (value: number) =>
-      value * value * value * (value * (value * 6 - 15) + 10);
+    const breathAt = (time: number) =>
+      (1 - Math.cos((time / cycle) * Math.PI * 2)) / 2;
 
     const tick = (now: number) => {
       const total = Math.max(0, now - start);
       const turn = Math.floor(total / cycle);
       const elapsed = total % cycle;
-      if (elapsed < holdMs) {
-        progress = 0;
-        zoomed = 0;
-      } else if (elapsed < holdMs + morphMs) {
-        progress = ease((elapsed - holdMs) / morphMs);
-        zoomed = 0;
-      } else if (elapsed < zoomStart) {
-        progress = 1;
-        zoomed = 0;
-      } else {
-        progress = 1;
-        zoomed = ease((elapsed - zoomStart) / zoomMs);
-      }
+      const breathProgress = breathAt(elapsed);
+      progress = breathProgress;
+      detailProgress = breathProgress;
+      cubeScale = breathProgress;
+      traceProgresses = Array.from({ length: traceCount }, (_, index) =>
+        breathAt(
+          Math.max(0, total - (index + 1) * traceSpacingBeats * beatMs),
+        ),
+      );
       /*
        * Scheduled ahead of the frame that draws it, at the exact grid time.
        * Striking at whatever currentTime the frame happened to observe put
@@ -209,17 +188,28 @@
     preserveAspectRatio="xMidYMid meet"
     aria-hidden="true"
   >
-    <defs>
-      <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
-        <path d={cropPath} />
-      </clipPath>
-    </defs>
-    <g clip-path={`url(#${clipId})`}>
-      <path d={cropPath} fill={fieldColour} />
-      <g transform={`scale(${zoomScale})`}>
-        <path d={innerPath} fill={shapeColour} />
-      </g>
-    </g>
+    {#each tracePaths as trace}
+      <path
+        class="morphTrace"
+        d={trace.path}
+        style={`--trace-opacity: ${trace.opacity}`}
+      />
+    {/each}
+    <path d={shapePath} fill={fieldColour} />
+    {#each vertexSpokes as spoke}
+      <line
+        class="vertexSpoke"
+        x1={spoke.x1}
+        y1={spoke.y1}
+        x2={spoke.x2}
+        y2={spoke.y2}
+      />
+    {/each}
+    <polygon
+      class="cubeFill"
+      transform={`scale(${cubeScale})`}
+      points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+    />
   </svg>
 
   {#if soundManager}
@@ -248,6 +238,25 @@
     display: block;
     width: min(60vw, 60vh);
     height: min(60vw, 60vh);
+  }
+
+  .morphTrace {
+    fill: none;
+    opacity: var(--trace-opacity);
+    stroke: var(--range);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .vertexSpoke {
+    stroke: var(--paper);
+    stroke-width: 2;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .cubeFill {
+    fill: var(--paper);
   }
 
   .gongToggle {

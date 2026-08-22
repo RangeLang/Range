@@ -18,10 +18,15 @@ macro bool(): Construct {
 
 macro collection(): Macro {
 
-  #modifier {
+  let modifiers: #environment.filter(
+    all: @collection.modifier
+  )
 
+  if modifiers.isEmpty {
+    @print("Hello print should work like this")
 
   }
+
 }
 
 @collection.modifier
@@ -44,7 +49,28 @@ macro filter(named: String): @many -> @any {
 }
 
 @collection.modifier
-macro map(transform: Function): @many -> @many {
+macro isEmpty(): @many -> Bool {
+    #environment.target.count == 0
+}
+
+@collection.modifier
+macro each(): @many -> @one {
+    let action: #environment.Application.children.filter(all: Closure)
+
+    state input: #environment.target
+    state index: Int(0)
+
+    while index < input.count {
+        let element: input.element(index: index)
+        action(element)
+        index: index + 1
+    }
+}
+
+@collection.modifier
+macro map(): @many -> @many {
+    let transform: #environment.Application.children.filter(all: Closure)
+
     state input: #environment.target
     state output: @many(capacity: input.count)
     state index: Int(0)

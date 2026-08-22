@@ -1,0 +1,22 @@
+function compilerBEmitRangeViewGPUIEntry(): Int {
+    if commandLineArgumentCount() != 1 {
+        print(value: "usage: emit-rangeview-gpui <artifact-directory>")
+        return 64
+    }
+    let route: String(commandLineArgument(index: 0))
+    return compilerBWriteLinkRunRangeViewGPUI(
+        viewSourcePath: fileManagerChildPath(path: route, name: "RangeViewView.range"),
+        rendererSourcePath: fileManagerChildPath(path: route, name: "RangeViewGPUI.range"),
+        sourcePath: fileManagerChildPath(path: route, name: "RangeView.range"),
+        llvmPath: fileManagerChildPath(path: route, name: "RangeView.ll"),
+        gpuiLibraryPath: fileManagerChildPath(
+            path: route,
+            name: "librange_view_gpui.a"
+        ),
+        executablePath: fileManagerChildPath(path: route, name: "RangeView")
+    )
+}
+
+@main {
+    return compilerBEmitRangeViewGPUIEntry()
+}

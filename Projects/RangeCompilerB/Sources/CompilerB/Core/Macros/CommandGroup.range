@@ -1,0 +1,4 @@
+macro commandGroup(): Construct {
+  @many
+  let commands: #environment.target.Declaration.members.filter(all: Function.Declaration)
+}

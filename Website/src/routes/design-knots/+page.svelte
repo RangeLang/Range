@@ -65,9 +65,9 @@
       </div>
 
       <p class="shapeNote">
-        A circle folds into three corners, and the circle those corners
-        contain is the one the next turn begins from. Collapsing a knot does
-        not end the work; it hands it on at a smaller scale.
+        Three edge tangents press a circle inward until their shared pressure
+        resolves as an equilateral triangle. A knot collapses when its
+        restatements converge on one decision.
       </p>
     </section>
 

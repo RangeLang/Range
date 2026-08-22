@@ -1,0 +1,27 @@
+macro app(): Construct -> Void {}
+macro shape(): Construct -> Void {}
+macro many(count: Int): Let -> Void {}
+macro material(): Construct -> Void {}
+macro shader(): Construct -> Void {}
+
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+@shape
+construct BrokenShape {
+    @many(4)
+    let points: Point(
+        Point(x: 0, y: 0),
+        Point(x: 100, y: 0),
+        Point(x: 100, y: 100)
+    )
+}
+
+@app
+construct InvalidRangeViewShape {
+    derived body: @view {
+        BrokenShape()
+    }
+}

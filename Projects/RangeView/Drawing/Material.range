@@ -1,0 +1,24 @@
+@shader
+construct Gradient {
+    @many
+    let colors: Color
+    let angle: Int
+}
+
+@shader
+construct Emission {
+    let color: Gradient
+    let strength: Int
+}
+
+@material
+construct Aero {
+    derived output: @shader {
+        let color: Gradient(.blue, .teal, angle: 135)
+
+        Emission(
+            color: color,
+            strength: 100
+        )
+    }
+}

@@ -372,18 +372,14 @@ RANGE_DEVELOPMENT_COMPILER=/path/to/RangeCompiler \
   scripts/range run Examples/RangeViewNativeTriangle \
   --source RangeCompiler/Sources/Frameworks/RangeView/Drawing/Geometry.range \
   --source RangeCompiler/Sources/Frameworks/RangeView/Drawing/Style.range \
-  --source RangeCompiler/Sources/Frameworks/RangeView/Macros/Iterable.range \
   --source RangeCompiler/Sources/Frameworks/RangeView/Native
 ```
 
-The source-first semantic surface keeps `Color` as an ordinary open OKLCH
-construct and composes named colors inside `@iterable construct RangePalette`.
-Enums remain reserved for genuine alternatives. `@iterable` registers the
-construct's stored values as its source-ordered traversal relationship, so the
-palette itself can map into a matrix without a generated `elements` field,
-`Array`, or parallel palette list. The SDL checkpoint
-continues to own final RGBA bytes until that general derived-collection path is
-compiler-backed.
+The source-first semantic surface keeps `Color` as ordinary open OKLCH data.
+Named colors are homogeneous enum values; no separate traversal-registration
+macro or parallel palette list participates in the framework source. The SDL
+checkpoint continues to own final RGBA bytes until general derived collection
+projection is compiler-backed.
 
 The example now also presents all twelve chromatic presets as a 6 by 2 matrix
 of filled rectangles beneath the Triangle. A native `NativeRectangle` adapter

@@ -15,7 +15,7 @@ construct Stack {
     state axis: Axis
     state spacing: Float
     state alignment: LayoutAlignment
-    derived view: [@component] {
+    derived view: @view {
         // The component body is the view field.
     }
 }
@@ -24,9 +24,9 @@ construct Stack {
 construct Fragment {
     let html: String
     let css: String
-    let children: () -> [@component]
+    let children: () -> @view
 
-    derived body: [@component] {
+    derived body: @view {
         children()
     }
 }

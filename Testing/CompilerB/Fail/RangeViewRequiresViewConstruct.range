@@ -1,0 +1,28 @@
+// Focused compiler fixture declaration. The RangeView framework owns the
+// executable @app implementation in Projects/RangeView/Macros/Core.range.
+macro app(): Construct -> Void {}
+macro shape(): Construct -> Void {}
+macro many(count: Int): Let -> Void {}
+macro material(): Construct -> Void {}
+macro shader(): Construct -> Void {}
+
+construct UnmarkedRectangle {
+    let x: Int
+    let y: Int
+    let width: Int
+    let height: Int
+    let color: Int
+}
+
+@app
+construct InvalidRangeView {
+    derived body: @view {
+        UnmarkedRectangle(
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            color: 16711680
+        )
+    }
+}

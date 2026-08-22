@@ -1,0 +1,3 @@
+macro diagnostic(message: String): Void {
+    stringDiagnostic(value: message)
+}

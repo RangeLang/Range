@@ -1,0 +1,11 @@
+macro print(message: String): Void {
+    stringPrint(value: message)
+}
+
+macro print(nodes: @many): Void {
+
+  nodes.each { node in
+    stringPrint(value: node)
+  }
+
+}

@@ -1,16 +1,7 @@
 macro shape(): Construct {
-    let namedDrawFunctions: [Function.Declaration](
-        #environment.target.Declaration.members.filter(all: Function.Declaration) { function in
-            return function.identity.name == "draw"
+    #environment {
+        extension #environment.target.Declaration.identity {
+            @view
         }
-    )
-    let validDrawFunctions: [Function.Declaration](
-        namedDrawFunctions.filter { function in
-            return function.parameters.count == 0 && function.returnType != nil
-        }
-    )
-
-    if namedDrawFunctions.count != 1 || validDrawFunctions.count != 1 {
-        #environment.error("@shape requires exactly one zero-argument draw function with an explicit representation return type.")
     }
 }
