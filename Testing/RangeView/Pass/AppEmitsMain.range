@@ -1,6 +1,6 @@
 @app
 construct Website {
-    derived routes: Route {
-        Route("/") {}
+    derived body: @view {
+        Text("Home")
     }
 }

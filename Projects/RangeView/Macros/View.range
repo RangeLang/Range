@@ -1,1 +1,8 @@
-macro view(): Construct -> Void {}
+macro view(): Construct -> Void {
+    #environment {
+        extension #environment.target.Declaration.identity {
+            @many
+            let modifiers: @modifier
+        }
+    }
+}

@@ -1,4 +1,4 @@
-// Backend-neutral products produced from the component graph.
+// Backend-neutral products produced from the view graph.
 
 construct RenderNode {
     let identity: Identity

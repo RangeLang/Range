@@ -52,6 +52,8 @@ macro_argument_duplicate_fixture="$REPO_ROOT/Testing/CompilerB/Fail/DuplicateMac
 macro_argument_failure_output="$work_root/macro-argument-failure.out"
 application_execution_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ApplicationExecution.range"
 application_execution_output="$work_root/application-execution.out"
+process_result_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProcessResultExpression.range"
+process_result_output="$work_root/process-result.out"
 enum_switch_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EnumSwitchGraph.range"
 enum_switch_output="$work_root/enum-switch.out"
 many_switch_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ManySwitchEnvironment.range"
@@ -70,7 +72,7 @@ many_print_mismatch_output="$work_root/many-print-mismatch.out"
 freestanding_target_fixture="$REPO_ROOT/Testing/CompilerB/Fail/FreestandingMacroRequiresVoid.range"
 freestanding_target_output="$work_root/freestanding-target.out"
 backend_entry_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EmitIntegerLLVM.range"
-backend_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntegerReturnProduct.range"
+backend_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntegerResultProduct.range"
 backend_integer_collection_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntegerLLVMCollection.range"
 collection_production_fixture="$REPO_ROOT/Testing/CompilerB/Pass/CollectionProduction.range"
 uuid_many_fixture="$REPO_ROOT/Testing/CompilerB/Pass/UUIDMany.range"
@@ -80,12 +82,12 @@ collection_production_population_output="$work_root/collection-production-popula
 collection_production_population_graph_output="$work_root/collection-production-population.out"
 collection_production_mismatch_fixture="$REPO_ROOT/Testing/CompilerB/Fail/CollectionProductionResultMismatch.range"
 collection_production_mismatch_output="$work_root/collection-production-mismatch.out"
-backend_byte_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ByteReturnProduct.range"
+backend_byte_product_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ByteResultProduct.range"
 backend_int_representation_fixture="$REPO_ROOT/Testing/CompilerB/Pass/IntRepresentation.range"
 backend_product_identity_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroProductIdentity.range"
 backend_macro_argument_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroArgumentLLVM.range"
-backend_returned_product_fixture="$REPO_ROOT/Testing/CompilerB/Fail/ReturnedLLVMProduct.range"
-backend_rejection_fixture="$REPO_ROOT/Testing/CompilerB/Fail/UnsupportedReturnProduct.range"
+backend_terminal_product_fixture="$REPO_ROOT/Testing/CompilerB/Fail/TerminalLLVMProduct.range"
+backend_rejection_fixture="$REPO_ROOT/Testing/CompilerB/Fail/UnsupportedResultExpression.range"
 backend_byte_overflow_fixture="$REPO_ROOT/Testing/CompilerB/Fail/ByteLiteralOverflow.range"
 backend_missing_representation_fixture="$REPO_ROOT/Testing/CompilerB/Fail/MissingIntegerRepresentation.range"
 backend_invalid_representation_fixture="$REPO_ROOT/Testing/CompilerB/Fail/InvalidIntegerRepresentation.range"
@@ -109,7 +111,7 @@ backend_missing_metadata_output="$work_root/compiler-b-missing-metadata.out"
 backend_product_identity_output="$work_root/compiler-b-product-identity.ll"
 backend_macro_argument_output="$work_root/compiler-b-macro-argument.ll"
 backend_macro_argument_executable="$work_root/compiler-b-macro-argument"
-backend_returned_product_output="$work_root/compiler-b-returned-product.out"
+backend_terminal_product_output="$work_root/compiler-b-terminal-product.out"
 integer_macro_output="$work_root/compiler-b-integer-macro.out"
 many_macro_output="$work_root/compiler-b-many-macro.out"
 collection_production_output="$work_root/compiler-b-collection-production.out"
@@ -213,10 +215,11 @@ if rg -n '#environment\.target\.root\(\)|functionModifier|callRoot' "$COMPILER_B
 fi
 grep -F 'revision.functionDeclarations.syntaxIDs.element(index: declarationRow)' "$backend_model" >/dev/null || fail "backend does not query canonical Function identities"
 grep -F 'revision.functionSignatures.returnTypeTokenIDs.element(' "$backend_model" >/dev/null || fail "backend does not query canonical function signatures"
-if grep -F 'revision.returns' "$representation_model" >/dev/null; then
-    fail "macro execution still consumes function Return relationships"
+if rg -n 'CompilerBReturnFacetStore|revision\.returns|returnSyntaxIDs' "$syntax_model" "$syntax_parser" "$representation_model" "$backend_model" >/dev/null; then
+    fail "Compiler B still retains a parallel Return representation"
 fi
-grep -F 'revision.returns.firstValueTokenIDs.element(index: returnRow)' "$backend_model" >/dev/null || fail "backend does not query canonical Return relationships"
+grep -F 'let resultExpressionSyntaxIDs: Buffer<Int>' "$syntax_model" >/dev/null || fail "Process does not own its terminal result expression"
+grep -F 'revision.process.processes.resultExpressionSyntaxIDs.element(' "$backend_model" >/dev/null || fail "backend does not query the canonical Process result"
 grep -F 'let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: source))' "$backend_model" >/dev/null || fail "backend does not enter through one canonical syntax revision"
 if grep -E 'CompilerB(FunctionIndex|IRFunctionStore|IndexedProgram|IntegerLiteralStore|IntegerRepresentationStore)' "$backend_model" "$representation_model" >/dev/null; then
     fail "backend still copies graph facts into a parallel program or IR store"
@@ -377,6 +380,12 @@ grep -F $'syntax\tvalid=false\tdiagnostic=macro argument does not satisfy parame
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument label is not declared' "$macro_argument_failure_output" >/dev/null || fail "unknown macro argument rejected at the wrong boundary"
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_duplicate_fixture" > "$macro_argument_failure_output"
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument is duplicated' "$macro_argument_failure_output" >/dev/null || fail "duplicate macro argument rejected at the wrong boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$process_result_fixture" > "$process_result_output"
+[[ "$(grep -c $'^processResult\t' "$process_result_output")" -eq 2 ]] || fail "function and macro terminal expressions did not become canonical Process results"
+grep -F $'\tkind=unknown\tvalue=origin + ((((value - origin) % period) + period) % period)' "$process_result_output" >/dev/null || fail "macro calculation is not retained as its terminal Process result"
+grep -F $'\tkind=integer\tvalue=42' "$process_result_output" >/dev/null || fail "function scalar is not retained as its terminal Process result"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$process_result_output" >/dev/null || fail "terminal Process result fixture was rejected"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$enum_switch_fixture" > "$enum_switch_output"
 [[ "$(grep -c $'^syntaxNode\tmarker=enumCase\t' "$enum_switch_output")" -eq 2 ]] || fail "enum declaration did not retain both cases"
@@ -555,10 +564,10 @@ backend_macro_argument_status=0
 "$backend_macro_argument_executable" || backend_macro_argument_status=$?
 [[ "$backend_macro_argument_status" -eq 42 ]] || fail "macro-argument LLVM product did not exit 42"
 
-backend_returned_product_status=0
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_returned_product_fixture" > "$backend_returned_product_output" || backend_returned_product_status=$?
-[[ "$backend_returned_product_status" -eq 65 ]] || fail "returned LLVM aggregate did not reject with exit 65"
-grep -F $'compilerBBackendError\tunable to resolve collection production relationships' "$backend_returned_product_output" >/dev/null || fail "returned LLVM aggregate rejected at the wrong boundary"
+backend_terminal_product_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_terminal_product_fixture" > "$backend_terminal_product_output" || backend_terminal_product_status=$?
+[[ "$backend_terminal_product_status" -eq 65 ]] || fail "terminal LLVM aggregate did not reject with exit 65"
+grep -F $'compilerBBackendError\tunable to resolve collection production relationships' "$backend_terminal_product_output" >/dev/null || fail "terminal LLVM aggregate rejected at the wrong boundary"
 
 {
     cat "$integer_macro"
@@ -591,8 +600,8 @@ backend_rejection_status=0
     cat "$backend_rejection_fixture"
 } > "$backend_rejection_source"
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$backend_rejection_source" > "$backend_rejection_output" || backend_rejection_status=$?
-[[ "$backend_rejection_status" -eq 65 ]] || fail "unsupported B return expression did not reject with exit 65"
-grep -F $'compilerBBackendError\tfirst backend slice requires return <integer> as the complete body' "$backend_rejection_output" >/dev/null || fail "unsupported B return expression rejected at the wrong boundary"
+[[ "$backend_rejection_status" -eq 65 ]] || fail "unsupported B result expression did not reject with exit 65"
+grep -F $'compilerBBackendError\tfirst backend slice requires an integer terminal expression as the complete body' "$backend_rejection_output" >/dev/null || fail "unsupported B result expression rejected at the wrong boundary"
 
 backend_byte_overflow_status=0
 {

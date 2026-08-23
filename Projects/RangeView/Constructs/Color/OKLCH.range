@@ -1,0 +1,14 @@
+@color
+construct OKLCH {
+    @bounded(minimum: 0, maximum: 1)
+    let lightness: Float
+
+    @lowerBounded(minimum: 0)
+    let chroma: Float
+
+    @cyclic(origin: 0, period: 360)
+    let hue: Float
+
+    @bounded(minimum: 0, maximum: 1)
+    let alpha: Float
+}

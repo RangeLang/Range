@@ -1,0 +1,10 @@
+@view
+construct Fragment {
+    let html: String
+    let css: String
+    let children: () -> @view
+
+    derived body: @view {
+        children()
+    }
+}

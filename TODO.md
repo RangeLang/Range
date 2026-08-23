@@ -86,6 +86,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         product store. The backend selects products by target identity and
         never by the `integer` macro name; returned LLVM aggregates and
         redundant `-> LLVM` promises are not execution paths.
+    - [x] Make the final value-producing expression the canonical result of a
+      Function or Macro process.
+      - Process owns one optional `resultExpressionSyntaxID` edge directly;
+        the parallel Return facet and copied scalar columns are gone. Compiler
+        B retains an arithmetic macro result as the exact terminal expression,
+        and the focused LLVM slice consumes a bare integer terminal expression
+        without requiring a `return` statement.
     - [x] Materialize switch cases as ordinary comparison expressions in the
       canonical process graph before selecting compile-time macro environments.
       - A case stores one condition expression identity; it does not retain a
@@ -160,6 +167,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         flow and the shared freestanding macro executor).
     - [ ] Rebuild the Compiler B gate around one produced compiler instead of
       per-fixture entry compilation.
+      - [ ] Make that produced compiler expose one B-owned `@commandGroup`
+        `check` command. Compiler B itself dispatches fixture routes and prints
+        warnings/progress once; the shell only builds and invokes it.
       - [ ] Route fixtures into a B executable as input data (a parse/emit
         route per fixture file) instead of appending each fixture to the
         bundle as a compiled-in focused entry. This is the same capability as
@@ -527,12 +537,15 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
 - [ ] Finish the RangeView app-to-window entry hook.
   - [x] Make `@app` emit the single top-level `@main` block through
     `#environment`, with root-graph duplicate-main rejection.
-  - [x] Have the emitted main call the application backend, which performs
-    SDL setup, window creation, the event loop, and SDL teardown.
-  - [ ] Hand the resolved route/page tree to the window runtime instead of
-    rendering the current fixed Stack example.
-  - [ ] Prove `@component` modifier accumulation with focused macro fixtures.
-    - `@component` now emits one ordered `@many modifiers: @modifier`
+  - [x] Replace the opaque application runner with a direct Window application
+    in the emitted main. Window is a Range-owned `@view` with a String title
+    and an `@app` graph binding; native strings and renderer handles are not
+    source identities.
+  - [ ] Lower that Window application through its resolved app body,
+    NavigationStack, destination path, and layout-modifier graph into the
+    selected platform backend.
+  - [ ] Prove `@view` modifier accumulation with focused macro fixtures.
+    - `@view` now emits one ordered `@many modifiers: @modifier`
       relationship in the idealized RangeView source; compiler-backed proof
       still needs positive member-access accumulation and duplicate-slot
       rejection fixtures.
@@ -1293,14 +1306,49 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
 
 ## RangeView
 
+  - [x] Make Window an ordinary Range-owned `@view` declaration.
+    - `@app` emits Window directly in its generated `@main`; there is no
+      intermediate `run()` function.
+    - The obsolete `RangeViewNativeCString`, opaque Window, WindowRenderer,
+      SDL lifecycle implementation, and native-window fixture were removed.
+      The independent `@color` target-admission proof remains active.
+    - [ ] Teach Compiler B's RangeView route to consume the real `@app`
+      expansion and Window Application instead of independently manufacturing
+      `main` plus the `rangeGPUIRun` transport call.
+    - [ ] Resolve Window size and placement from general layout modifiers such
+      as `frame` and `position`; do not add intrinsic bounds fields.
+  - [x] Keep color representation in Range rather than a native semantic shim.
+    - `RGBA`, `OKLCH`, and the composed `Color` enum are ordinary `@color`
+      declarations whose applications carry the emitted representation.
+    - The orphan `Projects/RangeView/Native/Color.c` implementation and the
+      Range functions delegating into it were removed. A platform renderer may
+      translate the emitted fields at its final API boundary, but it does not
+      own Range color semantics.
+    - [ ] Replace Compiler B's packed integer GPUI gradient placeholders with
+      graph-resolved `@color` applications, including composed enum-case values.
+  - [x] Make RangeView color domains member macro relationships rather than
+    generic scalar specializations.
+    - `RGBA` uses plain Int members carrying `@bounded(0...255)` relationships.
+      `OKLCH` uses plain Float members: bounded lightness and alpha,
+      lower-bounded chroma, and cyclic hue with period 360.
+    - [x] Express scalar constraints as `@member -> Value` observers of every
+      member Application: bounded observers diagnose rejected values and
+      preserve accepted values; cyclic observers produce an Euclidean-modulo
+      normalized value without changing scalar storage identity.
+    - [ ] Execute implicit final macro expressions in Compiler B so the authored
+      constraint observers validate static applications and lower dynamic
+      checks/normalization into emitted programs.
+    - [ ] Migrate other semantic-domain generic wrappers to the same
+      conformance pattern after the observer behavior has a focused compiler
+      fixture. Physical storage representation remains a separate concern.
   - [x] Compose and draw the first Compiler B derived `@view` value.
     - Compiler B retains a derived builder body as a normal Member/Process
       identity and retains each value-producing call as an ordered execution
       Application. Construct calls use the shared Application relationship.
-    - RangeView owns the abstract `@view` relationship in `Macros/View.range`;
-      `@component` and `@shape` contribute it, while `Text` carries it directly
-      and accepts one unlabeled String value. The focused fixture authors its
-      own ordinary Rectangle and Text declarations.
+    - RangeView owns the single abstract `@view` relationship in
+      `Macros/View.range`; `@shape` contributes it, while `Text` carries it
+      directly and accepts one unlabeled String value. The focused fixture
+      authors its own ordinary Rectangle and Text declarations.
     - An app composes both through one ordinary
       `derived body: @view { ... }` value. The backend selects exact `@view`
       relationships plus the GPUI adapter's separate `@gpui(kind:)`
@@ -1323,13 +1371,12 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
     - `scripts/check-range-compiler-b-rangeview-gpui` owns the repeatable
       headless link/execution proof. A manual launch additionally verified the
       native GPUI window and event loop.
-    - Component, route, and render-tree lowering remain later graph-to-GPUI
+    - View and render-tree lowering remain later graph-to-GPUI
       slices; this checkpoint proves only the app-root artifact pipeline.
-  - [x] Establish `@app`, `@component`, and `@page` as the minimal
-    framework marker surface.
-  - [x] Move every foundational macro into `Macros/Core.range` and make
-    `Macros/` the ownership boundary for future concern-specific RangeView
-    macro files.
+  - [x] Establish `@app` and `@view` as the minimal framework marker surface;
+    there are no parallel component or page identities.
+  - [x] Give every foundational concern its own file under `Macros/`:
+    `App.range` owns `@app` and `View.range` owns `@view`.
   - [x] Remove framework registration objects and Compiler B shadow
     declarations from the RangeView path.
     - The obsolete iterable registration macro and wrapper are deleted; no
@@ -1338,8 +1385,8 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
       RangeView owns `@view`, the GPUI adapter owns `@gpui`, and focused
       fixtures declare only the ordinary values and minimal `@app` relation
       they exercise.
-    - [ ] Admit the collection/generic graph-query syntax in the real
-      `Projects/RangeView/Macros/Core.range`, then replace the focused fixture's
+    - [ ] Admit the required macro expansion syntax in the real
+      `Projects/RangeView/Macros/App.range`, then replace the focused fixture's
       minimal `@app` declaration with the executable framework macro body.
   - [ ] Emit `.html`, `.css`, and `.js` files from ordinary Range strings once
     that backend has a compiler-owned artifact boundary.
@@ -1347,37 +1394,26 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
     source has focused compiler fixtures; do not make RangeView itself a test
     input.
   - [ ] Prove the first executable `VStack` lowering through compiler-owned
-    component fixtures, without using the idealized framework as validation.
+    view fixtures, without using the idealized framework as validation.
   - [x] Replace the prototype declaration with the intended declaration-first
     surface, even though compiler support remains pending:
     `state spacing: Float` plus
     `binding _ children: () -> @view`.
-  - [ ] Make `@app` discover `@page` declarations and generate the site entry
-    point once framework dependencies and emitted artifacts have a supported
-    project-graph consumer.
-    - [x] Declare the source-first `Route` model and one derived route tree on
-      the example app, with paths owned by routes rather than `@page`.
-    - [x] Declare the `@app` contract requiring exactly one
-      `derived routes: Route`, with distinct missing, duplicate, and wrong-type
-      diagnostics.
-    - [ ] Execute the typed `Derived<Route>` query and its missing, duplicate,
-      and wrong-type diagnostics through the current macro compiler.
-    - [ ] Recover route-builder expression, block, optional, either, and array
-      collection without restoring the old Swift result-builder runtime.
-    - [ ] Resolve nested prefixes and build both path-to-page and page-to-path
-      graph facts before artifact emission.
-      - [ ] Let each `Route` normalize its local segment and derive its resolved
-        canonical matcher signature from the parent prefix.
-      - [ ] Make `@app` reject duplicate matcher signatures across the complete
-        tree, treating parameter-name-only differences as the same matcher.
-      - [ ] Make `@app` reject a repeated page declaration so reverse lookup
-        has one canonical path; add aliases later through an explicit route
-        declaration if needed.
-  - [ ] Make `@component` generate or select its artifact lowering so callers
-    express `VStack` composition without invoking framework lowering functions.
-    - [x] Declare the macro contract requiring exactly one ordinary
-      `derived view: @view` or `derived body: @view` value on every component
-      and page.
+  - [ ] Make NavigationStack, rather than `@app`, own application navigation.
+    - [x] Remove the `Route` tree and route validation contract from `@app`;
+      the application composes one ordinary `derived body: @view` instead.
+    - [x] Declare the source-first `NavigationStack` with an ordered mutable
+      `@view` path and a root view binding.
+    - [ ] Resolve the app body and lower the root NavigationStack through the
+      current macro compiler.
+    - [ ] Make path append, removal, and replacement select the presented view
+      through general state and view-graph observation.
+    - [ ] Add restoration and URL/deep-link adapters as translations into the
+      navigation path; they must not become an application-owned route tree.
+  - [ ] Make `@view` generate or select its artifact lowering so callers express
+    `VStack` composition without invoking framework lowering functions.
+    - [x] Use one ordinary `derived body: @view` value for composed views;
+      primitive views can be lowered directly without a parallel category.
     - [ ] Execute the typed `Derived<[@view]>` query and its missing,
       duplicate, and wrong-type diagnostics through the current macro compiler.
     - [ ] Admit constructing `VStack(spacing:)` and projecting its spacing into
@@ -1385,26 +1421,26 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
       `renderHomePage` function discovery with failure code `6595`.
     - [ ] Recover the general builder operations proven by the earlier Neat
       model: expression, block, optional, either, and array collection.
-    - [ ] Make `VStack { ... }` collect component values through those builder
+    - [ ] Make `VStack { ... }` collect view values through those builder
       operations without reparsing source or naming `VStack` in compiler code.
       - [ ] Add independent external and local names to stored/binding
         declarations so `binding _ children` parses; the literal form currently
         rejects during top-level declaration capture.
       - [ ] Admit a builder closure binding with type `() -> @view`;
         `() -> [Int]` currently parses but rejects during enum-payload type
-        linking, while the earlier direct `[@component]` surface reached
+        linking, while the earlier direct `[@view]` surface reached
         `invalidMacroFamilyMemoryGraph`.
-      - [ ] Consume the component-family result as compile-time child syntax
+      - [ ] Consume the view-family result as compile-time child syntax
         before runtime layout instead of storing it in every `VStack`.
-  - [ ] Add one unified 2D `Geometry` intent shared by components and pages.
+  - [ ] Add one unified 2D `Geometry` intent shared by views.
     - [ ] Expose `.geometry { geometry in ... }` as the observation and
       transform boundary without a modifier registry or per-function macros.
     - [ ] Support size and shape transforms, including rectangle-to-circle,
       before lowering the final geometry into HTML, CSS, and JavaScript.
   - [ ] Add `@styleModifier` declarations that produce backend-neutral style
-    transforms and chain on every component and page.
+    transforms and chain on every view.
     - [ ] Implement `.padding(10)` as the first modifier and merge it into the
-      target node rather than emitting a wrapper component.
+      target node rather than emitting a wrapper view.
     - [ ] Lower static style transforms to CSS and reserve JavaScript for
       observed or runtime-dependent values.
   - [ ] Pass app values with owned dynamic strings through component and page
@@ -3414,9 +3450,9 @@ Discarded roadmap assumptions:
     - [x] Confirm that the explicit SDL show/raise and event-pump revision
       visibly presents the native Triangle window on the maintainer desktop;
       linked execution and exit `42` alone did not prove presentation.
-    - [x] Model `Window` and `WindowRenderer` as distinct Range-authored
-      `@opaque` resource identities, route Triangle drawing through the typed
-      renderer, and add a `Window` close query for SDL quit events.
+    - [x] Prove the historical SDL checkpoint with separate opaque Window and
+      WindowRenderer resources. This model is superseded on the experimental
+      RangeView path by one concrete `@view` Window and no renderer identity.
     - [x] Remove the ten-second diagnostic lifetime so a RangeView native app
       remains alive until its window closes or its process is terminated.
     - [x] Introduce backend-neutral `Point`, `Size`, and `DrawingSpace` values,
@@ -3456,15 +3492,12 @@ Discarded roadmap assumptions:
     - [x] Define semantic `Color` as OKLCH plus alpha, add the magenta, red,
       yellow, green, cyan, and blue hue-cycle presets plus neutral colors, and
       declare source-first `@styleModifier` fill and line transforms.
-      - [ ] Give every `@color` representation an explicit RGBA projection and
-        make the SDL adapter consume that lowering product while authored
-        collections can remain `Array<Color>`.
-        - `toRGBA(color: OKLCH)` is source-authored, but the temporary Float
-          foreign-conversion declaration is not accepted by the current extern
-          macro execution path yet.
-      - [ ] Admit reachable aggregate-return member calls, then allow the same
-        operation to be spelled `color.toRGBA()` without a framework-specific
-        compiler path.
+      - [x] Remove the temporary native OKLCH conversion ownership. Each
+        `RGBA(...)` or `OKLCH(...)` application is already the emitted color
+        representation; platform lowering consumes its fields directly.
+      - [ ] Make backend color lowering select `@color` relationships and
+        composed enum-case values generally, without a Color-specific compiler
+        path or packed integer placeholder.
       - [x] Add the six adjacent-pair derivatives: rose, orange, lime, spring
         green, azure, and violet.
       - [x] Keep `Color` as ordinary open data and compose named values as
@@ -3498,9 +3531,9 @@ Discarded roadmap assumptions:
       `Void` wrapper functions. The current compiler rejects that wrapper
       boundary during evaluation-temporary expiration at stage `13`, so the
       proven one-window lifecycle calls show, present, and destroy directly.
-    - [ ] Let RangeView `@app` own one explicit native-window lifecycle before
-      modeling multiple windows. Add a window collection only after each
-      window's identity, renderer/resource ownership, event routing, and close
+    - [ ] Let each RangeView Window Application own one explicit platform
+      lifecycle before modeling multiple windows. Add a window collection only
+      after each Window identity, resource ownership, event routing, and close
       behavior are explicit.
   - [ ] Pin and resolve wgpu-native, then add the C-layout descriptors,
     callbacks, out parameters, and platform surface bridge required for a

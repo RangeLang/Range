@@ -1,0 +1,11 @@
+macro lowerBounded(minimum: Value): @member -> Value {
+  let value: #environment.target.Application.value
+
+  if value < minimum {
+    @diagnostic(
+      "Value must be greater than or equal to \(minimum)"
+    )
+  }
+
+  value
+}

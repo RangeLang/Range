@@ -434,3 +434,117 @@ relationships and nested canonical Applications; it will not recognize
 `Aero`, `Gradient`, or `Emission` by declaration spelling.
 
 — Codex
+
+## 2026-08-22 — from Codex
+
+Claiming the RangeView Window ownership correction on the local
+`experimental` branch. I will remove the source-level opaque native CString,
+Window, and WindowRenderer identities plus their SDL lifecycle implementation;
+make Window an ordinary `@view` value; and have the real `@app` macro emit the
+Window application directly in its generated `@main`. I will also retire the
+stale SDL native-window fixture/gate block and update only matching RangeView
+documentation and root TODO wording. Compiler B's separate GPUI adapter and
+the in-progress material claim remain untouched in this slice.
+
+— Codex
+
+Completed and releasing the RangeView Window ownership claim. The concrete
+Window now lives at `Projects/RangeView/Application/Window.range`, carries a
+Range String title plus an `@app` binding, and is itself marked `@view`.
+`@app` emits that Window Application directly in `@main`; there is no `run()`
+step. The old opaque native CString, Window, WindowRenderer, SDL lifecycle
+implementation, and NativeWindow fixture/proof were removed. The unrelated
+`@color` admission proof was preserved as its own gate function.
+
+Focused source assertions, `bash -n scripts/check-range-value-ownership`, and
+`git diff --check` pass. The owning broad gate was attempted and stopped before
+RangeView at the pre-existing `RangeCompiler/Runtime/RangeRawBuffer.c` runtime
+input hash mismatch. Direct platform lowering of the Window graph and general
+frame/position modifier resolution remain explicit TODOs.
+
+— Codex
+
+## 2026-08-23 — from Codex
+
+Claiming the RangeView color ownership correction. I will remove the orphan
+`Native/Color.c` semantic conversion implementation and the Range functions
+that delegate OKLCH conversion to it. `RGBA`, `OKLCH`, and composed `Color`
+cases remain ordinary Range declarations/applications; renderer lowering must
+consume those emitted graph values. I will update only the matching focused
+source assertions, README, root TODO, and historical handoff note. The current
+Compiler B packed-integer GPUI material proof will be recorded as transitional,
+not silently presented as the completed color graph route.
+
+— Codex
+
+Completed and releasing the RangeView color ownership correction. The orphan
+`Projects/RangeView/Native/Color.c` implementation is deleted, and
+`Drawing/Style.range` no longer delegates OKLCH values through a C conversion
+function. `RGBA`, `OKLCH`, and composed `Color` cases remain the canonical
+Range declarations/applications whose fields are consumed by renderer
+lowering. Focused source assertions, script syntax, and `git diff --check`
+pass. The broad ownership gate still stops before RangeView at the existing
+`RangeCompiler/Runtime/RangeRawBuffer.c` input-hash mismatch. Compiler B's
+packed integer GPUI gradient fixture remains explicitly transitional until it
+consumes graph-resolved `@color` applications.
+
+— Codex
+
+## 2026-08-23 — from Codex
+
+Claiming the RangeView scalar-constraint example. I will add RangeView-owned
+`@bounded`, `@lowerBounded`, and `@cyclic` member macros with value parameters;
+replace RGBA's `Int<.unsigned, 8>` and OKLCH's unconstrained Float fields with
+plain scalar storage plus those relationships; and update only the matching
+README, root TODO, focused source assertions, and handoff note. This is a
+source-first observer model: broader compiler execution of the constraints and
+repository-wide generic cleanup remain separate work.
+
+— Codex
+
+Completed and releasing the RangeView scalar-constraint example. Added
+`Macros/Constraint.range` with value-parameterized `@bounded`,
+`@lowerBounded`, and `@cyclic` member macros. `Drawing/Style.range` now uses
+plain Int RGBA channels and plain Float OKLCH components; six finite bounds,
+one lower bound, and one cyclic period carry their semantic domains without
+`<>` specialization. README, root TODO, the GPUNative handoff, and focused
+source assertions describe the observer boundary and broader migration rule.
+Direct assertions, script syntax, and `git diff --check` pass. The broad
+ownership gate still stops before RangeView on the pre-existing
+`RangeCompiler/Runtime/RangeRawBuffer.c` input-hash mismatch; constraint
+execution remains explicitly pending compiler work.
+
+— Codex
+
+## 2026-08-23 — from Codex
+
+Claiming the RangeView scalar-constraint execution source. I will make
+`@bounded`, `@lowerBounded`, and `@cyclic` operate as `@member -> Value`
+transformations over `#environment.target.Application.value`: malformed domains and
+out-of-domain bounded values emit ordinary `@diagnostic` applications, each
+bounded observer preserves its accepted value, and cyclic values produce an
+Euclidean-modulo normalized value. This claim does not add compiler dispatch
+for any constraint macro name; focused proof will cover the authored graph
+shape and record the current Compiler B execution boundary honestly.
+
+— Codex
+
+Completed and releasing the RangeView scalar-constraint execution-source claim.
+`@bounded` and `@lowerBounded` now read the marked member's canonical
+`#environment.target.Application.value`, emit ordinary diagnostics for invalid
+values, and preserve accepted values. `@cyclic` validates its period and
+produces an Euclidean-modulo normalized value. All three are explicit
+`@member -> Value` transformations; no constraint name is special-cased in
+Compiler B and no scalar wrapper/storage identity was introduced.
+
+Compiler B's real lexer/parser accepts the file with `syntax valid=true` and
+retains three Application-query locals, five conditional nodes, and five
+freestanding diagnostic executions. Focused source assertions, shell syntax,
+and `git diff --check` pass. The broad ownership gate remains blocked before
+RangeView by the pre-existing `RangeCompiler/Runtime/RangeRawBuffer.c` runtime
+input hash mismatch. Compiler B still needs one general capability: executing
+an implicit final macro expression as its Value product. Until that lands, the
+constraint behavior is authored and structurally retained but not enforced in
+emitted programs.
+
+— Codex

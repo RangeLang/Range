@@ -1,5 +1,5 @@
 // Focused compiler fixture declaration. The RangeView framework owns the
-// executable @app implementation in Projects/RangeView/Macros/Core.range.
+// executable @app implementation in Projects/RangeView/Macros/App.range.
 macro app(): Construct -> Void {}
 macro shape(): Construct -> Void {}
 macro many(count: Int): Let -> Void {}

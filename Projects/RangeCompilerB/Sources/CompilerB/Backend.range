@@ -5,33 +5,6 @@ construct CompilerBLLVMModule {
     let diagnostic: String
 }
 
-function compilerBReturnFacetCountForOwner(
-    returns: CompilerBReturnFacetStore,
-    ownerSyntaxID: Int
-): Int {
-    state row: Int(0)
-    state count: Int(0)
-    while row < returns.syntaxIDs.count {
-        if returns.ownerSyntaxIDs.element(index: row) == ownerSyntaxID {
-            count: count + 1
-        }
-        row: row + 1
-    }
-    return count
-}
-
-function compilerBReturnFacetRowForOwner(
-    returns: CompilerBReturnFacetStore,
-    ownerSyntaxID: Int
-): Int {
-    state row: Int(0)
-    while row < returns.syntaxIDs.count {
-        if returns.ownerSyntaxIDs.element(index: row) == ownerSyntaxID { return row }
-        row: row + 1
-    }
-    return 0 - 1
-}
-
 function compilerBFunctionIdentityIsDuplicate(
     revision: CompilerBSyntaxRevision,
     declarationRow: Int
@@ -175,28 +148,46 @@ function compilerBEmitLLVM(source: String): CompilerBLLVMModule {
             }
         }
 
-        if diagnostic == "" && compilerBReturnFacetCountForOwner(
-            returns: revision.returns,
-            ownerSyntaxID: functionSyntaxID
-        ) != 1 {
-            diagnostic: "first backend slice requires exactly one return"
-        }
-
-        state returnRow: Int(0 - 1)
+        state processRow: Int(0 - 1)
+        state resultExpressionSyntaxID: Int(0 - 1)
+        state resultExpressionRow: Int(0 - 1)
         state valueTokenID: Int(0 - 1)
         state literalValue: Int(0)
         state literalIdentity: Int(0 - 1)
         if diagnostic == "" {
-            returnRow: compilerBReturnFacetRowForOwner(
-                returns: revision.returns,
-                ownerSyntaxID: functionSyntaxID
+            processRow: compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.processes.ownerSyntaxIDs,
+                syntaxID: functionSyntaxID
             )
-            valueTokenID: revision.returns.firstValueTokenIDs.element(index: returnRow)
-            if revision.returns.valueKindCodes.element(index: returnRow)
-                != compilerBParserScalarKindIntegerCode() {
-                diagnostic: "first backend slice requires return <integer> as the complete body"
+            if processRow < 0 {
+                diagnostic: "function is missing its canonical process"
             } else {
-                literalValue: revision.returns.integerValues.element(index: returnRow)
+                resultExpressionSyntaxID: revision.process.processes.resultExpressionSyntaxIDs.element(
+                    index: processRow
+                )
+                if resultExpressionSyntaxID < 0 {
+                    diagnostic: "first backend slice requires a terminal result expression"
+                }
+            }
+        }
+        if diagnostic == "" {
+            resultExpressionRow: compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.expressions.syntaxIDs,
+                syntaxID: resultExpressionSyntaxID
+            )
+            if resultExpressionRow < 0 {
+                diagnostic: "process result does not resolve to an expression"
+            } else if revision.process.expressions.kindCodes.element(
+                index: resultExpressionRow
+            ) != compilerBParserExpressionKindIntegerCode() {
+                diagnostic: "first backend slice requires an integer terminal expression as the complete body"
+            } else {
+                valueTokenID: revision.process.expressions.firstTokenIDs.element(
+                    index: resultExpressionRow
+                )
+                literalValue: revision.process.expressions.integerValues.element(
+                    index: resultExpressionRow
+                )
                 literalIdentity: compilerBRetainedToken(
                     store: revision.tokens,
                     id: TokenID(value: valueTokenID)
@@ -212,17 +203,17 @@ function compilerBEmitLLVM(source: String): CompilerBLLVMModule {
                 store: revision.nodes,
                 syntaxID: bodySyntaxID
             ))
-            let returnNodeRow: Int(compilerBSyntaxNodeRowForID(
+            let resultNodeRow: Int(compilerBSyntaxNodeRowForID(
                 store: revision.nodes,
-                syntaxID: revision.returns.syntaxIDs.element(index: returnRow)
+                syntaxID: resultExpressionSyntaxID
             ))
-            if bodyNodeRow < 0 || returnNodeRow < 0 {
+            if bodyNodeRow < 0 || resultNodeRow < 0 {
                 diagnostic: "function body relationships are incomplete"
-            } else if revision.nodes.firstTokenIDs.element(index: returnNodeRow)
+            } else if revision.nodes.firstTokenIDs.element(index: resultNodeRow)
                     != revision.nodes.firstTokenIDs.element(index: bodyNodeRow) + 1
-                || revision.returns.afterLastValueTokenIDs.element(index: returnRow)
+                || revision.nodes.afterLastTokenIDs.element(index: resultNodeRow)
                     != revision.nodes.afterLastTokenIDs.element(index: bodyNodeRow) - 1 {
-                diagnostic: "first backend slice requires return <integer> as the complete body"
+                diagnostic: "first backend slice requires an integer terminal expression as the complete body"
             }
         }
 

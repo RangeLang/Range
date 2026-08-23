@@ -1,0 +1,9 @@
+macro cyclic(origin: Int, period: Int): Construct -> Int {
+    let value: 5
+
+    origin + ((((value - origin) % period) + period) % period)
+}
+
+function answer(): Int {
+    42
+}

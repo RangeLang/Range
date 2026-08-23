@@ -4,5 +4,5 @@ construct IncompleteInteger {
 }
 
 function answer(): IncompleteInteger {
-    return 1
+    1
 }

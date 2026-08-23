@@ -61,20 +61,10 @@ construct CompilerBFunctionSignatureFacetStore {
     let outputCardinalityTokenIDs: Buffer<Int>
 }
 
-construct CompilerBReturnFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let valueExpressionSyntaxIDs: Buffer<Int>
-    let firstValueTokenIDs: Buffer<Int>
-    let afterLastValueTokenIDs: Buffer<Int>
-    let valueKindCodes: Buffer<Int>
-    let integerValues: Buffer<Int>
-}
-
 construct CompilerBProcessFacetStore {
     let ownerSyntaxIDs: Buffer<Int>
     let bodySyntaxIDs: Buffer<Int>
-    let returnSyntaxIDs: Buffer<Int>
+    let resultExpressionSyntaxIDs: Buffer<Int>
 }
 
 construct CompilerBExpressionFacetStore {
@@ -294,7 +284,6 @@ construct CompilerBSyntaxRevision {
     let blocks: CompilerBBlockFacetStore
     let macroApplications: CompilerBMacroApplicationStore
     let functionSignatures: CompilerBFunctionSignatureFacetStore
-    let returns: CompilerBReturnFacetStore
     let process: CompilerBProcessGraph
     let macroSignatures: CompilerBMacroSignatureFacetStore
     let members: CompilerBMemberFacetStore

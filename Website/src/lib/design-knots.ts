@@ -9,6 +9,7 @@
  */
 
 import manySource from "../../../Projects/RangeCompilerB/Sources/CompilerB/Core/Macros/Many.range?raw";
+import constraintSource from "../../../Projects/RangeView/Macros/Constraint.range?raw";
 import commandGroupSource from "../../../RangeCompiler/Sources/Core/Macro/CommandGroup.range?raw";
 import routesSource from "../../../Testing/CommandLine/Pass/Routes.range?raw";
 
@@ -122,6 +123,22 @@ export const designKnots: DesignKnot[] = [
     ],
     question:
       "The empty macro exists so that declarations can carry a mark — but applying a macro already marks a declaration. Registration is not a mechanism the language needs; it is a thing macros already are. And the whole shape is copied per feature: @test / @testGroup in Test.range, @collectionModifier in Compiler B's Bool.range, the same five corners each time.",
+  },
+  {
+    id: "resulting-value",
+    title: "The calculation that remains",
+    shape: "circle",
+    sources: [
+      {
+        path: "Projects/RangeView/Macros/Constraint.range",
+        source: constraintSource,
+        focusLine: 37,
+      },
+    ],
+    says: "the resulting value",
+    corners: [],
+    question:
+      "At the end of the day, this is what matters most in a calculation or transformation: the final expression states the value that comes out. The surrounding macro can query the graph, constrain the domain, and emit diagnostics; this line is the transformation.",
   },
 ];
 

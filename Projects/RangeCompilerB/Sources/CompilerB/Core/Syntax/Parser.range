@@ -948,55 +948,12 @@ function compilerBMacroSignatureFacetStoreAppend(
     return store.outputCardinalityTokenIDs.append(element: outputCardinalityTokenID)
 }
 
-function compilerBReturnFacetStoreCreate(capacity: Int): CompilerBReturnFacetStore {
-    return CompilerBReturnFacetStore(
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-        valueExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-        firstValueTokenIDs: bufferCreateInt(capacity: capacity),
-        afterLastValueTokenIDs: bufferCreateInt(capacity: capacity),
-        valueKindCodes: bufferCreateInt(capacity: capacity),
-        integerValues: bufferCreateInt(capacity: capacity)
-    )
-}
-
-function compilerBReturnFacetStoreDestroy(store: CompilerBReturnFacetStore): Int {
-    state status: Int(0)
-    if store.syntaxIDs.destroy() != 0 { status: 0 - 1 }
-    if store.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
-    if store.valueExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
-    if store.firstValueTokenIDs.destroy() != 0 { status: 0 - 1 }
-    if store.afterLastValueTokenIDs.destroy() != 0 { status: 0 - 1 }
-    if store.valueKindCodes.destroy() != 0 { status: 0 - 1 }
-    if store.integerValues.destroy() != 0 { status: 0 - 1 }
-    return status
-}
-
-function compilerBReturnFacetStoreAppend(
-    store: CompilerBReturnFacetStore,
-    syntaxID: Int,
-    ownerSyntaxID: Int,
-    valueExpressionSyntaxID: Int,
-    firstValueTokenID: Int,
-    afterLastValueTokenID: Int,
-    valueKindCode: Int,
-    integerValue: Int
-): Int {
-    if store.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
-    if store.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 { return 0 - 1 }
-    if store.valueExpressionSyntaxIDs.append(element: valueExpressionSyntaxID) != 0 { return 0 - 1 }
-    if store.firstValueTokenIDs.append(element: firstValueTokenID) != 0 { return 0 - 1 }
-    if store.afterLastValueTokenIDs.append(element: afterLastValueTokenID) != 0 { return 0 - 1 }
-    if store.valueKindCodes.append(element: valueKindCode) != 0 { return 0 - 1 }
-    return store.integerValues.append(element: integerValue)
-}
-
 function compilerBProcessGraphCreate(capacity: Int): CompilerBProcessGraph {
     return CompilerBProcessGraph(
         processes: CompilerBProcessFacetStore(
             ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
             bodySyntaxIDs: bufferCreateInt(capacity: capacity),
-            returnSyntaxIDs: bufferCreateInt(capacity: capacity)
+            resultExpressionSyntaxIDs: bufferCreateInt(capacity: capacity)
         ),
         expressions: CompilerBExpressionFacetStore(
             syntaxIDs: bufferCreateInt(capacity: capacity),
@@ -1111,7 +1068,7 @@ function compilerBProcessGraphDestroy(graph: CompilerBProcessGraph): Int {
     state status: Int(0)
     if graph.processes.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.processes.bodySyntaxIDs.destroy() != 0 { status: 0 - 1 }
-    if graph.processes.returnSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.processes.resultExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.expressions.syntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.expressions.kindCodes.destroy() != 0 { status: 0 - 1 }
     if graph.expressions.firstTokenIDs.destroy() != 0 { status: 0 - 1 }
@@ -1525,7 +1482,7 @@ function compilerBParseDerivedBodyMemberFacet(
     if process.processes.bodySyntaxIDs.append(element: opening.start) != 0 {
         return 0 - 3
     }
-    if process.processes.returnSyntaxIDs.append(element: 0 - 1) != 0 {
+    if process.processes.resultExpressionSyntaxIDs.append(element: 0 - 1) != 0 {
         return 0 - 3
     }
     if selectorIdentityTokenID >= 0 {
@@ -3774,12 +3731,140 @@ function compilerBParserCallStartsAt(
     return false
 }
 
+function compilerBProcessTerminalExpressionSyntaxID(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    nodes: SyntaxNodeStore,
+    process: CompilerBProcessGraph,
+    openingTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let bodyAfterLastTokenID: Int(afterLastTokenID - 1)
+    state lineFirstTokenID: Int(openingTokenID + 1)
+    state terminalFirstTokenID: Int(0 - 1)
+    state terminalAfterLastTokenID: Int(0 - 1)
+    while lineFirstTokenID < bodyAfterLastTokenID {
+        terminalFirstTokenID: lineFirstTokenID
+        terminalAfterLastTokenID: compilerBParserLineAfterLastTokenID(
+            source: source,
+            tokens: tokens,
+            firstTokenID: lineFirstTokenID,
+            limitTokenID: bodyAfterLastTokenID
+        )
+        if terminalAfterLastTokenID <= lineFirstTokenID { return 0 - 2 }
+        lineFirstTokenID: terminalAfterLastTokenID
+    }
+    if terminalFirstTokenID < 0 { return 0 - 1 }
+
+    let terminalFirst: CompilerBToken(compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: terminalFirstTokenID)
+    ))
+    if terminalFirst.kind == .identity && compilerBTokenMatchesBytes(
+        source: source,
+        token: terminalFirst,
+        expected: "return"
+    ) {
+        terminalFirstTokenID: terminalFirstTokenID + 1
+    }
+    if terminalFirstTokenID >= terminalAfterLastTokenID { return 0 - 1 }
+
+    let expressionFirst: CompilerBToken(compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: terminalFirstTokenID)
+    ))
+    if expressionFirst.kind == .identity
+        && (compilerBTokenMatchesBytes(
+                source: source,
+                token: expressionFirst,
+                expected: "let"
+            )
+            || compilerBTokenMatchesBytes(
+                source: source,
+                token: expressionFirst,
+                expected: "state"
+            )
+            || compilerBTokenMatchesBytes(
+                source: source,
+                token: expressionFirst,
+                expected: "if"
+            )
+            || compilerBTokenMatchesBytes(
+                source: source,
+                token: expressionFirst,
+                expected: "switch"
+            )
+            || compilerBTokenMatchesBytes(
+                source: source,
+                token: expressionFirst,
+                expected: "while"
+            )) {
+        return 0 - 1
+    }
+    if compilerBParserTokenByte(
+        source: source,
+        tokens: tokens,
+        tokenID: terminalFirstTokenID
+    ) == 64 { return 0 - 1 }
+
+    state delimiterDepth: Int(0)
+    state cursor: Int(terminalFirstTokenID)
+    while cursor < terminalAfterLastTokenID {
+        let byte: Int(compilerBParserTokenByte(
+            source: source,
+            tokens: tokens,
+            tokenID: cursor
+        ))
+        if byte == 123 && delimiterDepth == 0 { return 0 - 1 }
+        if byte == 40 || byte == 91 { delimiterDepth: delimiterDepth + 1 }
+        if byte == 41 || byte == 93 { delimiterDepth: delimiterDepth - 1 }
+        cursor: cursor + 1
+    }
+
+    state expressionRow: Int(0)
+    while expressionRow < process.expressions.syntaxIDs.count {
+        if process.expressions.firstTokenIDs.element(index: expressionRow)
+                == terminalFirstTokenID
+            && process.expressions.afterLastTokenIDs.element(index: expressionRow)
+                == terminalAfterLastTokenID {
+            return process.expressions.syntaxIDs.element(index: expressionRow)
+        }
+        expressionRow: expressionRow + 1
+    }
+    state expressionSyntaxID: Int(0 - 1)
+    if compilerBParserCallStartsAt(
+        source: source,
+        tokens: tokens,
+        firstTokenID: terminalFirstTokenID,
+        limitTokenID: terminalAfterLastTokenID
+    ) {
+        expressionSyntaxID: compilerBParseExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: terminalFirstTokenID,
+            afterLastTokenID: terminalAfterLastTokenID
+        )
+    } else {
+        expressionSyntaxID: compilerBParseLeafExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: terminalFirstTokenID,
+            afterLastTokenID: terminalAfterLastTokenID
+        )
+    }
+    if expressionSyntaxID < 0 { return 0 - 2 }
+    return expressionSyntaxID
+}
+
 function compilerBParseProcessFacets(
     source: String,
     tokens: CompilerBRetainedTokenStore,
     nodes: SyntaxNodeStore,
     process: CompilerBProcessGraph,
-    returns: CompilerBReturnFacetStore,
     blocks: CompilerBBlockFacetStore,
     macroApplications: CompilerBMacroApplicationStore,
     members: CompilerBMemberFacetStore,
@@ -3899,60 +3984,22 @@ function compilerBParseProcessFacets(
         openingTokenID: openingTokenID,
         afterLastTokenID: afterLastTokenID
     ) != 0 { return 0 - 1 }
-    state returnSyntaxID: Int(0 - 1)
-    state bodyTokenID: Int(openingTokenID + 1)
-    while bodyTokenID < afterLastTokenID - 1 && returnSyntaxID < 0 {
-        let bodyToken: CompilerBToken(compilerBRetainedToken(
-            store: tokens,
-            id: TokenID(value: bodyTokenID)
-        ))
-        if bodyToken.kind == .identity
-            && compilerBTokenMatchesBytes(source: source, token: bodyToken, expected: "return") {
-            let firstValueTokenID: Int(bodyTokenID + 1)
-            let afterLastValueTokenID: Int(afterLastTokenID - 1)
-            let expressionSyntaxID: Int(compilerBParseExpressionFacet(
-                source: source,
-                tokens: tokens,
-                nodes: nodes,
-                process: process,
-                firstTokenID: firstValueTokenID,
-                afterLastTokenID: afterLastValueTokenID
-            ))
-            if expressionSyntaxID < 0 { return expressionSyntaxID }
-            state valueKindCode: Int(compilerBParserScalarKindNoneCode())
-            state integerValue: Int(0)
-            let expressionRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: process.expressions.syntaxIDs,
-                syntaxID: expressionSyntaxID
-            ))
-            if process.expressions.kindCodes.element(index: expressionRow)
-                == compilerBParserExpressionKindIntegerCode() {
-                valueKindCode: compilerBParserScalarKindIntegerCode()
-                integerValue: process.expressions.integerValues.element(index: expressionRow)
-            }
-            if compilerBSyntaxNodeStoreAppend(
-                store: nodes,
-                id: bodyToken.start,
-                firstTokenID: bodyTokenID,
-                afterLastTokenID: afterLastValueTokenID
-            ) != 0 { return 0 - 1 }
-            returnSyntaxID: bodyToken.start
-            if compilerBReturnFacetStoreAppend(
-                store: returns,
-                syntaxID: returnSyntaxID,
-                ownerSyntaxID: ownerSyntaxID,
-                valueExpressionSyntaxID: expressionSyntaxID,
-                firstValueTokenID: firstValueTokenID,
-                afterLastValueTokenID: afterLastValueTokenID,
-                valueKindCode: valueKindCode,
-                integerValue: integerValue
-            ) != 0 { return 0 - 1 }
-        }
-        bodyTokenID: bodyTokenID + 1
+    let resultExpressionSyntaxID: Int(compilerBProcessTerminalExpressionSyntaxID(
+        source: source,
+        tokens: tokens,
+        nodes: nodes,
+        process: process,
+        openingTokenID: openingTokenID,
+        afterLastTokenID: afterLastTokenID
+    ))
+    if resultExpressionSyntaxID < 0 && resultExpressionSyntaxID != 0 - 1 {
+        return 0 - 1
     }
     if process.processes.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 { return 0 - 1 }
     if process.processes.bodySyntaxIDs.append(element: bodySyntaxID) != 0 { return 0 - 1 }
-    return process.processes.returnSyntaxIDs.append(element: returnSyntaxID)
+    return process.processes.resultExpressionSyntaxIDs.append(
+        element: resultExpressionSyntaxID
+    )
 }
 
 function compilerBParseFunctionFacets(
@@ -4284,7 +4331,6 @@ function compilerBParseDeclarationTokens(
     declarations: CompilerBDeclarationFacetStore,
     blocks: CompilerBBlockFacetStore,
     functionSignatures: CompilerBFunctionSignatureFacetStore,
-    returns: CompilerBReturnFacetStore,
     process: CompilerBProcessGraph,
     macroSignatures: CompilerBMacroSignatureFacetStore,
     macroApplications: CompilerBMacroApplicationStore,
@@ -4408,7 +4454,6 @@ function compilerBParseDeclarationTokens(
         tokens: tokens,
         nodes: nodes,
         process: process,
-        returns: returns,
         blocks: blocks,
         macroApplications: macroApplications,
         members: members,
@@ -4453,9 +4498,6 @@ function compilerBParseSyntaxRevision(source: String): CompilerBSyntaxRevision {
         capacity: tokens.kinds.count
     ))
     let functionSignatures: CompilerBFunctionSignatureFacetStore(compilerBFunctionSignatureFacetStoreCreate(
-        capacity: tokens.kinds.count
-    ))
-    let returns: CompilerBReturnFacetStore(compilerBReturnFacetStoreCreate(
         capacity: tokens.kinds.count
     ))
     let process: CompilerBProcessGraph(compilerBProcessGraphCreate(
@@ -4503,7 +4545,6 @@ function compilerBParseSyntaxRevision(source: String): CompilerBSyntaxRevision {
                 declarations: functions,
                 blocks: blocks,
                 functionSignatures: functionSignatures,
-                returns: returns,
                 process: process,
                 macroSignatures: macroSignatures,
                 macroApplications: macroApplications,
@@ -4528,7 +4569,6 @@ function compilerBParseSyntaxRevision(source: String): CompilerBSyntaxRevision {
                 declarations: constructs,
                 blocks: blocks,
                 functionSignatures: functionSignatures,
-                returns: returns,
                 process: process,
                 macroSignatures: macroSignatures,
                 macroApplications: macroApplications,
@@ -4553,7 +4593,6 @@ function compilerBParseSyntaxRevision(source: String): CompilerBSyntaxRevision {
                 declarations: enums,
                 blocks: blocks,
                 functionSignatures: functionSignatures,
-                returns: returns,
                 process: process,
                 macroSignatures: macroSignatures,
                 macroApplications: macroApplications,
@@ -4578,7 +4617,6 @@ function compilerBParseSyntaxRevision(source: String): CompilerBSyntaxRevision {
                 declarations: macros,
                 blocks: blocks,
                 functionSignatures: functionSignatures,
-                returns: returns,
                 process: process,
                 macroSignatures: macroSignatures,
                 macroApplications: macroApplications,
@@ -4702,7 +4740,6 @@ function compilerBParseSyntaxRevision(source: String): CompilerBSyntaxRevision {
         blocks: blocks,
         macroApplications: macroApplications,
         functionSignatures: functionSignatures,
-        returns: returns,
         process: process,
         macroSignatures: macroSignatures,
         members: members,
@@ -4725,9 +4762,6 @@ function compilerBSyntaxRevisionDestroy(revision: CompilerBSyntaxRevision): Int 
     if compilerBMacroSignatureFacetStoreDestroy(
         store: revision.macroSignatures
     ) != 0 { status: 0 - 1 }
-    if compilerBReturnFacetStoreDestroy(store: revision.returns) != 0 {
-        status: 0 - 1
-    }
     if compilerBFunctionSignatureFacetStoreDestroy(store: revision.functionSignatures) != 0 {
         status: 0 - 1
     }
@@ -5006,6 +5040,51 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
         }
         output.append(text: "application\tid=\(applicationSyntaxID)\tpredecessor=\(revision.process.applications.predecessorSyntaxIDs.element(index: applicationRow))\tdeclaration=\(declarationSyntaxID)\tkind=\(declarationKind)\tname=\(revision.source.substring(start: identity.start, end: identity.end))\tinput=\(inputCardinality)\toutput=\(outputCardinality)\n")
         applicationRow: applicationRow + 1
+    }
+    state processRow: Int(0)
+    while processRow < revision.process.processes.ownerSyntaxIDs.count {
+        let resultExpressionSyntaxID: Int(
+            revision.process.processes.resultExpressionSyntaxIDs.element(
+                index: processRow
+            )
+        )
+        if resultExpressionSyntaxID >= 0 {
+            let resultExpressionRow: Int(compilerBFacetRowForSyntaxID(
+                syntaxIDs: revision.process.expressions.syntaxIDs,
+                syntaxID: resultExpressionSyntaxID
+            ))
+            if resultExpressionRow >= 0 {
+                state kind: String("unknown")
+                let kindCode: Int(revision.process.expressions.kindCodes.element(
+                    index: resultExpressionRow
+                ))
+                if kindCode == compilerBParserExpressionKindIntegerCode() {
+                    kind: "integer"
+                }
+                if kindCode == compilerBParserExpressionKindBooleanCode() {
+                    kind: "boolean"
+                }
+                if kindCode == compilerBParserExpressionKindStringCode() {
+                    kind: "string"
+                }
+                let first: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: revision.process.expressions.firstTokenIDs.element(
+                        index: resultExpressionRow
+                    ))
+                ))
+                let last: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(
+                        value: revision.process.expressions.afterLastTokenIDs.element(
+                            index: resultExpressionRow
+                        ) - 1
+                    )
+                ))
+                output.append(text: "processResult\towner=\(revision.process.processes.ownerSyntaxIDs.element(index: processRow))\texpression=\(resultExpressionSyntaxID)\tkind=\(kind)\tvalue=\(revision.source.substring(start: first.start, end: last.end))\n")
+            }
+        }
+        processRow: processRow + 1
     }
     state localRow: Int(0)
     while localRow < revision.process.locals.syntaxIDs.count {

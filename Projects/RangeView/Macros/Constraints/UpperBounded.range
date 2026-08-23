@@ -1,0 +1,11 @@
+macro upperBounded(maximum: Value): @member -> Value {
+  let value: #environment.target.Application.value
+
+  if value > maximum {
+    @diagnostic(
+      "Value must be less than or equal to \(maximum)"
+    )
+  }
+
+  value
+}

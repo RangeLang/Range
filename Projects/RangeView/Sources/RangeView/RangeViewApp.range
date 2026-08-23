@@ -2,33 +2,9 @@
 
 @app
 construct RangeViewApp {
-    derived routes: Route {
-        Route("/") {
-            Route("home", RangeViewHome())
-        }
-    }
-}
-
-@shape
-@component
-construct Rectangle {
-    @many(4)
-    let points: Point(
-        Point(x: 0, y: 0),
-        Point(x: 100, y: 0),
-        Point(x: 100, y: 100),
-        Point(x: 0, y: 100)
-    )
-
-    let material: @material?
-}
-
-@page
-construct RangeViewHome {
     derived body: @view {
-        Text("RangeView draws regular values.")
-        Stack(.vertical, spacing: 10) {
-            Rectangle(material: Aero())
+        NavigationStack {
+            RangeViewHome()
         }
     }
 }

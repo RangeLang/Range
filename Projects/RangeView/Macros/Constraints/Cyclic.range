@@ -1,0 +1,11 @@
+macro cyclic(origin: Value, period: Value): @member -> Value {
+  let value: #environment.target.Application.value
+
+  if period <= 0 {
+    @diagnostic(
+      "Cyclic period must be greater than zero"
+    )
+  }
+
+  origin + ((((value - origin) % period) + period) % period)
+}

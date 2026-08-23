@@ -1,0 +1,14 @@
+@color
+construct RGBA {
+    @bounded(minimum: 0, maximum: 255)
+    let red: Int
+
+    @bounded(minimum: 0, maximum: 255)
+    let green: Int
+
+    @bounded(minimum: 0, maximum: 255)
+    let blue: Int
+
+    @bounded(minimum: 0, maximum: 255)
+    let alpha: Int
+}

@@ -1354,8 +1354,12 @@ check_opaque_handle() {
     echo "Macros Core @opaque native pthread handle and nullable foreign argument: pass"
 }
 
-check_range_view_native_window() {
+check_range_view_color_capability() {
     local color_macro="$REPO_ROOT/Projects/RangeView/Macros/Color.range"
+    local constraint_macro="$REPO_ROOT/Projects/RangeView/Macros/Constraint.range"
+    local color_model="$REPO_ROOT/Projects/RangeView/Drawing/Color.range"
+    local style_model="$REPO_ROOT/Projects/RangeView/Drawing/Style.range"
+    local native_color="$REPO_ROOT/Projects/RangeView/Native/Color.c"
     local color_fixture="$REPO_ROOT/Testing/RangeView/Pass/ColorCapability.range"
     local color_fail_fixture="$REPO_ROOT/Testing/RangeView/Fail/ColorCapabilityFunction.range"
     local color_bundle="$WORK_ROOT/range-view-color-capability.range"
@@ -1364,18 +1368,42 @@ check_range_view_native_window() {
     local color_fail_bundle="$WORK_ROOT/range-view-color-capability-function.range"
     local color_fail_output="$WORK_ROOT/range-view-color-capability-function.out"
     local color_fail_error="$WORK_ROOT/range-view-color-capability-function.err"
-    local geometry="$REPO_ROOT/Projects/RangeView/Drawing/Geometry.range"
-    local style="$REPO_ROOT/Projects/RangeView/Drawing/Style.range"
-    local shapes="$REPO_ROOT/Projects/RangeView/Drawing/Shapes.range"
-    local framework="$REPO_ROOT/Projects/RangeView/Native/Window.range"
-    local color_native="$REPO_ROOT/Projects/RangeView/Native/Color.c"
-    local fixture="$REPO_ROOT/Testing/RangeView/Pass/NativeWindow.range"
-    local bundle="$WORK_ROOT/range-view-native-window.range"
-    local llvm="$WORK_ROOT/range-view-native-window.ll"
-    local error="$WORK_ROOT/range-view-native-window.err"
-    local executable="$WORK_ROOT/range-view-native-window"
-    local temporary="$WORK_ROOT/range-view-native-window.tmp"
-    local sdl2_prefix actual_status native_pid
+    local actual_status
+
+    [[ ! -e "$native_color" ]] \
+        || fail "RangeView retained a native Color semantic implementation"
+    /usr/bin/grep -Fq 'macro bounded(minimum: Value, maximum: Value): @member -> Value {' "$constraint_macro" \
+        || fail "RangeView bounded constraint is not a value-parameterized member macro"
+    /usr/bin/grep -Fq 'macro lowerBounded(minimum: Value): @member -> Value {' "$constraint_macro" \
+        || fail "RangeView lower-bound constraint is not a member macro"
+    /usr/bin/grep -Fq 'macro cyclic(origin: Value, period: Value): @member -> Value {' "$constraint_macro" \
+        || fail "RangeView cyclic constraint is not a value-parameterized member macro"
+    [[ "$(/usr/bin/grep -Fc 'let value: #environment.target.Application.value' "$constraint_macro")" -eq 3 ]] \
+        || fail "RangeView scalar constraints do not consume canonical Application values"
+    [[ "$(/usr/bin/grep -Fc '@diagnostic(' "$constraint_macro")" -eq 5 ]] \
+        || fail "RangeView scalar constraints do not emit their domain diagnostics"
+    /usr/bin/grep -Fq 'origin + ((((value - origin) % period) + period) % period)' "$constraint_macro" \
+        || fail "RangeView cyclic constraint does not use Euclidean modulo normalization"
+    /usr/bin/grep -Fqx '@color' "$style_model" \
+        || fail "RangeView RGBA is not an @color declaration"
+    [[ "$(/usr/bin/grep -Fxc '@color' "$style_model")" -eq 2 ]] \
+        || fail "RangeView Style does not own exactly RGBA and OKLCH color declarations"
+    /usr/bin/grep -Fq 'construct RGBA {' "$style_model" \
+        || fail "RangeView RGBA declaration is missing"
+    /usr/bin/grep -Fq 'construct OKLCH {' "$style_model" \
+        || fail "RangeView OKLCH declaration is missing"
+    [[ "$(/usr/bin/grep -Fc '@bounded(' "$style_model")" -eq 6 ]] \
+        || fail "RangeView color scalar bounds are incomplete"
+    [[ "$(/usr/bin/grep -Fc '@lowerBounded(' "$style_model")" -eq 1 ]] \
+        || fail "RangeView OKLCH chroma is not lower-bounded"
+    [[ "$(/usr/bin/grep -Fc '@cyclic(' "$style_model")" -eq 1 ]] \
+        || fail "RangeView OKLCH hue is not cyclic"
+    ! /usr/bin/grep -Eq 'Int<|Float<' "$style_model" \
+        || fail "RangeView color domains returned to generic scalar specialization"
+    /usr/bin/grep -Fq 'enum Color {' "$color_model" \
+        || fail "RangeView composed Color enum is missing"
+    ! /usr/bin/grep -Eq 'rangeViewOKLCHChannel|toRGBA\(' "$style_model" \
+        || fail "RangeView color still delegates representation to a conversion shim"
 
     write_opaque_bundle "$color_bundle" "" "$color_macro"
     /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${color_fixture#"$REPO_ROOT/"}" >> "$color_bundle"
@@ -1399,112 +1427,38 @@ check_range_view_native_window() {
     /usr/bin/grep -Fq $'compilerError\tkind=macroLinking\tcount=1\tdiagnosticKind=macroTargetSurfaceMismatch' "$color_fail_output" \
         || fail "RangeView @color Function rejection omitted its exact boundary"
 
-    write_opaque_bundle "$bundle" "" "$geometry"
-    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${color_macro#"$REPO_ROOT/"}" >> "$bundle"
-    /bin/cat "$color_macro" >> "$bundle"
-    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${style#"$REPO_ROOT/"}" >> "$bundle"
-    /bin/cat "$style" >> "$bundle"
-    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${shapes#"$REPO_ROOT/"}" >> "$bundle"
-    /bin/cat "$shapes" >> "$bundle"
-    /usr/bin/printf '\ncompilerSourceFile\\trole=project\\tpath=%s\n' "${framework#"$REPO_ROOT/"}" >> "$bundle"
-    /bin/cat "$framework" >> "$bundle"
-    /usr/bin/printf '\n' >> "$bundle"
-    /usr/bin/printf 'compilerSourceFile\\trole=project\\tpath=%s\n' "${fixture#"$REPO_ROOT/"}" >> "$bundle"
-    /bin/cat "$fixture" >> "$bundle"
-    /usr/bin/printf '\n' >> "$bundle"
-    "$BUILD_EXECUTABLE" compile "$bundle" > "$llvm" 2> "$error" \
-        || fail "RangeView native window did not emit LLVM"
-    [[ ! -s "$error" ]] || fail "RangeView native window LLVM emission wrote stderr"
-    [[ "$(/usr/bin/grep -Fxc '; range-link-v1 kind=library id=sdl2' "$llvm" || true)" -eq 1 ]] \
-        || fail "RangeView native window omitted its typed SDL2 link requirement"
-    /usr/bin/grep -Fq '%Range.Point = type { i32, i32 }' "$llvm" \
-        || fail "RangeView native window omitted its framework Point value"
-    /usr/bin/grep -Fq '%Range.Size = type { i32, i32 }' "$llvm" \
-        || fail "RangeView native window omitted its framework Size value"
-    /usr/bin/grep -Fq '%Range.DrawingSpace = type { ptr }' "$llvm" \
-        || fail "RangeView native window omitted its framework DrawingSpace value"
-    /usr/bin/grep -Fq '%Range.Rectangle = type { ptr, ptr }' "$llvm" \
-        || fail "RangeView native window omitted its Point-and-Size Rectangle"
-    /usr/bin/grep -Fq '%Range.OKLCH = type { double, double, double, double }' "$llvm" \
-        || fail "RangeView native window omitted its concrete OKLCH color value"
-    /usr/bin/grep -Fq '%Range.RGBA = type { i8, i8, i8, i8 }' "$llvm" \
-        || fail "RangeView native window omitted its RGBA lowering product"
-    /usr/bin/grep -Fq '%Range.Shape = type { i32, %Range.Line, %Range.Rectangle, %Range.Circle, %Range.Polygon }' "$llvm" \
-        || fail "RangeView native window omitted its heterogeneous Shape value"
-    /usr/bin/grep -Fq 'declare ptr @SDL_CreateWindow(ptr, i32, i32, i32, i32, i32)' "$llvm" \
-        || fail "RangeView native window omitted its typed window declaration"
-    /usr/bin/grep -Fq 'declare ptr @SDL_CreateRenderer(ptr, i32, i32)' "$llvm" \
-        || fail "RangeView native window omitted its typed renderer declaration"
-    /usr/bin/grep -Fq 'call void @SDL_ShowWindow' "$llvm" \
-        || fail "RangeView native window did not explicitly show its window"
-    /usr/bin/grep -Fq 'call void @SDL_RaiseWindow' "$llvm" \
-        || fail "RangeView native window did not raise its window"
-    /usr/bin/grep -Fq 'define i1 @rangeViewWindowShouldClose(ptr %window)' "$llvm" \
-        || fail "RangeView native window omitted its typed Window close-query boundary"
-    /usr/bin/grep -Fq 'call i1 @rangeViewWindowShouldClose(ptr ' "$llvm" \
-        || fail "RangeView native window did not route its event loop through the Window value"
-    /usr/bin/grep -Fq 'declare i32 @SDL_HasEvent(i32)' "$llvm" \
-        || fail "RangeView native window omitted its typed SDL event query"
-    /usr/bin/grep -Fq 'call i32 @SDL_HasEvent(i32 256)' "$llvm" \
-        || fail "RangeView native window did not query the SDL quit event"
-    /usr/bin/grep -Fq 'declare i32 @SDL_SetRenderDrawColor(ptr, i8, i8, i8, i8)' "$llvm" \
-        || fail "RangeView native window omitted its unsigned-byte color ABI"
-    /usr/bin/grep -Fq 'declare i8 @rangeViewOKLCHChannel(double, double, double, double, i32)' "$llvm" \
-        || fail "RangeView native window omitted its Float-backed OKLCH conversion declaration"
-    /usr/bin/grep -Fq 'define i32 @rangeViewFillRectangle(ptr %renderer, %Range.Rectangle %rectangle)' "$llvm" \
-        || fail "RangeView native window omitted its filled rectangle boundary"
-    /usr/bin/grep -Fq 'define i32 @rangeViewFillCircle(ptr %renderer, %Range.Circle %circle)' "$llvm" \
-        || fail "RangeView native window omitted its filled Circle boundary"
-    /usr/bin/grep -Fq 'define i32 @rangeViewDrawPolygon(ptr %renderer, %Range.Polygon %polygon)' "$llvm" \
-        || fail "RangeView native window omitted its Polygon boundary"
-    /usr/bin/grep -Fq 'define i32 @rangeViewDrawShapeGallery(ptr %renderer)' "$llvm" \
-        || fail "RangeView native window omitted its collection-driven shape gallery"
-    /usr/bin/grep -Fq 'call void @toRGBA(ptr ' "$llvm" \
-        || fail "RangeView native window did not lower Color through toRGBA"
-    /usr/bin/grep -Fq 'call i32 @rangeViewDrawShapeGallery(ptr ' "$llvm" \
-        || fail "RangeView native window did not draw through its shape gallery"
-    /usr/bin/grep -Eq 'alloca %Range\.Shape, i32 4' "$llvm" \
-        || fail "RangeView native window omitted its four-value Shape collection"
-    /usr/bin/grep -Eq 'alloca %Range\.OKLCH, i32 4' "$llvm" \
-        || fail "RangeView native window omitted its four-value OKLCH collection"
-    /usr/bin/grep -Fq 'call void @SDL_RenderPresent' "$llvm" \
-        || fail "RangeView native window omitted its Void presentation call"
-    /usr/bin/grep -Fq 'declare void @SDL_PumpEvents()' "$llvm" \
-        || fail "RangeView native window omitted its event-pump declaration"
-    /usr/bin/grep -Fq 'call void @SDL_PumpEvents()' "$llvm" \
-        || fail "RangeView native window did not service its native event queue"
-    /usr/bin/grep -Fq 'declare void @SDL_Delay(i32)' "$llvm" \
-        || fail "RangeView native window omitted its SDL frame-delay declaration"
-    /usr/bin/grep -Fq 'call void @SDL_Delay(i32 16)' "$llvm" \
-        || fail "RangeView native window omitted its event-loop frame delay"
-    ! /usr/bin/grep -Fq 'i32 10000' "$llvm" \
-        || fail "RangeView native window retained a time-bounded event loop"
-    /usr/bin/grep -Fq 'call void @SDL_DestroyRenderer' "$llvm" \
-        || fail "RangeView native window omitted renderer destruction"
-    /usr/bin/grep -Fq 'call void @SDL_DestroyWindow' "$llvm" \
-        || fail "RangeView native window omitted window destruction"
-    /usr/bin/grep -Fq 'call void @SDL_Quit' "$llvm" \
-        || fail "RangeView native window omitted SDL shutdown"
-    validate_llvm "$llvm"
+    echo "RangeView @color declarations own representation and target admission: pass"
+}
 
-    command -v sdl2-config >/dev/null 2>&1 \
-        || fail "RangeView native window proof requires sdl2-config"
-    sdl2_prefix="$(sdl2-config --prefix)"
-    [[ -d "$sdl2_prefix/lib" ]] || fail "RangeView native window could not resolve SDL2 libraries"
-    clang "$COMPILER_OPTIMIZATION" "$COMPILER_LTO" -Wno-override-module "$llvm" "$color_native" "${RUNTIME_INPUTS[@]}" \
-        -L"$sdl2_prefix/lib" -lSDL2 -Wl,-rpath,"$sdl2_prefix/lib" -o "$temporary"
-    /bin/mv "$temporary" "$executable"
-    "$executable" &
-    native_pid=$!
-    /bin/sleep 1
-    /bin/kill -0 "$native_pid" 2>/dev/null \
-        || fail "RangeView native window did not remain alive for event-driven termination"
-    /bin/kill "$native_pid"
-    actual_status=0
-    wait "$native_pid" || actual_status=$?
-    [[ "$actual_status" -eq 42 ]] \
-        || fail "RangeView native window termination returned $actual_status, expected graceful result 42"
-    echo "RangeView native @app page window remains alive until termination and tears down gracefully: pass"
+check_range_view_window_source() {
+    local app="$REPO_ROOT/Projects/RangeView/Macros/App.range"
+    local view="$REPO_ROOT/Projects/RangeView/Macros/View.range"
+    local window="$REPO_ROOT/Projects/RangeView/Application/Window.range"
+
+    [[ ! -e "$REPO_ROOT/Projects/RangeView/Macros/Core.range" ]] \
+        || fail "RangeView retained the obsolete foundational macro bucket"
+    /usr/bin/grep -Fq 'macro view(): Construct -> Void {' "$view" \
+        || fail "RangeView does not own one @view macro"
+    /usr/bin/grep -Fq 'let modifiers: @modifier' "$view" \
+        || fail "RangeView @view does not own modifier accumulation"
+    /usr/bin/grep -Fqx '@view' "$window" \
+        || fail "RangeView Window is not an @view declaration"
+    /usr/bin/grep -Fq 'construct Window {' "$window" \
+        || fail "RangeView Window declaration is missing"
+    /usr/bin/grep -Fq 'let title: String' "$window" \
+        || fail "RangeView Window does not own its String title"
+    /usr/bin/grep -Fq 'binding application: @app' "$window" \
+        || fail "RangeView Window does not bind its app graph"
+    ! /usr/bin/grep -Fq '@opaque' "$window" \
+        || fail "RangeView Window retained an opaque source identity"
+    ! /usr/bin/grep -Eq 'RangeViewNativeCString|WindowRenderer|SDL_' "$window" \
+        || fail "RangeView Window retained its obsolete SDL transport layer"
+    /usr/bin/grep -Fq 'Window(' "$app" \
+        || fail "RangeView @app does not emit a Window application"
+    ! /usr/bin/grep -Fq 'rangeViewRunApplication' "$app" \
+        || fail "RangeView @app retained the opaque application runner"
+
+    echo "RangeView @app and @view own independent macro files: pass"
 }
 
 write_hashable_bundle() {
@@ -3330,7 +3284,8 @@ main_value_ownership() {
     check_extern_registration
     check_link_registration
     check_opaque_handle
-    check_range_view_native_window
+    check_range_view_color_capability
+    check_range_view_window_source
     check_many_relationship_registration
     check_enum_parameter_materialization
     check_block_relationship_reification

@@ -1,0 +1,12 @@
+@shape
+construct Rectangle {
+    @many(4)
+    let points: Point(
+        Point(x: 0, y: 0),
+        Point(x: 100, y: 0),
+        Point(x: 100, y: 100),
+        Point(x: 0, y: 100)
+    )
+
+    let material: @material?
+}

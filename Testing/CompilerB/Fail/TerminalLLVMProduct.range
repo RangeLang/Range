@@ -4,7 +4,7 @@ macro member(): Let | State | Derived | Binding -> Void {}
 macro many(): @member {}
 
 macro scalar(): Construct {
-    return LLVM(
+    LLVM(
         type: "%Range.Legacy = type { i8 }",
         value: "%Range.Legacy { i8 42 }"
     )
@@ -23,5 +23,5 @@ state scalars: @scalar
 derived commands: scalars -> LLVM
 
 function answer(): Legacy {
-    return 42
+    42
 }

@@ -90,10 +90,12 @@
 - Treat RangeView as the idealized version of Range. Its source and examples
   may express the intended language and framework design ahead of what the
   current compiler can compile.
-- Put every RangeView macro under
-  `Projects/RangeView/Macros/`, grouped by concern.
-  `Macros/Core.range` owns the foundational `@app`, `@component`, and `@page`
-  macros; do not duplicate macro declarations in `RangeView.range`.
+- Put every RangeView macro under `Projects/RangeView/Macros/`, with one
+  independently named concern per file. `Macros/App.range` owns `@app` and
+  `Macros/View.range` owns the single `@view` identity; do not introduce
+  parallel `@component` or `@page` identities.
+- Organize independently meaningful RangeView declarations into independently
+  named files so an application can be navigated like a SwiftUI project.
 - Do not treat a RangeView compilation failure as evidence that its design is
   invalid. Distinguish idealized RangeView code from compiler-backed language
   support, and require a focused fixture and supported proof command before

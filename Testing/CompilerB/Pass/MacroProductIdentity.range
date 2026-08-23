@@ -37,5 +37,5 @@ state scalars: @scalar
 derived commands: scalars -> LLVM
 
 function answer(): Tiny {
-    return 42
+    42
 }

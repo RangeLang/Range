@@ -707,7 +707,7 @@ reason to reduce RangeView to SDL calls.
 The intended layering is:
 
 ```text
-RangeView components and geometry intent
+RangeView views and geometry intent
   -> Range-authored render planning
   -> typed GPU resources and commands
   -> wgpu-native Range declarations
@@ -718,7 +718,7 @@ Keep these distinctions:
 
 - SDL2 currently proves native windowing and a drawing lifecycle.
 - wgpu-native currently proves native GPU-library initialization.
-- neither currently lowers a RangeView component tree to GPU commands.
+- neither currently lowers a RangeView view tree to GPU commands.
 - the final framework should own layout, resource lifetimes, shader values,
   event handling, and scheduling in Range source.
 
@@ -814,3 +814,38 @@ top.
 - Do not call wgpu instance creation GPU drawing.
 - Add each new ABI feature with a focused pass fixture, exact LLVM assertions,
   native execution, and a neighboring rejection control.
+
+## 2026-08-22 Experimental RangeView Window Supersession
+
+The SDL2 Window/WindowRenderer checkpoint above remains historical proof of
+typed foreign calls, but it is no longer the current RangeView source model.
+On the local `experimental` branch, `Projects/RangeView/Application/Window.range`
+defines one concrete `@view` Window with a Range String title and an `@app`
+binding. `@app` emits that Window Application directly in `@main`. The opaque
+native-C-string, Window, and renderer identities plus the SDL lifecycle fixture
+were removed; direct platform lowering of the Window graph remains pending.
+
+## 2026-08-23 Experimental RangeView Color Supersession
+
+The SDL-era `Projects/RangeView/Native/Color.c` conversion checkpoint above is
+historical proof, not current RangeView ownership. `RGBA`, `OKLCH`, and composed
+`Color` enum cases are ordinary Range declarations and applications. Their
+application fields are the emitted color representation; the selected renderer
+may translate those fields at its final platform boundary but does not call a
+RangeView-owned C semantic conversion layer. Compiler B's focused GPUI material
+fixture still uses packed integer colors and remains transitional until it
+queries and emits the canonical `@color` graph applications.
+
+## 2026-08-23 RangeView Scalar Constraint Direction
+
+RangeView's canonical RGBA and OKLCH example no longer encodes semantic domains
+through generic scalar specialization. Both use plain Int or Float storage.
+`@bounded`, `@lowerBounded`, and `@cyclic` applications on individual members
+carry the domain facts. Their Range bodies are now `@member -> Value`
+transformations over `#environment.target.Application.value`: bounded forms use
+ordinary conditionals and `@diagnostic`, and cyclic uses Euclidean modulo before
+producing its value. Compiler B lexes and retains the parameters, Application
+query locals, conditionals, and diagnostic executions. It does not yet execute
+the implicit final macro expression, so emitted-program enforcement remains the
+next general compiler proof; other domain-bearing generic source should migrate
+only after that proof is complete.

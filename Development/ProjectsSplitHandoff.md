@@ -9,10 +9,11 @@ Projects/RangeView/
 Projects/RangeCompilerB/
 ```
 
-`Projects/RangeView` owns the RangeView framework sources (`Macros`, `Drawing`,
-`Native`, and `RangeView.range`) plus the source-level application example in
-`Sources/RangeView/`. The example contains the `@app`, `@component`, `@page`,
-`@shape`, and `Rectangle` declarations that exercise the framework.
+`Projects/RangeView` owns the RangeView framework sources (`Macros`,
+`Application`, `Views`, `Drawing`, and `Native`) plus the source-level
+application example in `Sources/RangeView/`. `@app` and `@view` are the only
+application/view identities; every independently meaningful declaration lives
+in an independently named file.
 
 `Projects/RangeCompilerB` owns Compiler B's project declaration, Core,
 compiler sources, native runtime, and the existing Compiler B example. It is a

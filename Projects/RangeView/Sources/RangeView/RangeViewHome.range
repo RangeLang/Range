@@ -1,7 +1,7 @@
-@page
-construct HomePage {
+@view
+construct RangeViewHome {
     derived body: @view {
-        Text("Home")
+        Text("RangeView draws regular values.")
         Stack(.vertical, spacing: 10) {
             Rectangle(material: Aero())
         }
