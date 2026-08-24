@@ -1,120 +1,145 @@
 <div align="center">
 
-# Range Performance
+<a href="https://rangelang.org">
+  <img src="https://rangelang.org/og-homepage.png" alt="Range — a love letter to electrons, logic and abstraction" width="100%">
+</a>
 
-Native LLVM · `-O3` · July 2026
+# Range
+
+### An applied programming language
+
+[Website](https://rangelang.org) · [Introduction](https://rangelang.org/posts/intro-to-range) · [Benchmarks](https://rangelang.org/benchmarks)
 
 </div>
 
-![Range String performance improved from 491.2 ms and 5.3 GB to 4.1 ms and 1.9 MB](Development/Benchmarks/Speed/range-strings-improvement.svg)
+Range is a native programming language for describing software as a typed
+graph. Identity, value, access, ownership, and transformation remain connected
+in one program model instead of being recovered from syntax and scattered
+across unrelated compiler representations.
 
-Range's owned String storage now carries its length, capacity, and data forward, allowing uniquely owned strings to grow in the same allocation.
+Range is about the architecture of a program as much as its execution: what a
+value is, which identity it belongs to, how it may be reached, and what is
+allowed to transform it.
 
-| 100k appends | Before | After | Improvement |
-|---|---:|---:|---:|
-| Median wall time | 491.2 ms | **4.1 ms** | **~120× faster** |
-| Peak memory | 5.3 GB | **1.9 MB** | **~2,800× less** |
+## Why Range
 
-## Native comparison
+- **One connected program model.** The same typed graph carries declarations,
+  values, relationships, ownership, and execution.
+- **Typed metaprogramming.** Macros query program identities and relationships,
+  receive only the environment they are allowed to observe, and return graph
+  transformations rather than rewriting an untyped token stream.
+- **Native output.** The supported compiler is authored in Range and emits
+  LLVM for native execution.
+- **A reproducible compiler authority.** A compiler checkpoint is accepted only
+  when the accepted compiler builds a candidate and that candidate rebuilds
+  the same source into byte-identical LLVM and a byte-identical executable.
 
-All results below are ordered fastest to slowest. Range is highlighted in bold.
+## Identity : Value
 
-| Strings · 100k appends | Median wall time |
-|---|---:|
-| C | 3.9 ms |
-| C++ | 3.9 ms |
-| **Range** | **4.1 ms** |
-| Rust | 4.2 ms |
-| Go | 4.8 ms |
-| Swift | 5.6 ms |
+Range begins with one base concept: **Identity : Value**. Lowering may represent
+identity and value separately, but the language does not confuse a value with
+the question of *which* value it is.
 
-Range peak memory: **1.9 MB**.
+That distinction lets Range describe mutation, sharing, ownership, and
+specialization as relationships in the graph rather than conventions layered
+on top of it.
 
-<details>
-<summary><strong>Initial benchmark</strong> · July 18, 2026</summary>
+## A small concrete language
 
-### Loops · 20m iterations
+The concrete substrate is intentionally compact:
 
-| Language | Median wall time |
-|---|---:|
-| C++ | 61.3 ms |
-| C | 61.4 ms |
-| Rust | 61.9 ms |
-| Swift | 62.5 ms |
-| **Range** | **66.3 ms** |
-| Go | 79.6 ms |
+- `construct` describes composed values.
+- `enum` describes alternatives.
+- `function` describes behavior between them.
 
-### Noise · 50m samples
+Properties state their storage and access relationship directly. `let` is
+immutable storage, `state` is mutable storage, `binding` is projected access,
+and `derived` is computed access.
 
-| Language | Median wall time |
-|---|---:|
-| C | 70.5 ms |
-| C++ | 70.9 ms |
-| Go | 78.9 ms |
-| **Range** | **82.4 ms** |
-| Rust | 82.9 ms |
-| Swift | 82.9 ms |
+```range
+construct Counter {
+    let seed: Int
+    state count: Int
 
-### Function calls · 20m iterations
+    derived total: Int {
+        seed + count
+    }
+}
 
-| Language | Median wall time |
-|---|---:|
-| Go | 64.2 ms |
-| C++ | 67.4 ms |
-| C | 67.5 ms |
-| Rust | 67.9 ms |
-| Swift | 68.5 ms |
-| **Range** | **72.3 ms** |
-
-### Strings before lowering · 100k appends
-
-| Language | Median wall time |
-|---|---:|
-| C++ | 3.6 ms |
-| Rust | 3.6 ms |
-| Go | 4.3 ms |
-| C | 4.4 ms |
-| Swift | 4.8 ms |
-| **Range** | **491.2 ms** |
-
-Range peak memory: **5.3 GB** · peers: **1.8–4.2 MB**.
-
-</details>
-
-<details>
-<summary><strong>String scaling</strong> · 30 runs at each size</summary>
-
-| 100k appends | 1m appends | 5m appends | 10m appends |
-|---|---|---|---|
-| C · 4.2 ms | C++ · 8.2 ms | C · 20.0 ms | C · 36.1 ms |
-| C++ · 4.3 ms | C · 8.7 ms | C++ · 20.2 ms | Rust · 36.2 ms |
-| **Range · 4.3 ms** | Rust · 8.9 ms | Rust · 20.3 ms | C++ · 36.3 ms |
-| Rust · 4.4 ms | Go · 9.5 ms | Go · 21.3 ms | Go · 37.0 ms |
-| Go · 5.3 ms | **Range · 10.1 ms** | **Range · 27.2 ms** | **Range · 50.1 ms** |
-| Swift · 6.2 ms | Swift · 20.7 ms | Swift · 62.1 ms | Swift · 118.4 ms |
-
-</details>
-
-## Compiler status
-
-**4 of 6 tests emitted and passed.**
-
-| Result | Tests |
-|---|---|
-| Passed | Loops, Noise, Function Calls, Strings |
-| Did not emit | Collections · resolution stage 2 |
-| Did not emit | Constructs · constructor-argument parse reachability |
-| Emitted but failed | None |
-
-## Use Range
-
-```sh
-scripts/range compiler next
-scripts/range compiler progression
-scripts/range check-stage2-compiler
+function clamp(value: Int, min: Int, max: Int): Int {
+    if value < min { return min }
+    if value > max { return max }
+    return value
+}
 ```
 
-The supported implementation is the Range-authored self-hosted compiler kernel. It emits native LLVM and must reproduce byte-identical LLVM and linked compiler executables before a compiler change is accepted. Ordinary project compilation is intentionally absent until its source loading, macro materialization, lowering, and runtime behavior are Range-owned and proven. See [Development](Development/README.md) and the [speed benchmark](Development/Benchmarks/Speed/README.md) for historical design work and performance comparisons.
+Richer ideas are composed from these few explicit forms instead of requiring a
+new language construct for every programming pattern.
+
+## The language can see itself
+
+A Range macro receives typed program structure, queries the environment it has
+authority to observe, and returns a transformed execution graph. Macros work
+with declarations, members, identities, and relationships—not a separate
+untyped representation hidden from the rest of the language.
+
+The long-term aim is for frameworks, the compiler, editor intelligence, and
+program transformations to speak about the same graph as ordinary Range code.
+
+## Written in Range
+
+The supported compiler is authored in Range and emits native LLVM. Compiler
+changes are proven with one two-build fixed-point check:
+
+```text
+accepted compiler + source -> candidate
+candidate + same source -> reproduction
+```
+
+Candidate and reproduction LLVM and executables must match byte for byte.
+There is one rolling compiler authority under `RangeCompiler/Bootstrap/`; Git
+history preserves older checkpoints without turning them into competing
+authorities.
+
+## Project status
+
+Range is early, self-hosting language infrastructure under active development.
+The compiler parses and reasons about real Range programs, executes typed
+macros, models ownership and graph relationships, and emits native code. The
+supported language surface remains deliberately bounded: focused fixtures
+prove individual capabilities rather than implying a complete language or
+standard library.
+
+Repository branches may represent different compiler generations. Run the
+branch's command index to see its supported workflows:
+
+```sh
+scripts/range
+```
+
+Two shared compiler-maintenance proofs are:
+
+```sh
+scripts/range check-build-plan
+scripts/range check-compiler-candidate
+```
+
+A passing focused proof establishes only its documented boundary. It is not a
+claim that every later compiler gate or intended language feature is complete.
+
+## Explore and contribute
+
+- Read the [introduction to Range](https://rangelang.org/posts/intro-to-range).
+- Inspect the reproducible [native benchmarks](https://rangelang.org/benchmarks).
+- Explore the compiler, Core declarations, and focused fixtures in this
+  repository.
+- Use [GitHub Issues](https://github.com/RangeLang/Range/issues) for bugs,
+  focused proposals, and questions about contributing.
+
+Range welcomes careful experiments, bug reports, documentation improvements,
+and focused compiler proofs. Because the language is evolving, verify a
+capability against the live Range-authored implementation and its supported
+fixtures before relying on design material or examples from another branch.
 
 ## License
 
