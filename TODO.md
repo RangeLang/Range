@@ -20,10 +20,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   permanent path-and-query-preserving redirect to the apex origin.
 - [x] Verify the domain in Google Search Console, submit the sitemap, and add
   the four priority URLs to Google's crawl queue.
-- [ ] Import the verified property into Bing Webmaster Tools and submit its
+- [x] Import the verified property into Bing Webmaster Tools and submit its
   sitemap and priority URLs.
 - [ ] Inspect Google and Bing sitemap and URL processing after 48 hours and
   seven days.
+  - One-time Codex follow-ups are scheduled for 2026-08-28 and 2026-09-02 at
+    17:30 Asia/Tbilisi, pending acceptance of the automation cards.
 
 ## Active compiler work
 
