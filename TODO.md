@@ -13,14 +13,17 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 - [x] Make the Website self-contained and publish one 11-route SEO contract
   with canonical metadata, structured data, `robots.txt`, `sitemap.xml`, and
   production draft/private-route indexing guards.
-- [ ] Release the verified Website snapshot to `production` and deploy it at
+- [x] Release the verified Website snapshot to `production` and deploy it at
   `https://rangelang.org` with the pinned Sveltely submodule and a rollback
   image retained.
-- [ ] Point `www.rangelang.org` at the production server and verify its
+- [x] Point `www.rangelang.org` at the production server and verify its
   permanent path-and-query-preserving redirect to the apex origin.
-- [ ] Verify the domain in Google Search Console, import it into Bing Webmaster
-  Tools, submit the sitemap and priority URLs, then inspect processing after
-  48 hours and seven days.
+- [x] Verify the domain in Google Search Console, submit the sitemap, and add
+  the four priority URLs to Google's crawl queue.
+- [ ] Import the verified property into Bing Webmaster Tools and submit its
+  sitemap and priority URLs.
+- [ ] Inspect Google and Bing sitemap and URL processing after 48 hours and
+  seven days.
 
 ## Active compiler work
 
