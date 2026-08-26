@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+.svelte-kit
+build
+coverage
+node_modules
+*.db
+*.db-shm
+*.db-wal

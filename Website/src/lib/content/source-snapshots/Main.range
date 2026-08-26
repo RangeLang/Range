@@ -1,0 +1,153 @@
+@main {
+    let argumentCount: Int(commandLineArgumentCount())
+    if argumentCount == 1 {
+        return rangeCompilerCLICompile(input: commandLineArgument(index: 0), printOutput: true)
+    }
+    if argumentCount == 2 {
+        let command: String(commandLineArgument(index: 0))
+        let input: String(commandLineArgument(index: 1))
+        if command == String("compile") {
+            return rangeCompilerCLICompile(input: input, printOutput: true)
+        }
+        if command == String("check") {
+            return rangeCompilerCLICompile(input: input, printOutput: false)
+        }
+        if command == String("compile-v1") {
+            return rangeCompilerV1CLI(compiler: CompilerV1(version: 1), input: input, inspect: false)
+        }
+        if command == String("inspect-v1") {
+            return rangeCompilerV1CLI(compiler: CompilerV1(version: 1), input: input, inspect: true)
+        }
+        if command == String("compile-shape") {
+            return rangeCompilerV1ShapeCLI(input: input)
+        }
+        if command == String("project-shape-v1") {
+            return rangeCompilerV1ProjectShapeCLI(factsPath: input)
+        }
+    }
+    if argumentCount == 3 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("capture-syntax-v1") {
+            return rangeCompilerV1SyntaxFactsWriteCLI(
+                input: commandLineArgument(index: 1),
+                outputPath: commandLineArgument(index: 2))
+        }
+        if command == String("emit-llvm") {
+            return rangeCompilerCLIEmitLLVM(input: commandLineArgument(index: 1), outputPath: commandLineArgument(index: 2))
+        }
+    }
+    if argumentCount == 4 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("resume-v1") {
+            return rangeCompilerV1ResumeCLI(
+                executionPath: commandLineArgument(index: 1),
+                input: commandLineArgument(index: 2),
+                outputPath: commandLineArgument(index: 3))
+        }
+    }
+    if argumentCount == 5 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("load-plan-sources") {
+            return rangeCompilerCLILoadPlanSources(
+                plan: commandLineArgument(index: 1),
+                repoRoot: commandLineArgument(index: 2),
+                candidateRoot: commandLineArgument(index: 3),
+                outputPath: commandLineArgument(index: 4))
+        }
+    }
+    if argumentCount == 6 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("resume-v1-facts") {
+            return rangeCompilerV1ResumeFactsCLI(
+                executionPath: commandLineArgument(index: 1),
+                bindingPath: commandLineArgument(index: 2),
+                factsPath: commandLineArgument(index: 3),
+                input: commandLineArgument(index: 4),
+                outputPath: commandLineArgument(index: 5))
+        }
+    }
+    if argumentCount == 7 {
+        let command: String(commandLineArgument(index: 0))
+        if command == String("link") {
+            return rangeCompilerCLILink(
+                inputLLVM: commandLineArgument(index: 1),
+                outputExecutable: commandLineArgument(index: 2),
+                hostRuntime: commandLineArgument(index: 3),
+                stringRuntime: commandLineArgument(index: 4),
+                rawBufferRuntime: commandLineArgument(index: 5),
+                metricsRuntime: commandLineArgument(index: 6))
+        }
+        if command == String("build") {
+            return rangeCompilerCLIBuild(
+                input: commandLineArgument(index: 1),
+                outputExecutable: commandLineArgument(index: 2),
+                hostRuntime: commandLineArgument(index: 3),
+                stringRuntime: commandLineArgument(index: 4),
+                rawBufferRuntime: commandLineArgument(index: 5),
+                metricsRuntime: commandLineArgument(index: 6))
+        }
+    }
+    print(value: rangeCompilerCLIUsage())
+    return 64
+}
+
+function rangeCompilerCLIUsage(): String {
+    return "usage:\n  range compile <input.range>\n  range check <input.range>\n  range compile-v1 <input.range>\n  range inspect-v1 <input.range>\n  range compile-shape <input.range>\n  range capture-syntax-v1 <input.range> <syntax-facts.tsv>\n  range project-shape-v1 <syntax-facts.tsv>\n  range emit-llvm <input.range> <output.ll>\n  range resume-v1 <execution.tsv> <input.range> <output.ll>\n  range resume-v1-facts <execution.tsv> <syntax-binding.tsv> <syntax-facts.tsv> <input.range> <output.ll>\n  range load-plan-sources <plan.tsv> <repo-root> <candidate-root> <output.range>\n  range link <input.ll> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>\n  range build <input.range> <output> <host.c> <string.c> <raw-buffer.c> <metrics.c>"
+}
+
+function rangeCompilerCLILoadPlanSources(plan: String, repoRoot: String, candidateRoot: String, outputPath: String): Int {
+    let source: String(readFile(path: plan))
+    let bundle: String(compilerBuildPlanLoadSourceBundle(source: source, repoRoot: repoRoot, candidateRoot: candidateRoot))
+    if hasRangePrefix(source: bundle, start: 0, prefix: String("compilerError")) {
+        print(value: bundle)
+        return 65
+    }
+    let writeStatus: Int(writeFile(path: outputPath, text: bundle))
+    if writeStatus != 0 {
+        print(value: "range: unable to write \(outputPath)")
+        return writeStatus
+    }
+    return 0
+}
+
+function rangeCompilerCLICompile(input: String, printOutput: Bool): Int {
+    let source: String(readFile(path: input))
+    let output: String(compileRangeSource(source: source))
+    let exitCode: Int(compilerNativeOutputExitCode(output: output))
+    if printOutput || exitCode != 0 {
+        print(value: output)
+    }
+    return exitCode
+}
+
+function rangeCompilerCLIEmitLLVM(input: String, outputPath: String): Int {
+    let source: String(readFile(path: input))
+    let output: String(compileRangeSource(source: source))
+    let exitCode: Int(compilerNativeOutputExitCode(output: output))
+    if exitCode != 0 {
+        print(value: output)
+        return exitCode
+    }
+    let writeStatus: Int(writeFile(path: outputPath, text: "\(output)\n"))
+    if writeStatus != 0 {
+        print(value: "range: unable to write \(outputPath)")
+        return writeStatus
+    }
+    return 0
+}
+
+function rangeCompilerCLILink(inputLLVM: String, outputExecutable: String, hostRuntime: String, stringRuntime: String, rawBufferRuntime: String, metricsRuntime: String): Int {
+    let plan: LinkPlan(nativeLinkPlan(inputLLVM: inputLLVM, outputExecutable: outputExecutable, hostRuntime: hostRuntime, stringRuntime: stringRuntime, rawBufferRuntime: rawBufferRuntime, metricsRuntime: metricsRuntime))
+    let linkStatus: Int(linkPlanRun(plan: plan))
+    if linkStatus != 0 {
+        print(value: "range: linker exited with status \(linkStatus)")
+    }
+    return linkStatus
+}
+
+function rangeCompilerCLIBuild(input: String, outputExecutable: String, hostRuntime: String, stringRuntime: String, rawBufferRuntime: String, metricsRuntime: String): Int {
+    let llvmPath: String("\(outputExecutable).ll")
+    let emissionStatus: Int(rangeCompilerCLIEmitLLVM(input: input, outputPath: llvmPath))
+    if emissionStatus != 0 { return emissionStatus }
+    return rangeCompilerCLILink(inputLLVM: llvmPath, outputExecutable: outputExecutable, hostRuntime: hostRuntime, stringRuntime: stringRuntime, rawBufferRuntime: rawBufferRuntime, metricsRuntime: metricsRuntime)
+}

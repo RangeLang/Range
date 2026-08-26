@@ -1,0 +1,959 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-24T21:55:36Z",
+  "configuration": {
+    "baseIterations": 400000000,
+    "runs": 30,
+    "caseFilter": [
+      "constructs"
+    ]
+  },
+  "environment": {
+    "system": "Darwin",
+    "release": "27.0.0",
+    "architecture": "arm64",
+    "python": "3.14.3"
+  },
+  "procedure": {
+    "steps": [
+      "Write the generated implementation for each language into an isolated case directory.",
+      "Compile every native implementation with its release optimization settings. Compilation time is excluded from the measurement.",
+      "Emit Range to LLVM with the verified self-hosted compiler, then link the emitted module and runtime sources with clang -O3 -mcpu=native.",
+      "Run every language once per round, rotating the starting language to reduce thermal, frequency, and background-load bias.",
+      "Require the expected exit code and identical output on every run, then report median wall time, median CPU time, and median peak RSS."
+    ],
+    "commands": {
+      "c": [
+        "cc -O3 -mcpu=native main.c -o speed-c",
+        "./speed-c <iterations>"
+      ],
+      "range": [
+        "RangeCompiler emit-llvm Playground.range Main.ll",
+        "clang -O3 -mcpu=native -Wno-override-module Main.ll <runtime-sources> -o speed-range",
+        "./speed-range"
+      ],
+      "suite": [
+        "N=<base-iterations> RUNS=<sample-count> npm run benchmarks"
+      ]
+    },
+    "notes": [
+      "The workload count is specialized per leaf; some leaves intentionally scale it down to keep total work comparable.",
+      "Wall time includes process execution but excludes source generation and compilation.",
+      "A result is published only when output remains stable across every measured run.",
+      "Bun and TypeScript rows are omitted when their local toolchains are unavailable."
+    ]
+  },
+  "languages": [
+    "C",
+    "C++",
+    "Go",
+    "Range",
+    "Range malloc",
+    "Rust",
+    "Swift"
+  ],
+  "summary": {
+    "leafCount": 15,
+    "runLeafCount": 4,
+    "rangePassed": 4,
+    "rangeNotEmitted": 0,
+    "rangeFailed": 0
+  },
+  "categories": [
+    {
+      "id": "loops",
+      "name": "Loops",
+      "subcategories": [
+        {
+          "id": "while",
+          "name": "While",
+          "leaves": [
+            {
+              "id": "integer_loop",
+              "name": "Sequential modulo",
+              "description": "Sequential integer arithmetic and modulo dependency chain",
+              "workload": {
+                "count": 400000000,
+                "unit": "iterations"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    int64_t i = 0;\n    int64_t acc = 1;\n    while (i < n) {\n        acc = (acc + i * 3 + 1) % 1000003;\n        i += 1;\n    }\n    printf(\"%\" PRId64 \"\\n\", acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    let n: Int(400000000)\n    state i: Int(0)\n    state acc: Int(1)\n    while i < n {\n        acc: (acc + i * 3 + 1) % 1000003\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        },
+        {
+          "id": "if",
+          "name": "If",
+          "leaves": [
+            {
+              "id": "loop_if",
+              "name": "75% taken",
+              "description": "Repeated one-sided conditional with a 75% taken branch",
+              "workload": {
+                "count": 400000000,
+                "unit": "iterations"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    int64_t i = 0, acc = 1;\n    while (i < n) {\n        if (i % 4 != 0) acc = (acc + i * 3 + 1) % 1000003;\n        i += 1;\n    }\n    printf(\"%\" PRId64 \"\\n\", acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    let n: Int(400000000)\n    state i: Int(0)\n    state acc: Int(1)\n    while i < n {\n        if i % 4 != 0 {\n            acc: (acc + i * 3 + 1) % 1000003\n        }\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        },
+        {
+          "id": "if-else",
+          "name": "If Else",
+          "leaves": [
+            {
+              "id": "loop_if_else",
+              "name": "Balanced alternating",
+              "description": "Repeated balanced two-outcome conditional",
+              "workload": {
+                "count": 400000000,
+                "unit": "iterations"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    int64_t i = 0, acc = 1;\n    while (i < n) {\n        if (i % 2 == 0) acc = (acc + i * 3 + 1) % 1000003;\n        else acc = (acc + i * 5 + 2) % 1000003;\n        i += 1;\n    }\n    printf(\"%\" PRId64 \"\\n\", acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    let n: Int(400000000)\n    state i: Int(0)\n    state acc: Int(1)\n    while i < n {\n        if i % 2 == 0 {\n            acc: (acc + i * 3 + 1) % 1000003\n        } else {\n            acc: (acc + i * 5 + 2) % 1000003\n        }\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "noise",
+      "name": "Noise",
+      "subcategories": [
+        {
+          "id": "perlin",
+          "name": "Perlin",
+          "leaves": [
+            {
+              "id": "perlin_noise",
+              "name": "2D single cell",
+              "description": "Two-dimensional single-cell Perlin gradient interpolation",
+              "workload": {
+                "count": 400000000,
+                "unit": "samples"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nstatic inline double fade(double value) {\n    return value * value * value * (value * (value * 6.0 - 15.0) + 10.0);\n}\nstatic inline double noise(double x, double y) {\n    double u = fade(x), v = fade(y);\n    double n00 = x * 0.8 + y * 0.6;\n    double n10 = (x - 1.0) * -0.6 + y * 0.8;\n    double n01 = x * 0.3 + (y - 1.0) * -0.95;\n    double n11 = (x - 1.0) * -0.8 + (y - 1.0) * -0.6;\n    double lower = n00 * (1.0 - u) + n10 * u;\n    double upper = n01 * (1.0 - u) + n11 * u;\n    return lower * (1.0 - v) + upper * v;\n}\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    double total = 0.0, x = 0.37, y = 0.61;\n    for (int64_t i = 0; i < n; ++i) {\n        total += noise(x, y);\n        x += 0.000013; if (x > 1.0) x -= 1.0;\n        y += 0.000017; if (y > 1.0) y -= 1.0;\n    }\n    return total != 0.0 ? 1 : 0;\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "function fade(value: Float): Float {\n    return value * value * value * (value * (value * Float(6.0) - Float(15.0)) + Float(10.0))\n}\n\nfunction perlinNoise(x: Float, y: Float): Float {\n    let u: Float(fade(value: x))\n    let v: Float(fade(value: y))\n    let n00: Float(x * Float(0.8) + y * Float(0.6))\n    let n10: Float((x - Float(1.0)) * Float(0.0 - 0.6) + y * Float(0.8))\n    let n01: Float(x * Float(0.3) + (y - Float(1.0)) * Float(0.0 - 0.95))\n    let n11: Float((x - Float(1.0)) * Float(0.0 - 0.8) + (y - Float(1.0)) * Float(0.0 - 0.6))\n    let lower: Float(n00 * (Float(1.0) - u) + n10 * u)\n    let upper: Float(n01 * (Float(1.0) - u) + n11 * u)\n    return lower * (Float(1.0) - v) + upper * v\n}\n\n@main {\n    state total: Float(0.0)\n    state index: Int(0)\n    state x: Float(0.37)\n    state y: Float(0.61)\n    while index < 400000000 {\n        let sample: Float(perlinNoise(x: x, y: y))\n        total: total + sample\n        index: index + 1\n        x: x + Float(0.000013)\n        if x > Float(1.0) { x: x - Float(1.0) }\n        y: y + Float(0.000017)\n        if y > Float(1.0) { y: y - Float(1.0) }\n    }\n    if total != Float(0.0) {\n        return 1\n    }\n    return 0\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        },
+        {
+          "id": "voronoi",
+          "name": "Voronoi",
+          "leaves": [
+            {
+              "id": "voronoi_noise",
+              "name": "Three feature points",
+              "description": "Squared distance to the nearest of three two-dimensional feature points",
+              "workload": {
+                "count": 400000000,
+                "unit": "samples"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <stdint.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    double total = 0.0, x = 0.13, y = 0.27;\n    for (int64_t i = 0; i < n; ++i) {\n        double ax=x-0.20, ay=y-0.30, bx=x-0.70, by=y-0.80, cx=x-0.40, cy=y-0.65;\n        double best=ax*ax+ay*ay, second=bx*bx+by*by, third=cx*cx+cy*cy;\n        if (second < best) best = second;\n        if (third < best) best = third;\n        total += best;\n        x += 0.000013; if (x > 1.0) x -= 1.0;\n        y += 0.000017; if (y > 1.0) y -= 1.0;\n    }\n    return total != 0.0 ? 1 : 0;\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    state total: Float(0.0)\n    state index: Int(0)\n    state x: Float(0.13)\n    state y: Float(0.27)\n    while index < 400000000 {\n        let ax: Float(x - Float(0.20))\n        let ay: Float(y - Float(0.30))\n        let bx: Float(x - Float(0.70))\n        let by: Float(y - Float(0.80))\n        let cx: Float(x - Float(0.40))\n        let cy: Float(y - Float(0.65))\n        state best: Float(ax * ax + ay * ay)\n        let second: Float(bx * bx + by * by)\n        let third: Float(cx * cx + cy * cy)\n        if second < best { best: second }\n        if third < best { best: third }\n        total: total + best\n        index: index + 1\n        x: x + Float(0.000013)\n        if x > Float(1.0) { x: x - Float(1.0) }\n        y: y + Float(0.000017)\n        if y > Float(1.0) { y: y - Float(1.0) }\n    }\n    if total != Float(0.0) { return 1 }\n    return 0\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        },
+        {
+          "id": "value-noise",
+          "name": "Value Noise",
+          "leaves": [
+            {
+              "id": "value_noise",
+              "name": "Four lattice values",
+              "description": "Two-dimensional smooth bilinear interpolation of four lattice values",
+              "workload": {
+                "count": 400000000,
+                "unit": "samples"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <stdint.h>\n#include <stdlib.h>\nstatic inline double fade(double value) { return value * value * (3.0 - 2.0 * value); }\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    double total=0.0, x=0.37, y=0.61;\n    for (int64_t i=0; i<n; ++i) {\n        double u=fade(x), v=fade(y);\n        double lower=0.15*(1.0-u)+0.82*u, upper=0.44*(1.0-u)+0.67*u;\n        total += lower*(1.0-v)+upper*v;\n        x += 0.000013; if (x > 1.0) x -= 1.0;\n        y += 0.000017; if (y > 1.0) y -= 1.0;\n    }\n    return total != 0.0 ? 1 : 0;\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "function valueFade(value: Float): Float {\n    return value * value * (Float(3.0) - Float(2.0) * value)\n}\n@main {\n    state total: Float(0.0)\n    state index: Int(0)\n    state x: Float(0.37)\n    state y: Float(0.61)\n    while index < 400000000 {\n        let u: Float(valueFade(value: x))\n        let v: Float(valueFade(value: y))\n        let lower: Float(Float(0.15)*(Float(1.0)-u)+Float(0.82)*u)\n        let upper: Float(Float(0.44)*(Float(1.0)-u)+Float(0.67)*u)\n        total: total + lower*(Float(1.0)-v)+upper*v\n        index: index + 1\n        x: x + Float(0.000013)\n        if x > Float(1.0) { x: x - Float(1.0) }\n        y: y + Float(0.000017)\n        if y > Float(1.0) { y: y - Float(1.0) }\n    }\n    if total != Float(0.0) { return 1 }\n    return 0\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strings",
+      "name": "Strings",
+      "subcategories": [
+        {
+          "id": "append",
+          "name": "Append",
+          "leaves": [
+            {
+              "id": "strings",
+              "name": "Incremental owned growth",
+              "description": "Incremental string growth and length tracking",
+              "workload": {
+                "count": 40000000,
+                "unit": "appends"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\nint main(int argc, char **argv) {\n    int n = argc > 1 ? atoi(argv[1]) : 40000000;\n    char *s = malloc((size_t)n + 1);\n    int64_t acc = 0;\n    int len = 0;\n    for (int i = 0; i < n; i++) {\n        s[len++] = (char)('a' + (i % 26));\n        acc = (acc + len) % 1000003;\n    }\n    s[len] = 0;\n    printf(\"%lld\\n\", (long long)((acc + strlen(s)) % 1000003));\n    free(s);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    let n: Int(40000000)\n    state i: Int(0)\n    state text: String(\"\")\n    state acc: Int(0)\n    while i < n {\n        text: \"\\(text)a\"\n        acc: (acc + i + 1) % 1000003\n        i: i + 1\n    }\n    return ((acc + stringLength(value: text)) % 1000003) % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "collections",
+      "name": "Collections",
+      "subcategories": [
+        {
+          "id": "indexed-read",
+          "name": "Indexed Read",
+          "leaves": [
+            {
+              "id": "collections",
+              "name": "Eight-value reduction",
+              "description": "Repeated indexed array reads, branching, and reduction",
+              "workload": {
+                "count": 40000000,
+                "unit": "reads"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    int n = argc > 1 ? atoi(argv[1]) : 40000000;\n    int values[8] = {0, 1, 2, 3, 4, 5, 6, 7};\n    int64_t acc = 0;\n    for (int i = 0; i < n; i++) {\n        int value = values[i % 8];\n        if ((value & 1) == 0) acc += value * 2;\n    }\n    printf(\"%lld\\n\", (long long)acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    let n: Int(40000000)\n    let values: [0, 1, 2, 3, 4, 5, 6, 7]\n    state index: Int(0)\n    state acc: Int(0)\n    while index < n {\n        let value: Int(values[index % 8])\n        if value % 2 == 0 {\n            acc: acc + value * 2\n        }\n        index: index + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "convolution",
+      "name": "Convolution",
+      "subcategories": [
+        {
+          "id": "1d-three-tap",
+          "name": "1D Three Tap",
+          "leaves": [
+            {
+              "id": "convolution_1d",
+              "name": "Circular eight sample",
+              "description": "Circular one-dimensional three-tap stencil over eight integer samples",
+              "workload": {
+                "count": 40000000,
+                "unit": "windows"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    int64_t n=argc>1?atoll(argv[1]):40000000, values[8]={1,3,5,7,11,13,17,19}, acc=0;\n    for(int64_t i=0;i<n;++i){\n        int64_t center=i%8,left=(center+7)%8,right=(center+1)%8;\n        acc=(acc+values[left]+values[center]*2+values[right])%1000003;\n    }\n    printf(\"%\" PRId64 \"\\n\",acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "@main {\n    let values: [1, 3, 5, 7, 11, 13, 17, 19]\n    state i: Int(0)\n    state acc: Int(0)\n    while i < 40000000 {\n        let center: Int(i % 8)\n        let left: Int((center + 7) % 8)\n        let right: Int((center + 1) % 8)\n        acc: (acc + values[left] + values[center] * 2 + values[right]) % 1000003\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "constructs",
+      "name": "Constructs",
+      "subcategories": [
+        {
+          "id": "raw-struct-race",
+          "name": "Raw Struct Race",
+          "leaves": [
+            {
+              "id": "constructs",
+              "name": "Identity construct versus inline pair",
+              "description": "A local Range construct whose unobservable identity is eliminated versus optimized inline 32-bit C, C++, Rust, Go, and Swift values",
+              "workload": {
+                "count": 40000000,
+                "unit": "constructions"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 168.9274,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\ntypedef struct { int32_t x; int32_t y; } Pair;\nint main(int argc, char **argv) {\n    int32_t n = argc > 1 ? (int32_t)atoi(argv[1]) : 40000000;\n    int32_t acc = 0;\n    for (int32_t i = 0; i < n; i++) {\n        Pair pair = (Pair){i, i + 1};\n        acc = (acc + pair.x + pair.y) % 1000003;\n    }\n    printf(\"%\" PRId32 \"\\n\", acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "construct Pair {\n    let x: Int\n    let y: Int\n}\n\n@main {\n    let n: Int(40000000)\n    state i: Int(0)\n    state acc: Int(0)\n    while i < n {\n        let pair: Pair(x: i, y: i + 1)\n        acc: (acc + pair.x + pair.y) % 1000003\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": [
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 133.5571,
+                  "cpuMilliseconds": 131.289,
+                  "peakRssKilobytes": 1648,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "14400"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 133.6365,
+                  "cpuMilliseconds": 131.6385,
+                  "peakRssKilobytes": 1680,
+                  "relativeToFastest": 1.0006,
+                  "relativeToC": 1.0006,
+                  "cpuRelativeToC": 1.0027,
+                  "memoryRelativeToC": 1.0194,
+                  "output": "exit:93",
+                  "identityAllocator": {
+                    "mode": "arena",
+                    "allocations": 0,
+                    "requestedBytes": 0,
+                    "usedBytes": 0,
+                    "chunks": 0,
+                    "reservedBytes": 0
+                  }
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 133.7807,
+                  "cpuMilliseconds": 131.55,
+                  "peakRssKilobytes": 1648,
+                  "relativeToFastest": 1.0017,
+                  "relativeToC": 1.0017,
+                  "cpuRelativeToC": 1.002,
+                  "memoryRelativeToC": 1.0,
+                  "output": "14400"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 134.1534,
+                  "cpuMilliseconds": 131.9275,
+                  "peakRssKilobytes": 1840,
+                  "relativeToFastest": 1.0045,
+                  "relativeToC": 1.0045,
+                  "cpuRelativeToC": 1.0049,
+                  "memoryRelativeToC": 1.1165,
+                  "output": "14400"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 134.7108,
+                  "cpuMilliseconds": 132.1715,
+                  "peakRssKilobytes": 2080,
+                  "relativeToFastest": 1.0086,
+                  "relativeToC": 1.0086,
+                  "cpuRelativeToC": 1.0067,
+                  "memoryRelativeToC": 1.2621,
+                  "output": "14400"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 156.4143,
+                  "cpuMilliseconds": 154.113,
+                  "peakRssKilobytes": 4152,
+                  "relativeToFastest": 1.1711,
+                  "relativeToC": 1.1711,
+                  "cpuRelativeToC": 1.1738,
+                  "memoryRelativeToC": 2.5194,
+                  "output": "14400"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "identity",
+          "name": "Identity",
+          "leaves": [
+            {
+              "id": "constructs_deep_identity",
+              "name": "Eight-level nested chain",
+              "description": "Build and traverse an eight-level stable-identity chain; Range arena and legacy malloc use identical generated LLVM",
+              "workload": {
+                "count": 4000000,
+                "unit": "chains"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 482.3852,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\ntypedef struct L0 { int64_t value; } L0;\ntypedef struct L1 { L0 *child; } L1;\ntypedef struct L2 { L1 *child; } L2;\ntypedef struct L3 { L2 *child; } L3;\ntypedef struct L4 { L3 *child; } L4;\ntypedef struct L5 { L4 *child; } L5;\ntypedef struct L6 { L5 *child; } L6;\ntypedef struct L7 { L6 *child; } L7;\nstatic volatile uintptr_t identity_sink;\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 4000000, checksum = 0;\n    for (int64_t i = 0; i < n; ++i) {\n        L0 *l0 = malloc(sizeof(*l0)); *l0 = (L0){i};\n        L1 *l1 = malloc(sizeof(*l1)); *l1 = (L1){l0};\n        L2 *l2 = malloc(sizeof(*l2)); *l2 = (L2){l1};\n        L3 *l3 = malloc(sizeof(*l3)); *l3 = (L3){l2};\n        L4 *l4 = malloc(sizeof(*l4)); *l4 = (L4){l3};\n        L5 *l5 = malloc(sizeof(*l5)); *l5 = (L5){l4};\n        L6 *l6 = malloc(sizeof(*l6)); *l6 = (L6){l5};\n        L7 *l7 = malloc(sizeof(*l7)); *l7 = (L7){l6};\n        identity_sink ^= (uintptr_t)l7;\n        checksum = (checksum + l7->child->child->child->child->child->child->child->value) % 1000003;\n    }\n    printf(\"%\" PRId64 \"\\n\", checksum);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "construct L0 { let value: Int }\nconstruct L1 { let child: L0 }\nconstruct L2 { let child: L1 }\nconstruct L3 { let child: L2 }\nconstruct L4 { let child: L3 }\nconstruct L5 { let child: L4 }\nconstruct L6 { let child: L5 }\nconstruct L7 { let child: L6 }\n@main {\n    state i: Int(0)\n    state checksum: Int(0)\n    while i < 4000000 {\n        let root: L7(child: L6(child: L5(child: L4(child: L3(child: L2(child: L1(child: L0(value: i))))))))\n        checksum: (checksum + root.child.child.child.child.child.child.child.value) % 1000003\n        i: i + 1\n    }\n    return checksum % 251\n}\n"
+                }
+              ],
+              "results": [
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 110.992,
+                  "cpuMilliseconds": 107.97,
+                  "peakRssKilobytes": 276176,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.4052,
+                  "cpuRelativeToC": 0.4029,
+                  "memoryRelativeToC": 0.5484,
+                  "output": "exit:78",
+                  "identityAllocator": {
+                    "mode": "arena",
+                    "allocations": 28000000,
+                    "requestedBytes": 208000000,
+                    "usedBytes": 224000000,
+                    "chunks": 3418,
+                    "reservedBytes": 224002048
+                  }
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 273.8938,
+                  "cpuMilliseconds": 268.0075,
+                  "peakRssKilobytes": 503632,
+                  "relativeToFastest": 2.4677,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "78"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 298.5388,
+                  "cpuMilliseconds": 293.3395,
+                  "peakRssKilobytes": 503632,
+                  "relativeToFastest": 2.6897,
+                  "relativeToC": 1.09,
+                  "cpuRelativeToC": 1.0945,
+                  "memoryRelativeToC": 1.0,
+                  "output": "78"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 309.4902,
+                  "cpuMilliseconds": 303.3275,
+                  "peakRssKilobytes": 503824,
+                  "relativeToFastest": 2.7884,
+                  "relativeToC": 1.13,
+                  "cpuRelativeToC": 1.1318,
+                  "memoryRelativeToC": 1.0004,
+                  "output": "78"
+                },
+                {
+                  "language": "Range malloc",
+                  "status": "passed",
+                  "wallMilliseconds": 315.4479,
+                  "cpuMilliseconds": 310.5565,
+                  "peakRssKilobytes": 440848,
+                  "relativeToFastest": 2.8421,
+                  "relativeToC": 1.1517,
+                  "cpuRelativeToC": 1.1588,
+                  "memoryRelativeToC": 0.8753,
+                  "output": "exit:78",
+                  "identityAllocator": {
+                    "mode": "malloc",
+                    "allocations": 28000000,
+                    "requestedBytes": 208000000,
+                    "usedBytes": 208000000,
+                    "chunks": 0,
+                    "reservedBytes": 0
+                  }
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 407.0361,
+                  "cpuMilliseconds": 2147.4945,
+                  "peakRssKilobytes": 353128,
+                  "relativeToFastest": 3.6673,
+                  "relativeToC": 1.4861,
+                  "cpuRelativeToC": 8.0128,
+                  "memoryRelativeToC": 0.7012,
+                  "output": "78"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 446.653,
+                  "cpuMilliseconds": 443.3365,
+                  "peakRssKilobytes": 1037296,
+                  "relativeToFastest": 4.0242,
+                  "relativeToC": 1.6308,
+                  "cpuRelativeToC": 1.6542,
+                  "memoryRelativeToC": 2.0596,
+                  "output": "78"
+                }
+              ]
+            },
+            {
+              "id": "constructs_shared_binding_mutation",
+              "name": "Shared binding mutation",
+              "description": "Mutate one array cell through a stable binding path and observe every update through its original owner path",
+              "workload": {
+                "count": 40000000,
+                "unit": "mutations"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 144.5321,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\ntypedef struct{int64_t value;}Counter;typedef struct{int64_t *value;}View;\nint main(int argc,char**argv){\n    int64_t n=argc>1?atoll(argv[1]):40000000,checksum=0;\n    Counter *counter=malloc(sizeof(*counter));counter->value=0;\n    View *view=malloc(sizeof(*view));view->value=&counter->value;\n    for(int64_t i=0;i<n;i++){counter->value=i+1;checksum=(checksum+*view->value)%1000003;}\n    printf(\"%\" PRId64 \"\\n\",checksum);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "construct View { binding values: [Int] }\n@main {\n    state values: [0]\n    let view: View(values: $values)\n    state i: Int(0)\n    state checksum: Int(0)\n    while i < 40000000 {\n        view.values[0]: i + 1\n        checksum: (checksum + values[0]) % 1000003\n        i: i + 1\n    }\n    return checksum % 251\n}\n"
+                }
+              ],
+              "results": [
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 122.9522,
+                  "cpuMilliseconds": 120.5675,
+                  "peakRssKilobytes": 1664,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "7140"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 123.14,
+                  "cpuMilliseconds": 120.874,
+                  "peakRssKilobytes": 1856,
+                  "relativeToFastest": 1.0015,
+                  "relativeToC": 1.0015,
+                  "cpuRelativeToC": 1.0025,
+                  "memoryRelativeToC": 1.1154,
+                  "output": "7140"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 123.7996,
+                  "cpuMilliseconds": 121.4245,
+                  "peakRssKilobytes": 1648,
+                  "relativeToFastest": 1.0069,
+                  "relativeToC": 1.0069,
+                  "cpuRelativeToC": 1.0071,
+                  "memoryRelativeToC": 0.9904,
+                  "output": "7140"
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 124.2894,
+                  "cpuMilliseconds": 122.1815,
+                  "peakRssKilobytes": 4064,
+                  "relativeToFastest": 1.0109,
+                  "relativeToC": 1.0109,
+                  "cpuRelativeToC": 1.0134,
+                  "memoryRelativeToC": 2.4423,
+                  "output": "7140"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 124.7712,
+                  "cpuMilliseconds": 121.932,
+                  "peakRssKilobytes": 2080,
+                  "relativeToFastest": 1.0148,
+                  "relativeToC": 1.0148,
+                  "cpuRelativeToC": 1.0113,
+                  "memoryRelativeToC": 1.25,
+                  "output": "7140"
+                },
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 133.826,
+                  "cpuMilliseconds": 131.647,
+                  "peakRssKilobytes": 1712,
+                  "relativeToFastest": 1.0884,
+                  "relativeToC": 1.0884,
+                  "cpuRelativeToC": 1.0919,
+                  "memoryRelativeToC": 1.0288,
+                  "output": "exit:112",
+                  "identityAllocator": {
+                    "mode": "arena",
+                    "allocations": 0,
+                    "requestedBytes": 0,
+                    "usedBytes": 0,
+                    "chunks": 0,
+                    "reservedBytes": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "constructs_state_replacement",
+              "name": "Repeated child replacement",
+              "description": "Replace a state-owned child identity repeatedly; equivalent languages may reclaim unreachable children while Range bulk-reclaims its arena at exit",
+              "workload": {
+                "count": 40000000,
+                "unit": "replacements"
+              },
+              "runStatus": "passed",
+              "rangeStatus": "passed",
+              "axisMaxMilliseconds": 933.8327,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\ntypedef struct{int64_t value;}Child;typedef struct{Child *child;}Root;\nint main(int argc,char**argv){\n    int64_t n=argc>1?atoll(argv[1]):40000000,checksum=0;Root root={malloc(sizeof(Child))};root.child->value=0;\n    for(int64_t i=0;i<n;i++){Child*next=malloc(sizeof(*next));next->value=i+1;free(root.child);root.child=next;checksum=(checksum+root.child->value)%1000003;}\n    printf(\"%\" PRId64 \"\\n\",checksum);free(root.child);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "construct Child { let value: Int }\nconstruct Root { state child: Child }\n@main {\n    let root: Root(child: Child(value: 0))\n    state i: Int(0)\n    state checksum: Int(0)\n    while i < 40000000 {\n        root.child: Child(value: i + 1)\n        checksum: (checksum + root.child.value) % 1000003\n        i: i + 1\n    }\n    return checksum % 251\n}\n"
+                }
+              ],
+              "results": [
+                {
+                  "language": "Range",
+                  "status": "passed",
+                  "wallMilliseconds": 223.1421,
+                  "cpuMilliseconds": 219.1225,
+                  "peakRssKilobytes": 393808,
+                  "relativeToFastest": 1.0,
+                  "relativeToC": 0.4293,
+                  "cpuRelativeToC": 0.4238,
+                  "memoryRelativeToC": 236.6635,
+                  "output": "exit:112",
+                  "identityAllocator": {
+                    "mode": "arena",
+                    "allocations": 40000001,
+                    "requestedBytes": 160000004,
+                    "usedBytes": 320000008,
+                    "chunks": 4883,
+                    "reservedBytes": 320012288
+                  }
+                },
+                {
+                  "language": "Go",
+                  "status": "passed",
+                  "wallMilliseconds": 294.0994,
+                  "cpuMilliseconds": 304.6875,
+                  "peakRssKilobytes": 10272,
+                  "relativeToFastest": 1.318,
+                  "relativeToC": 0.5658,
+                  "cpuRelativeToC": 0.5893,
+                  "memoryRelativeToC": 6.1731,
+                  "output": "7140"
+                },
+                {
+                  "language": "Range malloc",
+                  "status": "passed",
+                  "wallMilliseconds": 499.3021,
+                  "cpuMilliseconds": 493.106,
+                  "peakRssKilobytes": 629104,
+                  "relativeToFastest": 2.2376,
+                  "relativeToC": 0.9607,
+                  "cpuRelativeToC": 0.9537,
+                  "memoryRelativeToC": 378.0673,
+                  "output": "exit:112",
+                  "identityAllocator": {
+                    "mode": "malloc",
+                    "allocations": 40000001,
+                    "requestedBytes": 160000004,
+                    "usedBytes": 160000004,
+                    "chunks": 0,
+                    "reservedBytes": 0
+                  }
+                },
+                {
+                  "language": "C",
+                  "status": "passed",
+                  "wallMilliseconds": 519.7479,
+                  "cpuMilliseconds": 517.022,
+                  "peakRssKilobytes": 1664,
+                  "relativeToFastest": 2.3292,
+                  "relativeToC": 1.0,
+                  "cpuRelativeToC": 1.0,
+                  "memoryRelativeToC": 1.0,
+                  "output": "7140"
+                },
+                {
+                  "language": "C++",
+                  "status": "passed",
+                  "wallMilliseconds": 575.9298,
+                  "cpuMilliseconds": 572.092,
+                  "peakRssKilobytes": 1648,
+                  "relativeToFastest": 2.581,
+                  "relativeToC": 1.1081,
+                  "cpuRelativeToC": 1.1065,
+                  "memoryRelativeToC": 0.9904,
+                  "output": "7140"
+                },
+                {
+                  "language": "Rust",
+                  "status": "passed",
+                  "wallMilliseconds": 591.995,
+                  "cpuMilliseconds": 588.7215,
+                  "peakRssKilobytes": 1872,
+                  "relativeToFastest": 2.653,
+                  "relativeToC": 1.139,
+                  "cpuRelativeToC": 1.1387,
+                  "memoryRelativeToC": 1.125,
+                  "output": "7140"
+                },
+                {
+                  "language": "Swift",
+                  "status": "passed",
+                  "wallMilliseconds": 864.6599,
+                  "cpuMilliseconds": 861.6675,
+                  "peakRssKilobytes": 2112,
+                  "relativeToFastest": 3.8749,
+                  "relativeToC": 1.6636,
+                  "cpuRelativeToC": 1.6666,
+                  "memoryRelativeToC": 1.2692,
+                  "output": "7140"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recursion",
+      "name": "Recursion",
+      "subcategories": [
+        {
+          "id": "fibonacci",
+          "name": "Fibonacci",
+          "leaves": [
+            {
+              "id": "fibonacci_recursion",
+              "name": "Depth 20 and 21",
+              "description": "Repeated binary recursion alternating depths 20 and 21",
+              "workload": {
+                "count": 40000,
+                "unit": "root calls"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <inttypes.h>\n#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nstatic int64_t fibonacci(int64_t value){if(value<2)return value;return fibonacci(value-1)+fibonacci(value-2);}\nint main(int argc,char**argv){int64_t n=argc>1?atoll(argv[1]):40000,acc=0;for(int64_t i=0;i<n;++i)acc=(acc+fibonacci(20+i%2))%1000003;printf(\"%\" PRId64 \"\\n\",acc);}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "function fibonacci(value: Int): Int {\n    if value < 2 { return value }\n    return fibonacci(value: value - 1) + fibonacci(value: value - 2)\n}\n@main {\n    state i: Int(0)\n    state acc: Int(0)\n    while i < 40000 {\n        acc: (acc + fibonacci(value: 20 + i % 2)) % 1000003\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "function-calls",
+      "name": "Function Calls",
+      "subcategories": [
+        {
+          "id": "direct-call",
+          "name": "Direct Call",
+          "leaves": [
+            {
+              "id": "function_calls",
+              "name": "Choose",
+              "description": "Small reusable function calls and predictable branching",
+              "workload": {
+                "count": 400000000,
+                "unit": "calls"
+              },
+              "runStatus": "notRun",
+              "rangeStatus": "notRun",
+              "axisMaxMilliseconds": 0.0,
+              "implementations": [
+                {
+                  "language": "C",
+                  "syntax": "c",
+                  "filename": "main.c",
+                  "source": "#include <stdint.h>\n#include <stdio.h>\n#include <stdlib.h>\nstatic inline int64_t choose(int64_t lhs, int64_t rhs, int flag) { return flag ? lhs : rhs; }\nint main(int argc, char **argv) {\n    int64_t n = argc > 1 ? atoll(argv[1]) : 400000000;\n    int64_t acc = 0;\n    for (int64_t i = 0; i < n; i++) acc = (acc + choose(i, i + 1, (int)(i & 1))) % 1000003;\n    printf(\"%lld\\n\", (long long)acc);\n}\n"
+                },
+                {
+                  "language": "Range",
+                  "syntax": "range",
+                  "filename": "Playground.range",
+                  "source": "function choose(lhs: Int, rhs: Int, flag: Bool): Int {\n    if flag {\n        return lhs\n    }\n    return rhs\n}\n\n@main {\n    let n: Int(400000000)\n    state i: Int(0)\n    state acc: Int(0)\n    while i < n {\n        acc: (acc + choose(lhs: i, rhs: i + 1, flag: i % 2 == 1)) % 1000003\n        i: i + 1\n    }\n    return acc % 251\n}\n"
+                }
+              ],
+              "results": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

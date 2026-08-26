@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "2a69a8aae27511c329bd6aecbd4b4e982466bb89",
+  "files": [
+    {
+      "source": "Projects/RangeCompilerB/Sources/CompilerB/Core/Macros/Many.range",
+      "snapshot": "Many.range",
+      "sha256": "ec14aa26882d9622f3eaf3c415f9dbd266a444463627a3ca4cebaad2bdd564c9"
+    },
+    {
+      "source": "RangeCompiler/Sources/Compiler/Driver/Main.range",
+      "snapshot": "Main.range",
+      "sha256": "493975e3632580428f6b1d39e44d191f4b7a44a55b70507f9d6f8b19ed352963"
+    },
+    {
+      "source": "RangeCompiler/Sources/Core/Macro/Codable.range",
+      "snapshot": "Codable.range",
+      "sha256": "28b3970ab741b67cca6154ec14e86a4f56168a23a97825c7cc3012755d8774b5"
+    },
+    {
+      "source": "RangeCompiler/Sources/Core/Macro/CommandGroup.range",
+      "snapshot": "CommandGroup.range",
+      "sha256": "d30932a451bebfc2d368cd4fdcb764d534cdac6fb9f7eae875227467cfb19bd9"
+    },
+    {
+      "source": "Testing/CommandLine/Pass/Routes.range",
+      "snapshot": "Routes.range",
+      "sha256": "88cb47a40e2c20ae328e06a52084ca96667397e466df9aa8469b5ac2301bffe0"
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+import benchmarkData from "../../public/benchmarks.json";
+
+export type BenchmarkResult = {
+  language: string;
+  milliseconds: number;
+};
+
+export type Benchmark = {
+  name: string;
+  leaf?: string;
+  description?: string;
+  scale: string;
+  axisMax: number;
+  results: (BenchmarkResult | [string, number])[];
+  note?: string;
+  href?: string;
+  implementations?: { language: string; filename: string; syntax: string; source: string }[];
+};
+
+export const data: any = benchmarkData;
+export const githubUrl = "https://github.com/RangeLang/Range";
+
+
+
+
+
+export function slug(value: string): string {
+  return value.toLowerCase().replaceAll(" ", "-");
+}
+
+export function formatWorkload(count: number): string {
+  if (count >= 1_000_000) return `${Number.isInteger(count / 1_000_000) ? count / 1_000_000 : (count / 1_000_000).toFixed(1)}m`;
+  if (count >= 1_000) return `${Number.isInteger(count / 1_000) ? count / 1_000 : (count / 1_000).toFixed(1)}k`;
+  return String(count);
+}
+
+export function formatMemory(kilobytes: number): string {
+  return kilobytes >= 1024 ? `${(kilobytes / 1024).toFixed(1)} MB` : `${kilobytes} KB`;
+}
+
+export function completedCategories(): any[] {
+  return data.categories
+    .map((category: any) => ({
+      ...category,
+      subcategories: category.subcategories
+        .map((subcategory: any) => ({ ...subcategory, leaves: subcategory.leaves.filter((leaf: any) => leaf.results.length > 0) }))
+        .filter((subcategory: any) => subcategory.leaves.length > 0),
+    }))
+    .filter((category: any) => category.subcategories.length > 0);
+}
+
+export function benchmarkRecords(): any[] {
+  return data.categories.flatMap((category: any) =>
+    category.subcategories.flatMap((subcategory: any) =>
+      subcategory.leaves.map((leaf: any) => ({ category, subcategory, leaf })),
+    ),
+  );
+}
+
+export function benchmarkFromLeaf(subcategory: string, leaf: any): Benchmark {
+  return {
+    name: subcategory,
+    leaf: leaf.name,
+    description: leaf.description,
+    scale: `${formatWorkload(leaf.workload.count)} ${leaf.workload.unit} · ${data.configuration.runs} runs`,
+    axisMax: Math.max(leaf.axisMaxMilliseconds, 1),
+    implementations: leaf.implementations,
+    href: `/benchmarks/${leaf.id}`,
+    results: leaf.results.map((result: any) => ({ language: result.language, milliseconds: result.wallMilliseconds })),
+  };
+}
+
+const rangeKeywords = new Set([
+  "background", "binding", "break", "builder", "capture", "case", "closed",
+  "construct", "continue", "core", "default", "derived", "else", "enum",
+  "extension", "function", "get", "if", "in", "infix", "init", "let",
+  "macro", "main", "marker", "namespace", "nil", "on", "open", "operator",
+  "package", "postfix", "precedencegroup", "prefix", "protocol", "return",
+  "self", "set", "state", "switch", "var", "while",
+]);
+
+const rangeTypeDeclarationKeywords = new Set([
+  "construct", "enum", "namespace", "protocol",
+]);
+
+const rangeBindingKeywords = new Set([
+  "binding", "let", "state", "var",
+]);
+
+function rangeSemanticTokenType(
+  token: string,
+  previous: string,
+  next: string,
+) {
+  if (token.startsWith("//")) return "comment";
+  if (token.startsWith('"')) return "string";
+  if (token === "@stored") return "type";
+  if (token.startsWith("@")) return "macro";
+  if (token.startsWith("#")) return "splice";
+  if (/^\d/.test(token)) return "number";
+  if (/^[{}]$/.test(token)) return "brace";
+  if (/^[{}[\]();,.:<>]$/.test(token)) return "punctuation";
+  if (!/^[A-Za-z_]/.test(token)) return "";
+
+  if (previous === "." && next === "(") return "method";
+  if (previous === ".") return "property";
+  if (rangeKeywords.has(token)) return "keyword";
+  if (previous === "macro" || previous === "marker") {
+    return "macro-declaration";
+  }
+  if (rangeTypeDeclarationKeywords.has(previous)) {
+    return "type-declaration";
+  }
+  if (/^[A-Z]/.test(token)) return "type";
+  if (previous === "function") return "function-declaration";
+  if (next === "(") return "function";
+  if (next === ":") return "parameter";
+  if (rangeBindingKeywords.has(previous)) return "variable-declaration";
+  return "variable";
+}
+
+export function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+export function highlightRange(
+  source: string,
+  indexedKeywords: ReadonlySet<string> = new Set(),
+): string {
+  const pattern = /([@#][A-Za-z_]\w*|\/\/.*$|"(?:\\.|[^"\\])*"|\b[A-Za-z_]\w*\b|\b\d(?:_?\d)*(?:\.\d(?:_?\d)*)?\b|[{}[\]();,.:<>])/gm;
+  const matches = Array.from(source.matchAll(pattern));
+  let output = "";
+  let cursor = 0;
+  let keywordIndex = 0;
+  for (const [matchIndex, match] of matches.entries()) {
+    const token = match[0];
+    const index = match.index ?? 0;
+    output += escapeHtml(source.slice(cursor, index));
+    const previous = matches[matchIndex - 1]?.[0] ?? "";
+    const next = matches[matchIndex + 1]?.[0] ?? "";
+    const type = rangeSemanticTokenType(token, previous, next);
+    const indexAttribute = type === "keyword" && indexedKeywords.has(token)
+      ? ` data-keyword-index="${keywordIndex++}"`
+      : "";
+    output += type
+      ? `<span class="token ${type}"${indexAttribute}>${escapeHtml(token)}</span>`
+      : escapeHtml(token);
+    cursor = index + token.length;
+  }
+  return output + escapeHtml(source.slice(cursor));
+}
