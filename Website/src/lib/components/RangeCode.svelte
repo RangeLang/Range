@@ -22,4 +22,3 @@
   class={`rangeSource language-${syntax}`}
   aria-label={label}
 ><code>{@html renderedSource}</code></pre>
-
