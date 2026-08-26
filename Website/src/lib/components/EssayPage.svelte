@@ -37,14 +37,6 @@
   } = $props();
 </script>
 
-<svelte:head>
-  <title>{title} · Range</title>
-  <meta name="description" content={description} />
-  <meta property="og:title" content={`${title} · Range`} />
-  <meta property="og:description" content={description} />
-  <meta property="og:type" content="article" />
-</svelte:head>
-
 <range-essay-page>
   <main class="essayPage">
     <article>

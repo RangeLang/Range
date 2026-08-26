@@ -2,6 +2,10 @@
 	admin off
 }
 
+{$SITE_ALIAS_ADDRESS:http://www.localhost} {
+	redir {$SITE_ADDRESS:http://localhost}{uri} permanent
+}
+
 {$SITE_ADDRESS:http://localhost} {
 	encode zstd gzip
 

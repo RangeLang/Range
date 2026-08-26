@@ -11,6 +11,7 @@
     "build": "vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "generate:og": "bun run build && bun scripts/generate-post-og-images.ts",
+    "sync:sources": "bun scripts/sync-source-snapshots.ts",
     "start": "bun build/index.js",
     "test": "bun run build && bun test tests"
   },

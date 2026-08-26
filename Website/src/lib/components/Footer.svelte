@@ -5,7 +5,7 @@
 
 <range-site-footer>
   <footer>
-    <a class="githubButton" href={githubUrl} target="_blank" rel="noreferrer" aria-label="Open the Range development branch on GitHub"><GithubIcon /><span>GitHub</span></a>
+    <a class="githubButton" href={githubUrl} target="_blank" rel="noreferrer" aria-label="Open the Range repository on GitHub"><GithubIcon /><span>GitHub</span></a>
     <a class="footerMeta" href="/" aria-label="Range homepage">
       <span>Range</span>
       <range-scale

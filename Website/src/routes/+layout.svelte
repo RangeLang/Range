@@ -14,22 +14,21 @@
     createRangeOnboardingMachine,
     RANGE_ONBOARDING_MACHINE_CONTEXT,
   } from "$lib/interaction/onboarding-machine";
-  import { postForPath, postImageUrl } from "$lib/posts";
+  import { isSearchPrivatePath, seoForPath } from "$lib/seo";
   import Footer from "$lib/components/Footer.svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import SoundOnboarding from "$lib/components/SoundOnboarding.svelte";
   import "sveltely/style.css";
   import "../../app/globals.css";
 
-  const siteTitle = "Range — An Applied Programming Language";
-  const siteDescription = "A love letter to electrons, logic and abstraction.";
-  const defaultImage = "https://rangelang.org/og-homepage.png";
-  let activePost = $derived(postForPath(page.url.pathname));
-  let socialImage = $derived(activePost ? postImageUrl(activePost) : defaultImage);
-  let socialImageAlt = $derived(
-    activePost
-      ? `${activePost.cardTitle} — ${activePost.cardDescription}`
-      : "Range — an applied programming language",
+  let seo = $derived(seoForPath(page.url.pathname));
+  let searchPrivate = $derived(
+    isSearchPrivatePath(page.url.pathname) || page.status >= 400,
+  );
+  let structuredData = $derived(
+    seo?.structuredData
+      ? JSON.stringify(seo.structuredData).replaceAll("<", "\\u003c")
+      : "",
   );
   let isHome = $derived(page.url.pathname === "/");
   let isPreview = $derived(page.url.pathname.startsWith("/__preview/"));
@@ -97,20 +96,33 @@
 </script>
 
 <svelte:head>
-  <title>{siteTitle}</title>
-  <meta name="description" content={siteDescription} />
-  <meta property="og:title" content={siteTitle} />
-  <meta property="og:description" content={siteDescription} />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content={socialImage} />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content={socialImageAlt} />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content={siteTitle} />
-  <meta name="twitter:description" content={siteDescription} />
-  <meta name="twitter:image" content={socialImage} />
-  <meta name="twitter:image:alt" content={socialImageAlt} />
+  {#if seo}
+    <title>{seo.title}</title>
+    <meta name="description" content={seo.description} />
+    {#if seo.canonicalUrl}
+      <link rel="canonical" href={seo.canonicalUrl} />
+      <meta property="og:url" content={seo.canonicalUrl} />
+    {/if}
+    <meta property="og:site_name" content="Range" />
+    <meta property="og:title" content={seo.title} />
+    <meta property="og:description" content={seo.description} />
+    <meta property="og:type" content={seo.openGraphType} />
+    <meta property="og:image" content={seo.image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={seo.imageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={seo.title} />
+    <meta name="twitter:description" content={seo.description} />
+    <meta name="twitter:image" content={seo.image} />
+    <meta name="twitter:image:alt" content={seo.imageAlt} />
+  {/if}
+  {#if searchPrivate}
+    <meta name="robots" content="noindex, nofollow" />
+  {/if}
+  {#if structuredData}
+    {@html `<script type="application/ld+json">${structuredData}</script>`}
+  {/if}
 </svelte:head>
 
 <range-site-shell>

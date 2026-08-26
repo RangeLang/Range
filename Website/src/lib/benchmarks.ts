@@ -1,4 +1,4 @@
-import benchmarkData from "../../../Benchmarks/Speed/results/latest.json";
+import benchmarkData from "../../public/benchmarks.json";
 
 export type BenchmarkResult = {
   language: string;
@@ -18,7 +18,7 @@ export type Benchmark = {
 };
 
 export const data: any = benchmarkData;
-export const githubUrl = "https://github.com/georgetchelidze/Range/tree/development";
+export const githubUrl = "https://github.com/RangeLang/Range";
 
 
 

@@ -1,0 +1,23 @@
+@commandGroup
+construct CLI {
+    let commandGroupStorage: Int
+
+    @command
+    function render(): Int {
+        return 17
+    }
+
+    @command
+    function serve(): Int {
+        return 23
+    }
+}
+
+function runCLI(): Int {
+    let cli: CLI(commandGroupStorage: 0)
+    return cli.runCommandLine()
+}
+
+@main {
+    return runCLI()
+}

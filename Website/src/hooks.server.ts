@@ -1,19 +1,16 @@
+import { isSearchPrivatePath } from "$lib/seo";
 import type { Handle } from "@sveltejs/kit";
 
 export const handle: Handle = async ({ event, resolve }) => {
   const response = await resolve(event);
-  const acceptsHtml = event.request.headers
-    .get("accept")
-    ?.includes("text/html");
-  const isPageRequest =
-    event.request.method === "GET" || event.request.method === "HEAD";
-
-  if (response.status === 404 && acceptsHtml && isPageRequest) {
-    return new Response(null, {
-      status: 302,
-      headers: { location: "/" },
-    });
+  const headers = new Headers(response.headers);
+  if (response.status >= 400 || isSearchPrivatePath(event.url.pathname)) {
+    headers.set("X-Robots-Tag", "noindex, nofollow");
   }
 
-  return response;
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 };

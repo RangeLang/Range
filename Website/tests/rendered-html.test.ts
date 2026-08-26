@@ -1636,15 +1636,13 @@ test("gives post copy a broad softly fading radial backing", async () => {
 });
 
 test("keeps the generated benchmark artifact complete and versioned", async () => {
-  const [artifactText, schemaText] = await Promise.all([
-    readFile(new URL("../public/benchmarks.json", import.meta.url), "utf8"),
-    readFile(new URL("../../Benchmarks/Speed/benchmark-results.schema.json", import.meta.url), "utf8"),
-  ]);
+  const artifactText = await readFile(
+    new URL("../public/benchmarks.json", import.meta.url),
+    "utf8",
+  );
   const artifact = JSON.parse(artifactText);
-  const schema = JSON.parse(schemaText);
 
-  expect(schema.required).toContain("schemaVersion");
-  expect(artifact.schemaVersion).toBe(schema.properties.schemaVersion.const);
+  expect(artifact.schemaVersion).toBe(2);
   expect(artifact.summary.leafCount).toBe(15);
   expect(artifact.summary.runLeafCount).toBe(4);
   expect(artifact.categories.length).toBeGreaterThan(0);
@@ -2052,7 +2050,7 @@ test("keeps the concrete codability application example", async () => {
       "utf8",
     ),
     readFile(
-      new URL("../../RangeCompiler/Sources/Core/Macro/Codable.range", import.meta.url),
+      new URL("../src/lib/content/source-snapshots/Codable.range", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),

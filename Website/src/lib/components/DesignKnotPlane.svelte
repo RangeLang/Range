@@ -6,7 +6,7 @@
     RANGE_SOUND_MANAGER_CONTEXT,
     type RangeSoundManager,
   } from "$lib/audio/sound-manager";
-  import mainSource from "../../../../RangeCompiler/Sources/Compiler/Driver/Main.range?raw";
+  import mainSource from "$lib/content/source-snapshots/Main.range?raw";
 
   let viewport: HTMLDivElement;
   let sourceLayer: HTMLPreElement;

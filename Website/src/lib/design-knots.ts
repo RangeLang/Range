@@ -8,9 +8,9 @@
  * the other spellings were approximating.
  */
 
-import manySource from "../../../Projects/RangeCompilerB/Sources/CompilerB/Core/Macros/Many.range?raw";
-import commandGroupSource from "../../../RangeCompiler/Sources/Core/Macro/CommandGroup.range?raw";
-import routesSource from "../../../Testing/CommandLine/Pass/Routes.range?raw";
+import manySource from "$lib/content/source-snapshots/Many.range?raw";
+import commandGroupSource from "$lib/content/source-snapshots/CommandGroup.range?raw";
+import routesSource from "$lib/content/source-snapshots/Routes.range?raw";
 
 export type KnotShape = "pentagon" | "square" | "triangle" | "circle";
 
