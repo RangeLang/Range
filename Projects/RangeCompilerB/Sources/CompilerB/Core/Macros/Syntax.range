@@ -1,0 +1,1 @@
+macro syntax(template: String): Construct {}

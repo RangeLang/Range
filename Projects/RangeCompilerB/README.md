@@ -21,8 +21,42 @@ Compiler B is the new compiler. Build it out in small runnable slices.
 - Compiler A only bootstraps B’s LLVM; do not reshape B around A’s tables or body arena.
 - Each slice must compile, link, run, and show its result before expanding scope.
 - Keep the entrypoint in `Sources/CompilerB/Main.range` until the next boundary is proven.
-- The current frontend slice discovers a project’s first `.range` file and
-  prints B-owned lexer and syntax rows.
+- The current frontend slice discovers every `.range` file under a project
+  route, orders the paths deterministically, and processes each file under its
+  own source identity. It does not concatenate project text. The project
+  revision composes those files into one cross-file declaration and macro
+  graph, derives emitted `@main` blocks only from applied attached macros,
+  retains each producing Application identity and macro argument, and lowers
+  the reachable ordinary Function plus its typed `@extern` calls to LLVM. A
+  dormant Environment inside an unapplied macro contributes no runtime source.
+- `--emit-assembly` now lowers the selected project entry into a target-neutral
+  Function fact and renders deterministic Apple arm64 text. The current native
+  slice supports a literal `Int` entry or one reachable no-argument Function
+  returning a literal `Int`; it emits only the reachable pair, preserves
+  16-byte stack alignment across calls, and links with one clang invocation.
+  Parameters, control flow, extern calls, aggregate storage, and native many
+  materialization remain explicit next slices; LLVM is still the broader
+  transitional backend.
+  Use `scripts/range compiler b --emit-assembly <project>` to inspect the text
+  artifact or `scripts/range compiler b run <project>` to assemble, link, and
+  execute this bounded native surface.
+  The lowered program owns a function table and one ordered target-neutral
+  operation table. Literal, call, and homogeneous-many discovery append
+  constants, stack allocation, addressing, loads/stores, calls, releases, and
+  returns to that table. The Apple renderer consumes those operations and has
+  no source-level many fields or specialized many rendering path.
+- The first native homogeneous many slice derives storage from a Construct's
+  single owning `@many ...: @type` relationship. Receiver lookup follows the
+  attached Application to its Macro and then to the Macro-owned `count` or
+  `element(index:)` Function. Two closed Int values become a pointer/count/
+  capacity descriptor plus contiguous 64-bit slots; Byte values select a
+  separate compact byte representation from their `bits` graph fact. Mixed
+  identities reject until identity buckets are implemented. `Buffer(Int)`
+  admits the identity while materializing zero count/capacity and no values.
+  Counts above two, append/update, heap growth, and cleanup remain pending.
+- `@framework(name:)` is ordinary graph data. Project LLVM serializes each
+  framework relationship as link metadata; the shell driver only materializes
+  that plan and does not select a RangeView backend.
 - Lexing has one retained columnar store with concrete
   `CompilerBToken { id, kind, start, end }` values. Token identity compares
   `TokenID`; spelling equivalence compares source bytes over token ranges.
@@ -30,6 +64,26 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   nodes carry only source-derived `SyntaxNodeID` values and retained
   `TokenSpan`s. Revisions retain their token stores, so names and byte ranges
   are derived rather than copied into the common node.
+- `@syntax` is a freeform graph recipe. Parenthesized and brace-form templates
+  retain ordered literals, delimiters, and arbitrary `$capture` names. Every
+  capture resolves to one same-named relationship declared by the target;
+  that relationship supplies its admitted identity and singular, optional, or
+  `@many` cardinality. Exact matches materialize the target nominal plus stable
+  named relationship identity and source provenance. `Let`, `State`,
+  `Derived`, and `Binding` declare their macros, identity, and value graph
+  shape while `@storage` supplies ownership behavior. Adding a new typed
+  syntax-bearing form does not add a parser keyword case. Scalar holes
+  retain source-backed raw values, collection regions retain their ordered
+  materialized children, and leading annotation regions retain zero or many
+  Macro Application values. Construct, Function, Macro, Transformation, Enum,
+  EnumCase, Block, Extension, and the four property forms now share one
+  source-ordered concrete-syntax worklist. `Extension` captures only its target
+  and ordered members. A Macro captures its transformation and ordered body;
+  it is the sole syntax construct with `binding environment: Environment`,
+  which remains a non-owning compile-time relationship rather than source
+  capture or runtime storage.
+  Re-scheduling syntax emitted by a materialized macro remains the next
+  fixed-point slice.
 - Function, Construct, Block, Macro.Application, function-signature, and Return
   information lives in separate facet stores owned by one syntax revision.
   Individual `Function.Declaration` and `Construct.Declaration` query functions
@@ -48,6 +102,12 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   execution order and control flow but is not its target. The `Void` macro
   executes an ordinary call to an `@extern` String function, and only selected
   branches perform the effect.
+- The first project derivation boundary is application-owned. An applied
+  attached macro with one unconditional Environment materializes its emitted
+  macro blocks into the project graph with the producing Application identity;
+  merely declaring that Environment does not expose its dormant runtime source.
+  Conditional Environment selection, general extension-node commits, recursive
+  scheduling, and fixed-point execution remain later slices of the same path.
 - Enum declarations retain ordered case identities, and macro-process switches
   retain their subject plus exact/default case regions. Compile-time macro
   arguments select which authored Environment is related to each Application;
@@ -121,14 +181,17 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   one root -> filter -> map identity chain, and a modifier receives its
   predecessor directly as `#environment.target`. Executing the modifier body
   and materializing its bounded output remain a later process slice.
-- The existing `many` macro now queries
-  `#environment.macros.filter(all: @collectionModifier)` and directly
+- The existing `many` macro now suspends
+  `#environment.filter(for: @collectionModifier)` until its application-owned
+  Environment slot is sealed, then directly
   splices the plural `#modifiers` identity into an extension of its target
   Application. The splice cardinality handles none, one, or many identities;
   no authored `map`, collection registry, or attachment helper is involved. B
   retains the query and target/source-collection identities as one
-  Application-provision facet. Materializing that collection into deduplicated
-  target-to-Macro relationships is the next graph-expansion slice.
+  Application-provision facet. Because discovery already knows the enclosing
+  Environment and extension, that facet retains both direct ownership edges;
+  sealed execution materializes the deduplicated modifier collection as graph
+  updates without a second result table or an ancestry walk.
   Its element type is guaranteed declaration knowledge and is read directly
   from `#environment.target.Declaration.type`; it is not represented as an
   optional diagnostic binding.

@@ -1,7 +1,15 @@
 macro many(count: Int?, ordering: Ordering: .ordered): @member {
+  function append(value: Type): Void {}
+
+  function element(index: Int): Type {}
+
+  function update(value: Type, index: Int): Void {}
+
+  function count(): Int {}
+
   let element: #environment.target.Declaration.type
 
-  let modifiers: #environment.macros.filter(all: @collectionModifier)
+  let modifiers: #environment.filter(for: @collectionModifier)
 
   switch count {
   case < 0:
@@ -27,6 +35,12 @@ macro many(count: Int?, ordering: Ordering: .ordered): @member {
     }
 
   default:
+    if #environment.target.Application.values.count != count {
+      @diagnostic(
+        "Many value count must match declared count"
+      )
+    }
+
     #environment {
       extension #environment.target.Declaration {
         LLVM(

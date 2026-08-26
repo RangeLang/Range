@@ -1,12 +1,12 @@
 construct CompilerBMacroProductStore {
-    let statuses: Buffer<Int>
-    let emittedValues: Buffer<Int>
-    let collectionProductionSyntaxIDs: Buffer<Int>
-    let applicationSyntaxIDs: Buffer<Int>
-    let bitCounts: Buffer<Int>
-    let signedValues: Buffer<Int>
-    let hasValues: Buffer<Int>
-    let values: Buffer<Int>
+    let statuses: IntMany
+    let emittedValues: IntMany
+    let collectionProductionSyntaxIDs: IntMany
+    let applicationSyntaxIDs: IntMany
+    let bitCounts: IntMany
+    let signedValues: IntMany
+    let hasValues: IntMany
+    let values: IntMany
 }
 
 function compilerBMacroProductStoreCreate(

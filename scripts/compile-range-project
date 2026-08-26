@@ -14,6 +14,40 @@ compile_project_fail() {
     exit 1
 }
 
+verify_compiler_authority() {
+    [[ "$(manifest_value formatVersion)" == "1" ]] \
+        || compile_project_fail "unsupported bootstrap manifest format"
+    [[ "$(manifest_value target.platform)" == "macOS" ]] \
+        || compile_project_fail "unsupported bootstrap target platform"
+    [[ "$(manifest_value target.pointerBits)" == "64" ]] \
+        || compile_project_fail "unsupported bootstrap pointer width"
+    [[ "$(uname -m)" == "$(manifest_value target.architecture)" ]] \
+        || compile_project_fail "bootstrap target architecture mismatch"
+
+    local relative expected path actual expected_bytes
+    relative="$(manifest_value bootstrap.path)"
+    expected="$(manifest_value bootstrap.sha256)"
+    expected_bytes="$(manifest_value bootstrap.bytes)"
+    path="$REPO_ROOT/$relative"
+    [[ -f "$path" ]] || compile_project_fail "missing checked-in bootstrap: $relative"
+    actual="$(sha256 "$path")"
+    [[ "$actual" == "$expected" ]] \
+        || compile_project_fail "checked-in bootstrap hash mismatch"
+    [[ "$(bytes "$path")" == "$expected_bytes" ]] \
+        || compile_project_fail "checked-in bootstrap byte length mismatch"
+
+    relative="$(manifest_value executable.path)"
+    expected="$(manifest_value executable.sha256)"
+    expected_bytes="$(manifest_value executable.bytes)"
+    path="$REPO_ROOT/$relative"
+    [[ -x "$path" ]] || compile_project_fail "accepted compiler is not executable: $relative"
+    actual="$(sha256 "$path")"
+    [[ "$actual" == "$expected" ]] \
+        || compile_project_fail "accepted compiler executable hash mismatch"
+    [[ "$(bytes "$path")" == "$expected_bytes" ]] \
+        || compile_project_fail "accepted compiler executable byte length mismatch"
+}
+
 revision_field() {
     local source="$1"
     local key="$2"
@@ -374,6 +408,15 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+# A declared project is compiled as a separately discovered source graph by
+# Compiler B. The accepted compiler first builds Compiler B, which then emits
+# the ordinary project's LLVM without concatenating the application's sources.
+if [[ "$graph_mode" -eq 0 && "$shape_mode" -eq 0 \
+    && -d "$input" && -f "$input/Project.range" \
+    && "${#additional_inputs[@]}" -eq 0 ]]; then
+    exec "$SCRIPT_DIR/run-compiler-b-bootstrap" --emit-llvm "$input"
+fi
+
 if [[ -d "$input" ]]; then
     input_identity="$(cd "$input" && pwd)"
 else
@@ -407,19 +450,16 @@ trap '/bin/rm -rf "$WORK_ROOT"' EXIT
 
 development_compiler="${RANGE_DEVELOPMENT_COMPILER:-}"
 if [[ -z "$development_compiler" ]]; then
-    verify_manifest
+    # Ordinary source compilation consumes the accepted compiler artifacts but
+    # does not compile or link the manifest's C runtime sources. Keep runtime
+    # verification in the build/link and compiler fixed-point proof paths.
+    verify_compiler_authority
 else
     [[ -x "$development_compiler" ]] \
         || compile_project_fail "RANGE_DEVELOPMENT_COMPILER is not executable: $development_compiler"
     development_compiler="$(cd "$(dirname "$development_compiler")" && pwd)/$(basename "$development_compiler")"
     /usr/bin/printf 'range: using unpromoted development compiler %s\n' "$development_compiler" >&2
 fi
-
-canonical_core_source_path="$REPO_ROOT/RangeCompiler/Sources/Core/System/Memory/RawBuffer.range"
-[[ -f "$canonical_core_source_path" ]] || compile_project_fail "missing canonical Core source"
-CORE_SOURCE_MARKER_PATH="${canonical_core_source_path#"$REPO_ROOT/"}"
-CORE_SOURCE_PATH="$WORK_ROOT/RawBuffer.range"
-/bin/cp "$canonical_core_source_path" "$CORE_SOURCE_PATH"
 
 accepted_compiler="$REPO_ROOT/$(manifest_value executable.path)"
 if [[ -z "$development_compiler" ]]; then

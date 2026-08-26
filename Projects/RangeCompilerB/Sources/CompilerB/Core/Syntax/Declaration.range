@@ -13,136 +13,150 @@ construct SyntaxNode {
 }
 
 construct SyntaxNodeStore {
-    let ids: Buffer<Int>
-    let firstTokenIDs: Buffer<Int>
-    let afterLastTokenIDs: Buffer<Int>
+    let ids: IntMany
+    let firstTokenIDs: IntMany
+    let afterLastTokenIDs: IntMany
 }
 
 construct CompilerBDeclarationFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let bodySyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let identityTokenIDs: IntMany
+    let bodySyntaxIDs: IntMany
 }
 
 construct CompilerBBlockFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let parentSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let parentSyntaxIDs: IntMany
 }
 
 construct CompilerBEnumCaseFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let identityTokenIDs: IntMany
+    let ordinals: IntMany
 }
 
 construct CompilerBMacroApplicationStore {
-    let syntaxIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let macroDeclarationSyntaxIDs: Buffer<Int>
-    let firstArgumentTokenIDs: Buffer<Int>
-    let afterLastArgumentTokenIDs: Buffer<Int>
-    let targetSyntaxIDs: Buffer<Int>
-    let targetIdentityTokenIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
-    let argumentApplicationSyntaxIDs: Buffer<Int>
-    let argumentLabelTokenIDs: Buffer<Int>
-    let argumentValueExpressionSyntaxIDs: Buffer<Int>
-    let argumentOrdinals: Buffer<Int>
-    let environmentApplicationSyntaxIDs: Buffer<Int>
-    let environmentSyntaxIDs: Buffer<Int>
-    let environmentOrdinals: Buffer<Int>
+    let syntaxIDs: IntMany
+    let identityTokenIDs: IntMany
+    let macroDeclarationSyntaxIDs: IntMany
+    let firstArgumentTokenIDs: IntMany
+    let afterLastArgumentTokenIDs: IntMany
+    let targetSyntaxIDs: IntMany
+    let targetIdentityTokenIDs: IntMany
+    let ordinals: IntMany
+    let argumentApplicationSyntaxIDs: IntMany
+    let argumentLabelTokenIDs: IntMany
+    let argumentValueExpressionSyntaxIDs: IntMany
+    let argumentOrdinals: IntMany
+    let environmentApplicationSyntaxIDs: IntMany
+    let environmentSyntaxIDs: IntMany
+    let environmentOrdinals: IntMany
 }
 
 construct CompilerBFunctionSignatureFacetStore {
-    let functionSyntaxIDs: Buffer<Int>
-    let returnTypeTokenIDs: Buffer<Int>
-    let inputCardinalityTokenIDs: Buffer<Int>
-    let outputCardinalityTokenIDs: Buffer<Int>
+    let functionSyntaxIDs: IntMany
+    let syntaxIDs: IntMany
+    let returnTypeTokenIDs: IntMany
+    let inputCardinalityTokenIDs: IntMany
+    let outputCardinalityTokenIDs: IntMany
+}
+
+construct CompilerBFunctionParameterFacetStore {
+    let functionSyntaxIDs: IntMany
+    let externalLabelTokenIDs: IntMany
+    let identityTokenIDs: IntMany
+    let typeTokenIDs: IntMany
+    let ordinals: IntMany
+}
+
+construct CompilerBFunctionOwnerFacetStore {
+    let functionSyntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
 }
 
 construct CompilerBProcessFacetStore {
-    let ownerSyntaxIDs: Buffer<Int>
-    let bodySyntaxIDs: Buffer<Int>
-    let resultExpressionSyntaxIDs: Buffer<Int>
+    let ownerSyntaxIDs: IntMany
+    let bodySyntaxIDs: IntMany
+    let resultExpressionSyntaxIDs: IntMany
 }
 
 construct CompilerBExpressionFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let kindCodes: Buffer<Int>
-    let firstTokenIDs: Buffer<Int>
-    let afterLastTokenIDs: Buffer<Int>
-    let integerValues: Buffer<Int>
+    let syntaxIDs: IntMany
+    let kindCodes: IntMany
+    let firstTokenIDs: IntMany
+    let afterLastTokenIDs: IntMany
+    let integerValues: IntMany
 }
 
 construct CompilerBApplicationFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let predecessorSyntaxIDs: Buffer<Int>
-    let declarationSyntaxIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let firstTokenIDs: Buffer<Int>
-    let afterLastTokenIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let predecessorSyntaxIDs: IntMany
+    let declarationSyntaxIDs: IntMany
+    let identityTokenIDs: IntMany
+    let firstTokenIDs: IntMany
+    let afterLastTokenIDs: IntMany
 }
 
 construct CompilerBApplicationArgumentFacetStore {
-    let applicationSyntaxIDs: Buffer<Int>
-    let labelTokenIDs: Buffer<Int>
-    let valueExpressionSyntaxIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
+    let applicationSyntaxIDs: IntMany
+    let labelTokenIDs: IntMany
+    let valueExpressionSyntaxIDs: IntMany
+    let ordinals: IntMany
 }
 
 construct CompilerBProjectionSegmentStore {
-    let expressionSyntaxIDs: Buffer<Int>
-    let tokenIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
+    let expressionSyntaxIDs: IntMany
+    let tokenIDs: IntMany
+    let ordinals: IntMany
 }
 
 construct CompilerBLocalBindingFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let valueExpressionSyntaxIDs: Buffer<Int>
-    let firstValueTokenIDs: Buffer<Int>
-    let afterLastValueTokenIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let identityTokenIDs: IntMany
+    let valueExpressionSyntaxIDs: IntMany
+    let firstValueTokenIDs: IntMany
+    let afterLastValueTokenIDs: IntMany
 }
 
 construct CompilerBNoValueFallbackFacetStore {
-    let expressionSyntaxIDs: Buffer<Int>
-    let questionTokenIDs: Buffer<Int>
-    let firstTargetTokenIDs: Buffer<Int>
-    let afterLastTargetTokenIDs: Buffer<Int>
-    let firstRHSTokenIDs: Buffer<Int>
-    let afterLastRHSTokenIDs: Buffer<Int>
+    let expressionSyntaxIDs: IntMany
+    let questionTokenIDs: IntMany
+    let firstTargetTokenIDs: IntMany
+    let afterLastTargetTokenIDs: IntMany
+    let firstRHSTokenIDs: IntMany
+    let afterLastRHSTokenIDs: IntMany
 }
 
 construct CompilerBConditionalFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let firstConditionTokenIDs: Buffer<Int>
-    let afterLastConditionTokenIDs: Buffer<Int>
-    let bodySyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let firstConditionTokenIDs: IntMany
+    let afterLastConditionTokenIDs: IntMany
+    let bodySyntaxIDs: IntMany
 }
 
 construct CompilerBSwitchFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let subjectExpressionSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let subjectExpressionSyntaxIDs: IntMany
 }
 
 construct CompilerBSwitchCaseFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let switchSyntaxIDs: Buffer<Int>
-    let conditionExpressionSyntaxIDs: Buffer<Int>
-    let firstBodyTokenIDs: Buffer<Int>
-    let afterLastBodyTokenIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
+    let syntaxIDs: IntMany
+    let switchSyntaxIDs: IntMany
+    let conditionExpressionSyntaxIDs: IntMany
+    let firstBodyTokenIDs: IntMany
+    let afterLastBodyTokenIDs: IntMany
+    let ordinals: IntMany
 }
 
 construct CompilerBComparisonFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let leftExpressionSyntaxIDs: Buffer<Int>
-    let rightExpressionSyntaxIDs: Buffer<Int>
-    let operatorCodes: Buffer<Int>
+    let syntaxIDs: IntMany
+    let leftExpressionSyntaxIDs: IntMany
+    let rightExpressionSyntaxIDs: IntMany
+    let operatorCodes: IntMany
 }
 
 construct CompilerBCompileTimeInteger {
@@ -152,48 +166,58 @@ construct CompilerBCompileTimeInteger {
 }
 
 construct CompilerBApplicationProvisionFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let targetApplicationSyntaxIDs: Buffer<Int>
-    let sourceSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let environmentSyntaxIDs: IntMany
+    let extensionSyntaxIDs: IntMany
+    let targetApplicationSyntaxIDs: IntMany
+    let sourceSyntaxIDs: IntMany
 }
 
 construct CompilerBEnvironmentFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerDeclarationSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerDeclarationSyntaxIDs: IntMany
 }
 
 construct CompilerBEnvironmentNodeFacetStore {
-    let environmentSyntaxIDs: Buffer<Int>
-    let syntaxIDs: Buffer<Int>
-    let parentSyntaxIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
+    let environmentSyntaxIDs: IntMany
+    let syntaxIDs: IntMany
+    let parentSyntaxIDs: IntMany
+    let ordinals: IntMany
+}
+
+construct CompilerBEmittedMacroBlockFacetStore {
+    let syntaxIDs: IntMany
+    let identityTokenIDs: IntMany
+    let bodySyntaxIDs: IntMany
+    let openingTokenIDs: IntMany
+    let closingTokenIDs: IntMany
 }
 
 construct CompilerBExtensionFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let targetApplicationSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let targetApplicationSyntaxIDs: IntMany
 }
 
 construct CompilerBCollectionFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let selectorIdentityTokenIDs: Buffer<Int>
-    let selectorMacroSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let selectorIdentityTokenIDs: IntMany
+    let selectorMacroSyntaxIDs: IntMany
 }
 
 construct CompilerBCollectionProductionFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let sourceIdentityTokenIDs: Buffer<Int>
-    let sourceCollectionSyntaxIDs: Buffer<Int>
-    let outputIdentityTokenIDs: Buffer<Int>
-    let outputDeclarationSyntaxIDs: Buffer<Int>
+    let syntaxIDs: IntMany
+    let sourceIdentityTokenIDs: IntMany
+    let sourceCollectionSyntaxIDs: IntMany
+    let outputIdentityTokenIDs: IntMany
+    let outputDeclarationSyntaxIDs: IntMany
 }
 
 construct CompilerBExecutionFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let expressionSyntaxIDs: Buffer<Int>
-    let ordinals: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let expressionSyntaxIDs: IntMany
+    let ordinals: IntMany
 }
 
 construct CompilerBProcessGraph {
@@ -211,42 +235,45 @@ construct CompilerBProcessGraph {
     let applicationProvisions: CompilerBApplicationProvisionFacetStore
     let environments: CompilerBEnvironmentFacetStore
     let environmentNodes: CompilerBEnvironmentNodeFacetStore
+    let emittedMacroBlocks: CompilerBEmittedMacroBlockFacetStore
     let extensions: CompilerBExtensionFacetStore
     let collections: CompilerBCollectionFacetStore
     let collectionProductions: CompilerBCollectionProductionFacetStore
     let executions: CompilerBExecutionFacetStore
+    let functionOwners: CompilerBFunctionOwnerFacetStore
 }
 
 construct CompilerBMacroSignatureFacetStore {
-    let macroSyntaxIDs: Buffer<Int>
-    let targetTypeTokenIDs: Buffer<Int>
-    let afterLastTargetTypeTokenIDs: Buffer<Int>
-    let resultTypeTokenIDs: Buffer<Int>
-    let inputCardinalityTokenIDs: Buffer<Int>
-    let outputCardinalityTokenIDs: Buffer<Int>
-    let parameterMacroSyntaxIDs: Buffer<Int>
-    let parameterIdentityTokenIDs: Buffer<Int>
-    let parameterTypeTokenIDs: Buffer<Int>
-    let parameterCardinalityValues: Buffer<Int>
-    let parameterOptionalValues: Buffer<Int>
-    let parameterDefaultFirstTokenIDs: Buffer<Int>
-    let parameterDefaultAfterLastTokenIDs: Buffer<Int>
-    let parameterOrdinals: Buffer<Int>
+    let macroSyntaxIDs: IntMany
+    let syntaxIDs: IntMany
+    let targetTypeTokenIDs: IntMany
+    let afterLastTargetTypeTokenIDs: IntMany
+    let resultTypeTokenIDs: IntMany
+    let inputCardinalityTokenIDs: IntMany
+    let outputCardinalityTokenIDs: IntMany
+    let parameterMacroSyntaxIDs: IntMany
+    let parameterIdentityTokenIDs: IntMany
+    let parameterTypeTokenIDs: IntMany
+    let parameterCardinalityValues: IntMany
+    let parameterOptionalValues: IntMany
+    let parameterDefaultFirstTokenIDs: IntMany
+    let parameterDefaultAfterLastTokenIDs: IntMany
+    let parameterOrdinals: IntMany
 }
 
 construct CompilerBMemberFacetStore {
-    let syntaxIDs: Buffer<Int>
-    let ownerSyntaxIDs: Buffer<Int>
-    let kindCodes: Buffer<Int>
-    let keywordTokenIDs: Buffer<Int>
-    let identityTokenIDs: Buffer<Int>
-    let typeTokenIDs: Buffer<Int>
-    let firstInitializerTokenIDs: Buffer<Int>
-    let afterLastInitializerTokenIDs: Buffer<Int>
-    let initializerExpressionSyntaxIDs: Buffer<Int>
-    let bodySyntaxIDs: Buffer<Int>
-    let initializerKindCodes: Buffer<Int>
-    let initializerValues: Buffer<Int>
+    let syntaxIDs: IntMany
+    let ownerSyntaxIDs: IntMany
+    let kindCodes: IntMany
+    let keywordTokenIDs: IntMany
+    let identityTokenIDs: IntMany
+    let typeTokenIDs: IntMany
+    let firstInitializerTokenIDs: IntMany
+    let afterLastInitializerTokenIDs: IntMany
+    let initializerExpressionSyntaxIDs: IntMany
+    let bodySyntaxIDs: IntMany
+    let initializerKindCodes: IntMany
+    let initializerValues: IntMany
 }
 
 enum CompilerBScalarKind {
@@ -284,11 +311,14 @@ construct CompilerBSyntaxRevision {
     let blocks: CompilerBBlockFacetStore
     let macroApplications: CompilerBMacroApplicationStore
     let functionSignatures: CompilerBFunctionSignatureFacetStore
+    let functionParameters: CompilerBFunctionParameterFacetStore
     let process: CompilerBProcessGraph
     let macroSignatures: CompilerBMacroSignatureFacetStore
     let members: CompilerBMemberFacetStore
+    let environmentSlotsSealed: Bool
     let valid: Bool
     let diagnostic: String
+    let diagnosticStart: Int
 }
 
 enum CompilerBSyntaxRevisionOperation {
@@ -375,7 +405,7 @@ construct CompilerBExpandedMacroRelationshipQueryResult {
     let found: Bool
     let application: SyntaxNodeID
     let environment: SyntaxNodeID
-    let extension: SyntaxNodeID
+    let extensionSyntax: SyntaxNodeID
     let extensionTarget: SyntaxNodeID
     let emission: SyntaxNodeID
     let markerApplication: SyntaxNodeID
@@ -385,10 +415,10 @@ construct CompilerBExpandedMacroRelationshipQueryResult {
 
 
 construct CompilerBSyntaxDeltaStore {
-    let kinds: Buffer<Int>
-    let revisions: Buffer<Int>
-    let identities: Buffer<Int>
-    let counterparts: Buffer<Int>
+    let kinds: IntMany
+    let revisions: IntMany
+    let identities: IntMany
+    let counterparts: IntMany
 }
 
 construct CompilerBSyntaxDelta {

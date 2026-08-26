@@ -6,6 +6,16 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
 BOOTSTRAP="$REPO_ROOT/RangeCompiler/Bootstrap/range"
 ENTRY_SOURCE=""
+BUILD_OUTPUT_DIRECTORY=""
+
+if [[ "${1:-}" == "--build-only" ]]; then
+    if [[ "$#" -ne 2 ]]; then
+        echo "usage: scripts/run-compiler-b-bootstrap --build-only <output-directory>" >&2
+        exit 64
+    fi
+    BUILD_OUTPUT_DIRECTORY="$2"
+    shift 2
+fi
 
 if [[ "${1:-}" == "--entry" ]]; then
     if [[ "$#" -lt 3 ]]; then
@@ -16,10 +26,16 @@ if [[ "${1:-}" == "--entry" ]]; then
     shift 2
 fi
 
+RUN_MODE=""
+if [[ "${1:-}" == "--emit-llvm" || "${1:-}" == "--emit-assembly" ]]; then
+    RUN_MODE="$1"
+    shift
+fi
+
 ROUTE="${1:-}"
 
-if [[ -z "$ROUTE" ]]; then
-    echo "usage: scripts/run-compiler-b-bootstrap [--entry <entry.range>] <route>" >&2
+if [[ -z "$ROUTE" && -z "$BUILD_OUTPUT_DIRECTORY" ]]; then
+    echo "usage: scripts/run-compiler-b-bootstrap [--entry <entry.range>] [--emit-llvm|--emit-assembly] <route>" >&2
     exit 64
 fi
 if [[ -n "$ENTRY_SOURCE" && ! -f "$ENTRY_SOURCE" ]]; then
@@ -28,7 +44,14 @@ if [[ -n "$ENTRY_SOURCE" && ! -f "$ENTRY_SOURCE" ]]; then
 fi
 
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b-bootstrap.XXXXXX")"
-trap 'rm -rf "$WORK_ROOT"' EXIT
+cleanup() {
+    if [[ "${RANGE_KEEP_COMPILER_B_BOOTSTRAP_ROOT:-0}" == "1" ]]; then
+        echo "compiler-b bootstrap root: $WORK_ROOT" >&2
+    else
+        rm -rf "$WORK_ROOT"
+    fi
+}
+trap cleanup EXIT
 BUNDLE="$WORK_ROOT/CompilerBSourceSet.range"
 LLVM="$WORK_ROOT/CompilerB.ll"
 EXECUTABLE="$WORK_ROOT/CompilerB"
@@ -40,17 +63,34 @@ append_source() {
     local logical_path="$2"
     local source_path="$3"
     printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$role" "$logical_path" >> "$BUNDLE"
-    cat "$source_path" >> "$BUNDLE"
+    if [[ "$source_path" == "$B_ROOT/Sources/CompilerB/Main.range" ]]; then
+        sed \
+            -e 's/IntMany/Buffer<Int>/g' \
+            -e 's/ByteMany/Buffer<Byte>/g' \
+            -e '/^macro compilerEntry()/,$d' \
+            "$source_path" >> "$BUNDLE"
+    elif [[ "$source_path" == "$B_ROOT"/Sources/CompilerB/* ]]; then
+        sed \
+            -e 's/IntMany/Buffer<Int>/g' \
+            -e 's/ByteMany/Buffer<Byte>/g' \
+            "$source_path" >> "$BUNDLE"
+    else
+        cat "$source_path" >> "$BUNDLE"
+    fi
     [[ -z "$(tail -c 1 "$source_path")" ]] || printf '\n' >> "$BUNDLE"
 }
 
 while IFS= read -r relative; do
     [[ -n "$relative" ]] || continue
+    if [[ "$relative" == "Projects/RangeCompilerB/Sources/CompilerB/Core/System/Memory/Buffer.range" ]]; then
+        continue
+    fi
     append_source core "$relative" "$REPO_ROOT/$relative"
 done < "$B_ROOT/CompilerCoreSources.txt"
 
 for relative in \
     Projects/RangeCompilerB/Sources/CompilerB/Core/Main.range \
+    Projects/RangeCompilerB/Bootstrap/SeedBufferTransport.range \
     RangeCompiler/Sources/Core/Macro/Extern.range \
     RangeCompiler/Sources/Core/Macro/Link.range \
     RangeCompiler/Sources/Core/Macro/Opaque.range \
@@ -63,6 +103,8 @@ if [[ -n "$ENTRY_SOURCE" ]]; then
     append_source project CompilerB/FocusedEntry.range "$ENTRY_SOURCE"
 else
     append_source project CompilerB/Main.range "$B_ROOT/Sources/CompilerB/Main.range"
+    append_source project CompilerB/SeedEntryTransport.range \
+        "$B_ROOT/Bootstrap/SeedEntryTransport.range"
     append_source project CompilerB/Lexer.range "$B_ROOT/Sources/CompilerB/Lexer.range"
 fi
 
@@ -79,4 +121,22 @@ clang -O0 -fno-lto -Wno-override-module \
     "$B_ROOT/Runtime/RangeRawBuffer.c" \
     -o "$EXECUTABLE"
 
+if [[ -n "$BUILD_OUTPUT_DIRECTORY" ]]; then
+    mkdir -p "$BUILD_OUTPUT_DIRECTORY"
+    cp "$LLVM" "$BUILD_OUTPUT_DIRECTORY/CompilerB.ll"
+    cp "$EXECUTABLE" "$BUILD_OUTPUT_DIRECTORY/CompilerB"
+    exit 0
+fi
+
+if [[ "${RANGE_KEEP_COMPILER_B_BOOTSTRAP_ROOT:-0}" == "1" ]]; then
+    if [[ -n "$RUN_MODE" ]]; then
+        "$EXECUTABLE" "$RUN_MODE" "$ROUTE"
+    else
+        "$EXECUTABLE" "$ROUTE"
+    fi
+    exit $?
+fi
+if [[ -n "$RUN_MODE" ]]; then
+    exec "$EXECUTABLE" "$RUN_MODE" "$ROUTE"
+fi
 exec "$EXECUTABLE" "$ROUTE"

@@ -1,0 +1,11 @@
+macro main(): Void {}
+
+function start(): Void {}
+
+macro app(): Construct -> Void {
+    #environment {
+        @main {
+            start()
+        }
+    }
+}

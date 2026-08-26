@@ -1,0 +1,4 @@
+construct Buffer {
+    @many
+    state values: @type
+}

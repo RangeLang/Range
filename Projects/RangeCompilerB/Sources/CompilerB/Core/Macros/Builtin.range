@@ -1,0 +1,10 @@
+enum BuiltinOperation {
+    case storage
+    case create
+    case write
+    case read
+    case destroy
+    case target
+}
+
+macro builtin(operation: BuiltinOperation: .read): Construct | Function -> Void {}

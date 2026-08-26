@@ -1,0 +1,40 @@
+@syntax {
+    (
+    $parameters
+    )
+    :
+    $input
+    ->
+    $output
+}
+@syntax {
+    (
+    $parameters
+    )
+    :
+    $output
+}
+construct Transformation {
+    @many
+    state parameters: Parameter
+    state input: @syntax?
+    state output: @syntax
+}
+
+@syntax {
+    $macros
+    macro $identity $transformation {
+        $members
+    }
+}
+construct Macro {
+    @many
+    state macros: Macro
+    state identity: Identity
+    state transformation: Transformation
+
+    @many
+    state members: @syntax
+
+    binding environment: Environment
+}

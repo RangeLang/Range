@@ -1,0 +1,40 @@
+function compilerBEnvironmentFilterCountForResolution(
+    source: String,
+    resolveRelationships: Bool
+): Int {
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevisionWithResolution(
+        source: source,
+        resolveRelationships: resolveRelationships
+    ))
+    state count: Int(0 - 1)
+    if revision.valid
+        && revision.macroApplications.syntaxIDs.count > 0
+        && revision.process.locals.syntaxIDs.count > 0 {
+        count: compilerBEnvironmentFilterResultCount(
+            revision: revision,
+            applicationSyntaxID: revision.macroApplications.syntaxIDs.element(index: 0),
+            localSyntaxID: revision.process.locals.syntaxIDs.element(index: 0)
+        )
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 { return 0 - 10 }
+    return count
+}
+
+function compilerBEnvironmentFilterSuspensionEntry(): Int {
+    let openCount: Int(compilerBEnvironmentFilterCountForResolution(
+        source: "macro collectionModifier(): Macro {}\n\nmacro consumer(): Construct -> Void {\n    let modifiers: #environment.filter(for: @collectionModifier)\n    #environment {\n        extension #environment.target.Application {\n            #modifiers\n        }\n    }\n}\n\n@consumer\nconstruct Program {}\n\n@collectionModifier\nmacro first(): Macro {}\n\n@collectionModifier\nmacro second(): Macro {}\n",
+        resolveRelationships: false
+    ))
+    let sealedCount: Int(compilerBEnvironmentFilterCountForResolution(
+        source: "macro collectionModifier(): Macro {}\n\nmacro consumer(): Construct -> Void {\n    let modifiers: #environment.filter(for: @collectionModifier)\n    #environment {\n        extension #environment.target.Application {\n            #modifiers\n        }\n    }\n}\n\n@consumer\nconstruct Program {}\n\n@collectionModifier\nmacro first(): Macro {}\n\n@collectionModifier\nmacro second(): Macro {}\n",
+        resolveRelationships: true
+    ))
+    print(value: "environmentFilter\topen=\(openCount)\tgraphUpdates=\(sealedCount)\n")
+    if openCount != 0 - 2 { return 4 }
+    if sealedCount != 2 { return 5 }
+    return 0
+}
+
+@main {
+    return compilerBEnvironmentFilterSuspensionEntry()
+}

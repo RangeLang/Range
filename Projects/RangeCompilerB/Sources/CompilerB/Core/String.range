@@ -1,6 +1,6 @@
 @builtin(.storage)
 construct String {
-    state bytes: Buffer<Byte>
+    state bytes: ByteMany
 
     derived count: Int {
         stringLength(value: self)

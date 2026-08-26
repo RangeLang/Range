@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
+SOURCE_MANIFEST="$B_ROOT/CompilerSelfHostSources.txt"
+SEED_MANIFEST="$B_ROOT/Bootstrap/SeedManifest.json"
+AUDIT_ONLY=0
+cd "$REPO_ROOT"
+
+if [[ "${1:-}" == "--audit-only" && "$#" -eq 1 ]]; then
+    AUDIT_ONLY=1
+elif [[ "$#" -ne 0 ]]; then
+    echo "usage: scripts/check-compiler-b-self-host [--audit-only]" >&2
+    exit 64
+fi
+
+fail() {
+    echo "compiler-b self-host: $*" >&2
+    exit 1
+}
+
+sha256() {
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+}
+
+manifest_value() {
+    /usr/bin/plutil -extract "$1" raw -o - "$SEED_MANIFEST"
+}
+
+elapsed_start() {
+    /usr/bin/perl -MTime::HiRes=time -e 'printf "%.6f\n", time'
+}
+
+elapsed_finish() {
+    /usr/bin/perl -MTime::HiRes=time -e 'printf "%.6f\n", time - $ARGV[0]' "$1"
+}
+
+[[ -f "$SOURCE_MANIFEST" ]] || fail "missing canonical source manifest"
+[[ -f "$SEED_MANIFEST" ]] || fail "missing frozen seed manifest"
+python3 -m json.tool "$SEED_MANIFEST" >/dev/null \
+    || fail "seed manifest is not valid JSON"
+
+previous=""
+source_count=0
+while IFS= read -r relative; do
+    [[ -n "$relative" ]] || fail "canonical source manifest contains an empty row"
+    [[ "$relative" == Projects/RangeCompilerB/* && "$relative" == *.range ]] \
+        || fail "source is outside Compiler B: $relative"
+    [[ -f "$REPO_ROOT/$relative" ]] || fail "missing canonical source: $relative"
+    if [[ -n "$previous" && "$relative" < "$previous" ]]; then
+        fail "canonical source manifest is not bytewise sorted: $relative"
+    fi
+    [[ "$relative" != *"/Bootstrap/SeedBufferTransport.range" ]] \
+        || fail "seed transport entered the canonical source manifest"
+    previous="$relative"
+    source_count=$((source_count + 1))
+done < "$SOURCE_MANIFEST"
+[[ "$source_count" -gt 0 ]] || fail "canonical source manifest is empty"
+
+if xargs rg -n 'Buffer<' < "$SOURCE_MANIFEST" > /dev/null; then
+    fail "canonical Compiler B source still contains generic Buffer syntax"
+fi
+if xargs rg -n '[A-Za-z_][A-Za-z0-9_]*<' < "$SOURCE_MANIFEST" > /dev/null; then
+    fail "canonical Compiler B source still contains generic type syntax"
+fi
+
+transport_relative="$(manifest_value transport.path)"
+transport_expected="$(manifest_value transport.sha256)"
+[[ "$(sha256 "$REPO_ROOT/$transport_relative")" == "$transport_expected" ]] \
+    || fail "seed Buffer transport hash changed; update and review SeedManifest.json"
+
+entry_transport_relative="$(manifest_value entryTransport.path)"
+entry_transport_expected="$(manifest_value entryTransport.sha256)"
+[[ "$(sha256 "$REPO_ROOT/$entry_transport_relative")" == "$entry_transport_expected" ]] \
+    || fail "seed entry transport hash changed; update and review SeedManifest.json"
+
+accepted_relative="$(manifest_value acceptedCompilerA.path)"
+accepted_expected="$(manifest_value acceptedCompilerA.sha256)"
+[[ "$(sha256 "$REPO_ROOT/$accepted_relative")" == "$accepted_expected" ]] \
+    || fail "accepted Compiler A seed hash does not match the frozen seed manifest"
+
+runtime_count="$(manifest_value runtimeABI.sourceCount)"
+runtime_sources=()
+runtime_index=0
+while [[ "$runtime_index" -lt "$runtime_count" ]]; do
+    runtime_relative="$(manifest_value "runtimeABI.sources.$runtime_index.path")"
+    runtime_expected="$(manifest_value "runtimeABI.sources.$runtime_index.sha256")"
+    [[ "$(sha256 "$REPO_ROOT/$runtime_relative")" == "$runtime_expected" ]] \
+        || fail "frozen runtime input changed: $runtime_relative"
+    runtime_sources+=("$REPO_ROOT/$runtime_relative")
+    runtime_index=$((runtime_index + 1))
+done
+
+echo "compiler-b self-host audit: pass sources=$source_count genericTypes=0"
+if [[ "$AUDIT_ONLY" -eq 1 ]]; then
+    exit 0
+fi
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b-self-host.XXXXXX")"
+trap 'if [[ "${RANGE_KEEP_COMPILER_B_SELF_HOST_ROOT:-0}" == "1" ]]; then echo "compiler-b self-host root: $work_root" >&2; else rm -rf "$work_root"; fi' EXIT
+seed_root="$work_root/seed"
+source_root="$work_root/source"
+candidate_root="$work_root/candidate"
+reproduction_root="$work_root/reproduction"
+mkdir -p "$seed_root" "$source_root" "$candidate_root" "$reproduction_root"
+
+while IFS= read -r relative; do
+    staged_relative="${relative#Projects/RangeCompilerB/}"
+    if [[ "$staged_relative" == "Project.range" ]]; then
+        staged_relative="CompilerProject.range"
+    fi
+    staged="$source_root/$staged_relative"
+    mkdir -p "$(dirname "$staged")"
+    cp "$REPO_ROOT/$relative" "$staged"
+done < "$SOURCE_MANIFEST"
+
+seed_started="$(elapsed_start)"
+"$SCRIPT_DIR/run-compiler-b-bootstrap" --build-only "$seed_root"
+seed_seconds="$(elapsed_finish "$seed_started")"
+
+candidate_started="$(elapsed_start)"
+candidate_status=0
+"$seed_root/CompilerB" --emit-llvm "$source_root" \
+    > "$candidate_root/CompilerB.ll" || candidate_status=$?
+candidate_seconds="$(elapsed_finish "$candidate_started")"
+if [[ "$candidate_status" -ne 0 ]]; then
+    echo "compiler-b self-host boundary: seed B could not lower the canonical manifest" >&2
+    /usr/bin/sed -n '1,120p' "$candidate_root/CompilerB.ll" >&2
+    exit "$candidate_status"
+fi
+
+clang -O0 -fno-lto -Wno-override-module \
+    "$candidate_root/CompilerB.ll" \
+    "${runtime_sources[@]}" \
+    -o "$candidate_root/CompilerB"
+
+reproduction_started="$(elapsed_start)"
+reproduction_status=0
+"$candidate_root/CompilerB" --emit-llvm "$source_root" \
+    > "$reproduction_root/CompilerB.ll" || reproduction_status=$?
+reproduction_seconds="$(elapsed_finish "$reproduction_started")"
+if [[ "$reproduction_status" -ne 0 ]]; then
+    echo "compiler-b self-host boundary: candidate B could not produce reproduction LLVM" >&2
+    /usr/bin/sed -n '1,120p' "$reproduction_root/CompilerB.ll" >&2
+    exit "$reproduction_status"
+fi
+
+clang -O0 -fno-lto -Wno-override-module \
+    "$reproduction_root/CompilerB.ll" \
+    "${runtime_sources[@]}" \
+    -o "$reproduction_root/CompilerB"
+
+cmp "$candidate_root/CompilerB.ll" "$reproduction_root/CompilerB.ll" >/dev/null \
+    || fail "candidate and reproduction LLVM differ"
+cmp "$candidate_root/CompilerB" "$reproduction_root/CompilerB" >/dev/null \
+    || fail "candidate and reproduction executables differ"
+
+fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectLanguageSurface"
+"$candidate_root/CompilerB" "$fixture" > "$candidate_root/fixture.out"
+"$reproduction_root/CompilerB" "$fixture" > "$reproduction_root/fixture.out"
+cmp "$candidate_root/fixture.out" "$reproduction_root/fixture.out" >/dev/null \
+    || fail "candidate and reproduction fixture output differs"
+
+echo "compiler-b self-host: pass"
+echo "compiler-b self-host timing: seedSeconds=$seed_seconds candidateSeconds=$candidate_seconds reproductionSeconds=$reproduction_seconds"

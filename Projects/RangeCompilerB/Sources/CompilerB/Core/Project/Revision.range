@@ -1,0 +1,1087 @@
+construct CompilerBProjectDeclarationStore {
+    let sourceIDs: IntMany
+    let syntaxIDs: IntMany
+    let kindCodes: IntMany
+    let nameStarts: IntMany
+    let nameEnds: IntMany
+    let nameByteStarts: IntMany
+    let nameByteCounts: IntMany
+    let nameBytes: IntMany
+}
+
+construct CompilerBProjectMacroArgumentStore {
+    let sourceIDs: IntMany
+    let applicationSyntaxIDs: IntMany
+    let labelByteStarts: IntMany
+    let labelByteCounts: IntMany
+    let labelBytes: IntMany
+    let valueSourceStarts: IntMany
+    let valueSourceEnds: IntMany
+    let ordinals: IntMany
+}
+
+construct CompilerBProjectMacroApplicationStore {
+    let sourceIDs: IntMany
+    let syntaxIDs: IntMany
+    let declarationSourceIDs: IntMany
+    let declarationSyntaxIDs: IntMany
+    let targetSourceIDs: IntMany
+    let targetSyntaxIDs: IntMany
+    let ordinals: IntMany
+    let rawArgumentSourceStarts: IntMany
+    let rawArgumentSourceEnds: IntMany
+    let arguments: CompilerBProjectMacroArgumentStore
+}
+
+construct CompilerBProjectEmittedMacroBlockStore {
+    let sourceIDs: IntMany
+    let syntaxIDs: IntMany
+    let producerSourceIDs: IntMany
+    let producerApplicationSyntaxIDs: IntMany
+    let declarationSourceIDs: IntMany
+    let declarationSyntaxIDs: IntMany
+    let bodySyntaxIDs: IntMany
+    let identityStarts: IntMany
+    let identityEnds: IntMany
+}
+
+construct CompilerBProjectRevision {
+    let sourcePaths: String
+    let sourceCount: Int
+    let declarations: CompilerBProjectDeclarationStore
+    let macroApplications: CompilerBProjectMacroApplicationStore
+    let emittedMacroBlocks: CompilerBProjectEmittedMacroBlockStore
+    let syntaxGraph: CompilerBSyntaxGraph
+    let syntaxCaptureValues: CompilerBSyntaxCaptureValueGraph
+    let valid: Bool
+    let diagnosticCount: Int
+    let diagnostic: String
+}
+
+function compilerBProjectDeclarationKindFunction(): Int { return 1 }
+function compilerBProjectDeclarationKindConstruct(): Int { return 2 }
+function compilerBProjectDeclarationKindEnum(): Int { return 3 }
+function compilerBProjectDeclarationKindMacro(): Int { return 4 }
+
+function compilerBProjectDeclarationStoreCreate(
+    capacity: Int
+): CompilerBProjectDeclarationStore {
+    return CompilerBProjectDeclarationStore(
+        sourceIDs: bufferCreateInt(capacity: capacity),
+        syntaxIDs: bufferCreateInt(capacity: capacity),
+        kindCodes: bufferCreateInt(capacity: capacity),
+        nameStarts: bufferCreateInt(capacity: capacity),
+        nameEnds: bufferCreateInt(capacity: capacity),
+        nameByteStarts: bufferCreateInt(capacity: capacity),
+        nameByteCounts: bufferCreateInt(capacity: capacity),
+        nameBytes: bufferCreateInt(capacity: capacity)
+    )
+}
+
+function compilerBProjectMacroApplicationStoreCreate(
+    capacity: Int
+): CompilerBProjectMacroApplicationStore {
+    return CompilerBProjectMacroApplicationStore(
+        sourceIDs: bufferCreateInt(capacity: capacity),
+        syntaxIDs: bufferCreateInt(capacity: capacity),
+        declarationSourceIDs: bufferCreateInt(capacity: capacity),
+        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
+        targetSourceIDs: bufferCreateInt(capacity: capacity),
+        targetSyntaxIDs: bufferCreateInt(capacity: capacity),
+        ordinals: bufferCreateInt(capacity: capacity),
+        rawArgumentSourceStarts: bufferCreateInt(capacity: capacity),
+        rawArgumentSourceEnds: bufferCreateInt(capacity: capacity),
+        arguments: compilerBProjectMacroArgumentStoreCreate(capacity: capacity)
+    )
+}
+
+function compilerBProjectMacroArgumentStoreCreate(
+    capacity: Int
+): CompilerBProjectMacroArgumentStore {
+    return CompilerBProjectMacroArgumentStore(
+        sourceIDs: bufferCreateInt(capacity: capacity),
+        applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
+        labelByteStarts: bufferCreateInt(capacity: capacity),
+        labelByteCounts: bufferCreateInt(capacity: capacity),
+        labelBytes: bufferCreateInt(capacity: capacity),
+        valueSourceStarts: bufferCreateInt(capacity: capacity),
+        valueSourceEnds: bufferCreateInt(capacity: capacity),
+        ordinals: bufferCreateInt(capacity: capacity)
+    )
+}
+
+function compilerBProjectEmittedMacroBlockStoreCreate(
+    capacity: Int
+): CompilerBProjectEmittedMacroBlockStore {
+    return CompilerBProjectEmittedMacroBlockStore(
+        sourceIDs: bufferCreateInt(capacity: capacity),
+        syntaxIDs: bufferCreateInt(capacity: capacity),
+        producerSourceIDs: bufferCreateInt(capacity: capacity),
+        producerApplicationSyntaxIDs: bufferCreateInt(capacity: capacity),
+        declarationSourceIDs: bufferCreateInt(capacity: capacity),
+        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
+        bodySyntaxIDs: bufferCreateInt(capacity: capacity),
+        identityStarts: bufferCreateInt(capacity: capacity),
+        identityEnds: bufferCreateInt(capacity: capacity)
+    )
+}
+
+function compilerBProjectDeclarationStoreAppend(
+    store: CompilerBProjectDeclarationStore,
+    sourceID: Int,
+    syntaxID: Int,
+    kindCode: Int,
+    source: String,
+    nameStart: Int,
+    nameEnd: Int
+): Int {
+    if store.sourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if store.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
+    if store.kindCodes.append(element: kindCode) != 0 { return 0 - 1 }
+    if store.nameStarts.append(element: nameStart) != 0 { return 0 - 1 }
+    if store.nameEnds.append(element: nameEnd) != 0 { return 0 - 1 }
+    if store.nameByteStarts.append(element: store.nameBytes.count) != 0 {
+        return 0 - 1
+    }
+    if store.nameByteCounts.append(element: nameEnd - nameStart) != 0 {
+        return 0 - 1
+    }
+    state cursor: Int(nameStart)
+    while cursor < nameEnd {
+        if store.nameBytes.append(element: source.byte(index: cursor)) != 0 {
+            return 0 - 1
+        }
+        cursor: cursor + 1
+    }
+    return 0
+}
+
+function compilerBProjectMacroApplicationStoreAppend(
+    store: CompilerBProjectMacroApplicationStore,
+    sourceID: Int,
+    syntaxID: Int,
+    declarationSourceID: Int,
+    declarationSyntaxID: Int,
+    targetSyntaxID: Int,
+    rawArgumentSourceStart: Int,
+    rawArgumentSourceEnd: Int,
+    ordinal: Int
+): Int {
+    if store.sourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if store.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
+    if store.declarationSourceIDs.append(element: declarationSourceID) != 0 {
+        return 0 - 1
+    }
+    if store.declarationSyntaxIDs.append(element: declarationSyntaxID) != 0 {
+        return 0 - 1
+    }
+    if store.targetSourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if store.targetSyntaxIDs.append(element: targetSyntaxID) != 0 { return 0 - 1 }
+    if store.rawArgumentSourceStarts.append(
+        element: rawArgumentSourceStart
+    ) != 0 { return 0 - 1 }
+    if store.rawArgumentSourceEnds.append(
+        element: rawArgumentSourceEnd
+    ) != 0 { return 0 - 1 }
+    return store.ordinals.append(element: ordinal)
+}
+
+function compilerBProjectEmittedMacroBlockStoreAppend(
+    store: CompilerBProjectEmittedMacroBlockStore,
+    sourceID: Int,
+    syntaxID: Int,
+    producerSourceID: Int,
+    producerApplicationSyntaxID: Int,
+    declarationSourceID: Int,
+    declarationSyntaxID: Int,
+    bodySyntaxID: Int,
+    identityStart: Int,
+    identityEnd: Int
+): Int {
+    if store.sourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if store.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
+    if store.producerSourceIDs.append(element: producerSourceID) != 0 {
+        return 0 - 1
+    }
+    if store.producerApplicationSyntaxIDs.append(
+        element: producerApplicationSyntaxID
+    ) != 0 { return 0 - 1 }
+    if store.declarationSourceIDs.append(element: declarationSourceID) != 0 {
+        return 0 - 1
+    }
+    if store.declarationSyntaxIDs.append(element: declarationSyntaxID) != 0 {
+        return 0 - 1
+    }
+    if store.bodySyntaxIDs.append(element: bodySyntaxID) != 0 { return 0 - 1 }
+    if store.identityStarts.append(element: identityStart) != 0 { return 0 - 1 }
+    return store.identityEnds.append(element: identityEnd)
+}
+
+function compilerBProjectMacroArgumentStoreAppend(
+    store: CompilerBProjectMacroArgumentStore,
+    sourceID: Int,
+    applicationSyntaxID: Int,
+    source: String,
+    labelStart: Int,
+    labelEnd: Int,
+    valueStart: Int,
+    valueEnd: Int,
+    ordinal: Int
+): Int {
+    if store.sourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if store.applicationSyntaxIDs.append(element: applicationSyntaxID) != 0 {
+        return 0 - 1
+    }
+    if store.labelByteStarts.append(element: store.labelBytes.count) != 0 {
+        return 0 - 1
+    }
+    if store.labelByteCounts.append(element: labelEnd - labelStart) != 0 {
+        return 0 - 1
+    }
+    state cursor: Int(labelStart)
+    while cursor < labelEnd {
+        if store.labelBytes.append(element: source.byte(index: cursor)) != 0 {
+            return 0 - 1
+        }
+        cursor: cursor + 1
+    }
+    if store.valueSourceStarts.append(element: valueStart) != 0 { return 0 - 1 }
+    if store.valueSourceEnds.append(element: valueEnd) != 0 { return 0 - 1 }
+    return store.ordinals.append(element: ordinal)
+}
+
+function compilerBProjectDeclarationStoreDestroy(
+    store: CompilerBProjectDeclarationStore
+): Int {
+    state status: Int(0)
+    if store.sourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.kindCodes.destroy() != 0 { status: 0 - 1 }
+    if store.nameStarts.destroy() != 0 { status: 0 - 1 }
+    if store.nameEnds.destroy() != 0 { status: 0 - 1 }
+    if store.nameByteStarts.destroy() != 0 { status: 0 - 1 }
+    if store.nameByteCounts.destroy() != 0 { status: 0 - 1 }
+    if store.nameBytes.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBProjectMacroApplicationStoreDestroy(
+    store: CompilerBProjectMacroApplicationStore
+): Int {
+    state status: Int(0)
+    if store.sourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.targetSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.targetSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.ordinals.destroy() != 0 { status: 0 - 1 }
+    if store.rawArgumentSourceStarts.destroy() != 0 { status: 0 - 1 }
+    if store.rawArgumentSourceEnds.destroy() != 0 { status: 0 - 1 }
+    if compilerBProjectMacroArgumentStoreDestroy(store: store.arguments) != 0 {
+        status: 0 - 1
+    }
+    return status
+}
+
+function compilerBProjectEmittedMacroBlockStoreDestroy(
+    store: CompilerBProjectEmittedMacroBlockStore
+): Int {
+    state status: Int(0)
+    if store.sourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.producerSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.producerApplicationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.bodySyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.identityStarts.destroy() != 0 { status: 0 - 1 }
+    if store.identityEnds.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBProjectMacroArgumentStoreDestroy(
+    store: CompilerBProjectMacroArgumentStore
+): Int {
+    state status: Int(0)
+    if store.sourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.applicationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.labelByteStarts.destroy() != 0 { status: 0 - 1 }
+    if store.labelByteCounts.destroy() != 0 { status: 0 - 1 }
+    if store.labelBytes.destroy() != 0 { status: 0 - 1 }
+    if store.valueSourceStarts.destroy() != 0 { status: 0 - 1 }
+    if store.valueSourceEnds.destroy() != 0 { status: 0 - 1 }
+    if store.ordinals.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBProjectAppendDeclarations(
+    store: CompilerBProjectDeclarationStore,
+    sourceID: Int,
+    revision: CompilerBSyntaxRevision,
+    declarations: CompilerBDeclarationFacetStore,
+    kindCode: Int
+): Int {
+    state row: Int(0)
+    while row < declarations.syntaxIDs.count {
+        let identity: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: declarations.identityTokenIDs.element(index: row))
+        ))
+        if compilerBProjectDeclarationStoreAppend(
+            store: store,
+            sourceID: sourceID,
+            syntaxID: declarations.syntaxIDs.element(index: row),
+            kindCode: kindCode,
+            source: revision.source,
+            nameStart: identity.start,
+            nameEnd: identity.end
+        ) != 0 { return 0 - 1 }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerBProjectDeclarationName(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    row: Int
+): String {
+    let sourceID: Int(declarations.sourceIDs.element(index: row))
+    let sourcePath: String(compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    ))
+    let source: String(fileManagerReadFile(path: sourcePath))
+    return source.substring(
+        start: declarations.nameStarts.element(index: row),
+        end: declarations.nameEnds.element(index: row)
+    )
+}
+
+function compilerBProjectMacroDeclarationRowForToken(
+    declarations: CompilerBProjectDeclarationStore,
+    source: String,
+    token: CompilerBToken
+): Int {
+    state matchRow: Int(0 - 1)
+    state matchCount: Int(0)
+    state row: Int(0)
+    while row < declarations.syntaxIDs.count {
+        if declarations.kindCodes.element(index: row)
+            == compilerBProjectDeclarationKindMacro() {
+            let nameByteCount: Int(declarations.nameByteCounts.element(index: row))
+            if nameByteCount == token.end - token.start {
+                let nameByteStart: Int(declarations.nameByteStarts.element(index: row))
+                state offset: Int(0)
+                state matches: Bool(true)
+                while offset < nameByteCount && matches {
+                    if declarations.nameBytes.element(index: nameByteStart + offset)
+                        != source.byte(index: token.start + offset) {
+                        matches: false
+                    }
+                    offset: offset + 1
+                }
+                if matches {
+                    matchRow: row
+                    matchCount: matchCount + 1
+                }
+            }
+        }
+        row: row + 1
+    }
+    if matchCount == 1 { return matchRow }
+    if matchCount == 0 { return 0 - 1 }
+    return 0 - 2
+}
+
+function compilerBProjectReportSyntaxDiagnostics(sourcePaths: String): Int {
+    state reported: Int(0)
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    state sourceID: Int(0)
+    while sourceID < sourceCount {
+        let sourcePath: String(compilerBSourceSetPathAt(
+            paths: sourcePaths,
+            index: sourceID
+        ))
+        let source: String(fileManagerReadFile(path: sourcePath))
+        let revision: CompilerBSyntaxRevision(
+            compilerBParseSyntaxRevisionWithResolution(
+                source: source,
+                resolveRelationships: false
+            )
+        )
+        if !revision.valid {
+            state line: Int(1)
+            state column: Int(1)
+            state scan: Int(0)
+            while scan < revision.source.count && scan < revision.diagnosticStart {
+                if revision.source.byte(index: scan) == 10 {
+                    line: line + 1
+                    column: 1
+                } else {
+                    column: column + 1
+                }
+                scan: scan + 1
+            }
+            print(value: "\(sourcePath):\(line):\(column): \(revision.diagnostic)\n")
+            reported: reported + 1
+        }
+        if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
+            print(value: "\(sourcePath): unable to release parsed revision\n")
+        }
+        sourceID: sourceID + 1
+    }
+    return reported
+}
+
+function compilerBProjectReportResolutionDiagnostics(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore
+): Int {
+    state reported: Int(0)
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    state sourceID: Int(0)
+    while sourceID < sourceCount {
+        let sourcePath: String(compilerBSourceSetPathAt(
+            paths: sourcePaths,
+            index: sourceID
+        ))
+        let source: String(fileManagerReadFile(path: sourcePath))
+        let revision: CompilerBSyntaxRevision(
+            compilerBParseSyntaxRevisionWithResolution(
+                source: source,
+                resolveRelationships: false
+            )
+        )
+        state applicationRow: Int(0)
+        while applicationRow < revision.macroApplications.syntaxIDs.count {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.macroApplications.identityTokenIDs.element(
+                    index: applicationRow
+                ))
+            ))
+            let declarationRow: Int(compilerBProjectMacroDeclarationRowForToken(
+                declarations: declarations,
+                source: revision.source,
+                token: identity
+            ))
+            if declarationRow < 0 {
+                state message: String("macro application does not match any declaration")
+                if declarationRow == 0 - 2 {
+                    message: "macro application resolves to multiple declarations"
+                }
+                state line: Int(1)
+                state column: Int(1)
+                state scan: Int(0)
+                while scan < revision.source.count && scan < identity.start {
+                    if revision.source.byte(index: scan) == 10 {
+                        line: line + 1
+                        column: 1
+                    } else {
+                        column: column + 1
+                    }
+                    scan: scan + 1
+                }
+                print(value: "\(sourcePath):\(line):\(column): \(message)\n")
+                reported: reported + 1
+            }
+            applicationRow: applicationRow + 1
+        }
+        if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
+            print(value: "\(sourcePath): unable to release parsed revision\n")
+        }
+        sourceID: sourceID + 1
+    }
+    return reported
+}
+
+function compilerBProjectCollectSourceDeclarations(
+    sourcePaths: String,
+    sourceID: Int,
+    declarations: CompilerBProjectDeclarationStore
+): Int {
+    let sourcePath: String(compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    ))
+    let source: String(fileManagerReadFile(path: sourcePath))
+    let revision: CompilerBSyntaxRevision(
+        compilerBParseSyntaxRevisionWithResolution(
+            source: source,
+            resolveRelationships: false
+        )
+    )
+    state status: Int(0)
+    if !revision.valid { status: 0 - 2 }
+    if status == 0 {
+        status: compilerBProjectAppendDeclarations(
+            store: declarations,
+            sourceID: sourceID,
+            revision: revision,
+            declarations: revision.functionDeclarations,
+            kindCode: compilerBProjectDeclarationKindFunction()
+        )
+    }
+    if status == 0 {
+        status: compilerBProjectAppendDeclarations(
+            store: declarations,
+            sourceID: sourceID,
+            revision: revision,
+            declarations: revision.constructDeclarations,
+            kindCode: compilerBProjectDeclarationKindConstruct()
+        )
+    }
+    if status == 0 {
+        status: compilerBProjectAppendDeclarations(
+            store: declarations,
+            sourceID: sourceID,
+            revision: revision,
+            declarations: revision.enumDeclarations,
+            kindCode: compilerBProjectDeclarationKindEnum()
+        )
+    }
+    if status == 0 {
+        status: compilerBProjectAppendDeclarations(
+            store: declarations,
+            sourceID: sourceID,
+            revision: revision,
+            declarations: revision.macroDeclarations,
+            kindCode: compilerBProjectDeclarationKindMacro()
+        )
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 && status == 0 {
+        status: 0 - 3
+    }
+    return status
+}
+
+function compilerBProjectResolveSourceMacroApplications(
+    sourcePaths: String,
+    sourceID: Int,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore
+): Int {
+    let sourcePath: String(compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    ))
+    let source: String(fileManagerReadFile(path: sourcePath))
+    let revision: CompilerBSyntaxRevision(
+        compilerBParseSyntaxRevisionWithResolution(
+            source: source,
+            resolveRelationships: false
+        )
+    )
+    state status: Int(0)
+    if !revision.valid { status: 0 - 2 }
+    state applicationRow: Int(0)
+    while applicationRow < revision.macroApplications.syntaxIDs.count && status == 0 {
+        let identity: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: revision.macroApplications.identityTokenIDs.element(
+                index: applicationRow
+            ))
+        ))
+        let declarationRow: Int(compilerBProjectMacroDeclarationRowForToken(
+            declarations: declarations,
+            source: revision.source,
+            token: identity
+        ))
+        if declarationRow < 0 {
+            status: declarationRow - 10
+        } else {
+            let rawFirstTokenID: Int(
+                revision.macroApplications.firstArgumentTokenIDs.element(
+                    index: applicationRow
+                )
+            )
+            let rawAfterLastTokenID: Int(
+                revision.macroApplications.afterLastArgumentTokenIDs.element(
+                    index: applicationRow
+                )
+            )
+            state rawArgumentSourceStart: Int(0)
+            state rawArgumentSourceEnd: Int(0)
+            if rawFirstTokenID < rawAfterLastTokenID {
+                let rawFirst: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: rawFirstTokenID)
+                ))
+                let rawLast: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: rawAfterLastTokenID - 1)
+                ))
+                rawArgumentSourceStart: rawFirst.start
+                rawArgumentSourceEnd: rawLast.end
+            }
+            status: compilerBProjectMacroApplicationStoreAppend(
+                store: applications,
+                sourceID: sourceID,
+                syntaxID: revision.macroApplications.syntaxIDs.element(index: applicationRow),
+                declarationSourceID: declarations.sourceIDs.element(index: declarationRow),
+                declarationSyntaxID: declarations.syntaxIDs.element(index: declarationRow),
+                targetSyntaxID: revision.macroApplications.targetSyntaxIDs.element(
+                    index: applicationRow
+                ),
+                rawArgumentSourceStart: rawArgumentSourceStart,
+                rawArgumentSourceEnd: rawArgumentSourceEnd,
+                ordinal: revision.macroApplications.ordinals.element(index: applicationRow)
+            )
+            state argumentRow: Int(0)
+            state retainedArgument: Bool(false)
+            while argumentRow
+                < revision.macroApplications.argumentApplicationSyntaxIDs.count
+                && status == 0 {
+                if revision.macroApplications.argumentApplicationSyntaxIDs.element(
+                    index: argumentRow
+                ) == revision.macroApplications.syntaxIDs.element(index: applicationRow) {
+                    retainedArgument: true
+                    let expressionSyntaxID: Int(
+                        revision.macroApplications.argumentValueExpressionSyntaxIDs.element(
+                            index: argumentRow
+                        )
+                    )
+                    let expressionRow: Int(compilerBFacetRowForSyntaxID(
+                        syntaxIDs: revision.process.expressions.syntaxIDs,
+                        syntaxID: expressionSyntaxID
+                    ))
+                    if expressionRow >= 0 {
+                        state labelStart: Int(0)
+                        state labelEnd: Int(0)
+                        let labelTokenID: Int(
+                            revision.macroApplications.argumentLabelTokenIDs.element(
+                                index: argumentRow
+                            )
+                        )
+                        if labelTokenID >= 0 {
+                            let label: CompilerBToken(compilerBRetainedToken(
+                                store: revision.tokens,
+                                id: TokenID(value: labelTokenID)
+                            ))
+                            labelStart: label.start
+                            labelEnd: label.end
+                        }
+                        let firstValue: CompilerBToken(compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: revision.process.expressions.firstTokenIDs.element(
+                                index: expressionRow
+                            ))
+                        ))
+                        let afterLastValueTokenID: Int(
+                            revision.process.expressions.afterLastTokenIDs.element(
+                                index: expressionRow
+                            )
+                        )
+                        let lastValue: CompilerBToken(compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: afterLastValueTokenID - 1)
+                        ))
+                        state valueStart: Int(firstValue.start)
+                        state valueEnd: Int(lastValue.end)
+                        if revision.process.expressions.kindCodes.element(index: expressionRow)
+                            == compilerBParserExpressionKindStringCode()
+                            && valueEnd - valueStart >= 2 {
+                            valueStart: valueStart + 1
+                            valueEnd: valueEnd - 1
+                        }
+                        status: compilerBProjectMacroArgumentStoreAppend(
+                            store: applications.arguments,
+                            sourceID: sourceID,
+                            applicationSyntaxID: revision.macroApplications.syntaxIDs.element(
+                                index: applicationRow
+                            ),
+                            source: revision.source,
+                            labelStart: labelStart,
+                            labelEnd: labelEnd,
+                            valueStart: valueStart,
+                            valueEnd: valueEnd,
+                            ordinal: revision.macroApplications.argumentOrdinals.element(
+                                index: argumentRow
+                            )
+                        )
+                    }
+                }
+                argumentRow: argumentRow + 1
+            }
+            if !retainedArgument && status == 0 {
+                let firstTokenID: Int(
+                    revision.macroApplications.firstArgumentTokenIDs.element(
+                        index: applicationRow
+                    )
+                )
+                let afterLastTokenID: Int(
+                    revision.macroApplications.afterLastArgumentTokenIDs.element(
+                        index: applicationRow
+                    )
+                )
+                if firstTokenID < afterLastTokenID {
+                    let first: CompilerBToken(compilerBRetainedToken(
+                        store: revision.tokens,
+                        id: TokenID(value: firstTokenID)
+                    ))
+                    let last: CompilerBToken(compilerBRetainedToken(
+                        store: revision.tokens,
+                        id: TokenID(value: afterLastTokenID - 1)
+                    ))
+                    status: compilerBProjectMacroArgumentStoreAppend(
+                        store: applications.arguments,
+                        sourceID: sourceID,
+                        applicationSyntaxID: revision.macroApplications.syntaxIDs.element(
+                            index: applicationRow
+                        ),
+                        source: revision.source,
+                        labelStart: 0,
+                        labelEnd: 0,
+                        valueStart: first.start,
+                        valueEnd: last.end,
+                        ordinal: 0
+                    )
+                }
+            }
+        }
+        applicationRow: applicationRow + 1
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 && status == 0 {
+        status: 0 - 3
+    }
+    return status
+}
+
+function compilerBProjectEnvironmentOwnerForNode(
+    revision: CompilerBSyntaxRevision,
+    syntaxID: Int
+): Int {
+    let nodeRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.environmentNodes.syntaxIDs,
+        syntaxID: syntaxID
+    ))
+    if nodeRow < 0 { return 0 - 1 }
+    let environmentSyntaxID: Int(
+        revision.process.environmentNodes.environmentSyntaxIDs.element(index: nodeRow)
+    )
+    let environmentRow: Int(compilerBFacetRowForSyntaxID(
+        syntaxIDs: revision.process.environments.syntaxIDs,
+        syntaxID: environmentSyntaxID
+    ))
+    if environmentRow < 0 { return 0 - 1 }
+    return revision.process.environments.ownerDeclarationSyntaxIDs.element(
+        index: environmentRow
+    )
+}
+
+function compilerBProjectMacroEnvironmentCount(
+    revision: CompilerBSyntaxRevision,
+    macroDeclarationSyntaxID: Int
+): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.environments.syntaxIDs.count {
+        if revision.process.environments.ownerDeclarationSyntaxIDs.element(index: row)
+            == macroDeclarationSyntaxID { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBProjectAttachedMacroApplicationCount(
+    applications: CompilerBProjectMacroApplicationStore,
+    declarationSourceID: Int,
+    declarationSyntaxID: Int
+): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < applications.syntaxIDs.count {
+        if applications.declarationSourceIDs.element(index: row)
+                == declarationSourceID
+            && applications.declarationSyntaxIDs.element(index: row)
+                == declarationSyntaxID
+            && applications.targetSyntaxIDs.element(index: row) >= 0 {
+            count: count + 1
+        }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBProjectDeriveSourceEmittedMacroBlocks(
+    sourcePaths: String,
+    sourceID: Int,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore,
+    emittedMacroBlocks: CompilerBProjectEmittedMacroBlockStore
+): Int {
+    let sourcePath: String(compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    ))
+    let source: String(fileManagerReadFile(path: sourcePath))
+    let revision: CompilerBSyntaxRevision(
+        compilerBParseSyntaxRevisionWithResolution(
+            source: source,
+            resolveRelationships: false
+        )
+    )
+    state status: Int(0)
+    if !revision.valid { status: 0 - 2 }
+    state emittedRow: Int(0)
+    while emittedRow < revision.process.emittedMacroBlocks.syntaxIDs.count
+        && status == 0 {
+        let emittedSyntaxID: Int(
+            revision.process.emittedMacroBlocks.syntaxIDs.element(index: emittedRow)
+        )
+        let ownerMacroSyntaxID: Int(compilerBProjectEnvironmentOwnerForNode(
+            revision: revision,
+            syntaxID: emittedSyntaxID
+        ))
+        let producerCount: Int(compilerBProjectAttachedMacroApplicationCount(
+            applications: applications,
+            declarationSourceID: sourceID,
+            declarationSyntaxID: ownerMacroSyntaxID
+        ))
+        if ownerMacroSyntaxID < 0 {
+            status: 0 - 3
+        } else if producerCount > 0 && compilerBProjectMacroEnvironmentCount(
+            revision: revision,
+            macroDeclarationSyntaxID: ownerMacroSyntaxID
+        ) != 1 {
+            status: 0 - 4
+        } else if producerCount > 0 {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.process.emittedMacroBlocks.identityTokenIDs.element(
+                    index: emittedRow
+                ))
+            ))
+            let emittedDeclarationRow: Int(compilerBProjectMacroDeclarationRowForToken(
+                declarations: declarations,
+                source: revision.source,
+                token: identity
+            ))
+            if emittedDeclarationRow < 0 {
+                status: emittedDeclarationRow - 10
+            } else {
+                state producerRow: Int(0)
+                while producerRow < applications.syntaxIDs.count && status == 0 {
+                    if applications.declarationSourceIDs.element(index: producerRow)
+                            == sourceID
+                        && applications.declarationSyntaxIDs.element(index: producerRow)
+                            == ownerMacroSyntaxID
+                        && applications.targetSyntaxIDs.element(index: producerRow) >= 0 {
+                        status: compilerBProjectEmittedMacroBlockStoreAppend(
+                            store: emittedMacroBlocks,
+                            sourceID: sourceID,
+                            syntaxID: emittedSyntaxID,
+                            producerSourceID: applications.sourceIDs.element(
+                                index: producerRow
+                            ),
+                            producerApplicationSyntaxID: applications.syntaxIDs.element(
+                                index: producerRow
+                            ),
+                            declarationSourceID: declarations.sourceIDs.element(
+                                index: emittedDeclarationRow
+                            ),
+                            declarationSyntaxID: declarations.syntaxIDs.element(
+                                index: emittedDeclarationRow
+                            ),
+                            bodySyntaxID: revision.process.emittedMacroBlocks.bodySyntaxIDs.element(
+                                index: emittedRow
+                            ),
+                            identityStart: identity.start,
+                            identityEnd: identity.end
+                        )
+                    }
+                    producerRow: producerRow + 1
+                }
+            }
+        }
+        emittedRow: emittedRow + 1
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 && status == 0 {
+        status: 0 - 5
+    }
+    return status
+}
+
+function compilerBPopulateProjectRevision(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore,
+    emittedMacroBlocks: CompilerBProjectEmittedMacroBlockStore,
+    syntaxGraph: CompilerBSyntaxGraph
+): Int {
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    if sourceCount == 0 { return 1 }
+    state syntaxFailures: Int(0)
+    state sourceID: Int(0)
+    while sourceID < sourceCount {
+        if compilerBProjectCollectSourceDeclarations(
+            sourcePaths: sourcePaths,
+            sourceID: sourceID,
+            declarations: declarations
+        ) != 0 {
+            syntaxFailures: syntaxFailures + 1
+        }
+        sourceID: sourceID + 1
+    }
+    if syntaxFailures != 0 { return syntaxFailures }
+    state resolutionFailures: Int(0)
+    sourceID: 0
+    while sourceID < sourceCount {
+        if compilerBProjectResolveSourceMacroApplications(
+            sourcePaths: sourcePaths,
+            sourceID: sourceID,
+            declarations: declarations,
+            applications: applications
+        ) != 0 {
+            resolutionFailures: resolutionFailures + 1
+        }
+        sourceID: sourceID + 1
+    }
+    if resolutionFailures != 0 { return resolutionFailures }
+    if compilerBDeriveSyntaxGraph(
+        graph: syntaxGraph,
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        applications: applications
+    ) != 0 { return 1 }
+    state derivationFailures: Int(0)
+    sourceID: 0
+    while sourceID < sourceCount {
+        if compilerBProjectDeriveSourceEmittedMacroBlocks(
+            sourcePaths: sourcePaths,
+            sourceID: sourceID,
+            declarations: declarations,
+            applications: applications,
+            emittedMacroBlocks: emittedMacroBlocks
+        ) != 0 {
+            derivationFailures: derivationFailures + 1
+        }
+        sourceID: sourceID + 1
+    }
+    return derivationFailures
+}
+
+function compilerBProjectRevisionCreate(route: String): CompilerBProjectRevision {
+    let sourcePaths: String(compilerBDiscoverProjectSourcePaths(route: route))
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    let declarations: CompilerBProjectDeclarationStore(
+        compilerBProjectDeclarationStoreCreate(capacity: sourceCount * 32)
+    )
+    let applications: CompilerBProjectMacroApplicationStore(
+        compilerBProjectMacroApplicationStoreCreate(capacity: sourceCount * 32)
+    )
+    let emittedMacroBlocks: CompilerBProjectEmittedMacroBlockStore(
+        compilerBProjectEmittedMacroBlockStoreCreate(capacity: sourceCount * 4)
+    )
+    let syntaxGraph: CompilerBSyntaxGraph(
+        compilerBSyntaxGraphCreate(capacity: sourceCount * 8)
+    )
+    state failures: Int(compilerBPopulateProjectRevision(
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        applications: applications,
+        emittedMacroBlocks: emittedMacroBlocks,
+        syntaxGraph: syntaxGraph
+    ))
+    let syntaxCaptureValues: CompilerBSyntaxCaptureValueGraph(
+        compilerBDeriveSyntaxCaptureValues(
+            graph: syntaxGraph,
+            applications: applications
+        )
+    )
+    if compilerBValidateSyntaxCaptureCardinalities(
+        graph: syntaxGraph,
+        values: syntaxCaptureValues
+    ) != 0 {
+        failures: failures + 1
+    }
+    if compilerBValidateSyntaxCaptureIdentities(
+        graph: syntaxGraph,
+        values: syntaxCaptureValues,
+        sourcePaths: sourcePaths,
+        declarations: declarations
+    ) != 0 {
+        failures: failures + 1
+    }
+    state diagnostics: String("")
+    if failures != 0 {
+        let reported: Int(compilerBProjectReportSyntaxDiagnostics(sourcePaths: sourcePaths))
+        if reported == 0 {
+            let resolved: Int(compilerBProjectReportResolutionDiagnostics(
+                sourcePaths: sourcePaths,
+                declarations: declarations
+            ))
+            if resolved == 0 && syntaxGraph.diagnosticCodes.count == 0 {
+                diagnostics.append(text: "unable to compose project revision\n")
+            }
+        }
+    }
+    return CompilerBProjectRevision(
+        sourcePaths: sourcePaths,
+        sourceCount: sourceCount,
+        declarations: declarations,
+        macroApplications: applications,
+        emittedMacroBlocks: emittedMacroBlocks,
+        syntaxGraph: syntaxGraph,
+        syntaxCaptureValues: syntaxCaptureValues,
+        valid: failures == 0,
+        diagnosticCount: failures,
+        diagnostic: diagnostics
+    )
+}
+
+function compilerBProjectRevisionDestroy(revision: CompilerBProjectRevision): Int {
+    state status: Int(0)
+    if compilerBSyntaxCaptureValueGraphDestroy(
+        values: revision.syntaxCaptureValues
+    ) != 0 { status: 0 - 1 }
+    if compilerBSyntaxGraphDestroy(graph: revision.syntaxGraph) != 0 {
+        status: 0 - 1
+    }
+    if compilerBProjectEmittedMacroBlockStoreDestroy(
+        store: revision.emittedMacroBlocks
+    ) != 0 { status: 0 - 1 }
+    if compilerBProjectMacroApplicationStoreDestroy(
+        store: revision.macroApplications
+    ) != 0 { status: 0 - 1 }
+    if compilerBProjectDeclarationStoreDestroy(
+        store: revision.declarations
+    ) != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBRenderProjectRevision(revision: CompilerBProjectRevision): String {
+    state output: String("")
+    state declarationRow: Int(0)
+    while declarationRow < revision.declarations.syntaxIDs.count {
+        output.append(text: "projectDeclaration\tsource=\(revision.declarations.sourceIDs.element(index: declarationRow))\tsyntax=\(revision.declarations.syntaxIDs.element(index: declarationRow))\tkind=\(revision.declarations.kindCodes.element(index: declarationRow))\tname=\(compilerBProjectDeclarationName(sourcePaths: revision.sourcePaths, declarations: revision.declarations, row: declarationRow))\n")
+        declarationRow: declarationRow + 1
+    }
+    state applicationRow: Int(0)
+    while applicationRow < revision.macroApplications.syntaxIDs.count {
+        output.append(text: "projectMacroApplication\tsource=\(revision.macroApplications.sourceIDs.element(index: applicationRow))\tsyntax=\(revision.macroApplications.syntaxIDs.element(index: applicationRow))\tdeclarationSource=\(revision.macroApplications.declarationSourceIDs.element(index: applicationRow))\tdeclaration=\(revision.macroApplications.declarationSyntaxIDs.element(index: applicationRow))\ttargetSource=\(revision.macroApplications.targetSourceIDs.element(index: applicationRow))\ttarget=\(revision.macroApplications.targetSyntaxIDs.element(index: applicationRow))\tordinal=\(revision.macroApplications.ordinals.element(index: applicationRow))\n")
+        applicationRow: applicationRow + 1
+    }
+    state emittedRow: Int(0)
+    while emittedRow < revision.emittedMacroBlocks.syntaxIDs.count {
+        let sourceID: Int(revision.emittedMacroBlocks.sourceIDs.element(index: emittedRow))
+        let sourcePath: String(compilerBSourceSetPathAt(
+            paths: revision.sourcePaths,
+            index: sourceID
+        ))
+        let source: String(fileManagerReadFile(path: sourcePath))
+        output.append(text: "projectEmittedMacroBlock\tsource=\(sourceID)\tsyntax=\(revision.emittedMacroBlocks.syntaxIDs.element(index: emittedRow))\tproducerSource=\(revision.emittedMacroBlocks.producerSourceIDs.element(index: emittedRow))\tproducerApplication=\(revision.emittedMacroBlocks.producerApplicationSyntaxIDs.element(index: emittedRow))\tname=\(source.substring(start: revision.emittedMacroBlocks.identityStarts.element(index: emittedRow), end: revision.emittedMacroBlocks.identityEnds.element(index: emittedRow)))\tdeclarationSource=\(revision.emittedMacroBlocks.declarationSourceIDs.element(index: emittedRow))\tdeclaration=\(revision.emittedMacroBlocks.declarationSyntaxIDs.element(index: emittedRow))\tbody=\(revision.emittedMacroBlocks.bodySyntaxIDs.element(index: emittedRow))\n")
+        emittedRow: emittedRow + 1
+    }
+    output.append(text: compilerBRenderSyntaxGraph(
+        graph: revision.syntaxGraph,
+        captureValues: revision.syntaxCaptureValues,
+        sourcePaths: revision.sourcePaths,
+        declarations: revision.declarations
+    ))
+    output.append(text: revision.diagnostic)
+    output.append(text: "projectSyntax\tvalid=\(revision.valid)\tfailures=\(revision.diagnosticCount)\n")
+    return output
+}

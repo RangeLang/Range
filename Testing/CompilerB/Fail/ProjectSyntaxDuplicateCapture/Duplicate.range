@@ -1,0 +1,6 @@
+@syntax($macros duplicate $identifier : $identifier)
+@storage(.immutable)
+construct Duplicate {
+    let macros: Syntax
+    let identifier: Syntax
+}

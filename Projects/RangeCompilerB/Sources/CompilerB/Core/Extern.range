@@ -1,1 +1,2 @@
-macro extern(): Function {}
+macro extern(symbol: String: ""): Function {}
+macro framework(name: String): Function {}

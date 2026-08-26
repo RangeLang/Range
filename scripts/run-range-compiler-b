@@ -2,5 +2,34 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-exec "$SCRIPT_DIR/check-range-compiler-b"
+command="${1:-check}"
+if [[ "$command" == "check" && "$#" -le 1 ]]; then
+    exec "$SCRIPT_DIR/check-range-compiler-b"
+fi
+if [[ "$command" == "--emit-assembly" && "$#" -eq 2 ]]; then
+    exec "$SCRIPT_DIR/run-compiler-b-bootstrap" --emit-assembly "$2"
+fi
+if [[ "$command" != "run" || "$#" -lt 2 ]]; then
+    echo "usage: scripts/range compiler b [check|--emit-assembly <project>|run <project> [-- args...]]" >&2
+    exit 64
+fi
+
+project="$2"
+shift 2
+if [[ "${1:-}" == "--" ]]; then shift; fi
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b-run.XXXXXX")"
+cleanup() {
+    if [[ "${RANGE_KEEP_COMPILER_B_RUN_ROOT:-0}" == "1" ]]; then
+        echo "compiler-b run root: $work_root" >&2
+    else
+        rm -rf "$work_root"
+    fi
+}
+trap cleanup EXIT
+assembly="$work_root/Program.s"
+executable="$work_root/Program"
+"$SCRIPT_DIR/run-compiler-b-bootstrap" --emit-assembly "$project" > "$assembly"
+clang -arch arm64 "$assembly" -o "$executable"
+"$executable" "$@"

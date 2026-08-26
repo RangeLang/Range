@@ -1,0 +1,18 @@
+// function ignoredCommentDeclaration(): Int { return 1 }
+
+@opaque
+construct NativeSurface {}
+
+@extern
+function surfaceDevice(): NativeSurface
+
+construct Transform {}
+
+function contextualTransform(): Transform {
+    return Transform(.identity(value: 1))
+}
+
+@view
+construct TextValue {
+    let _ value: String
+}

@@ -1,0 +1,15 @@
+@syntax {
+    $macros
+    construct $identity {
+        $members
+    }
+}
+construct Construct {
+    @many
+    state macros: Macro
+
+    state identity: Identity
+
+    @many
+    state members: @member
+}

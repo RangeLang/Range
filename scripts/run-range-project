@@ -28,7 +28,14 @@ done
 if [[ "${1:-}" == "--" ]]; then shift; fi
 
 WORK_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/range-run.XXXXXX")"
-trap '/bin/rm -rf "$WORK_ROOT"' EXIT
+cleanup() {
+    if [[ "${RANGE_KEEP_RUN_ROOT:-0}" == "1" ]]; then
+        echo "range run root: $WORK_ROOT" >&2
+    else
+        /bin/rm -rf "$WORK_ROOT"
+    fi
+}
+trap cleanup EXIT
 
 llvm_path="$WORK_ROOT/Program.ll"
 executable_path="$WORK_ROOT/Program"
@@ -36,15 +43,21 @@ executable_path="$WORK_ROOT/Program"
 "$REPO_ROOT/scripts/compile-range-project" "${compiler_arguments[@]}" > "$llvm_path"
 
 runtime_inputs=()
-runtime_source_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
-for ((index = 0; index < runtime_source_count; index += 1)); do
-    runtime_relative_path="$(/usr/bin/plutil -extract "runtimeSources.$index.path" raw -o - "$MANIFEST")"
-    runtime_path="$REPO_ROOT/$runtime_relative_path"
-    [[ -f "$runtime_path" ]] || run_project_fail "missing runtime input: $runtime_relative_path"
-    runtime_inputs+=("$runtime_path")
-done
+standalone_project=0
+if /usr/bin/grep -Fqx '; Compiler B ordinary project LLVM' "$llvm_path"; then
+    standalone_project=1
+else
+    runtime_source_count="$(/usr/bin/plutil -extract runtimeSources raw -o - "$MANIFEST")"
+    for ((index = 0; index < runtime_source_count; index += 1)); do
+        runtime_relative_path="$(/usr/bin/plutil -extract "runtimeSources.$index.path" raw -o - "$MANIFEST")"
+        runtime_path="$REPO_ROOT/$runtime_relative_path"
+        [[ -f "$runtime_path" ]] || run_project_fail "missing runtime input: $runtime_relative_path"
+        runtime_inputs+=("$runtime_path")
+    done
+fi
 
 link_arguments=()
+application_bundle=0
 if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=sqlite3' "$llvm_path"; then
     link_arguments+=("-lsqlite3")
 fi
@@ -71,8 +84,41 @@ if /usr/bin/grep -Fqx '; range-link-v1 kind=library id=sdl2' "$llvm_path"; then
     [[ -d "$sdl2_prefix/lib" ]] || run_project_fail "@link(.sdl2) could not resolve SDL2 libraries"
     link_arguments+=("-L$sdl2_prefix/lib" "-lSDL2" "-Wl,-rpath,$sdl2_prefix/lib")
 fi
+while IFS= read -r framework_id; do
+    [[ -n "$framework_id" ]] || continue
+    [[ "$framework_id" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]] \
+        || run_project_fail "invalid framework link identity: $framework_id"
+    link_arguments+=("-framework" "$framework_id")
+    if [[ "$framework_id" == "AppKit" ]]; then
+        application_bundle=1
+    fi
+done < <(/usr/bin/sed -n 's/^; range-link-v1 kind=framework id=//p' "$llvm_path")
 
-if [[ "${#link_arguments[@]}" -gt 0 ]]; then
+app_bundle=""
+if [[ "$application_bundle" -eq 1 ]]; then
+    app_bundle="$WORK_ROOT/RangeApplication.app"
+    executable_path="$app_bundle/Contents/MacOS/RangeApplication"
+    /bin/mkdir -p "$app_bundle/Contents/MacOS"
+    /usr/bin/plutil -create xml1 "$app_bundle/Contents/Info.plist"
+    /usr/bin/plutil -insert CFBundleExecutable -string RangeApplication \
+        "$app_bundle/Contents/Info.plist"
+    /usr/bin/plutil -insert CFBundleIdentifier -string org.range.application \
+        "$app_bundle/Contents/Info.plist"
+    /usr/bin/plutil -insert CFBundleName -string RangeApplication \
+        "$app_bundle/Contents/Info.plist"
+    /usr/bin/plutil -insert CFBundlePackageType -string APPL \
+        "$app_bundle/Contents/Info.plist"
+fi
+
+if [[ "$standalone_project" -eq 1 ]]; then
+    if [[ "${#link_arguments[@]}" -gt 0 ]]; then
+        clang -O0 -fno-lto -Wno-override-module \
+            "$llvm_path" "${link_arguments[@]}" -o "$executable_path"
+    else
+        clang -O0 -fno-lto -Wno-override-module \
+            "$llvm_path" -o "$executable_path"
+    fi
+elif [[ "${#link_arguments[@]}" -gt 0 ]]; then
     clang -O0 -fno-lto -Wno-override-module \
         "$llvm_path" "${runtime_inputs[@]}" "${link_arguments[@]}" -o "$executable_path"
 else
@@ -81,5 +127,13 @@ else
 fi
 
 program_exit=0
-"$executable_path" "$@" || program_exit=$?
+if [[ -n "$app_bundle" ]]; then
+    if [[ "$#" -gt 0 ]]; then
+        /usr/bin/open -n -W "$app_bundle" --args "$@" || program_exit=$?
+    else
+        /usr/bin/open -n -W "$app_bundle" || program_exit=$?
+    fi
+else
+    "$executable_path" "$@" || program_exit=$?
+fi
 exit "$program_exit"

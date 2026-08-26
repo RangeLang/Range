@@ -1,0 +1,10 @@
+construct NativeObject {}
+
+@extern(symbol: "project_test_foreign")
+@framework(name: "Metal")
+function projectForeign(value: String): NativeObject
+
+function launch(): Int {
+    let result: projectForeign(value: "ordinary Range call")
+    return 0
+}

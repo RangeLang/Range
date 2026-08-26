@@ -1,0 +1,4 @@
+macro extern(): Function {}
+
+@extern
+function send(receiver: NativeObject, _ selector: NativeSelector): NativeObject

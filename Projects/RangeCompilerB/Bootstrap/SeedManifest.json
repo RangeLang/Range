@@ -1,0 +1,56 @@
+{
+  "formatVersion": 1,
+  "purpose": "Compiler A transport for the first runnable Compiler B seed only",
+  "target": {
+    "platform": "macOS",
+    "architecture": "arm64",
+    "pointerBits": 64
+  },
+  "acceptedCompilerA": {
+    "path": "RangeCompiler/Bootstrap/RangeCompilerBootstrap.ll",
+    "sha256": "344d8be76525792c8c6a5809ed20ae3a6f9cbe8f24ef81a1cdb105408a9ae814"
+  },
+  "sourceManifest": "Projects/RangeCompilerB/CompilerSelfHostSources.txt",
+  "transport": {
+    "path": "Projects/RangeCompilerB/Bootstrap/SeedBufferTransport.range",
+    "sha256": "d3866d1a88ce1411cadd8fae7e00216d756cb6c7a2983fccbf63d56f1de0bfb0",
+    "purpose": "Map canonical IntMany and ByteMany identities to Compiler A's generic Buffer ABI while building the initial seed",
+    "candidateInput": false,
+    "reproductionInput": false,
+    "removalCondition": "Remove after the promoted Compiler B recreates candidate and reproduction without Compiler A"
+  },
+  "entryTransport": {
+    "path": "Projects/RangeCompilerB/Bootstrap/SeedEntryTransport.range",
+    "sha256": "7bd4b4d14da4757cf1e5611307c88d931db97e9a2ef030917d7b1cf68c0b77cc",
+    "purpose": "Give Compiler A its directly authored main block while canonical Compiler B materializes the entry through a macro graph delta",
+    "candidateInput": false,
+    "reproductionInput": false,
+    "removalCondition": "Remove with the A-to-B seed runner after Compiler B promotion"
+  },
+  "runtimeABI": {
+    "sourceCount": 3,
+    "sources": [
+      {
+        "path": "Projects/RangeCompilerB/Runtime/RangeCompilerHost.c",
+        "sha256": "c3908059c3dc5085bd37a8582d29f835faf777c57a3f91e30c59e64401619750"
+      },
+      {
+        "path": "Projects/RangeCompilerB/Runtime/RangeCompilerMetrics.c",
+        "sha256": "ca0ee52429166d933dc309b3c41ee97e3ffa75746f6627fce731c80fc511c1b4"
+      },
+      {
+        "path": "Projects/RangeCompilerB/Runtime/RangeRawBuffer.c",
+        "sha256": "4c4d98e29fca8bf0586821a0408aa90bed03eba56b37cb8201e87843cc3a3f8f"
+      }
+    ],
+    "transportSymbols": [
+      "bufferCreateInt",
+      "bufferCreateUnsigned8",
+      "rawBufferAppendInt",
+      "rawBufferCount",
+      "rawBufferLoadInt",
+      "rawBufferStoreInt",
+      "rawBufferDestroy"
+    ]
+  }
+}

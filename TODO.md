@@ -22,9 +22,108 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     Compiler B's accepted language model.
     - Element identity, cardinality, and input/output correspondence come from
       graph relationships instead of authored `<Element>` parameters.
-    - [ ] Replace the remaining accepted-A `Buffer<Int>` and `Buffer<Byte>`
+    - [x] Replace the remaining accepted-A `Buffer<Int>` and `Buffer<Byte>`
       bootstrap storage spellings with B-owned graph-native cardinality storage
       before the complete Compiler B source set becomes a self-source fixture.
+      - Compiler B now names nongeneric `IntMany` and `ByteMany` carriers whose
+        element identities come from one attached `@many` relationship. The
+        frozen A-only seed bundle deterministically maps those identities back
+        to A's generic Buffer ABI; candidate and reproduction manifests exclude
+        that transport source and canonical B contains zero `Buffer<...>`
+        syntax.
+  - [ ] Materialize graph-native `@many` collections.
+    - [x] Retain Functions nested directly in a Macro as declarations owned by
+      that Macro, without executing their declaration tokens as body calls.
+    - [x] Add `@type` admission resolution and record the first derived
+      collection-materialization edge for `@many state values: @type`.
+    - [ ] Resolve member lookup through receiver -> attached many Application
+      -> Macro declaration -> owned shared Function, with representation-keyed
+      variants rather than per-application copies.
+    - [ ] Materialize constructor identities and values into homogeneous or
+      identity-bucket storage, including order, count, capacity, promotion,
+      filtering, fixed-count validation, mutation capability, and cleanup.
+      - [x] Materialize the first closed two-value homogeneous descriptor from
+        `Buffer(Int(...), Int(...))` and `Buffer(Byte(...), Byte(...))` graph
+        applications. The native renderer emits `{pointer, count, capacity}`
+        plus compact contiguous 64-bit or byte storage, and executes `count`
+        and bounded ordered `element(index:)` through Macro-owned Functions.
+      - [x] Reject mixed identities at the explicit homogeneous-only boundary;
+        bucket promotion remains the next representation key, not an implicit
+        widening of contiguous storage.
+      - [x] Admit a bare identity without incrementing count: `Buffer(Int)`
+        materializes a zero-count, zero-capacity descriptor and no value slots.
+      - [ ] Generalize beyond two values, dynamic capacity growth,
+        append/update, and representation-keyed shared operation code.
+    - [ ] Replace `Many.range`'s authored LLVM strings with target-neutral
+      representation and operation facts consumed only by backends.
+  - [ ] Complete Compiler B freeform syntax materialization.
+    - [x] Retain parenthesized and brace-form `@syntax` recipes as ordered
+      literal, delimiter, and arbitrary `$capture` parts. Bind every capture to
+      one same-named relationship declared by its target Construct.
+    - [x] Materialize typed `Let`, `State`, `Derived`, `Binding`, custom member
+      syntax, and `Construct` syntax through nominal plans; declared
+      relationships supply capture identity/cardinality while storage lowering
+      follows the materialized nominal plus its `@storage` edge.
+    - [x] Materialize Function, bodyless Function, Macro, Transformation, Enum,
+      EnumCase, and Block declarations from the same source-ordered concrete
+      syntax worklist. Macro retains ordered body values and declares the
+      non-owning compile-time `binding environment: Environment` relationship.
+    - [x] Materialize `extension $target { $members }` as a typed `Extension`
+      value. Extension owns only its target and ordered members; compile-time
+      environment authority remains the single binding on `Macro`.
+    - [x] Canonicalize repeated syntax-node observations by stable source
+      identity, deterministically widen shared provenance across nested facet
+      observations, and size the node store from its source-byte identity
+      domain instead of hiding duplicates with a capacity multiplier.
+    - [ ] Replace repeated project source parsing with one project-owned
+      retained concrete syntax graph and sealed deterministic lookup indexes.
+    - [ ] Materialize parameters, applications/arguments, statements,
+      expressions, collections, and environment operations as
+      typed syntax values to complete the Compiler B self-source closure.
+    - [x] Give capture relationships stable template-application/part
+      identities, ordered provenance spans, and ordered capture-value rows;
+      reject empty, duplicate, adjacent, no-match, and ambiguous forms.
+    - [x] Store syntax diagnostics as graph rows and render them at the command
+      boundary so rejected projects exit 65 without partial-row invalid frees.
+    - [x] Replace raw collection regions with ordered materialized graph values
+      and retain plural attached Macro Applications as capture values; scalar
+      expression/identity holes remain source-backed raw values.
+    - [ ] Iterate newly enabled syntax work when a materialization emits new
+      declarations or syntax applications, with explicit cycle/fuel failures.
+    - [x] Prove zero-, one-, and many-value capture relationships plus stable
+      repeated graph output in the focused Compiler B gate.
+    - [ ] Make capture/materialization commit fully transactional under an
+      allocation failure.
+  - [ ] Replace Compiler B's LLVM output with deterministic native assembly.
+    - [x] Add `--emit-assembly` and an architecture-neutral lowered Function
+      boundary for a project entry returning a literal Int or one reachable
+      no-argument literal Function call.
+    - [x] Render stable Apple arm64 symbols, 16-byte-aligned call frames, direct
+      calls, and a `_main` adapter; assemble/link once with clang and prove the
+      resulting programs return 42. Unreachable Functions are omitted.
+      - `CompilerBLoweredProgram` owns function and ordered operation stores.
+        Literal, call, and homogeneous-many discovery append target-neutral
+        constant, stack-allocation, address, store, load, call, release, and
+        return operations. The Apple renderer consumes those operations; it has
+        no `hasMany`, element-value, count, capacity, or operation-code fields.
+        Do not reintroduce representation-specific string-renderer argument
+        lists or return rendered text merely to append it at the caller.
+    - [x] Expose the bounded backend as `scripts/range compiler b
+      --emit-assembly <project>` and `scripts/range compiler b run <project>`
+      without prematurely replacing the accepted compiler's broader `run`.
+    - [ ] Lower parameters, locals, stack slots, arithmetic, comparisons,
+      branches, aggregate addressing, identity dispatch, extern/libSystem
+      calls, and graph-native many operations.
+      - [x] Lower the first stack-resident many descriptor and aggregate
+        addressing for Int and Byte count/positional-read operations.
+        - The many graph facts disappear during lowering into the same ordered
+          operation store used by literals and calls; backend rendering does
+          not dispatch on the source construct or macro identity.
+    - [ ] Make `scripts/range run` consume B's textual assembly, then remove
+      B's LLVM renderer, RawBuffer C ABI, and compiler-host link dependencies.
+    - [ ] Add the approved candidate/reproduction assembly and executable
+      fixed-point proof. Do not promote before the complete proof and focused
+      gates pass.
   - [x] Establish `scripts/range check-compiler-b` as the focused runnable B
     gate.
     - It proves file and directory routes, a
@@ -223,7 +322,7 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         the open set of declarations carrying the @member relationship rather
         than the closed union authored in `member()`'s signature.
         - Conformance is application: a transform constrains by the @member
-          relationship (the `filter(all: @collectionModifier)` pattern in
+          relationship (the `filter(for: @collectionModifier)` pattern in
           Many.range), so extending the family is one new declaration plus
           one application, with no union edited anywhere.
         - Requires the previous storage split: `Let`, `State`, `Derived`, and
@@ -357,6 +456,16 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             `users` collection identity, executes the authored print process
             once per selected graph node, and recalls each node's exact source
             representation without compiler dispatch on the `print` name.
+      - [x] Materialize the first application-owned runtime compilation source.
+        - An applied attached macro with one unconditional Environment derives
+          its emitted `@main` block into the project graph and retains the
+          producing Application's source and syntax identities. Declaring the
+          same macro without applying it leaves the Environment dormant; the
+          project source graph remains valid and LLVM emission rejects because
+          no runtime entrypoint was produced.
+        - [ ] Generalize the derivation runner to selected conditional
+          Environments, extension-node graph deltas, newly emitted macro
+          Applications, deterministic replay, and fixed-point scheduling.
       - [x] Retain enum cases and switch-selected macro environments in Compiler B.
         - Enum declarations retain ordered case identities. Macro processes retain
           `switch` subjects and ordered exact/default cases as canonical graph
@@ -368,6 +477,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
           fixed LLVM arrays. Negative-count diagnostic execution remains part of
           the general macro control-flow executor rather than a `many` compiler
           special case.
+        - [ ] Execute `many`'s authored fixed-count Application validation
+          generally: `Application.values.count` must equal the supplied count
+          before lowering. The validation must be compiler-backed for every
+          plural member; there is no RangeView-specific rejection path.
       - [x] Collect collection modifiers as canonical macro relationships and
         retain their cardinality transforms on Applications.
         - `@collectionModifier` resolves to the exact marked Macro identity;
@@ -422,16 +535,22 @@ owns the actionable checkboxes for the active and deliberately deferred work.
             Token-root reconstruction, function-modifier rows, and copied
             callee-segment storage are retired.
         - [x] Author direct modifier provision in the existing `many` macro.
-          - `many` queries `#environment.macros` for every
-            `@collectionModifier` and splices the resulting plural `#modifiers`
-            identity directly into an extension of the target Application.
+          - `many` suspends `#environment.filter(for: @collectionModifier)`
+            until its application-owned Environment slot is sealed, then
+            splices the resulting plural `#modifiers` identity directly into
+            an extension of the target Application.
             The splice cardinality materializes none, one, or many identities;
             there is no authored traversal, attachment helper, or copied
             modifier declaration.
-          - Compiler B retains the graph query as a canonical local call and
-            the direct target/source-collection identities as one
-            Application-provision facet. Materializing the selected identities
-            into deduplicated graph relationships remains pending.
+          - [x] Materialize the sealed filter result as derived graph updates.
+            - Compiler B retains the graph query as a canonical local call and
+              captures the already-known Environment, extension, target, and
+              source identities on one Application-provision facet. The sealed
+              query deduplicates marker targets and derives updates without a
+              second result table or reconstructing ancestry. The focused
+              `EnvironmentFilterSuspension` proof observes `-2` while discovery
+              is open and two updates after both later marker applications are
+              present and the graph is sealed.
           - [x] Make the macro environment itself the graph capability surface.
             - Graph collections are direct `#environment` members such as
               `#environment.macros`. Diagnostics are ordinary freestanding
@@ -521,9 +640,25 @@ owns the actionable checkboxes for the active and deliberately deferred work.
   - [ ] Add resolution, CFG, ownership, MIR, and emission only as later B-owned
     products derived from retained syntax identities, each with its own
     runnable focused proof.
-  - [ ] Attempt B self-compilation only after those required products exist. At
-    that milestone, require byte-identical candidate/reproduction LLVM and
-    executables before describing B as self-hosting.
+  - [ ] Complete B self-compilation through the frozen-seed proof.
+    - [x] Add one sorted 50-source canonical B manifest, frozen A/transport/C
+      runtime hashes, and `scripts/range check-compiler-b-self-host`. Its audit
+      rejects generic Buffer syntax and prevents both seed transports from
+      entering candidate or reproduction input.
+    - [x] Make B's own entry use an attached Macro that emits `@main` as a graph
+      delta. The A-only seed tail retains the old direct entry form because A
+      cannot commit B's emitted entry during seed construction.
+    - [x] Reach self-source parsing and materialization with zero syntax
+      failures. Remove the duplicate experimental String source, add ordinary
+      B `Bool` and `builtin` declarations, and exclude A-only reflection and
+      integer shims from the canonical manifest.
+    - [ ] Finish reachable architecture-neutral lowering. The current proof
+      reaches `compilerBEntry`, unwraps typed one-value nominal construction,
+      records ordinary direct-call reachability and parameter operands, then
+      stops at control-flow/process lowering inside a reachable callee.
+    - [ ] Require byte-identical candidate/reproduction LLVM and executables,
+      compare focused fixture output, and record A/B cold and warm timings
+      before describing B as self-hosting.
   - [ ] Use the Compiler A escape valve only for a concrete focused blocker,
     with no architecture-preserving B solution, and only after explicit
     maintainer approval of the general A change and bootstrap promotion.
@@ -1306,15 +1441,49 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
 
 ## RangeView
 
+  - [x] Compile and run RangeView as an ordinary Compiler B project.
+    - [x] Keep Compiler B's copied Core under
+      `Projects/RangeCompilerB/Sources/CompilerB/Core/` and repair its source
+      inventory after the ownership move.
+    - [x] Discover every project `.range` file in deterministic path order and
+      retain each file as a separate source identity; do not select a first
+      file or concatenate project source text.
+    - [x] Delete the RangeView-specific Compiler B backend,
+      `EmitRangeViewMetal` entry, `@metal(kind:)` dispatch identity, and their
+      focused pass/fail routes.
+    - [x] Compose the per-file syntax revisions into one cross-file declaration
+      and Application graph with stable source identities.
+      - Compiler B now retains RangeView's 37 application/framework files plus
+        the manifest-selected Compiler B Core surface as 43 separate source
+        identities. The project graph resolves attached and emitted macro
+        Applications across those sources without concatenating their text.
+    - [x] Lower ordinary `@extern` declarations and typed calls through the
+      same LLVM emission path used by every Range program.
+      - Project macro arguments retain their source identity and exact value;
+        `@extern(symbol:)` selects the foreign symbol while each call's
+        retained parameters produce a fixed LLVM ABI signature.
+    - [x] Derive the native link inputs from ordinary project/graph
+      relationships and link no RangeRawBuffer, compiler-host, Rust, GPUI, or
+      C adapter into the RangeView product.
+      - Ordinary `@framework(name:)` relationships emit generic
+        `range-link-v1` metadata. The runner links those Apple frameworks and
+        packages AppKit products as transient applications without adding the
+        compiler or its C runtime to the product.
+    - [x] Compile Compiler B with the accepted bootstrap, use that exact B
+      executable to compile RangeView, then link, launch, and visually verify
+      the resulting Metal application.
+      - `scripts/range run Projects/RangeView` now performs that path. The
+        first Range-owned lifecycle obtains the default Metal device, enters
+        AppKit through ordinary extern calls, and presents a live modal window.
   - [x] Make Window an ordinary Range-owned `@view` declaration.
     - `@app` emits Window directly in its generated `@main`; there is no
       intermediate `run()` function.
     - The obsolete `RangeViewNativeCString`, opaque Window, WindowRenderer,
       SDL lifecycle implementation, and native-window fixture were removed.
       The independent `@color` target-admission proof remains active.
-    - [ ] Teach Compiler B's RangeView route to consume the real `@app`
-      expansion and Window Application instead of independently manufacturing
-      `main` plus the `rangeGPUIRun` transport call.
+    - [ ] Lower the real `@app` expansion and Window Application through the
+      ordinary Compiler B project graph; no compiler-owned platform entrypoint
+      may manufacture RangeView behavior.
     - [ ] Resolve Window size and placement from general layout modifiers such
       as `frame` and `position`; do not add intrinsic bounds fields.
   - [x] Keep color representation in Range rather than a native semantic shim.
@@ -1324,8 +1493,8 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
       Range functions delegating into it were removed. A platform renderer may
       translate the emitted fields at its final API boundary, but it does not
       own Range color semantics.
-    - [ ] Replace Compiler B's packed integer GPUI gradient placeholders with
-      graph-resolved `@color` applications, including composed enum-case values.
+    - [ ] Lower graph-resolved `@color` applications, including composed
+      enum-case values, through ordinary representation relationships.
   - [x] Make RangeView color domains member macro relationships rather than
     generic scalar specializations.
     - `RGBA` uses plain Int members carrying `@bounded(0...255)` relationships.
@@ -1341,7 +1510,7 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
     - [ ] Migrate other semantic-domain generic wrappers to the same
       conformance pattern after the observer behavior has a focused compiler
       fixture. Physical storage representation remains a separate concern.
-  - [x] Compose and draw the first Compiler B derived `@view` value.
+  - [x] Compose and retain the first Compiler B derived `@view` values.
     - Compiler B retains a derived builder body as a normal Member/Process
       identity and retains each value-producing call as an ordered execution
       Application. Construct calls use the shared Application relationship.
@@ -1350,29 +1519,14 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
       directly and accepts one unlabeled String value. The focused fixture
       authors its own ordinary Rectangle and Text declarations.
     - An app composes both through one ordinary
-      `derived body: @view { ... }` value. The backend selects exact `@view`
-      relationships plus the GPUI adapter's separate `@gpui(kind:)`
-      relationship and never checks the `Rectangle` or `Text` spelling.
-    - `scripts/check-range-compiler-b-rangeview-gpui` proves one closed
-      four-point `@shape` path plus Text, native link/execution, exact LLVM
-      point order, cardinality mismatch rejection, and the unmarked-view
-      rejection boundary.
-    - [x] Retain nested typed initializer Applications and lower one ordered
-      `@many` point member directly to a closed GPUI path. GPUI paints the
-      lowered points and does not reconstruct Rectangle fields or Range graph
-      meaning.
-  - [x] Prove the first Compiler B RangeView-to-GPUI artifact route.
-    - A focused source graph resolves exactly one `@app` relationship and uses
-      its Construct identity as the first window title/value.
-    - Compiler B emits LLVM directly; Range writes the `.ll` file, invokes
-      `clang`, links the precompiled GPUI boundary, and executes the resulting
-      native product. Rust is not a generated compiler output or intermediate
-      representation.
-    - `scripts/check-range-compiler-b-rangeview-gpui` owns the repeatable
-      headless link/execution proof. A manual launch additionally verified the
-      native GPUI window and event loop.
-    - View and render-tree lowering remain later graph-to-GPUI
-      slices; this checkpoint proves only the app-root artifact pipeline.
+      `derived body: @view { ... }` value. Platform lowering must consume those
+      exact graph relationships without checking `Rectangle`, `Text`, or any
+      renderer-kind spelling.
+    - [x] Retain nested typed initializer Applications and the ordered
+      `@many` point member in the Compiler B graph.
+    - [ ] Lower that ordered path through Range-authored Metal
+      vertex/pipeline/encoder calls once ordinary cross-file call lowering is
+      available.
   - [x] Establish `@app` and `@view` as the minimal framework marker surface;
     there are no parallel component or page identities.
   - [x] Give every foundational concern its own file under `Macros/`:
@@ -1381,13 +1535,17 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
     declarations from the RangeView path.
     - The obsolete iterable registration macro and wrapper are deleted; no
       RangeView proof bundle imports a traversal-registration source.
-    - Compiler B no longer compiles a private RangeView source prelude.
-      RangeView owns `@view`, the GPUI adapter owns `@gpui`, and focused
-      fixtures declare only the ordinary values and minimal `@app` relation
-      they exercise.
-    - [ ] Admit the required macro expansion syntax in the real
+    - Compiler B no longer compiles a private RangeView source prelude or owns
+      a RangeView backend. RangeView owns `@view`; Metal is expressed only as
+      an operating-system ABI surface through ordinary declarations.
+    - [x] Admit the required macro expansion syntax in the real
       `Projects/RangeView/Macros/App.range`, then replace the focused fixture's
       minimal `@app` declaration with the executable framework macro body.
+      - The complete RangeView tree now passes Compiler B's project syntax and
+        cross-file macro-relationship population. A general emitted-macro-block
+        facet retains `@main { ... }`, its ordinary Process body, and its
+        cross-file declaration relationship in the project revision. LLVM
+        lowering of that retained entry Process remains pending.
   - [ ] Emit `.html`, `.css`, and `.js` files from ordinary Range strings once
     that backend has a compiler-owned artifact boundary.
   - [ ] Add an executable RangeView command only after the relevant framework

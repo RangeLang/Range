@@ -1,0 +1,16 @@
+construct Subject {
+    let fixed: Int
+    state changing: Int
+    derived computed: Int { return Int(0) }
+    binding projected: Int
+    slot produced: Int
+}
+
+@syntax($annotations slot $label : $payload)
+@storage(.derived)
+construct Slot {
+    @many
+    state annotations: Macro
+    state label: Identity
+    state payload: @syntax
+}

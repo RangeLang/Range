@@ -1,4 +1,2 @@
 macro member(): Let | State | Derived | Binding -> Value {
-  let value:
-
 }

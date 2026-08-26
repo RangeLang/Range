@@ -1,0 +1,11 @@
+function compilerBProjectSourceSetEntry(): Int {
+    if commandLineArgumentCount() != 1 { return 64 }
+    let route: String(commandLineArgument(index: 0))
+    let paths: String(compilerBDiscoverSourcePaths(route: route))
+    print(value: paths)
+    return 0
+}
+
+@main {
+    return compilerBProjectSourceSetEntry()
+}

@@ -24,12 +24,30 @@ trap 'rm -rf "$work_root"' EXIT
 output="$work_root/bootstrap.out"
 directory_output="$work_root/directory.out"
 fixture="$REPO_ROOT/Testing/CompilerB/Pass/SyntaxNodes.range"
+project_source_set_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectSourceSet.range"
+direct_metal_llvm_fixture="$REPO_ROOT/Testing/CompilerB/Pass/DirectMetalLLVM.range"
+project_macro_pass="$REPO_ROOT/Testing/CompilerB/Pass/ProjectMacroAcrossFiles"
+project_language_surface="$REPO_ROOT/Testing/CompilerB/Pass/ProjectLanguageSurface"
+project_self_describing_syntax="$REPO_ROOT/Testing/CompilerB/Pass/ProjectSelfDescribingSyntax"
+project_self_describing_syntax_output="$work_root/project-self-describing-syntax.out"
+project_self_describing_syntax_repeat="$work_root/project-self-describing-syntax-repeat.out"
+project_syntax_duplicate="$REPO_ROOT/Testing/CompilerB/Fail/ProjectSyntaxDuplicateCapture"
+project_syntax_missing="$REPO_ROOT/Testing/CompilerB/Fail/ProjectSyntaxMissingCapture"
+project_syntax_adjacent="$REPO_ROOT/Testing/CompilerB/Fail/ProjectSyntaxAdjacentCapture"
+project_syntax_no_match="$REPO_ROOT/Testing/CompilerB/Fail/ProjectSyntaxNoMatch"
+project_syntax_ambiguous="$REPO_ROOT/Testing/CompilerB/Fail/ProjectSyntaxAmbiguous"
+project_syntax_unknown_relationship="$REPO_ROOT/Testing/CompilerB/Fail/ProjectSyntaxUnknownRelationship"
+project_macro_missing="$REPO_ROOT/Testing/CompilerB/Fail/ProjectMacroMissing"
+project_macro_duplicate="$REPO_ROOT/Testing/CompilerB/Fail/ProjectMacroDuplicate"
 token_syntax_fixture="$REPO_ROOT/Testing/CompilerB/Pass/TokenDrivenSyntax.range"
 token_syntax_output="$work_root/token-syntax.out"
 file_manager_fixture="$REPO_ROOT/Testing/CompilerB/Pass/FileManagerOperations.range"
 direct_directory_fixture="$REPO_ROOT/Testing/CompilerB/Pass/DirectDirectoryLLVM.range"
 token_identity_fixture="$REPO_ROOT/Testing/CompilerB/Pass/TokenIdentityAndBytes.range"
 syntax_revision_fixture="$REPO_ROOT/Testing/CompilerB/Pass/SyntaxRevisionDifference.range"
+environment_filter_suspension_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EnvironmentFilterSuspension.range"
+many_type_admission_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ManyTypeAdmission.range"
+many_type_admission_output="$work_root/many-type-admission.out"
 syntax_revision_output="$work_root/syntax-revision.out"
 member_macro_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MemberMacroTarget.range"
 member_macro_output="$work_root/member-macro.out"
@@ -45,6 +63,37 @@ macro_relationship_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroApplicationRe
 macro_relationship_output="$work_root/macro-relationship.out"
 macro_argument_fixture="$REPO_ROOT/Testing/CompilerB/Pass/MacroArguments.range"
 macro_argument_output="$work_root/macro-argument.out"
+emitted_macro_block_fixture="$REPO_ROOT/Testing/CompilerB/Pass/EmittedMacroBlock.range"
+emitted_macro_block_output="$work_root/emitted-macro-block.out"
+project_emitted_macro_block_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectEmittedMacroBlock"
+project_emitted_macro_block_output="$work_root/project-emitted-macro-block.out"
+unapplied_emitted_macro_block_fixture="$REPO_ROOT/Testing/CompilerB/Fail/UnappliedEmittedMacroBlock"
+unapplied_emitted_macro_block_output="$work_root/unapplied-emitted-macro-block.out"
+project_extern_main_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectExternMain"
+project_extern_main_output="$work_root/project-extern-main.ll"
+project_extern_main_object="$work_root/project-extern-main.o"
+project_assembly_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectAssembly"
+project_assembly_output="$work_root/project-assembly.s"
+project_assembly_executable="$work_root/project-assembly"
+project_assembly_call_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectAssemblyCall"
+project_assembly_call_output="$work_root/project-assembly-call.s"
+project_assembly_call_executable="$work_root/project-assembly-call"
+project_many_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectManyHomogeneous"
+project_many_output="$work_root/project-many.s"
+project_many_executable="$work_root/project-many"
+project_many_empty_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectManyEmpty"
+project_many_empty_output="$work_root/project-many-empty.s"
+project_many_empty_executable="$work_root/project-many-empty"
+project_many_read_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectManyHomogeneousRead"
+project_many_read_output="$work_root/project-many-read.s"
+project_many_read_executable="$work_root/project-many-read"
+project_many_byte_fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectManyByteRead"
+project_many_byte_output="$work_root/project-many-byte.s"
+project_many_byte_executable="$work_root/project-many-byte"
+project_many_mixed_fixture="$REPO_ROOT/Testing/CompilerB/Fail/ProjectManyMixedIdentity"
+project_many_mixed_output="$work_root/project-many-mixed.out"
+function_parameters_fixture="$REPO_ROOT/Testing/CompilerB/Pass/FunctionParameters.range"
+function_parameters_output="$work_root/function-parameters.out"
 macro_argument_missing_fixture="$REPO_ROOT/Testing/CompilerB/Fail/MissingMacroArgument.range"
 macro_argument_type_fixture="$REPO_ROOT/Testing/CompilerB/Fail/InvalidMacroArgumentType.range"
 macro_argument_unknown_fixture="$REPO_ROOT/Testing/CompilerB/Fail/UnknownMacroArgument.range"
@@ -128,14 +177,262 @@ llvm_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/LLVM.range"
 diagnostic_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Diagnostic.range"
 member_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Member.range"
 bool_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Bool.range"
+type_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Type.range"
 print_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/Print.range"
 command_group_macro="$COMPILER_B_ROOT/Sources/CompilerB/Core/Macros/CommandGroup.range"
 integer_bootstrap_macro="$COMPILER_B_ROOT/Sources/CompilerB/Bootstrap/Integer.range"
 backend_model="$COMPILER_B_ROOT/Sources/CompilerB/Backend.range"
 byte_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Byte.range"
 string_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/String.range"
-uuid_model="$COMPILER_B_ROOT/Sources/Core/Coding/UUID.range"
+uuid_model="$COMPILER_B_ROOT/Sources/CompilerB/Core/Coding/UUID.range"
 host_runtime="$COMPILER_B_ROOT/Runtime/RangeCompilerHost.c"
+
+direct_metal_root="$work_root/direct-metal"
+/bin/mkdir -p "$direct_metal_root"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$direct_metal_llvm_fixture" "$direct_metal_root"
+[[ -x "$direct_metal_root/MetalDevice" ]] || fail "direct Metal LLVM product was not linked"
+grep -F 'call ptr @MTLCreateSystemDefaultDevice()' "$direct_metal_root/MetalDevice.ll" >/dev/null \
+    || fail "direct Metal LLVM product omitted the driver entry call"
+if otool -L "$direct_metal_root/MetalDevice" | grep -E 'RangeCompiler|RangeRawBuffer|GPUI|rust' >/dev/null; then
+    fail "direct Metal LLVM product linked a compiler, buffer, GPUI, or Rust runtime"
+fi
+
+project_macro_output="$work_root/project-macro.out"
+project_language_surface_output="$work_root/project-language-surface.out"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_language_surface" \
+    > "$project_language_surface_output"
+grep -F $'projectSyntax\tvalid=true' "$project_language_surface_output" >/dev/null \
+    || fail "ordinary project language surface was rejected"
+grep -F $'name=surfaceDevice' "$project_language_surface_output" >/dev/null \
+    || fail "bodyless extern Function declaration was not retained"
+grep -F $'name=TextValue' "$project_language_surface_output" >/dev/null \
+    || fail "externally labeled Member declaration was not retained"
+if grep -F $'name=ignoredCommentDeclaration' "$project_language_surface_output" >/dev/null; then
+    fail "line comment text became a declaration"
+fi
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_self_describing_syntax" \
+    > "$project_self_describing_syntax_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_self_describing_syntax" \
+    > "$project_self_describing_syntax_repeat"
+cmp "$project_self_describing_syntax_output" "$project_self_describing_syntax_repeat" >/dev/null \
+    || fail "freeform syntax graph output was nondeterministic"
+for expected in \
+    $'declaration=Let\tstorage=immutable' \
+    $'declaration=State\tstorage=mutable' \
+    $'declaration=Derived\tstorage=derived' \
+    $'declaration=Binding\tstorage=binding' \
+    $'declaration=Slot\tstorage=derived' \
+    $'declaration=Function\tstorage=unknown' \
+    $'declaration=Macro\tstorage=unknown' \
+    $'declaration=Transformation\tstorage=unknown' \
+    $'declaration=Enum\tstorage=unknown' \
+    $'declaration=EnumCase\tstorage=unknown' \
+    $'declaration=Extension\tstorage=unknown' \
+    $'name=members\t' \
+    $'name=macros\t' \
+    $'name=annotations\t' \
+    $'name=label\t' \
+    $'name=payload\t' \
+    $'cardinality=many\tvalues=5' \
+    $'cardinality=many\tvalues=2' \
+    $'cardinality=many\tvalues=0' \
+    $'cardinality=one\tvalues=1' \
+    $'kind=materialized' \
+    $'kind=macroApplication'; do
+    grep -F "$expected" "$project_self_describing_syntax_output" >/dev/null \
+        || fail "freeform syntax graph omitted $expected"
+done
+grep -F 'construct Extension {' "$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/DeclarationForms.range" >/dev/null \
+    || fail "Extension syntax construct is missing"
+if sed -n '/construct Extension {/,/^}/p' "$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/DeclarationForms.range" \
+    | grep -F 'environment:' >/dev/null; then
+    fail "Extension owns an environment binding"
+fi
+grep -A12 -F 'construct Macro {' "$COMPILER_B_ROOT/Sources/CompilerB/Core/Syntax/Macro.range" \
+    | grep -F 'binding environment: Environment' >/dev/null \
+    || fail "Macro does not own its compile-time environment binding"
+
+for fixture_and_diagnostic in \
+    "$project_syntax_duplicate|@syntax capture '\$identifier' is duplicated" \
+    "$project_syntax_missing|@syntax contains an empty capture" \
+    "$project_syntax_adjacent|@syntax adjacent captures require a structural boundary" \
+    "$project_syntax_no_match|did you mean Let?" \
+    "$project_syntax_ambiguous|syntax materialization is ambiguous" \
+    "$project_syntax_unknown_relationship|must resolve to exactly one declared relationship"; do
+    fixture="${fixture_and_diagnostic%%|*}"
+    expected="${fixture_and_diagnostic#*|}"
+    syntax_failure_output="$work_root/$(basename "$fixture").out"
+    syntax_failure_status=0
+    "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$fixture" \
+        > "$syntax_failure_output" || syntax_failure_status=$?
+    [[ "$syntax_failure_status" -eq 65 ]] \
+        || fail "$(basename "$fixture") did not reject with status 65"
+    grep -F "$expected" "$syntax_failure_output" >/dev/null \
+        || fail "$(basename "$fixture") rejected with the wrong diagnostic"
+done
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$emitted_macro_block_fixture" \
+    > "$emitted_macro_block_output"
+emitted_main_id="$(sed -n $'s/^environmentNode\tenvironment=[0-9][0-9]*\tid=\([0-9][0-9]*\)\tparent=[0-9][0-9]*\tordinal=0\tkind=macroBlock\tvalue=main$/\\1/p' "$emitted_macro_block_output")"
+[[ -n "$emitted_main_id" ]] || fail "macro environment did not retain its emitted @main block"
+grep -E $'^processExecution\tid=[0-9]+\towner='"$emitted_main_id"$'\texpression=[0-9]+\tordinal=0\tfunction=start$' "$emitted_macro_block_output" >/dev/null \
+    || fail "emitted macro block body did not become an ordinary Process"
+grep -E $'^macroRelationship\tapplication='"$emitted_main_id"$'\tdeclaration=[0-9]+\ttarget=-1$' "$emitted_macro_block_output" >/dev/null \
+    || fail "emitted macro block application did not resolve by macro identity"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$emitted_macro_block_output" >/dev/null \
+    || fail "emitted macro block fixture was rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_emitted_macro_block_fixture" \
+    > "$project_emitted_macro_block_output"
+grep -E $'^projectEmittedMacroBlock\tsource=[0-9]+\tsyntax=[0-9]+\tproducerSource=[0-9]+\tproducerApplication=[0-9]+\tname=main\tdeclarationSource=[0-9]+\tdeclaration=[0-9]+\tbody=[0-9]+$' "$project_emitted_macro_block_output" >/dev/null \
+    || fail "attached macro execution did not derive its cross-file @main block"
+grep -F $'projectSyntax\tvalid=true' "$project_emitted_macro_block_output" >/dev/null \
+    || fail "cross-file emitted macro block project was rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" \
+    "$unapplied_emitted_macro_block_fixture" > "$unapplied_emitted_macro_block_output"
+if grep -F $'projectEmittedMacroBlock\t' "$unapplied_emitted_macro_block_output" >/dev/null; then
+    fail "unapplied attached macro leaked its dormant @main block into the project graph"
+fi
+grep -F $'projectSyntax\tvalid=true' "$unapplied_emitted_macro_block_output" >/dev/null \
+    || fail "project containing a dormant macro environment was rejected"
+unapplied_emitted_macro_block_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-llvm \
+    "$unapplied_emitted_macro_block_fixture" > "$unapplied_emitted_macro_block_output" \
+    || unapplied_emitted_macro_block_status=$?
+[[ "$unapplied_emitted_macro_block_status" -eq 65 ]] \
+    || fail "unapplied attached macro unexpectedly produced a runtime entrypoint"
+grep -F $'compilerBProjectLLVMError\tproject has no emitted @main block' \
+    "$unapplied_emitted_macro_block_output" >/dev/null \
+    || fail "unapplied attached macro rejected at the wrong runtime-source boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-llvm \
+    "$project_extern_main_fixture" > "$project_extern_main_output"
+grep -F '; Compiler B ordinary project LLVM' "$project_extern_main_output" >/dev/null \
+    || fail "ordinary project LLVM product omitted its compiler identity"
+grep -F '; range-link-v1 kind=framework id=Metal' "$project_extern_main_output" >/dev/null \
+    || fail "ordinary project LLVM product dropped its framework relationship"
+grep -F 'declare ptr @project_test_foreign(...)' "$project_extern_main_output" >/dev/null \
+    || fail "@extern(symbol:) did not control the foreign LLVM symbol"
+grep -F 'call ptr (ptr) @project_test_foreign(ptr ' "$project_extern_main_output" >/dev/null \
+    || fail "foreign call did not retain its fixed parameter ABI"
+if grep -F '@projectForeign' "$project_extern_main_output" >/dev/null; then
+    fail "foreign call used the Range declaration name instead of @extern(symbol:)"
+fi
+clang -O0 -fno-lto -Wno-override-module -c "$project_extern_main_output" \
+    -o "$project_extern_main_object"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_assembly_fixture" > "$project_assembly_output"
+grep -F '.section __TEXT,__text,regular,pure_instructions' "$project_assembly_output" >/dev/null \
+    || fail "native project product omitted its Apple arm64 text section"
+grep -E '^_Range_function_[0-9]+_[0-9]+:$' "$project_assembly_output" >/dev/null \
+    || fail "native project product omitted its stable Range Function symbol"
+grep -F '    movz x0, #42' "$project_assembly_output" >/dev/null \
+    || fail "native project product did not lower its Int result"
+clang -arch arm64 "$project_assembly_output" -o "$project_assembly_executable"
+project_assembly_status=0
+"$project_assembly_executable" || project_assembly_status=$?
+[[ "$project_assembly_status" -eq 42 ]] \
+    || fail "native project executable did not return 42"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_assembly_call_fixture" > "$project_assembly_call_output"
+[[ "$(grep -c '^_Range_function_[0-9][0-9]*_[0-9][0-9]*:$' "$project_assembly_call_output")" -eq 2 ]] \
+    || fail "native reachability did not emit exactly the entry and called Function"
+grep -E '^    bl _Range_function_[0-9]+_0$' "$project_assembly_call_output" >/dev/null \
+    || fail "native entry Function did not call its reachable callee"
+if grep -F '    movz x0, #7' "$project_assembly_call_output" >/dev/null; then
+    fail "native reachability emitted the unused Function"
+fi
+clang -arch arm64 "$project_assembly_call_output" -o "$project_assembly_call_executable"
+project_assembly_call_status=0
+"$project_assembly_call_executable" || project_assembly_call_status=$?
+[[ "$project_assembly_call_status" -eq 42 ]] \
+    || fail "native call executable did not return 42"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_many_fixture" > "$project_many_output"
+grep -F '    sub sp, sp, #48' "$project_many_output" >/dev/null \
+    || fail "native Int many storage did not allocate an aligned descriptor and values"
+grep -F '    str x9, [sp]' "$project_many_output" >/dev/null \
+    || fail "native Int many descriptor omitted its contiguous element pointer"
+grep -F '    str x10, [x9, #8]' "$project_many_output" >/dev/null \
+    || fail "native Int many storage omitted its second contiguous value"
+clang -arch arm64 "$project_many_output" -o "$project_many_executable"
+project_many_status=0
+"$project_many_executable" || project_many_status=$?
+[[ "$project_many_status" -eq 2 ]] \
+    || fail "native Int many count did not return 2"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_many_empty_fixture" > "$project_many_empty_output"
+grep -F '    movz x10, #0' "$project_many_empty_output" >/dev/null \
+    || fail "empty many descriptor did not derive zero count and capacity"
+if grep -F '    str x10, [x9]' "$project_many_empty_output" >/dev/null; then
+    fail "empty many descriptor materialized a value"
+fi
+clang -arch arm64 "$project_many_empty_output" -o "$project_many_empty_executable"
+"$project_many_empty_executable" \
+    || fail "empty many count did not return zero"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_many_read_fixture" > "$project_many_read_output"
+grep -F '    ldr x0, [x9, #8]' "$project_many_read_output" >/dev/null \
+    || fail "native Int many positional read did not load contiguous storage"
+clang -arch arm64 "$project_many_read_output" -o "$project_many_read_executable"
+project_many_read_status=0
+"$project_many_read_executable" || project_many_read_status=$?
+[[ "$project_many_read_status" -eq 4 ]] \
+    || fail "native Int many positional read did not return the second value"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_many_byte_fixture" > "$project_many_byte_output"
+grep -F '    strb w10, [x9, #1]' "$project_many_byte_output" >/dev/null \
+    || fail "native Byte many did not select compact byte storage"
+grep -F '    ldrb w0, [x9, #1]' "$project_many_byte_output" >/dev/null \
+    || fail "native Byte many positional read did not select byte width"
+clang -arch arm64 "$project_many_byte_output" -o "$project_many_byte_executable"
+project_many_byte_status=0
+"$project_many_byte_executable" || project_many_byte_status=$?
+[[ "$project_many_byte_status" -eq 4 ]] \
+    || fail "native Byte many positional read did not return the second value"
+
+project_many_mixed_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --emit-assembly \
+    "$project_many_mixed_fixture" > "$project_many_mixed_output" 2>&1 \
+    || project_many_mixed_status=$?
+[[ "$project_many_mixed_status" -ne 0 ]] \
+    || fail "homogeneous native many storage admitted mixed identities"
+grep -F 'first native many storage slice requires one identity' \
+    "$project_many_mixed_output" >/dev/null \
+    || fail "mixed native many storage failed at the wrong boundary"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$function_parameters_fixture" \
+    > "$function_parameters_output"
+grep -E $'^functionParameter\tfunction=[0-9]+\tlabel=receiver\tname=receiver\ttype=NativeObject\tordinal=0$' "$function_parameters_output" >/dev/null \
+    || fail "labeled Function parameter was not retained"
+grep -E $'^functionParameter\tfunction=[0-9]+\tlabel=_\tname=selector\ttype=NativeSelector\tordinal=1$' "$function_parameters_output" >/dev/null \
+    || fail "independently named positional Function parameter was not retained"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$function_parameters_output" >/dev/null \
+    || fail "Function parameter fixture was rejected"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_macro_pass" > "$project_macro_output"
+grep -F $'projectMacroApplication\tsource=0\tsyntax=0\tdeclarationSource=1\tdeclaration=0\ttargetSource=0\ttarget=6\tordinal=0' "$project_macro_output" >/dev/null \
+    || fail "cross-file Macro Application did not retain both source identities"
+grep -F $'projectSyntax\tvalid=true' "$project_macro_output" >/dev/null \
+    || fail "cross-file Macro Application project was rejected"
+project_macro_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_macro_missing" > "$project_macro_output" || project_macro_status=$?
+[[ "$project_macro_status" -eq 65 ]] || fail "missing cross-file Macro declaration did not reject"
+grep -E '^[^ ]+\.range:[0-9]+:[0-9]+: macro application does not match any declaration$' "$project_macro_output" >/dev/null \
+    || fail "missing cross-file Macro declaration rejected at the wrong boundary"
+project_macro_status=0
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$project_macro_duplicate" > "$project_macro_output" || project_macro_status=$?
+[[ "$project_macro_status" -eq 65 ]] || fail "duplicate cross-file Macro declaration did not reject"
+grep -E '^[^ ]+\.range:[0-9]+:[0-9]+: macro application resolves to multiple declarations$' "$project_macro_output" >/dev/null \
+    || fail "duplicate cross-file Macro declaration rejected at the wrong boundary"
 
 grep -F 'construct FileManager {' "$file_api" >/dev/null || fail "missing Range-owned FileManager"
 grep -F 'function filePrimitiveOpen(path: String, mode: Int): FileHandle' "$file_api" >/dev/null || fail "missing file-open primitive"
@@ -164,7 +461,7 @@ if rg -n 'expected: "llvm"|name == "llvm"' "$syntax_query_api" "$syntax_parser" 
     fail "post-expansion relationship collection special-cases the llvm spelling"
 fi
 grep -F 'function compilerBTargetMatchesMacroFamily(' "$syntax_query_api" >/dev/null || fail "macro targets cannot resolve an abstract macro family"
-grep -Fx 'macro member(): Let | State | Derived | Binding -> Void {}' "$member_macro" >/dev/null || fail "@member does not connect the four concrete property forms"
+grep -F 'macro member(): Let | State | Derived | Binding -> Value {' "$member_macro" >/dev/null || fail "@member does not connect the four concrete property forms to Value"
 if rg -n 'expected: "Member"|construct Member \{\}|: Member([[:space:]]|$)' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
     fail "Compiler B still treats Member as a nominal compiler-known target"
 fi
@@ -206,9 +503,10 @@ grep -F '  let commands: #environment.target.Declaration.members.filter(all: Fun
 if grep -F 'macro command(' "$command_group_macro" >/dev/null; then
     fail "command-group still requires a redundant per-function command macro"
 fi
-grep -F '@collection.modifier' "$bool_macro" >/dev/null || fail "filter is not marked as a collection modifier"
+grep -F '@collectionModifier' "$bool_macro" >/dev/null || fail "filter is not marked as a collection modifier"
 grep -F 'macro filter(named: String): @many -> @any {' "$bool_macro" >/dev/null || fail "filter does not declare its cardinality transform"
-grep -F 'macro map(transform: Function): @many -> @many {' "$bool_macro" >/dev/null || fail "map does not declare its cardinality-preserving transform"
+grep -F 'macro map(): @many -> @many {' "$bool_macro" >/dev/null || fail "map does not declare its cardinality-preserving transform"
+grep -F 'let transform: #environment.Application.children.filter(all: Closure)' "$bool_macro" >/dev/null || fail "map does not derive its transform Closure from the Application"
 grep -F 'state input: #environment.target' "$bool_macro" >/dev/null || fail "modifier does not consume its predecessor Application"
 if rg -n '#environment\.target\.root\(\)|functionModifier|callRoot' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
     fail "Compiler B still contains the retired token-root or function-modifier path"
@@ -275,7 +573,7 @@ grep -F '@diagnostic(' "$many_macro" >/dev/null || fail "many macro does not inv
 if rg -n '#environment\.diagnostic' "$COMPILER_B_ROOT/Sources/CompilerB" "$REPO_ROOT/Testing/CompilerB" >/dev/null; then
     fail "Compiler B still contains the special environment diagnostic effect"
 fi
-grep -F 'let modifiers: #environment.macros.filter(all: @collectionModifier)' "$many_macro" >/dev/null || fail "many macro does not query collection modifier macros directly from its environment"
+grep -F 'let modifiers: #environment.filter(for: @collectionModifier)' "$many_macro" >/dev/null || fail "many macro does not suspend its collection-modifier query on the environment slot"
 grep -F 'extension #environment.target.Application {' "$many_macro" >/dev/null || fail "many macro does not provision its target Application"
 grep -F '#modifiers' "$many_macro" >/dev/null || fail "many macro does not directly splice the filtered identity collection"
 if grep -F 'modifiers.map' "$many_macro" >/dev/null; then
@@ -342,9 +640,13 @@ if grep -F $'found=false' "$syntax_revision_output" >/dev/null; then
 fi
 grep -F $'syntaxDeltaCount=3\tadded=1\tremoved=1\tchanged=1\tvalid=true' "$syntax_revision_output" >/dev/null || fail "syntax revision diff summary is incorrect"
 
+environment_filter_suspension_output="$work_root/environment-filter-suspension.txt"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$environment_filter_suspension_fixture" "$environment_filter_suspension_fixture" > "$environment_filter_suspension_output"
+grep -F $'environmentFilter\topen=-2\tgraphUpdates=2' "$environment_filter_suspension_output" >/dev/null || fail "environment filter did not suspend before sealing and materialize the complete graph update"
+
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$member_macro_fixture" > "$member_macro_output"
-grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=state\tname=count\ttype=Int\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "owned state Member facet is incorrect"
-grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=-1\tkind=let\tname=seed\ttype=Int\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "top-level let Member facet is incorrect"
+grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=state\tname=count\ttype=Int\tinitializer=-?[0-9]+\tbody=-?[0-9]+\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "owned state Member facet is incorrect"
+grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=-1\tkind=let\tname=seed\ttype=Int\tinitializer=-?[0-9]+\tbody=-?[0-9]+\tinitializerStart=[0-9]+\tinitializerEnd=[0-9]+\tstart=[0-9]+\tend=[0-9]+$' "$member_macro_output" >/dev/null || fail "top-level let Member facet is incorrect"
 grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=binding\tname=selected\ttype=Int\t' "$member_macro_output" >/dev/null || fail "binding property did not materialize its concrete facet"
 grep -E $'^syntaxNode\tmarker=member\tid=[0-9]+\tparent=[0-9]+\tkind=derived\tname=labels\ttype=String\t' "$member_macro_output" >/dev/null || fail "derived property did not materialize its concrete facet"
 [[ "$(grep -c $'^macroRelationship\t' "$member_macro_output")" -eq 5 ]] || fail "abstract member fixture did not expose its five property relationships"
@@ -353,7 +655,22 @@ if grep -F $'macroExecution\t' "$member_macro_output" >/dev/null; then
     fail "marker @print unexpectedly executed a macro body"
 fi
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$member_macro_mismatch_fixture" > "$member_macro_mismatch_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_type_admission_fixture" \
+    > "$many_type_admission_output"
+many_owner_id="$(sed -n $'s/^syntaxNode\tmarker=macro\tid=\([0-9][0-9]*\)\tparent=-1\tname=many\t.*/\\1/p' "$many_type_admission_output")"
+[[ -n "$many_owner_id" ]] || fail "many declaration identity was not retained"
+grep -E $'^syntaxNode\tmarker=function\tid=[0-9]+\tparent='"$many_owner_id"$'\tname=append\t' "$many_type_admission_output" >/dev/null \
+    || fail "many append Function is not owned by the macro declaration"
+grep -E $'^syntaxNode\tmarker=function\tid=[0-9]+\tparent='"$many_owner_id"$'\tname=count\t' "$many_type_admission_output" >/dev/null \
+    || fail "many count Function is not owned by the macro declaration"
+grep -E $'^collection\tid=[0-9]+\tselector=[0-9]+\tmarker=type$' "$many_type_admission_output" >/dev/null \
+    || fail "@type admission did not resolve as the many member selector"
+grep -E $'^collectionMaterialization\tapplication=[0-9]+\tdeclaration=[0-9]+\ttarget=[0-9]+\towner=[0-9]+\tmemberKind=state\tadmission=[0-9]+\tstorage=derived$' "$many_type_admission_output" >/dev/null \
+    || fail "many application did not materialize its state, admission, and derived storage relationships"
+grep -F $'syntax\tvalid=true\tdiagnostic=' "$many_type_admission_output" >/dev/null \
+    || fail "many @type admission fixture did not produce a valid B graph"
+
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$member_macro_mismatch_fixture" > "$member_macro_mismatch_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro target does not satisfy declared type' "$member_macro_mismatch_output" >/dev/null || fail "non-Member @print target rejected at the wrong boundary"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_relationship_fixture" > "$macro_relationship_output"
@@ -372,13 +689,13 @@ grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=enabled\tvalue=[0-9]+\tkind=
 grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=label\tvalue=[0-9]+\tkind=string\tordinal=2$' "$macro_argument_output" >/dev/null || fail "String macro argument is incorrect"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$macro_argument_output" >/dev/null || fail "valid typed macro arguments were rejected"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_missing_fixture" > "$macro_argument_failure_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_missing_fixture" > "$macro_argument_failure_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument is missing' "$macro_argument_failure_output" >/dev/null || fail "missing macro argument rejected at the wrong boundary"
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_type_fixture" > "$macro_argument_failure_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_type_fixture" > "$macro_argument_failure_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument does not satisfy parameter type' "$macro_argument_failure_output" >/dev/null || fail "mistyped macro argument rejected at the wrong boundary"
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_unknown_fixture" > "$macro_argument_failure_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_unknown_fixture" > "$macro_argument_failure_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument label is not declared' "$macro_argument_failure_output" >/dev/null || fail "unknown macro argument rejected at the wrong boundary"
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_duplicate_fixture" > "$macro_argument_failure_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$macro_argument_duplicate_fixture" > "$macro_argument_failure_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro argument is duplicated' "$macro_argument_failure_output" >/dev/null || fail "duplicate macro argument rejected at the wrong boundary"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$process_result_fixture" > "$process_result_output"
@@ -451,7 +768,7 @@ grep -F $'syntax\tvalid=true\tdiagnostic=' "$llvm_collection_output" >/dev/null 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$bool_macro" > "$bool_macro_output"
 grep -E $'^macroCardinality\tmacro=[0-9]+\tinput=many\toutput=any$' "$bool_macro_output" >/dev/null || fail "filter macro cardinality transform was not retained"
 grep -E $'^macroCardinality\tmacro=[0-9]+\tinput=many\toutput=many$' "$bool_macro_output" >/dev/null || fail "map macro cardinality transform was not retained"
-[[ "$(grep -c $'^macroRelationship\t' "$bool_macro_output")" -eq 2 ]] || fail "collection modifier marker did not collect both Macro declarations"
+[[ "$(grep -c $'^macroRelationship\t' "$bool_macro_output")" -eq 4 ]] || fail "collection modifier marker did not collect all four Macro declarations"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$bool_macro_output" >/dev/null || fail "canonical collection modifier source did not produce a valid B graph"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$application_execution_fixture" > "$application_execution_output"
@@ -480,10 +797,10 @@ grep -E $'^macroParameter\tmacro=[0-9]+\tname=nodes\ttype=@many\toptional=false\
 grep -E $'^macroRelationship\tapplication=[0-9]+\tdeclaration=[0-9]+\ttarget=-1$' "$many_print_output" >/dev/null || fail "plural print did not resolve as a freestanding macro overload"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$many_print_output" >/dev/null || fail "plural print fixture did not produce a valid B graph"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_print_mismatch_fixture" > "$many_print_mismatch_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_print_mismatch_fixture" > "$many_print_mismatch_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro application does not match any declaration' "$many_print_mismatch_output" >/dev/null || fail "plural print accepted a value without @many cardinality"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$freestanding_target_fixture" > "$freestanding_target_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$freestanding_target_fixture" > "$freestanding_target_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=macro target does not satisfy declared type' "$freestanding_target_output" >/dev/null || fail "target-requiring macro executed without a target node"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$collection_production_fixture" > "$collection_production_output"
@@ -499,7 +816,7 @@ grep -E $'^macroArgument\tapplication=[0-9]+\tlabel=count\tvalue=[0-9]+\tkind=in
 grep -E $'^macroRelationship\tapplication=[0-9]+\tdeclaration=[0-9]+\ttarget=[0-9]+$' "$uuid_many_output" >/dev/null || fail "UUID Byte storage is not related to @many"
 grep -F $'syntax\tvalid=true\tdiagnostic=' "$uuid_many_output" >/dev/null || fail "UUID @many Byte model did not produce a valid B graph"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$collection_production_mismatch_fixture" > "$collection_production_mismatch_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$collection_production_mismatch_fixture" > "$collection_production_mismatch_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=unable to resolve collection production relationships' "$collection_production_mismatch_output" >/dev/null || fail "collection production accepted a result outside its selector Macro contract"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$backend_entry_fixture" "$collection_production_population_fixture" > "$collection_production_population_output"
@@ -521,7 +838,7 @@ grep -F $'syntax\tvalid=true\tdiagnostic=' "$integer_macro_output" >/dev/null ||
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$many_macro" > "$many_macro_output"
 grep -E $'^application\tid=[0-9]+\tpredecessor=[0-9]+\tdeclaration=-1\tkind=\tname=filter\tinput=\toutput=$' "$many_macro_output" >/dev/null || fail "many macro graph query was not retained as an Application"
 grep -E $'^processLocal\t.*\tname=modifiers\t.*\tnoValueFallback=false\trhsKind=$' "$many_macro_output" >/dev/null || fail "many macro modifier query result was not retained as a local value"
-grep -E $'^applicationProvision\tid=[0-9]+\towner=[0-9]+\ttarget=[0-9]+\tsourceIdentity=[0-9]+\tsource=modifiers$' "$many_macro_output" >/dev/null || fail "many macro plural Application provision was not retained by identity"
+grep -E $'^applicationProvision\tid=[0-9]+\towner=[0-9]+\tenvironment=[0-9]+\textension=[0-9]+\ttarget=[0-9]+\tsourceIdentity=[0-9]+\tsource=modifiers$' "$many_macro_output" >/dev/null || fail "many macro plural Application provision did not retain its direct environment and extension ownership"
 [[ "$(grep -c $'^environment\t.*\towner=' "$many_macro_output")" -eq 1 ]] || fail "many macro did not collect its environment"
 [[ "$(grep -c $'^environmentNode\t.*\tkind=application\tvalue=LLVM$' "$many_macro_output")" -eq 2 ]] || fail "many environment did not retain both LLVM Application nodes"
 [[ "$(grep -c $'^processExecution\t.*\tfunction=@diagnostic$' "$many_macro_output")" -eq 1 ]] || fail "many macro did not retain its inline diagnostic execution"
@@ -657,20 +974,22 @@ grep -F $'syntaxNode	marker=block	id=99	parent=76' "$output" >/dev/null || fail 
 grep -F $'token	id=1	kind=identity	text=value2' "$token_syntax_output" >/dev/null || fail "digit-bearing declaration name was not retained as one identity token"
 grep -F $'syntaxNode	marker=function	id=0	parent=-1	name=value2' "$token_syntax_output" >/dev/null || fail "syntax parser did not consume the retained digit-bearing identity"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_declaration_fixture" > "$generic_declaration_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_declaration_fixture" > "$generic_declaration_output" || true
 grep -F $'syntax	valid=false	diagnostic=Compiler B does not accept generic syntax; express the relationship through the graph' "$generic_declaration_output" >/dev/null || fail "generic declaration syntax did not reject at the graph-relationship boundary"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_member_fixture" > "$generic_member_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_member_fixture" > "$generic_member_output" || true
 grep -F $'syntax	valid=false	diagnostic=Compiler B does not accept generic syntax; express the relationship through the graph' "$generic_member_output" >/dev/null || fail "generic member type syntax did not reject at the graph-relationship boundary"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_function_type_fixture" > "$generic_function_type_output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$generic_function_type_fixture" > "$generic_function_type_output" || true
 grep -F $'syntax\tvalid=false\tdiagnostic=Compiler B does not accept generic syntax; express the relationship through the graph' "$generic_function_type_output" >/dev/null || fail "generic function type syntax did not reject at the graph-relationship boundary"
 
-"$REPO_ROOT/scripts/run-compiler-b-bootstrap" "$REPO_ROOT/Testing/CompilerB/Pass" > "$directory_output"
-grep -F "route=$REPO_ROOT/Testing/CompilerB/Pass" "$directory_output" >/dev/null || fail "missing directory route output"
+"$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$project_source_set_fixture" "$REPO_ROOT/Testing/CompilerB/Pass" > "$directory_output"
 grep -F "$REPO_ROOT/Testing/CompilerB/Pass/SyntaxNodes.range" "$directory_output" >/dev/null || fail "directory cursor missed SyntaxNodes.range"
 grep -F "$REPO_ROOT/Testing/CompilerB/Pass/SourceGraphFunction.range" "$directory_output" >/dev/null || fail "directory cursor missed SourceGraphFunction.range"
-grep -F $'syntax	valid=true' "$directory_output" >/dev/null || fail "directory-selected source did not parse"
+diff -u \
+    <(find "$REPO_ROOT/Testing/CompilerB/Pass" -type f -name '*.range' | LC_ALL=C sort) \
+    <(sed '/^$/d' "$directory_output") >/dev/null \
+    || fail "project source discovery is not deterministic"
 
 "$REPO_ROOT/scripts/run-compiler-b-bootstrap" --entry "$file_manager_fixture" "$file_manager_output"
 [[ "$(<"$file_manager_output")" == "alpha-beta" ]] || fail "FileManager write/append/read round trip did not persist expected text"

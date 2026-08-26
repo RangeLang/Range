@@ -16,20 +16,19 @@ macro bool(): Construct {
 
 }
 
+macro collectionModifier(): Macro {}
+
 macro collection(): Macro {
 
   let modifiers: #environment.filter(
-    all: @collection.modifier
+    for: @collectionModifier
   )
 
-  if modifiers.isEmpty {
-    @print("Hello print should work like this")
-
-  }
+  if modifiers.isEmpty {}
 
 }
 
-@collection.modifier
+@collectionModifier
 macro filter(named: String): @many -> @any {
     state input: #environment.target
     state output: @any(capacity: input.capacity)
@@ -48,12 +47,12 @@ macro filter(named: String): @many -> @any {
     output
 }
 
-@collection.modifier
+@collectionModifier
 macro isEmpty(): @many -> Bool {
     #environment.target.count == 0
 }
 
-@collection.modifier
+@collectionModifier
 macro each(): @many -> @one {
     let action: #environment.Application.children.filter(all: Closure)
 
@@ -67,7 +66,7 @@ macro each(): @many -> @one {
     }
 }
 
-@collection.modifier
+@collectionModifier
 macro map(): @many -> @many {
     let transform: #environment.Application.children.filter(all: Closure)
 

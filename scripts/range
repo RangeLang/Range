@@ -16,7 +16,7 @@ Usage:
   range lsp
   range compiler next
   range compiler next --cached-only
-  range compiler b
+  range compiler b [check|--emit-assembly <PROJECT>|run <PROJECT> [-- ARGS...]]
   range compiler progression
   range compiler progression --cached-only
   range compiler promote --approve
@@ -29,6 +29,7 @@ Usage:
   range check-shape
   range check-compiler-smoke [DIR]
   range check-compiler-b
+  range check-compiler-b-self-host
   range check-compiler-b-source-graph
   range check-compiler-v1
   range check-compiler-graph
@@ -92,8 +93,7 @@ case "$command" in
         shift
         case "$compiler_command" in
             b)
-                if [[ $# -ne 0 ]]; then usage; exit 1; fi
-                "$REPO_ROOT/scripts/run-range-compiler-b"
+                "$REPO_ROOT/scripts/run-range-compiler-b" "$@"
                 ;;
             next)
                 if [[ $# -eq 0 ]]; then
@@ -173,6 +173,10 @@ case "$command" in
     check-compiler-b)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi
         "$REPO_ROOT/scripts/check-range-compiler-b"
+        ;;
+    check-compiler-b-self-host)
+        if [[ $# -gt 1 ]]; then usage; exit 1; fi
+        "$REPO_ROOT/scripts/check-compiler-b-self-host" "$@"
         ;;
     check-compiler-b-source-graph)
         if [[ $# -ne 0 ]]; then usage; exit 1; fi

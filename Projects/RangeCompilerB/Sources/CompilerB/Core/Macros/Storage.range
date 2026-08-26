@@ -1,0 +1,8 @@
+enum Storage {
+    case immutable
+    case mutable
+    case derived
+    case binding
+}
+
+macro storage(mode: Storage): Construct {}

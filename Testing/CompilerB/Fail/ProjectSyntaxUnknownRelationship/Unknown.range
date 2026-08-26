@@ -1,0 +1,4 @@
+@syntax($unknown unknown)
+construct KnownShape {
+    state value: Syntax
+}

@@ -1,6 +1,12 @@
 macro member(): Let | State | Derived | Binding -> Void {}
 macro print(): @member {}
-macro values(): @member -> String {}
+macro values(): @member -> String {
+    #environment {
+        extension #environment.target.Declaration {
+            String(value: "")
+        }
+    }
+}
 
 construct String {}
 
