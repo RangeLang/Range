@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPILER="${RANGE_COMPILER_B_EXECUTABLE:-}"
+COMPILER="${RANGE_COMPILER_EXECUTABLE:-}"
 
 fail() {
     echo "RangeView MaterialMouse check: $*" >&2
@@ -13,14 +13,14 @@ fail() {
 work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-view-material-mouse.XXXXXX")"
 trap 'rm -rf "$work_root"' EXIT
 
-if [[ -z "$COMPILER" ]]; then
-    "$REPO_ROOT/scripts/run-compiler-b-bootstrap" --build-only "$work_root/seed"
-    COMPILER="$work_root/seed/CompilerB"
-fi
-[[ -x "$COMPILER" ]] || fail "Compiler B executable is not runnable"
-
 output="$work_root/range-view.out"
-"$COMPILER" "$REPO_ROOT/Projects/RangeView" > "$output"
+if [[ -n "$COMPILER" ]]; then
+    [[ -x "$COMPILER" ]] || fail "Range Compiler executable is not runnable"
+    RANGE_COMPILER_EXECUTABLE="$COMPILER" \
+        "$REPO_ROOT/scripts/run-range-compiler" "$REPO_ROOT/Projects/RangeView" > "$output"
+else
+    "$REPO_ROOT/scripts/run-range-compiler" "$REPO_ROOT/Projects/RangeView" > "$output"
+fi
 
 grep -F $'projectSyntax\tvalid=true\tfailures=0' "$output" >/dev/null \
     || fail "RangeView project graph is invalid"
@@ -53,10 +53,10 @@ number_input="$REPO_ROOT/Projects/RangeView/Sources/RangeView/NumberInput.range"
     || fail "NumberInput must contain two rectangles"
 
 if rg -n 'Rectangle|NumberInput|MaterialMouse|Metal' \
-    "$REPO_ROOT/Projects/RangeCompilerB/Sources/CompilerB/Core/Project/Construction.range" \
-    "$REPO_ROOT/Projects/RangeCompilerB/Sources/CompilerB/Core/Syntax/Parser.range" \
+    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Project/Construction.range" \
+    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Syntax/Parser.range" \
     >/dev/null; then
-    fail "Compiler B contains a RangeView- or Metal-specific construction identity"
+    fail "Range Compiler contains a RangeView- or Metal-specific construction identity"
 fi
 
-echo "RangeView MaterialMouse check: pass (Compiler B graph and authored static structure)"
+echo "RangeView MaterialMouse check: pass (Range Compiler graph and authored static structure)"

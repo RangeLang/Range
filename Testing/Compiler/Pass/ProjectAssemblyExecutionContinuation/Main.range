@@ -1,0 +1,13 @@
+@extern
+function commandLineArgumentCount(): Int
+
+function start(): Int {
+    let firstCount: Int(commandLineArgumentCount())
+
+    if firstCount != 1 && firstCount != 2 {
+        return 64
+    }
+
+    let continuationCount: Int(commandLineArgumentCount())
+    return 42
+}

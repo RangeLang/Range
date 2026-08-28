@@ -1,3 +1,0 @@
-macro main(): Void {}
-
-function start(): Void {}

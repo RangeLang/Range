@@ -1,5 +1,0 @@
-@syntax($first $second)
-construct Adjacent {
-    state first: Syntax
-    state second: Syntax
-}

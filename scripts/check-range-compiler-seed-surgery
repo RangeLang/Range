@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-seed-surgery.XXXXXX")"
+cleanup() { rm -rf "$work_root"; }
+trap cleanup EXIT
+
+clang -arch arm64 -mbranch-protection=bti -dynamiclib \
+    "$REPO_ROOT/RangeCompiler/Bootstrap/Rescue/SeedSurgery.c" \
+    "$REPO_ROOT/RangeCompiler/Bootstrap/Rescue/SeedSurgeryArm64.s" \
+    -o "$work_root/SeedSurgery.dylib"
+
+stage_root="$work_root/stage"
+mkdir -p "$stage_root/Projects/RangeCompilerB/Sources"
+ln -s "$REPO_ROOT/RangeCompiler/Sources/Compiler" \
+    "$stage_root/Projects/RangeCompilerB/Sources/CompilerB"
+
+cd "$stage_root"
+RANGE_SEED_SURGERY_MODE=probe \
+DYLD_INSERT_LIBRARIES="$work_root/SeedSurgery.dylib" \
+    "$REPO_ROOT/RangeCompiler/Bootstrap/range" --emit-assembly \
+    "$REPO_ROOT/Testing/Compiler/Pass/ProjectAssemblyExecutionCompass" \
+    > "$work_root/probe.out"
+
+grep -F $'projectSyntax\tvalid=true\tfailures=0' "$work_root/probe.out" >/dev/null \
+    || { echo "range seed surgery: in-memory probe did not redirect assembly mode" >&2; exit 1; }
+
+continuation_status=0
+continuation_assembly="$work_root/continuation.s"
+RANGE_SEED_SURGERY_MODE=continuation-probe \
+DYLD_INSERT_LIBRARIES="$work_root/SeedSurgery.dylib" \
+    "$REPO_ROOT/RangeCompiler/Bootstrap/range" --emit-assembly \
+    "$REPO_ROOT/Testing/Compiler/Pass/ProjectAssemblyExecutionContinuation" \
+    > "$continuation_assembly" || continuation_status=$?
+[[ "$continuation_status" -eq 0 ]] \
+    || { echo "range seed surgery: continuation ABI probe returned $continuation_status" >&2; exit 1; }
+[[ "$(grep -c '    bl _commandLineArgumentCount' "$continuation_assembly")" -eq 2 ]] \
+    || { echo "range seed surgery: continuation call was not materialized exactly once" >&2; exit 1; }
+
+clang -arch arm64 "$continuation_assembly" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
+    -o "$work_root/continuation"
+continuation_exit=0
+"$work_root/continuation" || continuation_exit=$?
+[[ "$continuation_exit" -eq 64 ]] \
+    || { echo "range seed surgery: continuation fixture missed early completion" >&2; exit 1; }
+continuation_exit=0
+"$work_root/continuation" value || continuation_exit=$?
+[[ "$continuation_exit" -eq 42 ]] \
+    || { echo "range seed surgery: continuation fixture missed ordered continuation" >&2; exit 1; }
+
+branch_assembly="$work_root/continuation-branch.s"
+RANGE_SEED_SURGERY_MODE=continuation-probe \
+DYLD_INSERT_LIBRARIES="$work_root/SeedSurgery.dylib" \
+    "$REPO_ROOT/RangeCompiler/Bootstrap/range" --emit-assembly \
+    "$REPO_ROOT/Testing/Compiler/Pass/ProjectAssemblyExecutionContinuationBranch" \
+    > "$branch_assembly"
+[[ "$(grep -c '    bl _commandLineArgumentCount' "$branch_assembly")" -eq 1 ]] \
+    || { echo "range seed surgery: continuation branch changed the declaration call count" >&2; exit 1; }
+
+clang -arch arm64 "$branch_assembly" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
+    "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
+    -o "$work_root/continuation-branch"
+branch_exit=0
+"$work_root/continuation-branch" || branch_exit=$?
+[[ "$branch_exit" -eq 64 ]] \
+    || { echo "range seed surgery: continuation branch missed early completion" >&2; exit 1; }
+branch_exit=0
+"$work_root/continuation-branch" value || branch_exit=$?
+[[ "$branch_exit" -eq 42 ]] \
+    || { echo "range seed surgery: continuation branch missed its false successor" >&2; exit 1; }
+branch_exit=0
+"$work_root/continuation-branch" first second || branch_exit=$?
+[[ "$branch_exit" -eq 43 ]] \
+    || { echo "range seed surgery: continuation branch missed its true successor" >&2; exit 1; }
+
+echo "range compiler seed surgery probe: pass"

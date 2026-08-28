@@ -1,5 +1,0 @@
-construct BlockRegistration {}
-
-macro block(): Member -> BlockRegistration {
-    return BlockRegistration()
-}

@@ -1,9 +1,0 @@
-@integer
-construct BrokenInteger {
-    let bits: Int(7)
-    let signed: Bool(false)
-}
-
-function answer(): BrokenInteger {
-    1
-}

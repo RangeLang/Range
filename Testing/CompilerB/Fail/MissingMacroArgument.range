@@ -1,5 +1,0 @@
-macro member(): Let | State | Derived | Binding -> Void {}
-macro metadata(count: Int): @member -> Void {}
-
-@metadata
-let bytes: Byte

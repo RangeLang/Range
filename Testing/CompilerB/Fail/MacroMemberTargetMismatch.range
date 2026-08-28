@@ -1,5 +1,0 @@
-macro member(): Let | State | Derived | Binding -> Void {}
-macro print(): @member {}
-
-@print
-construct NotAMember {}

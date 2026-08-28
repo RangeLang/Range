@@ -1,6 +1,5 @@
-// AppKit owns the native window and CAMetalLayer owns presentation. Range owns
-// the viewport and the semantic geometry that later lowering places in Metal
-// buffers; native objects remain disposable products.
+// A first ordinary Range-owned native lifecycle. AppKit supplies the windowing
+// boundary and Metal supplies the GPU device; neither owns RangeView semantics.
 
 function rangeViewLaunch(): Int {
     let appKitLoaded: NSApplicationLoad()
@@ -23,114 +22,34 @@ function rangeViewLaunch(): Int {
         selector: activateSelector,
         value: 1
     )
+    let alertClass: objc_getClass(name: "NSAlert")
     let allocationSelector: sel_registerName(name: "alloc")
-    let initializationSelector: sel_registerName(name: "init")
-
-    let windowClass: objc_getClass(name: "NSWindow")
-    let windowAllocation: objc_msgSend(
-        receiver: windowClass,
+    let alertAllocation: objc_msgSend(
+        receiver: alertClass,
         selector: allocationSelector
     )
-    let window: objc_msgSend(
-        receiver: windowAllocation,
+    let initializationSelector: sel_registerName(name: "init")
+    let alert: objc_msgSend(
+        receiver: alertAllocation,
         selector: initializationSelector
     )
-
     let stringClass: objc_getClass(name: "NSString")
     let stringSelector: sel_registerName(name: "stringWithUTF8String:")
     let title: objcMessageString(
         receiver: stringClass,
         selector: stringSelector,
-        value: "RangeView"
+        value: "RangeView - Metal is live"
     )
-    let titleSelector: sel_registerName(name: "setTitle:")
-    let titled: objcMessageObject(
-        receiver: window,
-        selector: titleSelector,
+    let messageSelector: sel_registerName(name: "setMessageText:")
+    let message: objcMessageObject(
+        receiver: alert,
+        selector: messageSelector,
         value: title
     )
-
-    let styleSelector: sel_registerName(name: "setStyleMask:")
-    let styled: objcMessageInteger(
-        receiver: window,
-        selector: styleSelector,
-        value: 15
-    )
-
-    // setFrameFromString: avoids a native geometry wrapper. The 800 x 600
-    // semantic viewport remains authored in RangeViewApp.
-    let frame: objcMessageString(
-        receiver: stringClass,
-        selector: stringSelector,
-        value: "100 100 800 600 0 0 1512 949 "
-    )
-    let frameSelector: sel_registerName(name: "setFrameFromString:")
-    let framed: objcMessageObject(
-        receiver: window,
-        selector: frameSelector,
-        value: frame
-    )
-
-    let viewClass: objc_getClass(name: "NSView")
-    let viewAllocation: objc_msgSend(receiver: viewClass, selector: allocationSelector)
-    let view: objc_msgSend(receiver: viewAllocation, selector: initializationSelector)
-    let wantsLayerSelector: sel_registerName(name: "setWantsLayer:")
-    let wantsLayer: objcMessageInteger(
-        receiver: view,
-        selector: wantsLayerSelector,
-        value: 1
-    )
-
-    let metalLayerClass: objc_getClass(name: "CAMetalLayer")
-    let metalLayerAllocation: objc_msgSend(
-        receiver: metalLayerClass,
-        selector: allocationSelector
-    )
-    let metalLayer: objc_msgSend(
-        receiver: metalLayerAllocation,
-        selector: initializationSelector
-    )
-    let deviceSelector: sel_registerName(name: "setDevice:")
-    let layerDevice: objcMessageObject(
-        receiver: metalLayer,
-        selector: deviceSelector,
-        value: device
-    )
-    let pixelFormatSelector: sel_registerName(name: "setPixelFormat:")
-    let pixelFormat: objcMessageInteger(
-        receiver: metalLayer,
-        selector: pixelFormatSelector,
-        value: 80
-    )
-    let framebufferOnlySelector: sel_registerName(name: "setFramebufferOnly:")
-    let framebufferOnly: objcMessageInteger(
-        receiver: metalLayer,
-        selector: framebufferOnlySelector,
-        value: 1
-    )
-    let layerSelector: sel_registerName(name: "setLayer:")
-    let attachedLayer: objcMessageObject(
-        receiver: view,
-        selector: layerSelector,
-        value: metalLayer
-    )
-
-    let contentViewSelector: sel_registerName(name: "setContentView:")
-    let contentView: objcMessageObject(
-        receiver: window,
-        selector: contentViewSelector,
-        value: view
-    )
-    let showSelector: sel_registerName(name: "makeKeyAndOrderFront:")
-    let shown: objcMessageObject(
-        receiver: window,
-        selector: showSelector,
-        value: window
-    )
-    let runSelector: sel_registerName(name: "run")
-    let running: objc_msgSend(
-        receiver: sharedApplication,
-        selector: runSelector
+    let modalSelector: sel_registerName(name: "runModal")
+    let response: objcIntegerMessage(
+        receiver: alert,
+        selector: modalSelector
     )
     return 0
 }

@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER_ROOT="$REPO_ROOT/RangeCompiler"
+SOURCE_MANIFEST="$COMPILER_ROOT/CompilerSources.txt"
+BOOTSTRAP_MANIFEST="$COMPILER_ROOT/Bootstrap/Manifest.json"
+MODE="proof"
+
+if [[ "${1:-}" == "--audit-only" && $# -eq 1 ]]; then
+    MODE="audit"
+elif [[ "${1:-}" == "--expect-boundary" && $# -eq 1 ]]; then
+    MODE="boundary"
+elif [[ $# -ne 0 ]]; then
+    echo "usage: check-range-compiler-self-host [--audit-only|--expect-boundary]" >&2
+    exit 64
+fi
+
+fail() {
+    echo "range compiler self-host: $*" >&2
+    exit 1
+}
+
+sha256() { /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; }
+manifest_value() { /usr/bin/plutil -extract "$1" raw -o - "$BOOTSTRAP_MANIFEST"; }
+
+python3 -m json.tool "$BOOTSTRAP_MANIFEST" >/dev/null || fail "invalid bootstrap manifest"
+[[ "$(sha256 "$COMPILER_ROOT/Bootstrap/range")" == "$(manifest_value compiler.sha256)" ]] \
+    || fail "bootstrap hash mismatch"
+[[ "$(sha256 "$SOURCE_MANIFEST")" == "$(manifest_value sources.manifestSha256)" ]] \
+    || fail "source manifest hash mismatch"
+
+previous=""
+source_count=0
+while IFS= read -r relative; do
+    [[ -n "$relative" ]] || fail "source manifest contains an empty row"
+    [[ "$relative" == RangeCompiler/* && "$relative" == *.range ]] \
+        || fail "source is outside canonical RangeCompiler: $relative"
+    [[ -f "$REPO_ROOT/$relative" ]] || fail "missing canonical source: $relative"
+    if [[ -n "$previous" && "$relative" < "$previous" ]]; then
+        fail "source manifest is not bytewise sorted: $relative"
+    fi
+    previous="$relative"
+    source_count=$((source_count + 1))
+done < "$SOURCE_MANIFEST"
+
+if xargs rg -n 'Buffer<|IntMany|ByteMany|LLVM\(|--emit-llvm' < "$SOURCE_MANIFEST" >/dev/null; then
+    fail "canonical source contains a retired generic, carrier, or LLVM product"
+fi
+if rg -n 'Projects/RangeCompilerB|Testing/CompilerB|Sources/CompilerB' \
+    "$COMPILER_ROOT" "$REPO_ROOT/Testing/Compiler" >/dev/null; then
+    fail "canonical compiler or fixtures retain a retired path"
+fi
+
+runtime_count="$(/usr/bin/plutil -extract runtime.sources raw -o - "$BOOTSTRAP_MANIFEST")"
+runtime_sources=()
+runtime_index=0
+while [[ "$runtime_index" -lt "$runtime_count" ]]; do
+    runtime_relative="$(manifest_value runtime.sources.$runtime_index.path)"
+    runtime_expected="$(manifest_value runtime.sources.$runtime_index.sha256)"
+    [[ "$(sha256 "$REPO_ROOT/$runtime_relative")" == "$runtime_expected" ]] \
+        || fail "runtime hash mismatch: $runtime_relative"
+    runtime_sources+=("$REPO_ROOT/$runtime_relative")
+    runtime_index=$((runtime_index + 1))
+done
+
+echo "range compiler self-host audit: pass sources=$source_count llvm=0 compilerA=0"
+[[ "$MODE" == "audit" ]] && exit 0
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-self-host.XXXXXX")"
+cleanup() {
+    if [[ "${RANGE_KEEP_SELF_HOST_ROOT:-0}" == "1" ]]; then
+        echo "range compiler self-host root: $work_root" >&2
+    else
+        rm -rf "$work_root"
+    fi
+}
+trap cleanup EXIT
+source_root="$work_root/source"
+candidate_root="$work_root/candidate"
+reproduction_root="$work_root/reproduction"
+runtime_root="$work_root/runtime"
+mkdir -p "$source_root" "$candidate_root" "$reproduction_root" "$runtime_root"
+
+while IFS= read -r relative; do
+    staged_relative="${relative#RangeCompiler/}"
+    if [[ "$staged_relative" == "Project.range" ]]; then staged_relative="CompilerProject.range"; fi
+    staged="$source_root/$staged_relative"
+    mkdir -p "$(dirname "$staged")"
+    cp "$REPO_ROOT/$relative" "$staged"
+done < "$SOURCE_MANIFEST"
+
+candidate_exit=0
+"$SCRIPT_DIR/run-range-compiler" --emit-assembly "$source_root" \
+    > "$candidate_root/RangeCompiler.s" 2> "$candidate_root/RangeCompiler.err" || candidate_exit=$?
+if [[ "$candidate_exit" -ne 0 ]]; then
+    if [[ "$MODE" == "boundary" && "$candidate_exit" -eq 65 ]] \
+        && grep -F 'execution compass continuation effect is not materialized' \
+            "$candidate_root/RangeCompiler.s" "$candidate_root/RangeCompiler.err" >/dev/null; then
+        echo "range compiler self-host boundary: execution compass continuation effect is not materialized"
+        exit 0
+    fi
+    sed -n '1,120p' "$candidate_root/RangeCompiler.s" >&2
+    sed -n '1,120p' "$candidate_root/RangeCompiler.err" >&2
+    exit "$candidate_exit"
+fi
+
+runtime_objects=()
+runtime_index=0
+while [[ "$runtime_index" -lt "${#runtime_sources[@]}" ]]; do
+    object="$runtime_root/Runtime-$runtime_index.o"
+    clang -arch arm64 -mmacosx-version-min=27.0 -O0 -fno-lto \
+        -c "${runtime_sources[$runtime_index]}" -o "$object"
+    runtime_objects+=("$object")
+    runtime_index=$((runtime_index + 1))
+done
+
+clang -arch arm64 -mmacosx-version-min=27.0 -c "$candidate_root/RangeCompiler.s" \
+    -o "$candidate_root/RangeCompiler.o"
+clang -arch arm64 -mmacosx-version-min=27.0 -Wl,-no_uuid \
+    "$candidate_root/RangeCompiler.o" "${runtime_objects[@]}" \
+    -o "$candidate_root/RangeCompiler"
+
+RANGE_COMPILER_EXECUTABLE="$candidate_root/RangeCompiler" \
+    "$SCRIPT_DIR/run-range-compiler" --emit-assembly "$source_root" \
+    > "$reproduction_root/RangeCompiler.s"
+clang -arch arm64 -mmacosx-version-min=27.0 -c "$reproduction_root/RangeCompiler.s" \
+    -o "$reproduction_root/RangeCompiler.o"
+clang -arch arm64 -mmacosx-version-min=27.0 -Wl,-no_uuid \
+    "$reproduction_root/RangeCompiler.o" "${runtime_objects[@]}" \
+    -o "$reproduction_root/RangeCompiler"
+
+cmp "$candidate_root/RangeCompiler.s" "$reproduction_root/RangeCompiler.s" >/dev/null \
+    || fail "candidate and reproduction assembly differ"
+cmp "$candidate_root/RangeCompiler.o" "$reproduction_root/RangeCompiler.o" >/dev/null \
+    || fail "candidate and reproduction objects differ"
+cmp "$candidate_root/RangeCompiler" "$reproduction_root/RangeCompiler" >/dev/null \
+    || fail "candidate and reproduction executables differ"
+
+echo "range compiler self-host: pass"

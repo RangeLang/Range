@@ -1,5 +1,0 @@
-@statement
-@syntax(defer $body)
-construct Defer {
-    let body: Block
-}

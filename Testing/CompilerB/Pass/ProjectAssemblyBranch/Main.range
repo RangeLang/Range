@@ -1,7 +1,0 @@
-function start(): Int {
-    state result: Int(7)
-    if true {
-        result: Int(42)
-    }
-    result
-}

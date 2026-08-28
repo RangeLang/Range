@@ -1,6 +1,0 @@
-construct Execution {
-    binding effect: @syntax?
-
-    @many
-    state next: Execution
-}

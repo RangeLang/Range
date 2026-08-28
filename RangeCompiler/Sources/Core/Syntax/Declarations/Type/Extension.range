@@ -1,9 +1,0 @@
-@syntax
-@member
-construct Extension {
-    let macros: Array<Macro.Application>
-    let identity: Identity
-    let target: TypeReference
-    let functions: Array<Function.Declaration>
-    let constructs: Array<Construct.Declaration>
-}

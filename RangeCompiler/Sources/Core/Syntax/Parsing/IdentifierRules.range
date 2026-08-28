@@ -1,7 +1,0 @@
-function identifierAcceptsStart(byte: Int): Bool {
-    return (byte >= 65 && byte <= 90) || byte == 95 || (byte >= 97 && byte <= 122)
-}
-
-function identifierAcceptsContinuation(byte: Int): Bool {
-    return identifierAcceptsStart(byte: byte) || (byte >= 48 && byte <= 57)
-}

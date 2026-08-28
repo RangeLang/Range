@@ -1,0 +1,17 @@
+@extern
+function commandLineArgumentCount(): Int
+
+function start(): Int {
+    let argumentCount: Int(commandLineArgumentCount())
+
+    if argumentCount != 1 && argumentCount != 2 {
+        return 64
+    }
+
+    state branchArgumentCount: Int(2)
+    if argumentCount == branchArgumentCount {
+        return 43
+    }
+
+    return 42
+}

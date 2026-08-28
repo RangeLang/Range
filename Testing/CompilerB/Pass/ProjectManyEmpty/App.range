@@ -1,7 +1,0 @@
-macro app(): Construct -> Void {
-    #environment {
-        @main {
-            start()
-        }
-    }
-}

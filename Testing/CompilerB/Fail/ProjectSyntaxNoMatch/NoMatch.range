@@ -1,3 +1,0 @@
-construct Subject {
-    lat value: Int
-}

@@ -63,30 +63,33 @@ Outcome:
 
 This invariant applies to every later milestone.
 
-## Active compiler fork node — Greenfield Compiler B
+## Active compiler node — Graph-native Range Compiler
 
 Status: active, pre-self-hosting.
 
-Compiler B is a minimal B-owned compiler under `Projects/RangeCompilerB/`.
-Compiler A is the frozen accepted bootstrap that builds B; it does not hand B
-typed syntax or later compiler products. B grows through focused runnable
-slices and does not inherit A's compiler tree, body arenas, or phase tables.
+`RangeCompiler/` is the sole compiler source authority. The checked-in native
+arm64 seed is transitional generation zero; Compiler A, LLVM emission, custom
+entry builds, and the duplicate Compiler B project are retired.
 
-Current checkpoint: self-source lexical and syntax correctness.
+Current checkpoint: replace statement-shaped `if`/`switch` lowering with one
+condition-valued Application topology. Body exposes declaration and Application
+views over one retained source body. Enum declarations carry the condition
+relationship, all possible case successors materialize as `Execution.next`,
+and execution follows only the case selected by the resolved value. A condition
+reached inside a branch is another graph node, not nested-control ownership.
 
 Exit proof:
 
-- accepted A builds and runs the current B slice;
-- B retains string- and comment-aware tokens with typed identities and source
-  ranges;
-- B parses its own `Main.range` and `Lexer.range` from those retained tokens;
-  and
-- the focused check asserts the exact expected top-level declarations and Block
-  relationships for both files.
+- bridge candidate G1 contains the general non-empty singular capture rule and
+  generic brace-form Application retention;
+- condition syntax is supplied only through `@syntax`, with exhaustive enum
+  validation and no source-name parser switch;
+- Apple lowering consumes only the resulting execution relationships; and
+- candidate and reproduction assembly, objects, executables, and focused output
+  are byte-identical before the checked-in seed changes.
 
-Self-compilation, byte-identical B candidate/reproduction artifacts, and an
-independent RangeView product are later milestones. They are not claims or
-requirements of the current checkpoint.
+The frozen seed's current diagnostic remains evidence of generation zero, not a
+reason to extend its statement-shaped conditional lowerer.
 
 ## Milestone 1 — Reduce Typed Function Reconstruction in V1
 

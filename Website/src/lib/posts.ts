@@ -251,6 +251,24 @@ export const posts: Post[] = [
     },
   },
   {
+    slug: "we-deleted-compiler-a",
+    href: "/posts/we-deleted-compiler-a",
+    category: "Compiler design",
+    cardTitle: "We Deleted Compiler A",
+    cardDescription:
+      "One compiler remains. It still cannot reproduce itself—and that is exactly the point.",
+    description:
+      "Why Range retired its old compiler before reaching the native self-hosted fixed point.",
+    palette: 0,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(0 8 94)",
+      mutedForeground: "rgb(0 56 81)",
+      background: "rgb(239 150 82)",
+      contrast: 6.51,
+    },
+  },
+  {
     slug: "requirement-and-provision",
     href: "/posts/requirement-and-provision",
     category: "Language design",

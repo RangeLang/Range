@@ -1,4 +1,0 @@
-@syntax
-construct VariadicTypeReference {
-    let element: TypeReference
-}

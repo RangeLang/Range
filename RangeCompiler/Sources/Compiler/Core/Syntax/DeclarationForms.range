@@ -1,0 +1,84 @@
+@syntax {
+    $macros
+    function $identity $transformation {
+        $members
+    }
+}
+@syntax {
+    $macros
+    function $identity $transformation
+}
+construct Function {
+    @many
+    state macros: Macro
+    state identity: Identity
+    state transformation: Transformation
+
+    @many
+    state members: @syntax
+}
+
+@syntax {
+    $macros
+    enum $identity {
+        $cases
+    }
+}
+construct Enum {
+    @many
+    state macros: Macro
+    state identity: Identity
+
+    @many
+    state cases: EnumCase
+}
+
+@syntax($macros case $identity)
+construct EnumCase {
+    @many
+    state macros: Macro
+    state identity: Identity
+}
+
+@syntax {
+    {
+        $members
+    }
+}
+construct Body {
+    @many
+    state members: @syntax
+
+    @many
+    derived declarations: @syntax
+
+    @many
+    derived applications: Application
+}
+
+construct Selection {
+    @many
+    binding conditions: Semantic
+
+    @many
+    state branches: SelectionCase
+}
+
+@syntax($range: $value)
+construct SelectionCase {
+    binding range: @syntax
+    state value: @syntax
+    binding successor: Execution
+}
+
+@syntax {
+    extension $target {
+        $members
+    }
+}
+construct Extension {
+    state target: Application
+
+    @many
+    state members: @syntax
+}

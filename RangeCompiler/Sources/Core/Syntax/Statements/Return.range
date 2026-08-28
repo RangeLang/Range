@@ -1,5 +1,0 @@
-@statement
-@syntax
-construct Return<Value = Nil> {
-    let value: Value?
-}

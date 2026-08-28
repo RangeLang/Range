@@ -100,10 +100,9 @@ special-casing `Stack` or reparsing its source.
 
 Placement is a local layout relationship. `alignment`, `position`, and
 `offset` are layout modifiers attached to individual view values; a
-container supplies the available boundary and resolves those values. The
-result is backend-neutral `ResolvedViewGeometry`: local position, world
-position, 2D size, and a separate paint layer. Occupancy is derived from that
-geometry and is never stored on a view.
+container supplies the available viewport and resolves those values. The
+result is backend-neutral `ResolvedViewGeometry`, not HTML or native drawing
+calls.
 
 The trailing closure is a view's direct construction input. A
 `derived body: @view` is an ordinary derived Range value and is consumed before
@@ -243,8 +242,9 @@ The current declaration establishes ownership only. Path mutation, destination
 selection, restoration, and backend presentation still require focused graph
 and compiler proofs before they are claimed as executable Range behavior.
 
-Builder output is a graph of backend-neutral view, layout, and geometry intent.
-It is not an HTML node tree and it is not a text-to-CSS program.
+Builder output is backend-neutral view and geometry intent. It is not an HTML
+node tree. The current backend lowers that intent into HTML, CSS, and only the
+JavaScript required for observation, interaction, or runtime updates.
 
 Functions marked `@modifier` contribute typed values to the current
 view's ordered modifier relationship:
@@ -261,20 +261,20 @@ observation and transformation boundary.
 
 ## Drawing model
 
-`Vector(2, Float)`, `Size`, and `DrawingSpace` are the backend-neutral 2D
-values. The graph-owned `Viewport` is fixed at 800 x 600 for the first native
-proof and flows into recursive Stack layout.
+`Point`, `Size`, and `DrawingSpace` are the first backend-neutral 2D values.
+Window dimensions come from the drawing space instead of being repeated in a
+native backend call.
 
 `Stack` owns an ordered `@many` collection of `@view` children. Nested stacks
 express composition recursively; layout does not need a parallel matrix or
 position representation.
 
-`Rectangle` is the canonical first area primitive. Its four ordered points are
-transformed by resolved position and size; there is no second rectangle or
-layout-rectangle representation.
+`Rectangle` is the first area primitive. It contributes an ordered point path,
+while `PaintCommand` connects its canonical shape identity to resolved geometry
+and paint without introducing a second nominal representation.
 
 Shapes are their ordered points. `@shape` contributes `@view`, and the ordered
-`@many` value is the path that Compiler B lowers directly:
+`@many` value is the path that the Range Compiler lowers directly:
 
 ```range
 @shape

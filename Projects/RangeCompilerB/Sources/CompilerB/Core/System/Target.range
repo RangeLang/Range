@@ -1,3 +1,0 @@
-@extern
-@builtin(.target)
-function targetPointerBits(): Int
