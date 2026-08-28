@@ -1,11 +1,13 @@
-@entry
 @view
 construct Stack {
     state axis: Axis
     state spacing: Float
     state alignment: LayoutAlignment
 
+    @many
+    let children: @view
+
     derived body: @view {
-        // The stack body is its composed view content.
+        children
     }
 }

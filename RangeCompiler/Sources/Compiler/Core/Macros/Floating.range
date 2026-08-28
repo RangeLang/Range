@@ -1,0 +1,15 @@
+macro floating(): Construct {
+  let bits: #environment.target.Declaration.members.filter(named: "bits").first
+
+  if !bits.isTarget {
+    @diagnostic(
+      "Floating construct must specify bits"
+    )
+  }
+
+  if bits != 32 && bits != 64 {
+    @diagnostic(
+      "Floating bits must be 32 or 64"
+    )
+  }
+}

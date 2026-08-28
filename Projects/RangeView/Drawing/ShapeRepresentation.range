@@ -1,4 +1,0 @@
-construct ShapeRepresentation {
-    @many
-    let points: Point
-}

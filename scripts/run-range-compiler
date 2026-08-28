@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/Manifest.json"
+DEFAULT_COMPILER="$REPO_ROOT/RangeCompiler/Bootstrap/range"
+
+if [[ ! -f "$MANIFEST" ]]; then
+    echo "range compiler: missing bootstrap manifest" >&2
+    exit 66
+fi
+
+compiler="${RANGE_COMPILER_EXECUTABLE:-$DEFAULT_COMPILER}"
+if [[ ! -x "$compiler" ]]; then
+    echo "range compiler: executable is not runnable: $compiler" >&2
+    exit 66
+fi
+
+if [[ "$compiler" == "$DEFAULT_COMPILER" ]]; then
+    expected="$(/usr/bin/plutil -extract compiler.sha256 raw -o - "$MANIFEST")"
+    actual="$(/usr/bin/shasum -a 256 "$compiler" | /usr/bin/awk '{print $1}')"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "range compiler: bootstrap hash mismatch" >&2
+        exit 65
+    fi
+
+    if [[ $# -eq 1 ]]; then
+        mode=""
+        route="$1"
+    elif [[ $# -eq 2 && "$1" == "--emit-assembly" ]]; then
+        mode="$1"
+        route="$2"
+    else
+        echo "usage: run-range-compiler [--emit-assembly] <route>" >&2
+        exit 64
+    fi
+    if [[ "$route" != /* ]]; then route="$REPO_ROOT/$route"; fi
+
+    # The frozen seed predates the canonical directory name. Stage only a
+    # temporary path alias; canonical sources remain single-owned in the repo.
+    stage_root="$(mktemp -d "${TMPDIR:-/tmp}/range-seed-path.XXXXXX")"
+    mkdir -p "$stage_root/Projects/RangeCompilerB/Sources"
+    ln -s "$REPO_ROOT/RangeCompiler/Sources/Compiler" \
+        "$stage_root/Projects/RangeCompilerB/Sources/CompilerB"
+    cleanup() { rm -rf "$stage_root"; }
+    trap cleanup EXIT
+    cd "$stage_root"
+    if [[ -n "$mode" ]]; then "$compiler" "$mode" "$route"; else "$compiler" "$route"; fi
+    exit $?
+fi
+
+exec "$compiler" "$@"

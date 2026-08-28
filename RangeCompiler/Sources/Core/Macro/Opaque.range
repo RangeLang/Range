@@ -1,7 +1,0 @@
-construct OpaqueRegistration {
-    let construct: Construct
-}
-
-macro opaque(): Construct -> OpaqueRegistration {
-    return OpaqueRegistration(construct: #environment.target)
-}

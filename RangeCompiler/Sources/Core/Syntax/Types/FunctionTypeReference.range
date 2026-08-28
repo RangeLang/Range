@@ -1,5 +1,0 @@
-@syntax
-construct FunctionTypeReference {
-    let parameters: Array<TypeReference>
-    let returnType: TypeReference
-}

@@ -1,0 +1,50 @@
+// Metal and the Objective-C runtime are operating-system ABI boundaries.
+// RangeView owns the values and behavior that call them; there is no renderer
+// registration identity or foreign implementation behind these declarations.
+
+@opaque
+construct NativeObject {}
+
+@opaque
+construct NativeSelector {}
+
+@extern
+@framework(name: "Metal")
+function MTLCreateSystemDefaultDevice(): NativeObject
+
+@extern
+@framework(name: "AppKit")
+function NSApplicationLoad(): Bool
+
+@extern
+function objc_getClass(name: String): NativeObject
+
+@extern
+function sel_registerName(name: String): NativeSelector
+
+@extern(symbol: "objc_msgSend")
+function objc_msgSend(receiver: NativeObject, selector: NativeSelector): NativeObject
+
+@extern(symbol: "objc_msgSend")
+function objcMessageObject(
+    receiver: NativeObject,
+    selector: NativeSelector,
+    value: NativeObject
+): NativeObject
+
+@extern(symbol: "objc_msgSend")
+function objcMessageString(
+    receiver: NativeObject,
+    selector: NativeSelector,
+    value: String
+): NativeObject
+
+@extern(symbol: "objc_msgSend")
+function objcMessageInteger(
+    receiver: NativeObject,
+    selector: NativeSelector,
+    value: Int
+): NativeObject
+
+@extern(symbol: "objc_msgSend")
+function objcIntegerMessage(receiver: NativeObject, selector: NativeSelector): Int

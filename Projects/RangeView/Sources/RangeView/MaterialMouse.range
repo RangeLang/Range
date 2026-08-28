@@ -1,0 +1,24 @@
+@view
+construct MaterialMouse {
+    state size: Vector(3, Float) {
+        width: 6.0,
+        height: 15.0,
+        depth: 1.2
+    }
+
+    state position: Vector(3, Float) {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0
+    }
+
+    derived body: @view {
+        Rectangle()
+        Rectangle()
+        Rectangle()
+        Rectangle()
+        NumberInput(value: size.width)
+        NumberInput(value: size.height)
+        NumberInput(value: size.depth)
+    }
+}

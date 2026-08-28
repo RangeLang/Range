@@ -1,8 +1,0 @@
-@integer
-construct IncompleteInteger {
-    let bits: Int(8)
-}
-
-function answer(): IncompleteInteger {
-    1
-}

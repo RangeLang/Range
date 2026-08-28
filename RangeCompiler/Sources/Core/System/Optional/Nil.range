@@ -1,3 +1,0 @@
-enum Nil {
-    case nil
-}

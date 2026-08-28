@@ -1,6 +1,0 @@
-// A representation transform over matrix coordinates. A one-column matrix
-// projects as a list; higher-dimensional consumers preserve the same model.
-construct ForEachRepresentation<Element, Representation> {
-    let matrix: Matrix<Element>
-    binding _ representation: (Element, MatrixPosition) -> Representation
-}

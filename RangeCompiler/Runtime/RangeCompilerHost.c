@@ -9,6 +9,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <crt_externs.h>
+#include <dirent.h>
+#include <dlfcn.h>
+#include <sys/stat.h>
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
 #endif
@@ -277,6 +280,25 @@ int32_t stringPrint(void *value) {
     return puts(rangeStringData(value));
 }
 
+int32_t stringDiagnostic(void *value) {
+    const char *message = rangeStringData(value);
+    if (!message) return 74;
+    return fprintf(stderr, "%s\n", message) < 0 ? 74 : 0;
+}
+
+int32_t invokeExternStringToInt(void *opaqueIdentity, void *value) {
+    const char *identity = rangeStringData(opaqueIdentity);
+    if (!identity || identity[0] == 0) {
+        return 64;
+    }
+    void *symbol = dlsym(RTLD_DEFAULT, identity);
+    if (!symbol) {
+        return 69;
+    }
+    int32_t (*function)(void *) = (int32_t (*)(void *))symbol;
+    return function(value);
+}
+
 bool stringHasPrefix(void *opaqueSource, int32_t start, void *opaquePrefix) {
     char *source = rangeStringData(opaqueSource);
     char *prefix = rangeStringData(opaquePrefix);
@@ -403,75 +425,73 @@ void *commandLineArgument(int32_t index) {
     return rangeStringCreateTransientCopy(argv[actual], strlen(argv[actual]));
 }
 
-void *readFile(void *opaquePath) {
-    char *path = rangeStringData(opaquePath);
-    FILE *file = fopen(path, "rb");
-    if (!file) {
-        return rangeStringEmpty();
-    }
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return rangeStringEmpty();
-    }
-    long size = ftell(file);
-    if (size < 0) {
-        fclose(file);
-        return rangeStringEmpty();
-    }
-    rewind(file);
-    char *buffer = malloc((size_t)size + 1);
-    if (!buffer) {
-        fclose(file);
-        return rangeStringEmpty();
-    }
-    size_t readCount = fread(buffer, 1, (size_t)size, file);
-    buffer[readCount] = 0;
-    fclose(file);
+int32_t filePrimitivePathKind(void *opaquePath) {
+    const char *path = rangeStringData(opaquePath);
+    struct stat info;
+    if (!path || stat(path, &info) != 0) return 0;
+    if (S_ISREG(info.st_mode)) return 1;
+    if (S_ISDIR(info.st_mode)) return 2;
+    return 3;
+}
+
+void *filePrimitiveOpen(void *opaquePath, int32_t mode) {
+    const char *path = rangeStringData(opaquePath);
+    if (!path) return NULL;
+    const char *modeText = mode == 0 ? "rb" : (mode == 2 ? "ab" : "wb");
+    return fopen(path, modeText);
+}
+
+int32_t filePrimitiveHandleIsValid(void *opaqueHandle) {
+    return opaqueHandle ? 1 : 0;
+}
+
+void *filePrimitiveRead(void *opaqueHandle, int32_t byteCount) {
+    FILE *file = opaqueHandle;
+    if (!file || byteCount <= 0) return rangeStringEmpty();
+    char *buffer = malloc((size_t)byteCount);
+    if (!buffer) return rangeStringEmpty();
+    size_t readCount = fread(buffer, 1, (size_t)byteCount, file);
     void *result = rangeStringCreateTransientCopy(buffer, readCount);
     free(buffer);
     return result ? result : rangeStringEmpty();
 }
 
-int32_t writeFile(void *opaquePath, void *opaqueText) {
-    char *path = rangeStringData(opaquePath);
-    char *text = rangeStringData(opaqueText);
-    if (!path || !text) {
-        return 73;
-    }
-    size_t pathLength = strlen(path);
-    static const char temporarySuffix[] = ".tmp.XXXXXX";
-    char *temporaryPath = malloc(pathLength + sizeof(temporarySuffix));
-    if (!temporaryPath) {
-        return 73;
-    }
-    snprintf(temporaryPath, pathLength + sizeof(temporarySuffix), "%s%s", path, temporarySuffix);
-    int temporaryDescriptor = mkstemp(temporaryPath);
-    if (temporaryDescriptor < 0) {
-        free(temporaryPath);
-        return 73;
-    }
-    FILE *file = fdopen(temporaryDescriptor, "wb");
-    if (!file) {
-        close(temporaryDescriptor);
-        remove(temporaryPath);
-        free(temporaryPath);
-        return 73;
-    }
+int32_t filePrimitiveWrite(void *opaqueHandle, void *opaqueText) {
+    FILE *file = opaqueHandle;
+    if (!file || !opaqueText) return 74;
     size_t length = rangeStringSize(opaqueText);
-    size_t written = fwrite(text, 1, length, file);
-    int closeStatus = fclose(file);
-    if (written != length || closeStatus != 0) {
-        remove(temporaryPath);
-        free(temporaryPath);
-        return 74;
-    }
-    if (rename(temporaryPath, path) != 0) {
-        remove(temporaryPath);
-        free(temporaryPath);
-        return 73;
-    }
-    free(temporaryPath);
-    return 0;
+    return fwrite(rangeStringData(opaqueText), 1, length, file) == length ? 0 : 74;
+}
+
+int32_t filePrimitiveClose(void *opaqueHandle) {
+    FILE *file = opaqueHandle;
+    return file && fclose(file) == 0 ? 0 : 74;
+}
+
+int32_t filePrimitiveRemove(void *opaquePath) {
+    const char *path = rangeStringData(opaquePath);
+    return path && remove(path) == 0 ? 0 : 73;
+}
+
+int32_t filePrimitiveMove(void *opaqueSource, void *opaqueDestination) {
+    const char *source = rangeStringData(opaqueSource);
+    const char *destination = rangeStringData(opaqueDestination);
+    return source && destination && rename(source, destination) == 0 ? 0 : 73;
+}
+
+int32_t nativeDirectoryHandleIsValid(void *opaqueHandle) {
+    return opaqueHandle ? 1 : 0;
+}
+
+void *nativeDirectoryEntryName(void *opaqueEntry) {
+    struct dirent *entry = opaqueEntry;
+    if (!entry) return rangeStringEmpty();
+    return rangeStringCreateTransientCopy(entry->d_name, strlen(entry->d_name));
+}
+
+int32_t directoryPrimitiveCreate(void *opaquePath) {
+    const char *path = rangeStringData(opaquePath);
+    return path && mkdir(path, 0777) == 0 ? 0 : 73;
 }
 
 typedef struct {

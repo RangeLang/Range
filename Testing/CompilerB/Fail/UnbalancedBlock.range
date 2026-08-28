@@ -1,2 +1,0 @@
-function unbalanced(): Int {
-    return 1

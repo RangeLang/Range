@@ -849,3 +849,24 @@ query locals, conditionals, and diagnostic executions. It does not yet execute
 the implicit final macro expression, so emitted-program enforcement remains the
 next general compiler proof; other domain-bearing generic source should migrate
 only after that proof is complete.
+
+## 2026-08-23 Direct Metal Supersession
+
+The experimental Rust/GPUI adapter is no longer an active RangeView boundary.
+An intermediate Compiler B `RangeViewMetal` backend proved that emitted LLVM
+could link directly to AppKit, QuartzCore, Metal, and `libobjc`, create a real
+device and command queue, present a `CAMetalLayer`, and retain a native window.
+That backend was then removed because it selected RangeView-specific graph
+facts, concatenated fixture sources, and manufactured a platform entrypoint.
+It is historical evidence about the target ABI, not the accepted architecture.
+
+The active architecture keeps Metal as an operating-system boundary described
+by ordinary Range `@extern` declarations. Compiler B discovers project files as
+separate, deterministically ordered source identities, composes their ordinary
+declaration/macro graph, retains `@extern(symbol:)` and `@framework(name:)`
+arguments, and lowers the reachable emitted-main Function with fixed foreign
+call signatures. `scripts/range run Projects/RangeView` now builds B with the
+accepted compiler, emits the RangeView project LLVM, derives its Apple
+framework link plan, and launches the resulting application without a renderer
+identity, framework engine, C adapter, Rust crate, or RangeView-named compiler
+entry. Lowering the authored Window and view tree is the next rendering slice.

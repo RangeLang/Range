@@ -1,0 +1,7 @@
+construct Diagnostic {
+    binding message: String
+}
+
+macro diagnostic(message: String): Void {
+    Diagnostic(message: message)
+}

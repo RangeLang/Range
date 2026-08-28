@@ -1,3 +1,0 @@
-function value2(): Int {
-    return 2
-}

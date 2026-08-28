@@ -1,0 +1,4 @@
+derived size: Vector(3, Float) {
+    width: 5.0,
+    height: 5.0
+}

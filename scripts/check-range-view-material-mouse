@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER="${RANGE_COMPILER_EXECUTABLE:-}"
+
+fail() {
+    echo "RangeView MaterialMouse check: $*" >&2
+    exit 1
+}
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-view-material-mouse.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT
+
+output="$work_root/range-view.out"
+if [[ -n "$COMPILER" ]]; then
+    [[ -x "$COMPILER" ]] || fail "Range Compiler executable is not runnable"
+    RANGE_COMPILER_EXECUTABLE="$COMPILER" \
+        "$REPO_ROOT/scripts/run-range-compiler" "$REPO_ROOT/Projects/RangeView" > "$output"
+else
+    "$REPO_ROOT/scripts/run-range-compiler" "$REPO_ROOT/Projects/RangeView" > "$output"
+fi
+
+grep -F $'projectSyntax\tvalid=true\tfailures=0' "$output" >/dev/null \
+    || fail "RangeView project graph is invalid"
+[[ "$(grep -c '^projectConstructionOccurrence' "$output")" -eq 8 ]] \
+    || fail "expected eight size, position, and control-dimension occurrences"
+
+for occurrence in \
+    'width|6.0' \
+    'height|15.0' \
+    'depth|1.2' \
+    'x|0.0' \
+    'y|0.0' \
+    'z|0.0' \
+    'width|1.4' \
+    'height|0.6'; do
+    label="${occurrence%%|*}"
+    value="${occurrence#*|}"
+    grep -E "^projectConstructionOccurrence.*label=${label}.*value=${value}$" \
+        "$output" >/dev/null \
+        || fail "missing vector occurrence: $label=$value"
+done
+
+material_mouse="$REPO_ROOT/Projects/RangeView/Sources/RangeView/MaterialMouse.range"
+number_input="$REPO_ROOT/Projects/RangeView/Sources/RangeView/NumberInput.range"
+[[ "$(grep -c '^[[:space:]]*Rectangle()$' "$material_mouse")" -eq 4 ]] \
+    || fail "MaterialMouse top view must contain four rectangles"
+[[ "$(grep -c '^[[:space:]]*NumberInput(value:' "$material_mouse")" -eq 3 ]] \
+    || fail "MaterialMouse top view must contain three number controls"
+[[ "$(grep -c '^[[:space:]]*Rectangle()$' "$number_input")" -eq 2 ]] \
+    || fail "NumberInput must contain two rectangles"
+
+if rg -n 'Rectangle|NumberInput|MaterialMouse|Metal' \
+    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Project/Construction.range" \
+    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Syntax/Parser.range" \
+    >/dev/null; then
+    fail "Range Compiler contains a RangeView- or Metal-specific construction identity"
+fi
+
+echo "RangeView MaterialMouse check: pass (Range Compiler graph and authored static structure)"

@@ -1,0 +1,2362 @@
+construct CompilerBSyntaxTemplatePartStore {
+    @many
+    state templateRows: Int
+    @many
+    state kindCodes: Int
+    @many
+    state ordinals: Int
+    @many
+    state textByteStarts: Int
+    @many
+    state textByteCounts: Int
+    @many
+    state textBytes: Int
+    @many
+    state sourceStarts: Int
+    @many
+    state sourceEnds: Int
+    @many
+    state relationshipSyntaxIDs: Int
+    @many
+    state relationshipTypeTokenIDs: Int
+    @many
+    state relationshipCardinalityCodes: Int
+}
+
+construct CompilerBSyntaxTemplateStore {
+    @many
+    state applicationSourceIDs: Int
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state partStarts: Int
+    @many
+    state partCounts: Int
+    @many
+    state declarationNameStarts: Int
+    @many
+    state declarationNameEnds: Int
+    let parts: CompilerBSyntaxTemplatePartStore
+}
+
+construct CompilerBStorageRelationshipStore {
+    @many
+    state applicationSourceIDs: Int
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state modeCodes: Int
+}
+
+construct CompilerBSyntaxCaptureStore {
+    @many
+    state materializationRows: Int
+    @many
+    state ordinals: Int
+    @many
+    state templatePartRows: Int
+    @many
+    state sourceStarts: Int
+    @many
+    state sourceEnds: Int
+}
+
+construct CompilerBSyntaxMaterializationStore {
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state templateRows: Int
+    @many
+    state storageModeCodes: Int
+    @many
+    state captureStarts: Int
+    @many
+    state captureCounts: Int
+    let captures: CompilerBSyntaxCaptureStore
+}
+
+construct CompilerBSyntaxCaptureValueGraph {
+    @many
+    state captureStarts: Int
+    @many
+    state captureCounts: Int
+    @many
+    state captureRows: Int
+    @many
+    state ordinals: Int
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state sourceStarts: Int
+    @many
+    state sourceEnds: Int
+    @many
+    state kindCodes: Int
+}
+
+construct CompilerBSyntaxWork {
+    @many
+    state syntaxIDs: Int
+}
+
+function compilerBSyntaxWorkCreate(capacity: Int): CompilerBSyntaxWork {
+    return CompilerBSyntaxWork(syntaxIDs: @many(capacity: capacity))
+}
+
+construct CompilerBSyntaxGraph {
+    let templates: CompilerBSyntaxTemplateStore
+    let storage: CompilerBStorageRelationshipStore
+    let materializations: CompilerBSyntaxMaterializationStore
+    @many
+    state diagnosticCodes: Int
+    @many
+    state diagnosticSourceIDs: Int
+    @many
+    state diagnosticStarts: Int
+    @many
+    state diagnosticEnds: Int
+    @many
+    state diagnosticTemplateRows: Int
+}
+
+function compilerBSyntaxTemplatePartLiteral(): Int { return 1 }
+function compilerBSyntaxTemplatePartCapture(): Int { return 2 }
+function compilerBSyntaxCaptureValueRaw(): Int { return 1 }
+function compilerBSyntaxCaptureValueMaterialized(): Int { return 2 }
+function compilerBSyntaxCaptureValueMacroApplication(): Int { return 3 }
+function compilerBSyntaxRelationshipSingular(): Int { return 1 }
+function compilerBSyntaxRelationshipOptional(): Int { return 2 }
+function compilerBSyntaxRelationshipMany(): Int { return 3 }
+function compilerBStorageModeImmutable(): Int { return 1 }
+function compilerBStorageModeMutable(): Int { return 2 }
+function compilerBStorageModeDerived(): Int { return 3 }
+function compilerBStorageModeBinding(): Int { return 4 }
+
+function compilerBSyntaxTemplatePartStoreCreate(
+    capacity: Int
+): CompilerBSyntaxTemplatePartStore {
+    return CompilerBSyntaxTemplatePartStore(
+        templateRows: @many(capacity: capacity),
+        kindCodes: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity),
+        textByteStarts: @many(capacity: capacity),
+        textByteCounts: @many(capacity: capacity),
+        textBytes: @many(capacity: capacity * 8),
+        sourceStarts: @many(capacity: capacity),
+        sourceEnds: @many(capacity: capacity),
+        relationshipSyntaxIDs: @many(capacity: capacity),
+        relationshipTypeTokenIDs: @many(capacity: capacity),
+        relationshipCardinalityCodes: @many(capacity: capacity)
+    )
+}
+
+function compilerBSyntaxTemplateStoreCreate(
+    capacity: Int
+): CompilerBSyntaxTemplateStore {
+    return CompilerBSyntaxTemplateStore(
+        applicationSourceIDs: @many(capacity: capacity),
+        applicationSyntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        partStarts: @many(capacity: capacity),
+        partCounts: @many(capacity: capacity),
+        declarationNameStarts: @many(capacity: capacity),
+        declarationNameEnds: @many(capacity: capacity),
+        parts: compilerBSyntaxTemplatePartStoreCreate(capacity: capacity * 8)
+    )
+}
+
+function compilerBStorageRelationshipStoreCreate(
+    capacity: Int
+): CompilerBStorageRelationshipStore {
+    return CompilerBStorageRelationshipStore(
+        applicationSourceIDs: @many(capacity: capacity),
+        applicationSyntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        modeCodes: @many(capacity: capacity)
+    )
+}
+
+function compilerBSyntaxCaptureStoreCreate(capacity: Int): CompilerBSyntaxCaptureStore {
+    return CompilerBSyntaxCaptureStore(
+        materializationRows: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity),
+        templatePartRows: @many(capacity: capacity),
+        sourceStarts: @many(capacity: capacity),
+        sourceEnds: @many(capacity: capacity)
+    )
+}
+
+function compilerBSyntaxMaterializationStoreCreate(
+    capacity: Int
+): CompilerBSyntaxMaterializationStore {
+    return CompilerBSyntaxMaterializationStore(
+        sourceIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        templateRows: @many(capacity: capacity),
+        storageModeCodes: @many(capacity: capacity),
+        captureStarts: @many(capacity: capacity),
+        captureCounts: @many(capacity: capacity),
+        captures: compilerBSyntaxCaptureStoreCreate(capacity: capacity * 4)
+    )
+}
+
+function compilerBSyntaxGraphCreate(capacity: Int): CompilerBSyntaxGraph {
+    return CompilerBSyntaxGraph(
+        templates: compilerBSyntaxTemplateStoreCreate(capacity: capacity),
+        storage: compilerBStorageRelationshipStoreCreate(capacity: capacity),
+        materializations: compilerBSyntaxMaterializationStoreCreate(
+            capacity: capacity * 8
+        ),
+        diagnosticCodes: @many(capacity: capacity),
+        diagnosticSourceIDs: @many(capacity: capacity),
+        diagnosticStarts: @many(capacity: capacity),
+        diagnosticEnds: @many(capacity: capacity),
+        diagnosticTemplateRows: @many(capacity: capacity)
+    )
+}
+
+function compilerBSyntaxCaptureValueGraphCreate(
+    captureCapacity: Int,
+    valueCapacity: Int
+): CompilerBSyntaxCaptureValueGraph {
+    return CompilerBSyntaxCaptureValueGraph(
+        captureStarts: @many(capacity: captureCapacity),
+        captureCounts: @many(capacity: captureCapacity),
+        captureRows: @many(capacity: valueCapacity),
+        ordinals: @many(capacity: valueCapacity),
+        sourceIDs: @many(capacity: valueCapacity),
+        syntaxIDs: @many(capacity: valueCapacity),
+        sourceStarts: @many(capacity: valueCapacity),
+        sourceEnds: @many(capacity: valueCapacity),
+        kindCodes: @many(capacity: valueCapacity)
+    )
+}
+
+function compilerBSyntaxCaptureValueGraphAppend(
+    values: CompilerBSyntaxCaptureValueGraph,
+    captureRow: Int,
+    ordinal: Int,
+    sourceID: Int,
+    syntaxID: Int,
+    sourceStart: Int,
+    sourceEnd: Int,
+    kindCode: Int
+): Int {
+    if values.captureRows.append(element: captureRow) != 0 { return 0 - 1 }
+    if values.ordinals.append(element: ordinal) != 0 { return 0 - 1 }
+    if values.sourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if values.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
+    if values.sourceStarts.append(element: sourceStart) != 0 { return 0 - 1 }
+    if values.sourceEnds.append(element: sourceEnd) != 0 { return 0 - 1 }
+    return values.kindCodes.append(element: kindCode)
+}
+
+function compilerBSyntaxDiagnosticAppend(
+    graph: CompilerBSyntaxGraph,
+    code: Int,
+    sourceID: Int,
+    start: Int,
+    end: Int,
+    templateRow: Int
+): Int {
+    if graph.diagnosticCodes.append(element: code) != 0 { return 0 - 1 }
+    if graph.diagnosticSourceIDs.append(element: sourceID) != 0 { return 0 - 1 }
+    if graph.diagnosticStarts.append(element: start) != 0 { return 0 - 1 }
+    if graph.diagnosticEnds.append(element: end) != 0 { return 0 - 1 }
+    return graph.diagnosticTemplateRows.append(element: templateRow)
+}
+
+function compilerBSyntaxTemplatePartStoreAppend(
+    store: CompilerBSyntaxTemplatePartStore,
+    templateRow: Int,
+    kindCode: Int,
+    ordinal: Int,
+    text: String,
+    sourceBase: Int,
+    start: Int,
+    end: Int,
+    relationshipSyntaxID: Int,
+    relationshipTypeTokenID: Int,
+    relationshipCardinalityCode: Int
+): Int {
+    if store.templateRows.append(element: templateRow) != 0 { return 0 - 1 }
+    if store.kindCodes.append(element: kindCode) != 0 { return 0 - 1 }
+    if store.ordinals.append(element: ordinal) != 0 { return 0 - 1 }
+    if store.textByteStarts.append(element: store.textBytes.count) != 0 {
+        return 0 - 1
+    }
+    if store.textByteCounts.append(element: end - start) != 0 { return 0 - 1 }
+    state cursor: Int(start)
+    while cursor < end {
+        if store.textBytes.append(element: text.byte(index: cursor)) != 0 {
+            return 0 - 1
+        }
+        cursor: cursor + 1
+    }
+    if store.sourceStarts.append(element: sourceBase + start) != 0 {
+        return 0 - 1
+    }
+    if store.sourceEnds.append(element: sourceBase + end) != 0 {
+        return 0 - 1
+    }
+    if store.relationshipSyntaxIDs.append(
+        element: relationshipSyntaxID
+    ) != 0 { return 0 - 1 }
+    if store.relationshipTypeTokenIDs.append(
+        element: relationshipTypeTokenID
+    ) != 0 { return 0 - 1 }
+    return store.relationshipCardinalityCodes.append(
+        element: relationshipCardinalityCode
+    )
+}
+
+function compilerBSyntaxTemplatePartTextEquals(
+    store: CompilerBSyntaxTemplatePartStore,
+    row: Int,
+    text: String
+): Bool {
+    let start: Int(store.textByteStarts.element(index: row))
+    let count: Int(store.textByteCounts.element(index: row))
+    if count != text.count { return false }
+    state cursor: Int(0)
+    while cursor < count {
+        if store.textBytes.element(index: start + cursor)
+            != text.byte(index: cursor) { return false }
+        cursor: cursor + 1
+    }
+    return true
+}
+
+function compilerBSyntaxIdentifierByte(byte: Int): Bool {
+    return (byte >= 65 && byte <= 90)
+        || (byte >= 97 && byte <= 122)
+        || (byte >= 48 && byte <= 57)
+        || byte == 95
+}
+
+function compilerBSyntaxWhitespaceByte(byte: Int): Bool {
+    return byte == 9 || byte == 10 || byte == 13 || byte == 32
+}
+
+function compilerBProjectDeclarationRowForIdentity(
+    declarations: CompilerBProjectDeclarationStore,
+    sourceID: Int,
+    syntaxID: Int
+): Int {
+    state row: Int(0)
+    while row < declarations.syntaxIDs.count {
+        if declarations.sourceIDs.element(index: row) == sourceID
+            && declarations.syntaxIDs.element(index: row) == syntaxID {
+            return row
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerBProjectMacroApplicationName(
+    declarations: CompilerBProjectDeclarationStore,
+    sourcePaths: String,
+    applications: CompilerBProjectMacroApplicationStore,
+    row: Int
+): String {
+    let declarationRow: Int(compilerBProjectDeclarationRowForIdentity(
+        declarations: declarations,
+        sourceID: applications.declarationSourceIDs.element(index: row),
+        syntaxID: applications.declarationSyntaxIDs.element(index: row)
+    ))
+    if declarationRow < 0 { return String("") }
+    return compilerBProjectDeclarationName(
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        row: declarationRow
+    )
+}
+
+function compilerBProjectMacroArgumentText(
+    sourcePaths: String,
+    applications: CompilerBProjectMacroApplicationStore,
+    applicationSourceID: Int,
+    applicationSyntaxID: Int
+): String {
+    state applicationRow: Int(0)
+    while applicationRow < applications.syntaxIDs.count {
+        if applications.sourceIDs.element(index: applicationRow)
+                == applicationSourceID
+            && applications.syntaxIDs.element(index: applicationRow)
+                == applicationSyntaxID {
+            let sourceID: Int(applications.sourceIDs.element(index: applicationRow))
+            let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+                paths: sourcePaths,
+                index: sourceID
+            )))
+            return source.substring(
+                start: applications.rawArgumentSourceStarts.element(index: applicationRow),
+                end: applications.rawArgumentSourceEnds.element(index: applicationRow)
+            )
+        }
+        applicationRow: applicationRow + 1
+    }
+    return String("")
+}
+
+function compilerBStorageModeForText(text: String): Int {
+    if text == String(".immutable") { return compilerBStorageModeImmutable() }
+    if text == String(".mutable") { return compilerBStorageModeMutable() }
+    if text == String(".derived") { return compilerBStorageModeDerived() }
+    if text == String(".binding") { return compilerBStorageModeBinding() }
+    return 0
+}
+
+function compilerBStorageRelationshipStoreAppend(
+    store: CompilerBStorageRelationshipStore,
+    applications: CompilerBProjectMacroApplicationStore,
+    applicationRow: Int,
+    modeCode: Int
+): Int {
+    if store.applicationSourceIDs.append(
+        element: applications.sourceIDs.element(index: applicationRow)
+    ) != 0 { return 0 - 1 }
+    if store.applicationSyntaxIDs.append(
+        element: applications.syntaxIDs.element(index: applicationRow)
+    ) != 0 { return 0 - 1 }
+    if store.declarationSourceIDs.append(
+        element: applications.targetSourceIDs.element(index: applicationRow)
+    ) != 0 { return 0 - 1 }
+    if store.declarationSyntaxIDs.append(
+        element: applications.targetSyntaxIDs.element(index: applicationRow)
+    ) != 0 { return 0 - 1 }
+    return store.modeCodes.append(element: modeCode)
+}
+
+function compilerBStorageModeForDeclaration(
+    store: CompilerBStorageRelationshipStore,
+    sourceID: Int,
+    syntaxID: Int
+): Int {
+    state mode: Int(0)
+    state count: Int(0)
+    state row: Int(0)
+    while row < store.modeCodes.count {
+        if store.declarationSourceIDs.element(index: row) == sourceID
+            && store.declarationSyntaxIDs.element(index: row) == syntaxID {
+            mode: store.modeCodes.element(index: row)
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 }
+    return mode
+}
+
+function compilerBStorageModeForMaterializedSyntax(
+    graph: CompilerBSyntaxGraph,
+    sourceID: Int,
+    syntaxID: Int
+): Int {
+    state row: Int(0)
+    while row < graph.materializations.syntaxIDs.count {
+        if graph.materializations.sourceIDs.element(index: row) == sourceID
+            && graph.materializations.syntaxIDs.element(index: row) == syntaxID {
+            return graph.materializations.storageModeCodes.element(index: row)
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerBSyntaxTemplateHasCapture(
+    parts: CompilerBSyntaxTemplatePartStore,
+    templateRow: Int,
+    name: String
+): Bool {
+    state row: Int(0)
+    while row < parts.kindCodes.count {
+        if parts.templateRows.element(index: row) == templateRow
+            && parts.kindCodes.element(index: row)
+                == compilerBSyntaxTemplatePartCapture()
+            && compilerBSyntaxTemplatePartTextEquals(
+                store: parts,
+                row: row,
+                text: name
+            ) {
+            return true
+        }
+        row: row + 1
+    }
+    return false
+}
+
+function compilerBSyntaxCaptureRelationshipValueForName(
+    sourcePaths: String,
+    sourceID: Int,
+    declarationSyntaxID: Int,
+    name: String,
+    valueCode: Int
+): Int {
+    let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    )))
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevisionWithResolution(
+        source: source,
+        resolveRelationships: false
+    ))
+    state matchRow: Int(0 - 1)
+    state matchCount: Int(0)
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        if revision.members.ownerSyntaxIDs.element(index: row)
+            == declarationSyntaxID {
+            let identity: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: revision.members.identityTokenIDs.element(
+                    index: row
+                ))
+            ))
+            if compilerBTokenMatchesBytes(
+                source: revision.source,
+                token: identity,
+                expected: name
+            ) {
+                matchRow: row
+                matchCount: matchCount + 1
+            }
+        }
+        row: row + 1
+    }
+    state result: Int(0 - 1)
+    if matchCount == 1 {
+        let relationshipSyntaxID: Int(
+            revision.members.syntaxIDs.element(index: matchRow)
+        )
+        let relationshipTypeTokenID: Int(
+            revision.members.typeTokenIDs.element(index: matchRow)
+        )
+        state cardinalityCode: Int(compilerBSyntaxRelationshipSingular())
+        if relationshipTypeTokenID + 1 < revision.tokens.kinds.count
+            && compilerBParserTokenByte(
+                source: revision.source,
+                tokens: revision.tokens,
+                tokenID: relationshipTypeTokenID + 1
+            ) == 63 {
+            cardinalityCode: compilerBSyntaxRelationshipOptional()
+        }
+        state applicationRow: Int(0)
+        while applicationRow < revision.macroApplications.syntaxIDs.count {
+            if revision.macroApplications.targetSyntaxIDs.element(
+                index: applicationRow
+            ) == relationshipSyntaxID {
+                let applicationIdentity: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: revision.macroApplications.identityTokenIDs.element(
+                        index: applicationRow
+                    ))
+                ))
+                if compilerBTokenMatchesBytes(
+                    source: revision.source,
+                    token: applicationIdentity,
+                    expected: "many"
+                ) {
+                    cardinalityCode: compilerBSyntaxRelationshipMany()
+                }
+            }
+            applicationRow: applicationRow + 1
+        }
+        if valueCode == 1 { result: relationshipSyntaxID }
+        if valueCode == 2 { result: relationshipTypeTokenID }
+        if valueCode == 3 { result: cardinalityCode }
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
+        return 0 - 1
+    }
+    return result
+}
+
+function compilerBSyntaxRelationshipTypesEqual(
+    sourcePaths: String,
+    sourceID: Int,
+    leftTokenID: Int,
+    rightTokenID: Int
+): Bool {
+    let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    )))
+    let tokens: CompilerBRetainedTokenStore(compilerBLexRetained(source: source))
+    if leftTokenID < 0 || rightTokenID < 0
+        || leftTokenID >= tokens.kinds.count
+        || rightTokenID >= tokens.kinds.count {
+        compilerBRetainedTokenStoreDestroy(store: tokens)
+        return true
+    }
+    let left: CompilerBToken(compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: leftTokenID)
+    ))
+    let right: CompilerBToken(compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: rightTokenID)
+    ))
+    let equal: Bool(compilerBTokenBytesEqual(
+        source: source,
+        left: left,
+        right: right
+    ))
+    if compilerBRetainedTokenStoreDestroy(store: tokens) != 0 {
+        return false
+    }
+    return equal
+}
+
+function compilerBSyntaxTemplateCompile(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore,
+    applicationRow: Int,
+    template: String
+): Int {
+    let templateRow: Int(graph.templates.applicationSyntaxIDs.count)
+    let targetSourceID: Int(applications.targetSourceIDs.element(index: applicationRow))
+    let targetSyntaxID: Int(applications.targetSyntaxIDs.element(index: applicationRow))
+    let partStart: Int(graph.templates.parts.kindCodes.count)
+    state partOrdinal: Int(0)
+    state cursor: Int(0)
+    while cursor < template.count {
+        while cursor < template.count
+            && compilerBSyntaxWhitespaceByte(byte: template.byte(index: cursor)) {
+            cursor: cursor + 1
+        }
+        if cursor < template.count {
+            if template.byte(index: cursor) == 36 {
+                let nameStart: Int(cursor + 1)
+                state nameEnd: Int(nameStart)
+                while nameEnd < template.count
+                    && compilerBSyntaxIdentifierByte(byte: template.byte(index: nameEnd)) {
+                    nameEnd: nameEnd + 1
+                }
+                let captureName: String(template.substring(start: nameStart, end: nameEnd))
+                if nameEnd == nameStart {
+                    compilerBSyntaxDiagnosticAppend(
+                        graph: graph,
+                        code: 1,
+                        sourceID: applications.sourceIDs.element(index: applicationRow),
+                        start: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameStart,
+                        end: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameEnd,
+                        templateRow: templateRow
+                    )
+                    return 0 - 1
+                }
+                if compilerBSyntaxTemplateHasCapture(
+                    parts: graph.templates.parts,
+                    templateRow: templateRow,
+                    name: captureName
+                ) {
+                    compilerBSyntaxDiagnosticAppend(
+                        graph: graph,
+                        code: 2,
+                        sourceID: applications.sourceIDs.element(index: applicationRow),
+                        start: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameStart,
+                        end: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameEnd,
+                        templateRow: templateRow
+                    )
+                    return 0 - 1
+                }
+                let relationshipSyntaxID: Int(
+                    compilerBSyntaxCaptureRelationshipValueForName(
+                        sourcePaths: sourcePaths,
+                        sourceID: targetSourceID,
+                        declarationSyntaxID: targetSyntaxID,
+                        name: captureName,
+                        valueCode: 1
+                    )
+                )
+                let relationshipTypeTokenID: Int(
+                    compilerBSyntaxCaptureRelationshipValueForName(
+                        sourcePaths: sourcePaths,
+                        sourceID: targetSourceID,
+                        declarationSyntaxID: targetSyntaxID,
+                        name: captureName,
+                        valueCode: 2
+                    )
+                )
+                let relationshipCardinalityCode: Int(
+                    compilerBSyntaxCaptureRelationshipValueForName(
+                        sourcePaths: sourcePaths,
+                        sourceID: targetSourceID,
+                        declarationSyntaxID: targetSyntaxID,
+                        name: captureName,
+                        valueCode: 3
+                    )
+                )
+                if relationshipSyntaxID < 0 || relationshipTypeTokenID < 0
+                    || relationshipCardinalityCode < 0 {
+                    compilerBSyntaxDiagnosticAppend(
+                        graph: graph,
+                        code: 8,
+                        sourceID: applications.sourceIDs.element(index: applicationRow),
+                        start: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameStart,
+                        end: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameEnd,
+                        templateRow: templateRow
+                    )
+                    return 0 - 1
+                }
+                if partOrdinal > 0 {
+                    let previousPartRow: Int(
+                        graph.templates.parts.kindCodes.count - 1
+                    )
+                    if graph.templates.parts.kindCodes.element(
+                        index: previousPartRow
+                    ) == compilerBSyntaxTemplatePartCapture()
+                        && compilerBSyntaxRelationshipTypesEqual(
+                            sourcePaths: sourcePaths,
+                            sourceID: targetSourceID,
+                            leftTokenID: graph.templates.parts.relationshipTypeTokenIDs.element(
+                                index: previousPartRow
+                            ),
+                            rightTokenID: relationshipTypeTokenID
+                        ) {
+                        compilerBSyntaxDiagnosticAppend(
+                            graph: graph,
+                            code: 3,
+                            sourceID: applications.sourceIDs.element(index: applicationRow),
+                            start: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameStart,
+                            end: applications.rawArgumentSourceStarts.element(index: applicationRow) + nameEnd,
+                            templateRow: templateRow
+                        )
+                        return 0 - 1
+                    }
+                }
+                if compilerBSyntaxTemplatePartStoreAppend(
+                    store: graph.templates.parts,
+                    templateRow: templateRow,
+                    kindCode: compilerBSyntaxTemplatePartCapture(),
+                    ordinal: partOrdinal,
+                    text: template,
+                    sourceBase: applications.rawArgumentSourceStarts.element(
+                        index: applicationRow
+                    ),
+                    start: nameStart,
+                    end: nameEnd,
+                    relationshipSyntaxID: relationshipSyntaxID,
+                    relationshipTypeTokenID: relationshipTypeTokenID,
+                    relationshipCardinalityCode: relationshipCardinalityCode
+                ) != 0 { return 0 - 1 }
+                cursor: nameEnd
+            } else {
+                let literalStart: Int(cursor)
+                state literalEnd: Int(cursor + 1)
+                if compilerBSyntaxIdentifierByte(byte: template.byte(index: cursor)) {
+                    while literalEnd < template.count
+                        && compilerBSyntaxIdentifierByte(
+                            byte: template.byte(index: literalEnd)
+                        ) {
+                        literalEnd: literalEnd + 1
+                    }
+                }
+                if compilerBSyntaxTemplatePartStoreAppend(
+                    store: graph.templates.parts,
+                    templateRow: templateRow,
+                    kindCode: compilerBSyntaxTemplatePartLiteral(),
+                    ordinal: partOrdinal,
+                    text: template,
+                    sourceBase: applications.rawArgumentSourceStarts.element(
+                        index: applicationRow
+                    ),
+                    start: literalStart,
+                    end: literalEnd,
+                    relationshipSyntaxID: 0 - 1,
+                    relationshipTypeTokenID: 0 - 1,
+                    relationshipCardinalityCode: 0
+                ) != 0 { return 0 - 1 }
+                cursor: literalEnd
+            }
+            partOrdinal: partOrdinal + 1
+        }
+    }
+    if partOrdinal == 0 {
+        compilerBSyntaxDiagnosticAppend(
+            graph: graph,
+            code: 4,
+            sourceID: applications.sourceIDs.element(index: applicationRow),
+            start: applications.rawArgumentSourceStarts.element(index: applicationRow),
+            end: applications.rawArgumentSourceEnds.element(index: applicationRow),
+            templateRow: templateRow
+        )
+        return 0 - 1
+    }
+    if graph.templates.applicationSourceIDs.append(
+        element: applications.sourceIDs.element(index: applicationRow)
+    ) != 0 { return 0 - 1 }
+    if graph.templates.applicationSyntaxIDs.append(
+        element: applications.syntaxIDs.element(index: applicationRow)
+    ) != 0 { return 0 - 1 }
+    if graph.templates.declarationSourceIDs.append(element: targetSourceID) != 0 {
+        return 0 - 1
+    }
+    if graph.templates.declarationSyntaxIDs.append(element: targetSyntaxID) != 0 {
+        return 0 - 1
+    }
+    if graph.templates.partStarts.append(element: partStart) != 0 { return 0 - 1 }
+    if graph.templates.partCounts.append(element: partOrdinal) != 0 { return 0 - 1 }
+    let declarationRow: Int(compilerBProjectDeclarationRowForIdentity(
+        declarations: declarations,
+        sourceID: targetSourceID,
+        syntaxID: targetSyntaxID
+    ))
+    if declarationRow < 0 { return 0 - 1 }
+    if graph.templates.declarationNameStarts.append(
+        element: declarations.nameStarts.element(index: declarationRow)
+    ) != 0 { return 0 - 1 }
+    if graph.templates.declarationNameEnds.append(
+        element: declarations.nameEnds.element(index: declarationRow)
+    ) != 0 { return 0 - 1 }
+    return 0
+}
+
+function compilerBSyntaxTokenMatchesPart(
+    revision: CompilerBSyntaxRevision,
+    tokenID: Int,
+    parts: CompilerBSyntaxTemplatePartStore,
+    partRow: Int
+): Bool {
+    let token: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: tokenID)
+    ))
+    let byteStart: Int(parts.textByteStarts.element(index: partRow))
+    let byteCount: Int(parts.textByteCounts.element(index: partRow))
+    if token.end - token.start != byteCount { return false }
+    state cursor: Int(0)
+    while cursor < byteCount {
+        if revision.source.byte(index: token.start + cursor)
+            != parts.textBytes.element(index: byteStart + cursor) {
+            return false
+        }
+        cursor: cursor + 1
+    }
+    return true
+}
+
+function compilerBSyntaxTemplateNextLiteralPart(
+    templates: CompilerBSyntaxTemplateStore,
+    templateRow: Int,
+    partOffset: Int
+): Int {
+    let start: Int(templates.partStarts.element(index: templateRow))
+    let count: Int(templates.partCounts.element(index: templateRow))
+    state offset: Int(partOffset + 1)
+    while offset < count {
+        let row: Int(start + offset)
+        if templates.parts.kindCodes.element(index: row)
+            == compilerBSyntaxTemplatePartLiteral() { return row }
+        offset: offset + 1
+    }
+    return 0 - 1
+}
+
+function compilerBSyntaxTemplateNextLiteralTokenID(
+    templates: CompilerBSyntaxTemplateStore,
+    templateRow: Int,
+    partOffset: Int,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let partStart: Int(templates.partStarts.element(index: templateRow))
+    let partCount: Int(templates.partCounts.element(index: templateRow))
+    if partOffset + 1 < partCount {
+        let nextPartRow: Int(partStart + partOffset + 1)
+        if templates.parts.kindCodes.element(index: nextPartRow)
+            == compilerBSyntaxTemplatePartCapture() {
+            state boundaryTokenID: Int(firstTokenID + 1)
+            while boundaryTokenID < afterLastTokenID {
+                let boundary: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: boundaryTokenID)
+                ))
+                if boundary.kind == .leftDelimiter { return boundaryTokenID }
+                boundaryTokenID: boundaryTokenID + 1
+            }
+            return afterLastTokenID
+        }
+    }
+    let literalPartRow: Int(compilerBSyntaxTemplateNextLiteralPart(
+        templates: templates,
+        templateRow: templateRow,
+        partOffset: partOffset
+    ))
+    if literalPartRow < 0 { return afterLastTokenID }
+    state depth: Int(0)
+    state tokenID: Int(firstTokenID)
+    while tokenID < afterLastTokenID {
+        if depth == 0 && compilerBSyntaxTokenMatchesPart(
+            revision: revision,
+            tokenID: tokenID,
+            parts: templates.parts,
+            partRow: literalPartRow
+        ) { return tokenID }
+        let token: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: tokenID)
+        ))
+        let byte: Int(revision.source.byte(index: token.start))
+        if byte == 40 || byte == 91 || byte == 123 {
+            depth: depth + 1
+        }
+        if byte == 41 || byte == 93 || byte == 125 {
+            if depth > 0 { depth: depth - 1 }
+        }
+        tokenID: tokenID + 1
+    }
+    return afterLastTokenID
+}
+
+function compilerBSyntaxTemplateExactMatch(
+    templates: CompilerBSyntaxTemplateStore,
+    templateRow: Int,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Bool {
+    let partStart: Int(templates.partStarts.element(index: templateRow))
+    let partCount: Int(templates.partCounts.element(index: templateRow))
+    state sourceCursor: Int(firstTokenID)
+    state partOffset: Int(0)
+    while partOffset < partCount {
+        let partRow: Int(partStart + partOffset)
+        let kindCode: Int(templates.parts.kindCodes.element(index: partRow))
+        if kindCode == compilerBSyntaxTemplatePartLiteral() {
+            if sourceCursor >= afterLastTokenID { return false }
+            if !compilerBSyntaxTokenMatchesPart(
+                revision: revision,
+                tokenID: sourceCursor,
+                parts: templates.parts,
+                partRow: partRow
+            ) { return false }
+            sourceCursor: sourceCursor + 1
+        } else {
+            let captureFirstTokenID: Int(sourceCursor)
+            sourceCursor: compilerBSyntaxTemplateNextLiteralTokenID(
+                templates: templates,
+                templateRow: templateRow,
+                partOffset: partOffset,
+                revision: revision,
+                firstTokenID: sourceCursor,
+                afterLastTokenID: afterLastTokenID
+            )
+            if templates.parts.relationshipCardinalityCodes.element(
+                index: partRow
+            ) == compilerBSyntaxRelationshipSingular()
+                && sourceCursor == captureFirstTokenID {
+                return false
+            }
+        }
+        partOffset: partOffset + 1
+    }
+    return sourceCursor == afterLastTokenID
+}
+
+function compilerBSyntaxTemplateLiteralScore(
+    templates: CompilerBSyntaxTemplateStore,
+    templateRow: Int,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let partStart: Int(templates.partStarts.element(index: templateRow))
+    let partCount: Int(templates.partCounts.element(index: templateRow))
+    state score: Int(0)
+    state sourceCursor: Int(firstTokenID)
+    state partOffset: Int(0)
+    while partOffset < partCount && sourceCursor < afterLastTokenID {
+        let partRow: Int(partStart + partOffset)
+        if templates.parts.kindCodes.element(index: partRow)
+            == compilerBSyntaxTemplatePartLiteral() {
+            if compilerBSyntaxTokenMatchesPart(
+                revision: revision,
+                tokenID: sourceCursor,
+                parts: templates.parts,
+                partRow: partRow
+            ) {
+                score: score + 1
+                sourceCursor: sourceCursor + 1
+            } else if sourceCursor == firstTokenID {
+                let token: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: sourceCursor)
+                ))
+                let byteStart: Int(templates.parts.textByteStarts.element(
+                    index: partRow
+                ))
+                let byteCount: Int(templates.parts.textByteCounts.element(
+                    index: partRow
+                ))
+                if token.end - token.start == byteCount {
+                    state mismatchCount: Int(0)
+                    state byteOffset: Int(0)
+                    while byteOffset < byteCount {
+                        if revision.source.byte(index: token.start + byteOffset)
+                            != templates.parts.textBytes.element(
+                                index: byteStart + byteOffset
+                            ) {
+                            mismatchCount: mismatchCount + 1
+                        }
+                        byteOffset: byteOffset + 1
+                    }
+                    if mismatchCount == 1 {
+                        score: score + 1
+                        sourceCursor: sourceCursor + 1
+                    }
+                }
+            }
+        }
+        partOffset: partOffset + 1
+    }
+    return score
+}
+
+function compilerBSyntaxCaptureStoreAppend(
+    store: CompilerBSyntaxCaptureStore,
+    materializationRow: Int,
+    ordinal: Int,
+    templatePartRow: Int,
+    sourceStart: Int,
+    sourceEnd: Int
+): Int {
+    if store.materializationRows.append(element: materializationRow) != 0 {
+        return 0 - 1
+    }
+    if store.ordinals.append(element: ordinal) != 0 { return 0 - 1 }
+    if store.templatePartRows.append(element: templatePartRow) != 0 {
+        return 0 - 1
+    }
+    if store.sourceStarts.append(element: sourceStart) != 0 { return 0 - 1 }
+    return store.sourceEnds.append(element: sourceEnd)
+}
+
+function compilerBSyntaxMaterializationAppendCaptures(
+    graph: CompilerBSyntaxGraph,
+    sourceID: Int,
+    templateRow: Int,
+    materializationRow: Int,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let partStart: Int(graph.templates.partStarts.element(index: templateRow))
+    let partCount: Int(graph.templates.partCounts.element(index: templateRow))
+    state sourceCursor: Int(firstTokenID)
+    state captureOrdinal: Int(0)
+    state partOffset: Int(0)
+    while partOffset < partCount {
+        let partRow: Int(partStart + partOffset)
+        if graph.templates.parts.kindCodes.element(index: partRow)
+            == compilerBSyntaxTemplatePartLiteral() {
+            sourceCursor: sourceCursor + 1
+        } else {
+            let captureFirstTokenID: Int(sourceCursor)
+            sourceCursor: compilerBSyntaxTemplateNextLiteralTokenID(
+                templates: graph.templates,
+                templateRow: templateRow,
+                partOffset: partOffset,
+                revision: revision,
+                firstTokenID: sourceCursor,
+                afterLastTokenID: afterLastTokenID
+            )
+            state sourceStart: Int(0)
+            state sourceEnd: Int(0)
+            if captureFirstTokenID < sourceCursor {
+                let first: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: captureFirstTokenID)
+                ))
+                let last: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: sourceCursor - 1)
+                ))
+                sourceStart: first.start
+                sourceEnd: last.end
+            } else {
+                let concrete: CompilerBToken(compilerBRetainedToken(
+                    store: revision.tokens,
+                    id: TokenID(value: firstTokenID)
+                ))
+                sourceStart: concrete.start
+                sourceEnd: concrete.start
+            }
+            if compilerBSyntaxCaptureStoreAppend(
+                store: graph.materializations.captures,
+                materializationRow: materializationRow,
+                ordinal: captureOrdinal,
+                templatePartRow: partRow,
+                sourceStart: sourceStart,
+                sourceEnd: sourceEnd
+            ) != 0 { return 0 - 1 }
+            captureOrdinal: captureOrdinal + 1
+        }
+        partOffset: partOffset + 1
+    }
+    return captureOrdinal
+}
+
+function compilerBSyntaxMaterializationStoreAppend(
+    graph: CompilerBSyntaxGraph,
+    sourceID: Int,
+    syntaxID: Int,
+    templateRow: Int,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let row: Int(graph.materializations.syntaxIDs.count)
+    let captureStart: Int(graph.materializations.captures.ordinals.count)
+    let captureCount: Int(compilerBSyntaxMaterializationAppendCaptures(
+        graph: graph,
+        sourceID: sourceID,
+        templateRow: templateRow,
+        materializationRow: row,
+        revision: revision,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: afterLastTokenID
+    ))
+    if captureCount < 0 { return 0 - 1 }
+    let declarationSourceID: Int(
+        graph.templates.declarationSourceIDs.element(index: templateRow)
+    )
+    let declarationSyntaxID: Int(
+        graph.templates.declarationSyntaxIDs.element(index: templateRow)
+    )
+    if graph.materializations.sourceIDs.append(element: sourceID) != 0 {
+        return 0 - 1
+    }
+    if graph.materializations.syntaxIDs.append(element: syntaxID) != 0 {
+        return 0 - 1
+    }
+    if graph.materializations.declarationSourceIDs.append(
+        element: declarationSourceID
+    ) != 0 { return 0 - 1 }
+    if graph.materializations.declarationSyntaxIDs.append(
+        element: declarationSyntaxID
+    ) != 0 { return 0 - 1 }
+    if graph.materializations.templateRows.append(element: templateRow) != 0 {
+        return 0 - 1
+    }
+    if graph.materializations.storageModeCodes.append(
+        element: compilerBStorageModeForDeclaration(
+            store: graph.storage,
+            sourceID: declarationSourceID,
+            syntaxID: declarationSyntaxID
+        )
+    ) != 0 { return 0 - 1 }
+    if graph.materializations.captureStarts.append(element: captureStart) != 0 {
+        return 0 - 1
+    }
+    return graph.materializations.captureCounts.append(element: captureCount)
+}
+
+function compilerBDeriveSyntaxCaptureValueRow(
+    graph: CompilerBSyntaxGraph,
+    applications: CompilerBProjectMacroApplicationStore,
+    values: CompilerBSyntaxCaptureValueGraph,
+    captureRow: Int
+): Int {
+    let owner: Int(graph.materializations.captures.materializationRows.element(
+        index: captureRow
+    ))
+    let sourceID: Int(graph.materializations.sourceIDs.element(index: owner))
+    let syntaxID: Int(graph.materializations.syntaxIDs.element(index: owner))
+    let sourceStart: Int(graph.materializations.captures.sourceStarts.element(
+        index: captureRow
+    ))
+    let sourceEnd: Int(graph.materializations.captures.sourceEnds.element(
+        index: captureRow
+    ))
+    state valueCount: Int(0)
+    if sourceStart == sourceEnd {
+        let partRow: Int(graph.materializations.captures.templatePartRows.element(
+            index: captureRow
+        ))
+        if graph.templates.parts.ordinals.element(index: partRow) == 0 {
+            state applicationRow: Int(0)
+            while applicationRow < applications.syntaxIDs.count {
+                if applications.targetSourceIDs.element(index: applicationRow) == sourceID
+                    && applications.targetSyntaxIDs.element(index: applicationRow) == syntaxID {
+                    if compilerBSyntaxCaptureValueGraphAppend(
+                        values: values,
+                        captureRow: captureRow,
+                        ordinal: valueCount,
+                        sourceID: applications.sourceIDs.element(index: applicationRow),
+                        syntaxID: applications.syntaxIDs.element(index: applicationRow),
+                        sourceStart: applications.syntaxIDs.element(index: applicationRow),
+                        sourceEnd: applications.syntaxIDs.element(index: applicationRow),
+                        kindCode: compilerBSyntaxCaptureValueMacroApplication()
+                    ) != 0 { return 0 - 1 }
+                    valueCount: valueCount + 1
+                }
+                applicationRow: applicationRow + 1
+            }
+        }
+    } else {
+        state candidateRow: Int(0)
+        while candidateRow < graph.materializations.syntaxIDs.count {
+            let candidateSyntaxID: Int(
+                graph.materializations.syntaxIDs.element(index: candidateRow)
+            )
+            if graph.materializations.sourceIDs.element(index: candidateRow) == sourceID
+                && candidateSyntaxID != syntaxID
+                && candidateSyntaxID >= sourceStart
+                && candidateSyntaxID < sourceEnd {
+                if compilerBSyntaxCaptureValueGraphAppend(
+                    values: values,
+                    captureRow: captureRow,
+                    ordinal: valueCount,
+                    sourceID: sourceID,
+                    syntaxID: candidateSyntaxID,
+                    sourceStart: candidateSyntaxID,
+                    sourceEnd: candidateSyntaxID,
+                    kindCode: compilerBSyntaxCaptureValueMaterialized()
+                ) != 0 { return 0 - 1 }
+                valueCount: valueCount + 1
+            }
+            candidateRow: candidateRow + 1
+        }
+        if valueCount == 0 {
+            if compilerBSyntaxCaptureValueGraphAppend(
+                values: values,
+                captureRow: captureRow,
+                ordinal: 0,
+                sourceID: sourceID,
+                syntaxID: sourceStart,
+                sourceStart: sourceStart,
+                sourceEnd: sourceEnd,
+                kindCode: compilerBSyntaxCaptureValueRaw()
+            ) != 0 { return 0 - 1 }
+            valueCount: 1
+        }
+    }
+    return valueCount
+}
+
+function compilerBDeriveSyntaxCaptureValues(
+    graph: CompilerBSyntaxGraph,
+    applications: CompilerBProjectMacroApplicationStore,
+    values: CompilerBSyntaxCaptureValueGraph
+): Int {
+    state captureRow: Int(0)
+    while captureRow < graph.materializations.captures.ordinals.count {
+        values.captureStarts.append(element: values.ordinals.count)
+        values.captureCounts.append(element: compilerBDeriveSyntaxCaptureValueRow(
+            graph: graph,
+            applications: applications,
+            values: values,
+            captureRow: captureRow
+        ))
+        captureRow: captureRow + 1
+    }
+    return 0
+}
+
+function compilerBValidateSyntaxCaptureCardinalities(
+    graph: CompilerBSyntaxGraph,
+    values: CompilerBSyntaxCaptureValueGraph
+): Int {
+    state failures: Int(0)
+    state captureRow: Int(0)
+    while captureRow < graph.materializations.captures.ordinals.count {
+        let partRow: Int(graph.materializations.captures.templatePartRows.element(
+            index: captureRow
+        ))
+        let cardinality: Int(
+            graph.templates.parts.relationshipCardinalityCodes.element(
+                index: partRow
+            )
+        )
+        let count: Int(values.captureCounts.element(index: captureRow))
+        state valid: Bool(cardinality == compilerBSyntaxRelationshipMany())
+        if cardinality == compilerBSyntaxRelationshipSingular() {
+            valid: count == 1
+        }
+        if cardinality == compilerBSyntaxRelationshipOptional() {
+            valid: count <= 1
+        }
+        if !valid {
+            let owner: Int(
+                graph.materializations.captures.materializationRows.element(
+                    index: captureRow
+                )
+            )
+            compilerBSyntaxDiagnosticAppend(
+                graph: graph,
+                code: 9,
+                sourceID: graph.materializations.sourceIDs.element(index: owner),
+                start: graph.materializations.captures.sourceStarts.element(
+                    index: captureRow
+                ),
+                end: graph.materializations.captures.sourceEnds.element(
+                    index: captureRow
+                ),
+                templateRow: graph.materializations.templateRows.element(
+                    index: owner
+                )
+            )
+            failures: failures + 1
+        }
+        captureRow: captureRow + 1
+    }
+    return failures
+}
+
+function compilerBValidateSyntaxCaptureIdentities(
+    graph: CompilerBSyntaxGraph,
+    values: CompilerBSyntaxCaptureValueGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore
+): Int {
+    state failures: Int(0)
+    state valueRow: Int(0)
+    while valueRow < values.syntaxIDs.count {
+        if values.kindCodes.element(index: valueRow)
+            == compilerBSyntaxCaptureValueMaterialized() {
+            let captureRow: Int(values.captureRows.element(index: valueRow))
+            let partRow: Int(
+                graph.materializations.captures.templatePartRows.element(
+                    index: captureRow
+                )
+            )
+            state materializationRow: Int(0 - 1)
+            state candidateMaterializationRow: Int(0)
+            while candidateMaterializationRow
+                < graph.materializations.syntaxIDs.count {
+                if graph.materializations.sourceIDs.element(
+                    index: candidateMaterializationRow
+                ) == values.sourceIDs.element(index: valueRow)
+                    && graph.materializations.syntaxIDs.element(
+                        index: candidateMaterializationRow
+                    ) == values.syntaxIDs.element(index: valueRow) {
+                    materializationRow: candidateMaterializationRow
+                }
+                candidateMaterializationRow: candidateMaterializationRow + 1
+            }
+            state admitted: Bool(materializationRow >= 0)
+            state declarationRow: Int(0 - 1)
+            if admitted {
+                state candidateDeclarationRow: Int(0)
+                while candidateDeclarationRow < declarations.syntaxIDs.count {
+                    if declarations.sourceIDs.element(index: candidateDeclarationRow)
+                        == graph.materializations.declarationSourceIDs.element(
+                            index: materializationRow
+                        )
+                        && declarations.syntaxIDs.element(
+                            index: candidateDeclarationRow
+                        ) == graph.materializations.declarationSyntaxIDs.element(
+                            index: materializationRow
+                        ) {
+                        declarationRow: candidateDeclarationRow
+                    }
+                    candidateDeclarationRow: candidateDeclarationRow + 1
+                }
+                admitted: declarationRow >= 0
+            }
+            if admitted {
+                let templateRow: Int(
+                    graph.templates.parts.templateRows.element(index: partRow)
+                )
+                let targetSourceID: Int(
+                    graph.templates.declarationSourceIDs.element(index: templateRow)
+                )
+                let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+                    paths: sourcePaths,
+                    index: targetSourceID
+                )))
+                let tokens: CompilerBRetainedTokenStore(
+                    compilerBLexRetained(source: source)
+                )
+                let typeTokenID: Int(
+                    graph.templates.parts.relationshipTypeTokenIDs.element(
+                        index: partRow
+                    )
+                )
+                if typeTokenID < 0 || typeTokenID >= tokens.kinds.count {
+                    admitted: false
+                } else {
+                    let typeToken: CompilerBToken(compilerBRetainedToken(
+                        store: tokens,
+                        id: TokenID(value: typeTokenID)
+                    ))
+                    if typeToken.start > 0
+                        && source.byte(index: typeToken.start - 1) == 64 {
+                        admitted: true
+                    } else {
+                        let expectedCount: Int(typeToken.end - typeToken.start)
+                        let actualCount: Int(
+                            declarations.nameByteCounts.element(
+                                index: declarationRow
+                            )
+                        )
+                        admitted: expectedCount == actualCount
+                        let actualStart: Int(
+                            declarations.nameByteStarts.element(
+                                index: declarationRow
+                            )
+                        )
+                        state offset: Int(0)
+                        while offset < expectedCount && admitted {
+                            if source.byte(index: typeToken.start + offset)
+                                != declarations.nameBytes.element(
+                                    index: actualStart + offset
+                                ) {
+                                admitted: false
+                            }
+                            offset: offset + 1
+                        }
+                    }
+                }
+                if compilerBRetainedTokenStoreDestroy(store: tokens) != 0 {
+                    admitted: false
+                }
+            }
+            if !admitted {
+                let owner: Int(
+                    graph.materializations.captures.materializationRows.element(
+                        index: captureRow
+                    )
+                )
+                compilerBSyntaxDiagnosticAppend(
+                    graph: graph,
+                    code: 10,
+                    sourceID: graph.materializations.sourceIDs.element(index: owner),
+                    start: values.sourceStarts.element(index: valueRow),
+                    end: values.sourceEnds.element(index: valueRow),
+                    templateRow: graph.materializations.templateRows.element(
+                        index: owner
+                    )
+                )
+                failures: failures + 1
+            }
+        }
+        valueRow: valueRow + 1
+    }
+    return failures
+}
+
+function compilerBDeriveSyntaxStorage(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore
+): Int {
+    state row: Int(0)
+    while row < applications.syntaxIDs.count {
+        if compilerBProjectMacroApplicationName(
+            declarations: declarations,
+            sourcePaths: sourcePaths,
+            applications: applications,
+            row: row
+        ) == String("storage") {
+            let mode: Int(compilerBStorageModeForText(text: compilerBProjectMacroArgumentText(
+                sourcePaths: sourcePaths,
+                applications: applications,
+                applicationSourceID: applications.sourceIDs.element(index: row),
+                applicationSyntaxID: applications.syntaxIDs.element(index: row)
+            )))
+            if mode == 0 {
+                compilerBSyntaxDiagnosticAppend(
+                    graph: graph,
+                    code: 5,
+                    sourceID: applications.sourceIDs.element(index: row),
+                    start: applications.syntaxIDs.element(index: row),
+                    end: applications.syntaxIDs.element(index: row),
+                    templateRow: 0 - 1
+                )
+                return 0 - 1
+            }
+            if compilerBStorageRelationshipStoreAppend(
+                store: graph.storage,
+                applications: applications,
+                applicationRow: row,
+                modeCode: mode
+            ) != 0 { return 0 - 1 }
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerBDeriveSyntaxTemplates(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore
+): Int {
+    state row: Int(0)
+    while row < applications.syntaxIDs.count {
+        if compilerBProjectMacroApplicationName(
+            declarations: declarations,
+            sourcePaths: sourcePaths,
+            applications: applications,
+            row: row
+        ) == String("syntax") {
+            if compilerBSyntaxTemplateCompile(
+                graph: graph,
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                applications: applications,
+                applicationRow: row,
+                template: compilerBProjectMacroArgumentText(
+                    sourcePaths: sourcePaths,
+                    applications: applications,
+                    applicationSourceID: applications.sourceIDs.element(index: row),
+                    applicationSyntaxID: applications.syntaxIDs.element(index: row)
+                )
+            ) != 0 { return 0 - 1 }
+        }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerBSyntaxExactCandidateCount(
+    graph: CompilerBSyntaxGraph,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    state exactCount: Int(0)
+    state bestSpecificity: Int(0 - 1)
+    state templateRow: Int(0)
+    while templateRow < graph.templates.applicationSyntaxIDs.count {
+        if compilerBSyntaxTemplateExactMatch(
+            templates: graph.templates,
+            templateRow: templateRow,
+            revision: revision,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        ) {
+            let partStart: Int(graph.templates.partStarts.element(
+                index: templateRow
+            ))
+            let partCount: Int(graph.templates.partCounts.element(
+                index: templateRow
+            ))
+            state specificity: Int(0)
+            state partOffset: Int(0)
+            while partOffset < partCount {
+                if graph.templates.parts.kindCodes.element(
+                    index: partStart + partOffset
+                ) == compilerBSyntaxTemplatePartLiteral() {
+                    specificity: specificity + graph.templates.parts.textByteCounts.element(
+                        index: partStart + partOffset
+                    )
+                }
+                partOffset: partOffset + 1
+            }
+            if specificity > bestSpecificity {
+                bestSpecificity: specificity
+                exactCount: 1
+            } else if specificity == bestSpecificity {
+                exactCount: exactCount + 1
+            }
+        }
+        templateRow: templateRow + 1
+    }
+    return exactCount
+}
+
+function compilerBSyntaxExactCandidateRow(
+    graph: CompilerBSyntaxGraph,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    state exactRow: Int(0 - 1)
+    state bestSpecificity: Int(0 - 1)
+    state templateRow: Int(0)
+    while templateRow < graph.templates.applicationSyntaxIDs.count {
+        if compilerBSyntaxTemplateExactMatch(
+            templates: graph.templates,
+            templateRow: templateRow,
+            revision: revision,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        ) {
+            let partStart: Int(graph.templates.partStarts.element(
+                index: templateRow
+            ))
+            let partCount: Int(graph.templates.partCounts.element(
+                index: templateRow
+            ))
+            state specificity: Int(0)
+            state partOffset: Int(0)
+            while partOffset < partCount {
+                if graph.templates.parts.kindCodes.element(
+                    index: partStart + partOffset
+                ) == compilerBSyntaxTemplatePartLiteral() {
+                    specificity: specificity + graph.templates.parts.textByteCounts.element(
+                        index: partStart + partOffset
+                    )
+                }
+                partOffset: partOffset + 1
+            }
+            if specificity > bestSpecificity {
+                bestSpecificity: specificity
+                exactRow: templateRow
+            }
+        }
+        templateRow: templateRow + 1
+    }
+    return exactRow
+}
+
+function compilerBSyntaxClosestCandidateRow(
+    graph: CompilerBSyntaxGraph,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    state closestTemplateRow: Int(0 - 1)
+    state closestScore: Int(0 - 1)
+    state templateRow: Int(0)
+    while templateRow < graph.templates.applicationSyntaxIDs.count {
+        let score: Int(compilerBSyntaxTemplateLiteralScore(
+            templates: graph.templates,
+            templateRow: templateRow,
+            revision: revision,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        ))
+        if score > closestScore {
+            closestScore: score
+            closestTemplateRow: templateRow
+        }
+        templateRow: templateRow + 1
+    }
+    return closestTemplateRow
+}
+
+function compilerBSyntaxCandidateName(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    templateRow: Int
+): String {
+    if templateRow < 0 { return String("unknown") }
+    let declarationSource: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: graph.templates.declarationSourceIDs.element(index: templateRow)
+    )))
+    return declarationSource.substring(
+        start: graph.templates.declarationNameStarts.element(index: templateRow),
+        end: graph.templates.declarationNameEnds.element(index: templateRow)
+    )
+}
+
+function compilerBMaterializeExactSyntax(
+    graph: CompilerBSyntaxGraph,
+    sourceID: Int,
+    syntaxID: Int,
+    revision: CompilerBSyntaxRevision,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let templateRow: Int(compilerBSyntaxExactCandidateRow(
+        graph: graph,
+        revision: revision,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: afterLastTokenID
+    ))
+    return compilerBSyntaxMaterializationStoreAppend(
+        graph: graph,
+        sourceID: sourceID,
+        syntaxID: syntaxID,
+        templateRow: templateRow,
+        revision: revision,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: afterLastTokenID
+    )
+}
+
+function compilerBSyntaxAppendNoMatchDiagnostic(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    sourceID: Int,
+    syntaxID: Int,
+    templateRow: Int
+): Int {
+    compilerBSyntaxDiagnosticAppend(
+        graph: graph,
+        code: 6,
+        sourceID: sourceID,
+        start: syntaxID,
+        end: syntaxID,
+        templateRow: templateRow
+    )
+    return 0 - 1
+}
+
+function compilerBMaterializeSyntaxNode(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    sourceID: Int,
+    revision: CompilerBSyntaxRevision,
+    syntaxID: Int
+): Int {
+    let nodeRow: Int(compilerBSyntaxNodeRowForID(store: revision.nodes, syntaxID: syntaxID))
+    if nodeRow < 0 { return 0 - 1 }
+    let firstTokenID: Int(revision.nodes.firstTokenIDs.element(index: nodeRow))
+    let afterLastTokenID: Int(revision.nodes.afterLastTokenIDs.element(index: nodeRow))
+    let exactCount: Int(compilerBSyntaxExactCandidateCount(
+        graph: graph,
+        revision: revision,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: afterLastTokenID
+    ))
+    if exactCount == 1 {
+        return compilerBMaterializeExactSyntax(
+            graph: graph,
+            sourceID: sourceID,
+            syntaxID: syntaxID,
+            revision: revision,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        )
+    }
+    if exactCount > 1 {
+        compilerBSyntaxDiagnosticAppend(
+            graph: graph,
+            code: 7,
+            sourceID: sourceID,
+            start: syntaxID,
+            end: syntaxID,
+            templateRow: 0 - 1
+        )
+        return 0 - 1
+    }
+    return compilerBSyntaxAppendNoMatchDiagnostic(
+        graph: graph,
+        sourcePaths: sourcePaths,
+        sourceID: sourceID,
+        syntaxID: syntaxID,
+        templateRow: compilerBSyntaxClosestCandidateRow(
+            graph: graph,
+            revision: revision,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        )
+    )
+}
+
+function compilerBSyntaxWorkAppend(
+    work: CompilerBSyntaxWork,
+    syntaxID: Int
+): Int {
+    state row: Int(0)
+    while row < work.syntaxIDs.count {
+        let existing: Int(work.syntaxIDs.element(index: row))
+        if existing == syntaxID { return 0 }
+        if existing > syntaxID {
+            if work.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
+            state shift: Int(work.syntaxIDs.count - 1)
+            while shift > row {
+                if work.syntaxIDs.update(
+                    element: work.syntaxIDs.element(index: shift - 1),
+                    index: shift
+                ) != 0 { return 0 - 1 }
+                shift: shift - 1
+            }
+            return work.syntaxIDs.update(element: syntaxID, index: row)
+        }
+        row: row + 1
+    }
+    return work.syntaxIDs.append(element: syntaxID)
+}
+
+function compilerBSyntaxWorkCollectionCount(
+    revision: CompilerBSyntaxRevision,
+    collection: Int
+): Int {
+    if collection == 1 { return revision.members.syntaxIDs.count }
+    if collection == 2 { return revision.functionDeclarations.syntaxIDs.count }
+    if collection == 3 { return revision.constructDeclarations.syntaxIDs.count }
+    if collection == 4 { return revision.enumDeclarations.syntaxIDs.count }
+    if collection == 5 { return revision.enumCases.syntaxIDs.count }
+    if collection == 6 { return revision.macroDeclarations.syntaxIDs.count }
+    if collection == 7 { return revision.blocks.syntaxIDs.count }
+    if collection == 8 { return revision.functionSignatures.syntaxIDs.count }
+    if collection == 9 { return revision.macroSignatures.syntaxIDs.count }
+    if collection == 10 { return revision.process.extensions.syntaxIDs.count }
+    return 0
+}
+
+function compilerBSyntaxWorkCollectionElement(
+    revision: CompilerBSyntaxRevision,
+    collection: Int,
+    index: Int
+): Int {
+    if collection == 1 { return revision.members.syntaxIDs.element(index: index) }
+    if collection == 2 {
+        return revision.functionDeclarations.syntaxIDs.element(index: index)
+    }
+    if collection == 3 {
+        return revision.constructDeclarations.syntaxIDs.element(index: index)
+    }
+    if collection == 4 { return revision.enumDeclarations.syntaxIDs.element(index: index) }
+    if collection == 5 { return revision.enumCases.syntaxIDs.element(index: index) }
+    if collection == 6 { return revision.macroDeclarations.syntaxIDs.element(index: index) }
+    if collection == 7 { return revision.blocks.syntaxIDs.element(index: index) }
+    if collection == 8 { return revision.functionSignatures.syntaxIDs.element(index: index) }
+    if collection == 9 { return revision.macroSignatures.syntaxIDs.element(index: index) }
+    if collection == 10 {
+        return revision.process.extensions.syntaxIDs.element(index: index)
+    }
+    return 0 - 1
+}
+
+function compilerBSyntaxWorkAppendCollection(
+    work: CompilerBSyntaxWork,
+    revision: CompilerBSyntaxRevision,
+    collection: Int
+): Int {
+    state row: Int(0)
+    let count: Int(compilerBSyntaxWorkCollectionCount(
+        revision: revision,
+        collection: collection
+    ))
+    while row < count {
+        if compilerBSyntaxWorkAppend(
+            work: work,
+            syntaxID: compilerBSyntaxWorkCollectionElement(
+                revision: revision,
+                collection: collection,
+                index: row
+            )
+        ) != 0 { return 0 - 1 }
+        row: row + 1
+    }
+    return 0
+}
+
+function compilerBConcreteSyntaxWork(
+    graph: CompilerBSyntaxGraph,
+    work: CompilerBSyntaxWork,
+    revision: CompilerBSyntaxRevision
+): Int {
+    state collection: Int(1)
+    while collection <= 10 {
+        compilerBSyntaxWorkAppendCollection(
+            work: work,
+            revision: revision,
+            collection: collection
+        )
+        collection: collection + 1
+    }
+    state applicationRow: Int(0)
+    while applicationRow < revision.process.applications.syntaxIDs.count {
+        let applicationSyntaxID: Int(
+            revision.process.applications.syntaxIDs.element(
+                index: applicationRow
+            )
+        )
+        let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(
+            value: applicationSyntaxID
+        ))
+        if revision.process.applications.predecessorSyntaxIDs.element(
+            index: applicationRow
+        ) < 0
+            && expressionRow >= 0
+            && revision.process.expressions.kindCodes.element(
+                index: expressionRow
+            ) == compilerBParserExpressionKindCallCode()
+            && compilerBSyntaxExactCandidateCount(
+                graph: graph,
+                revision: revision,
+                firstTokenID: revision.process.applications.firstTokenIDs.element(
+                    index: applicationRow
+                ),
+                afterLastTokenID: revision.process.applications.afterLastTokenIDs.element(
+                    index: applicationRow
+                )
+            ) > 0 {
+            if compilerBSyntaxWorkAppend(
+                work: work,
+                syntaxID: applicationSyntaxID
+            ) != 0 { return 0 - 1 }
+        }
+        applicationRow: applicationRow + 1
+    }
+    return 0
+}
+
+function compilerBMaterializeSourceSyntax(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    sourceID: Int
+): Int {
+    let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    )))
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevisionWithResolution(
+        source: source,
+        resolveRelationships: false
+    ))
+    if !revision.valid {
+        compilerBSyntaxRevisionDestroy(revision: revision)
+        return 0 - 1
+    }
+    let work: CompilerBSyntaxWork(compilerBSyntaxWorkCreate(
+        capacity: revision.nodes.ids.count
+    ))
+    state workRow: Int(0)
+    state status: Int(0)
+    status: compilerBConcreteSyntaxWork(
+        graph: graph,
+        work: work,
+        revision: revision
+    )
+    while workRow < work.syntaxIDs.count && status == 0 {
+        status: compilerBMaterializeSyntaxNode(
+            graph: graph,
+            sourcePaths: sourcePaths,
+            sourceID: sourceID,
+            revision: revision,
+            syntaxID: work.syntaxIDs.element(index: workRow)
+        )
+        workRow: workRow + 1
+    }
+    if work.syntaxIDs.destroy() != 0 && status == 0 { status: 0 - 1 }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 && status == 0 {
+        status: 0 - 1
+    }
+    return status
+}
+
+function compilerBDeriveSyntaxGraph(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    applications: CompilerBProjectMacroApplicationStore
+): Int {
+    if compilerBDeriveSyntaxStorage(
+        graph: graph,
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        applications: applications
+    ) != 0 { return 0 - 1 }
+    if compilerBDeriveSyntaxTemplates(
+        graph: graph,
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        applications: applications
+    ) != 0 { return 0 - 1 }
+    if graph.templates.applicationSyntaxIDs.count == 0 { return 0 }
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    state sourceID: Int(0)
+    while sourceID < sourceCount {
+        if compilerBMaterializeSourceSyntax(
+            graph: graph,
+            sourcePaths: sourcePaths,
+            sourceID: sourceID
+        ) != 0 { return 0 - 1 }
+        sourceID: sourceID + 1
+    }
+    return 0
+}
+
+function compilerBSyntaxTemplatePartStoreDestroy(
+    store: CompilerBSyntaxTemplatePartStore
+): Int {
+    state status: Int(0)
+    if store.relationshipCardinalityCodes.destroy() != 0 { status: 0 - 1 }
+    if store.relationshipTypeTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if store.relationshipSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.templateRows.destroy() != 0 { status: 0 - 1 }
+    if store.kindCodes.destroy() != 0 { status: 0 - 1 }
+    if store.ordinals.destroy() != 0 { status: 0 - 1 }
+    if store.textByteStarts.destroy() != 0 { status: 0 - 1 }
+    if store.textByteCounts.destroy() != 0 { status: 0 - 1 }
+    if store.textBytes.destroy() != 0 { status: 0 - 1 }
+    if store.sourceStarts.destroy() != 0 { status: 0 - 1 }
+    if store.sourceEnds.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBSyntaxTemplateStoreDestroy(store: CompilerBSyntaxTemplateStore): Int {
+    state status: Int(0)
+    if store.applicationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.applicationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.partStarts.destroy() != 0 { status: 0 - 1 }
+    if store.partCounts.destroy() != 0 { status: 0 - 1 }
+    if store.declarationNameStarts.destroy() != 0 { status: 0 - 1 }
+    if store.declarationNameEnds.destroy() != 0 { status: 0 - 1 }
+    if compilerBSyntaxTemplatePartStoreDestroy(store: store.parts) != 0 {
+        status: 0 - 1
+    }
+    return status
+}
+
+function compilerBStorageRelationshipStoreDestroy(
+    store: CompilerBStorageRelationshipStore
+): Int {
+    state status: Int(0)
+    if store.applicationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.applicationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.modeCodes.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBSyntaxCaptureStoreDestroy(store: CompilerBSyntaxCaptureStore): Int {
+    state status: Int(0)
+    if store.materializationRows.destroy() != 0 { status: 0 - 1 }
+    if store.ordinals.destroy() != 0 { status: 0 - 1 }
+    if store.templatePartRows.destroy() != 0 { status: 0 - 1 }
+    if store.sourceStarts.destroy() != 0 { status: 0 - 1 }
+    if store.sourceEnds.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBSyntaxMaterializationStoreDestroy(
+    store: CompilerBSyntaxMaterializationStore
+): Int {
+    state status: Int(0)
+    if store.sourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if store.declarationSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if store.templateRows.destroy() != 0 { status: 0 - 1 }
+    if store.storageModeCodes.destroy() != 0 { status: 0 - 1 }
+    if store.captureStarts.destroy() != 0 { status: 0 - 1 }
+    if store.captureCounts.destroy() != 0 { status: 0 - 1 }
+    if compilerBSyntaxCaptureStoreDestroy(store: store.captures) != 0 {
+        status: 0 - 1
+    }
+    return status
+}
+
+function compilerBSyntaxGraphDestroy(graph: CompilerBSyntaxGraph): Int {
+    state status: Int(0)
+    if graph.diagnosticCodes.destroy() != 0 { status: 0 - 1 }
+    if graph.diagnosticSourceIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.diagnosticStarts.destroy() != 0 { status: 0 - 1 }
+    if graph.diagnosticEnds.destroy() != 0 { status: 0 - 1 }
+    if graph.diagnosticTemplateRows.destroy() != 0 { status: 0 - 1 }
+    if compilerBSyntaxMaterializationStoreDestroy(
+        store: graph.materializations
+    ) != 0 { status: 0 - 1 }
+    if compilerBStorageRelationshipStoreDestroy(store: graph.storage) != 0 {
+        status: 0 - 1
+    }
+    if compilerBSyntaxTemplateStoreDestroy(store: graph.templates) != 0 {
+        status: 0 - 1
+    }
+    return status
+}
+
+function compilerBSyntaxCaptureValueGraphDestroy(
+    values: CompilerBSyntaxCaptureValueGraph
+): Int {
+    state status: Int(0)
+    if values.captureStarts.destroy() != 0 { status: 0 - 1 }
+    if values.captureCounts.destroy() != 0 { status: 0 - 1 }
+    if values.captureRows.destroy() != 0 { status: 0 - 1 }
+    if values.ordinals.destroy() != 0 { status: 0 - 1 }
+    if values.sourceIDs.destroy() != 0 { status: 0 - 1 }
+    if values.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if values.sourceStarts.destroy() != 0 { status: 0 - 1 }
+    if values.sourceEnds.destroy() != 0 { status: 0 - 1 }
+    if values.kindCodes.destroy() != 0 { status: 0 - 1 }
+    return status
+}
+
+function compilerBStorageModeName(mode: Int): String {
+    if mode == compilerBStorageModeImmutable() { return String("immutable") }
+    if mode == compilerBStorageModeMutable() { return String("mutable") }
+    if mode == compilerBStorageModeDerived() { return String("derived") }
+    if mode == compilerBStorageModeBinding() { return String("binding") }
+    return String("unknown")
+}
+
+function compilerBRenderSyntaxTemplateRow(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    templateRow: Int
+): String {
+    let declarationRow: Int(compilerBProjectDeclarationRowForIdentity(
+        declarations: declarations,
+        sourceID: graph.templates.declarationSourceIDs.element(index: templateRow),
+        syntaxID: graph.templates.declarationSyntaxIDs.element(index: templateRow)
+    ))
+    let declarationName: String(compilerBProjectDeclarationName(
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        row: declarationRow
+    ))
+    return "projectSyntaxTemplate\trow=\(templateRow)\tdeclaration=\(declarationName)\tparts=\(graph.templates.partCounts.element(index: templateRow))\n"
+}
+
+function compilerBRenderSyntaxTemplates(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore
+): String {
+    state output: String("")
+    state templateRow: Int(0)
+    while templateRow < graph.templates.applicationSyntaxIDs.count {
+        output.append(text: compilerBRenderSyntaxTemplateRow(
+            graph: graph,
+            sourcePaths: sourcePaths,
+            declarations: declarations,
+            templateRow: templateRow
+        ))
+        templateRow: templateRow + 1
+    }
+    return output
+}
+
+function compilerBRenderSyntaxMaterializationRow(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    row: Int
+): String {
+    let declarationRow: Int(compilerBProjectDeclarationRowForIdentity(
+        declarations: declarations,
+        sourceID: graph.materializations.declarationSourceIDs.element(index: row),
+        syntaxID: graph.materializations.declarationSyntaxIDs.element(index: row)
+    ))
+    let declarationName: String(compilerBProjectDeclarationName(
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        row: declarationRow
+    ))
+    let storageName: String(compilerBStorageModeName(
+        mode: graph.materializations.storageModeCodes.element(index: row)
+    ))
+    return "projectSyntaxValue\tsource=\(graph.materializations.sourceIDs.element(index: row))\tsyntax=\(graph.materializations.syntaxIDs.element(index: row))\tdeclaration=\(declarationName)\tstorage=\(storageName)\tcaptures=\(graph.materializations.captureCounts.element(index: row))\n"
+}
+
+function compilerBRenderSyntaxMaterializations(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore
+): String {
+    state output: String("")
+    state row: Int(0)
+    while row < graph.materializations.syntaxIDs.count {
+        output.append(text: compilerBRenderSyntaxMaterializationRow(
+            graph: graph,
+            sourcePaths: sourcePaths,
+            declarations: declarations,
+            row: row
+        ))
+        row: row + 1
+    }
+    return output
+}
+
+function compilerBSyntaxCaptureName(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    captureRow: Int
+): String {
+    let partRow: Int(graph.materializations.captures.templatePartRows.element(
+        index: captureRow
+    ))
+    let templateRow: Int(graph.templates.parts.templateRows.element(
+        index: partRow
+    ))
+    let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: graph.templates.applicationSourceIDs.element(index: templateRow)
+    )))
+    return source.substring(
+        start: graph.templates.parts.sourceStarts.element(index: partRow),
+        end: graph.templates.parts.sourceEnds.element(index: partRow)
+    )
+}
+
+function compilerBSyntaxCaptureValueKindName(kind: Int): String {
+    if kind == compilerBSyntaxCaptureValueRaw() { return String("raw") }
+    if kind == compilerBSyntaxCaptureValueMaterialized() {
+        return String("materialized")
+    }
+    if kind == compilerBSyntaxCaptureValueMacroApplication() {
+        return String("macroApplication")
+    }
+    return String("unknown")
+}
+
+function compilerBSyntaxRelationshipCardinalityName(cardinality: Int): String {
+    if cardinality == compilerBSyntaxRelationshipSingular() {
+        return String("one")
+    }
+    if cardinality == compilerBSyntaxRelationshipOptional() {
+        return String("optional")
+    }
+    if cardinality == compilerBSyntaxRelationshipMany() {
+        return String("many")
+    }
+    return String("unknown")
+}
+
+function compilerBRenderSyntaxCaptureRow(
+    graph: CompilerBSyntaxGraph,
+    captureValues: CompilerBSyntaxCaptureValueGraph,
+    sourcePaths: String,
+    row: Int
+): String {
+    let partRow: Int(graph.materializations.captures.templatePartRows.element(
+        index: row
+    ))
+    let templateRow: Int(graph.templates.parts.templateRows.element(
+        index: partRow
+    ))
+    return "projectSyntaxCapture\tmaterialization=\(graph.materializations.captures.materializationRows.element(index: row))\tordinal=\(graph.materializations.captures.ordinals.element(index: row))\tidentity=\(graph.templates.applicationSourceIDs.element(index: templateRow)):\(graph.templates.applicationSyntaxIDs.element(index: templateRow)):\(graph.templates.parts.ordinals.element(index: partRow))\tname=\(compilerBSyntaxCaptureName(graph: graph, sourcePaths: sourcePaths, captureRow: row))\trelationship=\(graph.templates.parts.relationshipSyntaxIDs.element(index: partRow))\tcardinality=\(compilerBSyntaxRelationshipCardinalityName(cardinality: graph.templates.parts.relationshipCardinalityCodes.element(index: partRow)))\tvalues=\(captureValues.captureCounts.element(index: row))\tstart=\(graph.materializations.captures.sourceStarts.element(index: row))\tend=\(graph.materializations.captures.sourceEnds.element(index: row))\n"
+}
+
+function compilerBRenderSyntaxCaptureValueRow(
+    values: CompilerBSyntaxCaptureValueGraph,
+    row: Int
+): String {
+    return "projectSyntaxCaptureValue\tcapture=\(values.captureRows.element(index: row))\tordinal=\(values.ordinals.element(index: row))\tkind=\(compilerBSyntaxCaptureValueKindName(kind: values.kindCodes.element(index: row)))\tsource=\(values.sourceIDs.element(index: row))\tsyntax=\(values.syntaxIDs.element(index: row))\tstart=\(values.sourceStarts.element(index: row))\tend=\(values.sourceEnds.element(index: row))\n"
+}
+
+function compilerBRenderSyntaxCaptures(
+    graph: CompilerBSyntaxGraph,
+    captureValues: CompilerBSyntaxCaptureValueGraph,
+    sourcePaths: String
+): String {
+    state output: String("")
+    state captureRow: Int(0)
+    while captureRow < graph.materializations.captures.ordinals.count {
+        output.append(text: compilerBRenderSyntaxCaptureRow(
+            graph: graph,
+            captureValues: captureValues,
+            sourcePaths: sourcePaths,
+            row: captureRow
+        ))
+        captureRow: captureRow + 1
+    }
+    state valueRow: Int(0)
+    while valueRow < captureValues.ordinals.count {
+        output.append(text: compilerBRenderSyntaxCaptureValueRow(
+            values: captureValues,
+            row: valueRow
+        ))
+        valueRow: valueRow + 1
+    }
+    return output
+}
+
+function compilerBRenderSyntaxDiagnosticRow(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String,
+    row: Int
+): String {
+    let code: Int(graph.diagnosticCodes.element(index: row))
+    if code == 1 { return String("@syntax contains an empty capture\n") }
+    if code == 2 {
+        let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+            paths: sourcePaths,
+            index: graph.diagnosticSourceIDs.element(index: row)
+        )))
+        return "@syntax capture '$\(source.substring(start: graph.diagnosticStarts.element(index: row), end: graph.diagnosticEnds.element(index: row)))' is duplicated\n"
+    }
+    if code == 3 {
+        return String("@syntax adjacent captures require a structural boundary\n")
+    }
+    if code == 4 {
+        return String("@syntax template must contain at least one part\n")
+    }
+    if code == 5 { return String("@storage requires a known storage mode\n") }
+    if code == 6 {
+        return "syntax did not match at source \(graph.diagnosticSourceIDs.element(index: row)):\(graph.diagnosticStarts.element(index: row)); did you mean \(compilerBSyntaxCandidateName(graph: graph, sourcePaths: sourcePaths, templateRow: graph.diagnosticTemplateRows.element(index: row)))?\n"
+    }
+    if code == 7 {
+        return "syntax materialization is ambiguous at source \(graph.diagnosticSourceIDs.element(index: row)):\(graph.diagnosticStarts.element(index: row))\n"
+    }
+    if code == 8 {
+        let source: String(fileManagerReadFile(path: compilerBSourceSetPathAt(
+            paths: sourcePaths,
+            index: graph.diagnosticSourceIDs.element(index: row)
+        )))
+        return "@syntax capture '$\(source.substring(start: graph.diagnosticStarts.element(index: row), end: graph.diagnosticEnds.element(index: row)))' must resolve to exactly one declared relationship\n"
+    }
+    if code == 9 {
+        return "@syntax capture cardinality does not satisfy its declared relationship at source \(graph.diagnosticSourceIDs.element(index: row)):\(graph.diagnosticStarts.element(index: row))\n"
+    }
+    if code == 10 {
+        return "@syntax capture identity is not admitted by its declared relationship at source \(graph.diagnosticSourceIDs.element(index: row)):\(graph.diagnosticStarts.element(index: row))\n"
+    }
+    return String("syntax materialization failed\n")
+}
+
+function compilerBRenderSyntaxDiagnostics(
+    graph: CompilerBSyntaxGraph,
+    sourcePaths: String
+): String {
+    state output: String("")
+    state row: Int(0)
+    while row < graph.diagnosticCodes.count {
+        output.append(text: compilerBRenderSyntaxDiagnosticRow(
+            graph: graph,
+            sourcePaths: sourcePaths,
+            row: row
+        ))
+        row: row + 1
+    }
+    return output
+}
+
+function compilerBRenderSyntaxGraph(
+    graph: CompilerBSyntaxGraph,
+    captureValues: CompilerBSyntaxCaptureValueGraph,
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore
+): String {
+    let templates: String(compilerBRenderSyntaxTemplates(
+        graph: graph,
+        sourcePaths: sourcePaths,
+        declarations: declarations
+    ))
+    let materializations: String(compilerBRenderSyntaxMaterializations(
+        graph: graph,
+        sourcePaths: sourcePaths,
+        declarations: declarations
+    ))
+    let captures: String(compilerBRenderSyntaxCaptures(
+        graph: graph,
+        captureValues: captureValues,
+        sourcePaths: sourcePaths
+    ))
+    let diagnostics: String(compilerBRenderSyntaxDiagnostics(
+        graph: graph,
+        sourcePaths: sourcePaths
+    ))
+    return "\(templates)\(materializations)\(captures)\(diagnostics)"
+}

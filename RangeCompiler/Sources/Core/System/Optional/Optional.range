@@ -1,4 +1,0 @@
-enum Optional<Value, None = Nil> {
-    case exists(value: Value)
-    case none(value: None)
-}

@@ -1,0 +1,3 @@
+function start(): Int {
+    return 0
+}

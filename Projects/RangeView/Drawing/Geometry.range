@@ -1,8 +1,15 @@
 construct Size {
-    let width: Int
-    let height: Int
+    let width: Float
+    let height: Float
 }
 
 construct DrawingSpace {
     let size: Size
+}
+
+construct EdgeInsets {
+    let top: Float
+    let leading: Float
+    let bottom: Float
+    let trailing: Float
 }

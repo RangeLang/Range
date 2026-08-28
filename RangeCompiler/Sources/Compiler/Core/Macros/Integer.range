@@ -1,0 +1,17 @@
+macro integer(): Construct {
+  let bits: #environment.target.Declaration.members.filter(named: "bits").first
+  let signed: #environment.target.Declaration.members.filter(named: "signed").first
+
+  if !bits.isTarget {
+    @diagnostic(
+      "Construct must specify bits"
+    )
+  }
+
+  if !signed.isTarget {
+    @diagnostic(
+      "Construct must specify signed"
+    )
+  }
+
+}

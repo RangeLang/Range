@@ -1,3 +1,0 @@
-function start(): Int {
-    Buffer(Byte(5), Byte(4)).element(index: 1)
-}

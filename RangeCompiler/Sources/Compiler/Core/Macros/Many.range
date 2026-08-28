@@ -1,0 +1,60 @@
+macro many(
+  count: Int?,
+  capacity: Int?,
+  ordering: Ordering: .ordered,
+  separator: Separator?
+): @member {
+  function append(element: Type): Int {}
+
+  function element(index: Int): Type {}
+
+  function update(element: Type, index: Int): Int {}
+
+  function count(): Int {}
+
+  function firstIndex(value: Type): Int {}
+
+  function destroy(): Int {}
+
+  let element: #environment.target.Declaration.type
+
+  let modifiers: #environment.filter(for: @collectionModifier)
+
+  switch count {
+  case < 0:
+    @diagnostic(
+      "Many count must not be negative"
+    )
+
+  case .none:
+    #environment {
+      extension #environment.target.Application {
+        #modifiers
+      }
+    }
+
+  default:
+    if #environment.target.Application.values.count != count {
+      @diagnostic(
+        "Many value count must match declared count"
+      )
+    }
+
+    #environment {
+      extension #environment.target.Application {
+        #modifiers
+      }
+    }
+  }
+}
+
+
+enum Ordering {
+  case ordered
+  case unordered
+
+}
+
+enum Separator {
+  case comma
+}

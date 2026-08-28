@@ -1,9 +1,8 @@
 @project
-@compiler
 construct RangeCompiler {
-    let name: Title("RangeCompiler")
     let version: Version(0.1.0)
     let author: "George"
     let commandLine: "Sources/Compiler"
-    let remotes: Array<Remote>([])
+    @many
+    let remotes: Remote
 }

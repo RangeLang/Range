@@ -1,0 +1,55 @@
+// A first ordinary Range-owned native lifecycle. AppKit supplies the windowing
+// boundary and Metal supplies the GPU device; neither owns RangeView semantics.
+
+function rangeViewLaunch(): Int {
+    let appKitLoaded: NSApplicationLoad()
+    let device: MTLCreateSystemDefaultDevice()
+    let applicationClass: objc_getClass(name: "NSApplication")
+    let sharedApplicationSelector: sel_registerName(name: "sharedApplication")
+    let sharedApplication: objc_msgSend(
+        receiver: applicationClass,
+        selector: sharedApplicationSelector
+    )
+    let activationSelector: sel_registerName(name: "setActivationPolicy:")
+    let activation: objcMessageInteger(
+        receiver: sharedApplication,
+        selector: activationSelector,
+        value: 0
+    )
+    let activateSelector: sel_registerName(name: "activateIgnoringOtherApps:")
+    let active: objcMessageInteger(
+        receiver: sharedApplication,
+        selector: activateSelector,
+        value: 1
+    )
+    let alertClass: objc_getClass(name: "NSAlert")
+    let allocationSelector: sel_registerName(name: "alloc")
+    let alertAllocation: objc_msgSend(
+        receiver: alertClass,
+        selector: allocationSelector
+    )
+    let initializationSelector: sel_registerName(name: "init")
+    let alert: objc_msgSend(
+        receiver: alertAllocation,
+        selector: initializationSelector
+    )
+    let stringClass: objc_getClass(name: "NSString")
+    let stringSelector: sel_registerName(name: "stringWithUTF8String:")
+    let title: objcMessageString(
+        receiver: stringClass,
+        selector: stringSelector,
+        value: "RangeView - Metal is live"
+    )
+    let messageSelector: sel_registerName(name: "setMessageText:")
+    let message: objcMessageObject(
+        receiver: alert,
+        selector: messageSelector,
+        value: title
+    )
+    let modalSelector: sel_registerName(name: "runModal")
+    let response: objcIntegerMessage(
+        receiver: alert,
+        selector: modalSelector
+    )
+    return 0
+}

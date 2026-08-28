@@ -1,0 +1,15 @@
+enum Output {
+    case standard
+    case diagnostic
+}
+
+construct Write {
+    binding destination: Output
+
+    @many
+    binding bytes: Byte
+}
+
+macro write(bytes: @many, destination: Output): Void {
+    Execution(effect: Write(destination: destination, bytes: bytes))
+}

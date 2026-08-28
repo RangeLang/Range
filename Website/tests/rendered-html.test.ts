@@ -356,6 +356,58 @@ describe("SvelteKit routes", () => {
     expect(shader).toContain("mix(abstractSurface, concreteSurface, concreteness)");
   });
 
+  test("reopens completed onboarding immediately on double click", async () => {
+    const onboarding = await readFile(
+      new URL(
+        "../src/lib/components/SoundOnboarding.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(onboarding).toContain(
+      'window.addEventListener("dblclick", handleOnboardingDoubleClick)',
+    );
+    expect(onboarding).toContain(
+      'window.removeEventListener("dblclick", handleOnboardingDoubleClick)',
+    );
+    expect(onboarding).toContain(
+      'if (onboardingMachine.getSnapshot().phase !== "complete") return;',
+    );
+    expect(onboarding).toContain('onboardingMachine.send({ type: "RESET" })');
+    expect(onboarding).toContain("reentryVeilOpacity = smootherstep(progress * 2)");
+    expect(onboarding).toContain(
+      "reentryVeilOpacity = 1 - smootherstep((progress - 0.5) * 2)",
+    );
+    expect(onboarding).toContain(
+      "setSphereSize(0.5 + 55.5 * smootherstep(progress))",
+    );
+    expect(onboarding).toContain('class="reentryVeil"');
+  });
+
+  test("double click switches small onboarding directly to the site-opening transition", async () => {
+    const onboarding = await readFile(
+      new URL(
+        "../src/lib/components/SoundOnboarding.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(onboarding).toContain("function handleOnboardingDoubleClick()");
+    expect(onboarding).toContain(
+      'if (startingPhase === "prompting") beginActivation("mouse")',
+    );
+    expect(onboarding).toContain(
+      'if (onboardingMachine.getSnapshot().phase === "entering") finishEntry()',
+    );
+    expect(onboarding).toContain("completeExperience()");
+    expect(onboarding).toContain(
+      'disabled={reopening || phase === "leaving" || liveCollapsing}',
+    );
+    expect(onboarding).not.toContain("entryClickAdvance");
+  });
+
   test("shares the onboarding sky with the cutout-free Intro hero", async () => {
     const [sky, onboardingShader, intro, articleHeader] = await Promise.all([
       readFile(
@@ -1038,15 +1090,34 @@ describe("SvelteKit routes", () => {
     expect(html).toContain('class="token keyword">state</span>');
   });
 
-  test("redirects unknown pages to the homepage", async () => {
+  test("renders unknown pages through the status-driven error surface", async () => {
     for (const path of [
       "/benchmarks/not-a-benchmark",
       "/this-route-does-not-exist",
     ]) {
       const response = await render(path, "manual");
-      expect(response.status).toBe(302);
-      expect(response.headers.get("location")).toBe("/");
+      const html = await response.text();
+      expect(response.status).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+      expect(html).toContain("<title>404 — Range</title>");
+      expect(html).toContain('class="errorPage"');
+      expect(html).toContain('id="error-status"');
+      expect(html).toContain("Sound is always on");
+      expect(html).not.toContain("<range-site-footer>");
     }
+
+    const errorSource = await readFile(
+      new URL("../src/routes/+error.svelte", import.meta.url),
+      "utf8",
+    );
+    expect(errorSource).toContain("const status = $derived(page.status || 500)");
+    expect(errorSource).toContain('soundManager.register("range-error"');
+    expect(errorSource).toContain("soundManager?.setEnabled(true)");
+    expect(errorSource).toContain("scheduleTwinkle()");
+    expect(errorSource).toContain("<ErrorBackgroundShader trigger={damPulse}");
+    expect(errorSource).toContain('effect="dam-sweep"');
+    expect(errorSource).toContain("trigger={damPulse}");
+    expect(errorSource).toContain("oncopy={(event) => event.preventDefault()}");
   });
 
   test("retires the Strings Go Fast optimization", async () => {

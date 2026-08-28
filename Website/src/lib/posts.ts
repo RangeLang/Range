@@ -233,6 +233,42 @@ export const posts: Post[] = [
     },
   },
   {
+    slug: "what-is-an-expression",
+    href: "/posts/what-is-an-expression",
+    category: "Language design",
+    cardTitle: "What Is an Expression?",
+    cardDescription:
+      "A condition is a value: a split between possible states of execution.",
+    description:
+      "In Range, an expression is a condition: a composable value that divides possible states of execution.",
+    palette: 8,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(24 28 65)",
+      mutedForeground: "rgb(67 70 109)",
+      background: "rgb(214 228 255)",
+      contrast: 10.4,
+    },
+  },
+  {
+    slug: "we-deleted-compiler-a",
+    href: "/posts/we-deleted-compiler-a",
+    category: "Compiler design",
+    cardTitle: "We Deleted Compiler A",
+    cardDescription:
+      "One compiler remains. It still cannot reproduce itself—and that is exactly the point.",
+    description:
+      "Why Range retired its old compiler before reaching the native self-hosted fixed point.",
+    palette: 0,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(0 8 94)",
+      mutedForeground: "rgb(0 56 81)",
+      background: "rgb(239 150 82)",
+      contrast: 6.51,
+    },
+  },
+  {
     slug: "requirement-and-provision",
     href: "/posts/requirement-and-provision",
     category: "Language design",

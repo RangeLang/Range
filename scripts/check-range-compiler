@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER_ROOT="$REPO_ROOT/RangeCompiler"
+SOURCE_MANIFEST="$COMPILER_ROOT/CompilerSources.txt"
+BOOTSTRAP_MANIFEST="$COMPILER_ROOT/Bootstrap/Manifest.json"
+COMPILER="$SCRIPT_DIR/run-range-compiler"
+
+fail() {
+    echo "range compiler check: $*" >&2
+    exit 1
+}
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-check.XXXXXX")"
+cleanup() {
+    if [[ "${RANGE_KEEP_COMPILER_CHECK_ROOT:-0}" == "1" ]]; then
+        echo "range compiler check root: $work_root" >&2
+    else
+        rm -rf "$work_root"
+    fi
+}
+trap cleanup EXIT
+
+python3 -m json.tool "$BOOTSTRAP_MANIFEST" >/dev/null \
+    || fail "bootstrap manifest is not valid JSON"
+expected_seed="$(/usr/bin/plutil -extract compiler.sha256 raw -o - "$BOOTSTRAP_MANIFEST")"
+actual_seed="$(/usr/bin/shasum -a 256 "$COMPILER_ROOT/Bootstrap/range" | /usr/bin/awk '{print $1}')"
+[[ "$actual_seed" == "$expected_seed" ]] || fail "bootstrap hash mismatch"
+/usr/bin/otool -L "$COMPILER_ROOT/Bootstrap/range" > "$work_root/seed-libraries.txt"
+[[ "$(/usr/bin/sed -n '2,$p' "$work_root/seed-libraries.txt" | /usr/bin/wc -l | /usr/bin/tr -d ' ')" -eq 1 ]] \
+    || fail "bootstrap has an unexpected dynamic dependency"
+/usr/bin/grep -F '/usr/lib/libSystem.B.dylib' "$work_root/seed-libraries.txt" >/dev/null \
+    || fail "bootstrap does not link libSystem"
+
+previous=""
+source_count=0
+while IFS= read -r relative; do
+    [[ -n "$relative" ]] || fail "source manifest contains an empty row"
+    [[ "$relative" == RangeCompiler/* && "$relative" == *.range ]] \
+        || fail "source is outside canonical RangeCompiler: $relative"
+    [[ -f "$REPO_ROOT/$relative" ]] || fail "missing canonical source: $relative"
+    if [[ -n "$previous" && "$relative" < "$previous" ]]; then
+        fail "source manifest is not bytewise sorted: $relative"
+    fi
+    previous="$relative"
+    source_count=$((source_count + 1))
+done < "$SOURCE_MANIFEST"
+[[ "$source_count" -gt 0 ]] || fail "source manifest is empty"
+
+if xargs rg -n 'Buffer<|IntMany|ByteMany|LLVM\(|--emit-llvm' < "$SOURCE_MANIFEST" >/dev/null; then
+    fail "canonical source contains a retired generic, carrier, or LLVM product"
+fi
+
+fixture_root="$REPO_ROOT/Testing/Compiler"
+"$COMPILER" "$fixture_root/Pass/ProjectSelfDescribingSyntax" > "$work_root/syntax-1.out"
+"$COMPILER" "$fixture_root/Pass/ProjectSelfDescribingSyntax" > "$work_root/syntax-2.out"
+cmp "$work_root/syntax-1.out" "$work_root/syntax-2.out" >/dev/null \
+    || fail "self-describing syntax graph is not deterministic"
+grep -F $'projectSyntax\tvalid=true\tfailures=0' "$work_root/syntax-1.out" >/dev/null \
+    || fail "self-describing syntax fixture failed"
+grep -F $'kind=2\tname=Body' "$work_root/syntax-1.out" >/dev/null \
+    || fail "generic Body declaration was not retained"
+grep -F $'kind=2\tname=Selection' "$work_root/syntax-1.out" >/dev/null \
+    || fail "generic Selection declaration was not retained"
+grep -F $'kind=2\tname=SelectionCase' "$work_root/syntax-1.out" >/dev/null \
+    || fail "generic SelectionCase declaration was not retained"
+grep -F $'kind=2\tname=Semantic' "$work_root/syntax-1.out" >/dev/null \
+    || fail "semantic state-chain declaration was not retained"
+if grep -F $'kind=4\tname=condition' "$work_root/syntax-1.out" >/dev/null; then
+    fail "a privileged condition capability remains active"
+fi
+grep -F $'declaration=Body\tparts=3' "$work_root/syntax-1.out" >/dev/null \
+    || fail "generic Body syntax plan was not materialized"
+if grep -F $'kind=2\tname=Block' "$work_root/syntax-1.out" >/dev/null; then
+    fail "legacy Block semantic nominal remains active"
+fi
+
+for fixture in VectorLabeled VectorPositional VectorNamedAccess VectorCollectionOperations VectorMemberBinding; do
+    "$COMPILER" "$fixture_root/Pass/$fixture" > "$work_root/$fixture.out"
+    grep -F $'projectSyntax\tvalid=true\tfailures=0' "$work_root/$fixture.out" >/dev/null \
+        || fail "$fixture was rejected"
+done
+for fixture in VectorCountMismatch VectorDerivedMemberBinding VectorDuplicateLabel VectorMissingComponentType VectorMissingMultiplicity VectorMissingNamedAccess VectorMixedComponents VectorWrongComponentType; do
+    fixture_exit=0
+    "$COMPILER" "$fixture_root/Fail/$fixture" > "$work_root/$fixture.out" 2>&1 || fixture_exit=$?
+    [[ "$fixture_exit" -eq 65 ]] || fail "$fixture did not reject with exit 65"
+done
+
+run_native() {
+    local fixture="$1"
+    local expected="$2"
+    local assembly="$work_root/$fixture.s"
+    local executable="$work_root/$fixture"
+    "$COMPILER" --emit-assembly "$fixture_root/Pass/$fixture" > "$assembly"
+    clang -arch arm64 "$assembly" -o "$executable"
+    local fixture_exit=0
+    "$executable" || fixture_exit=$?
+    [[ "$fixture_exit" -eq "$expected" ]] || fail "$fixture returned $fixture_exit instead of $expected"
+}
+
+run_native ProjectAssemblyCall 42
+run_native ProjectAssemblyLocal 42
+run_native ProjectAssemblyState 42
+run_native ProjectAssemblyBranchSequence 42
+run_native ProjectAssemblyAggregate 42
+run_native ProjectManyHomogeneous 4
+run_native ProjectManyHomogeneousRead 7
+run_native ProjectManyByteRead 7
+
+execution_assembly="$work_root/ProjectAssemblyExecutionCompass.s"
+execution_executable="$work_root/ProjectAssemblyExecutionCompass"
+"$COMPILER" --emit-assembly "$fixture_root/Pass/ProjectAssemblyExecutionCompass" > "$execution_assembly"
+clang -arch arm64 "$execution_assembly" \
+    "$COMPILER_ROOT/Runtime/RangeCompilerHost.c" \
+    "$COMPILER_ROOT/Runtime/RangeCompilerMetrics.c" \
+    "$COMPILER_ROOT/Runtime/RangeRawBuffer.c" \
+    -o "$execution_executable"
+execution_exit=0; "$execution_executable" || execution_exit=$?
+[[ "$execution_exit" -eq 64 ]] || fail "execution compass did not take early completion"
+execution_exit=0; "$execution_executable" value || execution_exit=$?
+[[ "$execution_exit" -eq 42 ]] || fail "execution compass did not take its continuation"
+
+output_assembly="$work_root/ProjectAssemblySystemOutput.s"
+output_repeat="$work_root/ProjectAssemblySystemOutput-repeat.s"
+output_executable="$work_root/ProjectAssemblySystemOutput"
+"$COMPILER" --emit-assembly "$fixture_root/Pass/ProjectAssemblySystemOutput" > "$output_assembly"
+"$COMPILER" --emit-assembly "$fixture_root/Pass/ProjectAssemblySystemOutput" > "$output_repeat"
+cmp "$output_assembly" "$output_repeat" >/dev/null || fail "system output assembly is not deterministic"
+[[ "$(grep -c '    bl _write' "$output_assembly")" -eq 5 ]] || fail "system output omitted ordered writes"
+clang -arch arm64 "$output_assembly" -o "$output_executable"
+"$output_executable" > "$work_root/stdout" 2> "$work_root/stderr"
+printf 'A\0B\n' > "$work_root/stdout.expected"
+printf 'E\n' > "$work_root/stderr.expected"
+cmp "$work_root/stdout.expected" "$work_root/stdout" >/dev/null || fail "stdout bytes differ"
+cmp "$work_root/stderr.expected" "$work_root/stderr" >/dev/null || fail "stderr bytes differ"
+
+owner_exit=0
+"$COMPILER" --emit-assembly "$fixture_root/Fail/ProjectAssemblyWriteWithoutRuntimeOwner" \
+    > "$work_root/write-without-owner.out" 2>&1 || owner_exit=$?
+[[ "$owner_exit" -eq 65 ]] || fail "ownerless runtime effect did not reject"
+grep -F 'runtime effect macro requires an owning execution compass' \
+    "$work_root/write-without-owner.out" >/dev/null || fail "ownerless runtime effect rejected at the wrong boundary"
+
+echo "range compiler check: pass sources=$source_count seed=$actual_seed"

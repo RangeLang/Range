@@ -25,14 +25,20 @@
     colors = "spectrum",
     transpose = 0,
     hdr = false,
-    effect = "interactive",
+    effect: visualEffect = "interactive",
+    layout = "natural",
+    sound = true,
+    trigger = 0,
   }: {
     text?: string;
     base?: "dark" | "white";
     colors?: "spectrum" | "warm-light";
     transpose?: number;
     hdr?: boolean;
-    effect?: "interactive" | "radiate";
+    effect?: "interactive" | "radiate" | "dam-sweep";
+    layout?: "natural" | "error-status";
+    sound?: boolean;
+    trigger?: number;
   } = $props();
   const anchorX = 0.59;
   const anchorY = 0.5;
@@ -99,6 +105,12 @@
   let radiateStartedAt = 0;
   let lastRadiateFrame = -Infinity;
   let radiateTime = 0;
+  let sweepProgress = 1;
+  let sweepDirection = 1;
+  let sweepRenderFrame: number | null = null;
+  let sweepStartedAt = 0;
+  let sweepRequested = false;
+  let lastSweepTrigger = 0;
   let pointerAnimationTime = 0;
   let pointerInside = false;
   let soundProximity = 0;
@@ -155,6 +167,9 @@
     uniform int uDisplayP3;
     uniform int uWarmOnly;
     uniform int uRadiate;
+    uniform int uSweep;
+    uniform float uSweepProgress;
+    uniform float uSweepDirection;
     uniform float uTime;
 
     in vec2 vUv;
@@ -175,6 +190,40 @@
 
     float glyphMask(vec2 uv) {
       return texture(uGlyph, uv).a;
+    }
+
+    float sweptGlyphMask(vec2 uv, float progress) {
+      float directionalProgress = uSweepDirection > 0.0
+        ? progress
+        : 1.0 - progress;
+      float sweepCenter = mix(-0.2, 1.2, directionalProgress);
+      vec2 lensCenter = vec2(
+        uContentRect.x + sweepCenter * uContentRect.z,
+        uInkY.x + 0.5 * uInkY.y
+      );
+      vec2 textureDimensions = vec2(textureSize(uGlyph, 0));
+      vec2 pixelOffset = (uv - lensCenter) * textureDimensions;
+      float inkPixels = uInkY.y * textureDimensions.y;
+      float lensRadius = max(1.0, inkPixels * 0.62);
+      float radius = length(pixelOffset) / lensRadius;
+      float lens = 1.0 - smoothstep(0.0, 1.0, radius);
+      float magnification = 1.0 + lens * 0.075;
+      vec2 source = lensCenter + (uv - lensCenter) * magnification;
+      return glyphMask(source);
+    }
+
+    float sweptOuterStroke(vec2 uv, float progress, float center) {
+      vec2 texel = 1.0 / vec2(textureSize(uGlyph, 0));
+      float expanded = center;
+      for (int sampleIndex = 0; sampleIndex < 8; sampleIndex += 1) {
+        float angle = float(sampleIndex) * 0.7853981634;
+        vec2 direction = vec2(cos(angle), sin(angle));
+        expanded = max(
+          expanded,
+          sweptGlyphMask(uv + direction * texel * 4.0, progress)
+        );
+      }
+      return max(0.0, expanded - center);
     }
 
     float radiatingGlyphMask(vec2 uv, float radius, float pulse) {
@@ -293,6 +342,40 @@
     }
 
     void main() {
+      if (uSweep == 1) {
+        float sweptBase = sweptGlyphMask(vUv, uSweepProgress);
+        if (uPass == 0) {
+          outputColor = vec4(0.0);
+        } else {
+          float directionalProgress = uSweepDirection > 0.0
+            ? uSweepProgress
+            : 1.0 - uSweepProgress;
+          float sweepCenter = mix(-0.2, 1.2, directionalProgress);
+          float contentX = (vUv.x - uContentRect.x) / uContentRect.z;
+          float fieldDistance = (contentX - sweepCenter) / 0.18;
+          float field = exp(-fieldDistance * fieldDistance);
+          float outerStroke = sweptOuterStroke(
+            vUv,
+            uSweepProgress,
+            sweptBase
+          );
+          float strokeAlpha = outerStroke * mix(0.12, 0.46, field);
+          vec3 coolEdge = vec3(0.52, 0.72, 1.0);
+          vec3 warmEdge = vec3(1.0, 0.62, 0.28);
+          vec3 edgeColor = mix(
+            coolEdge,
+            warmEdge,
+            smoothstep(-0.3, 0.3, contentX - sweepCenter)
+          );
+          float alpha = max(sweptBase, strokeAlpha);
+          vec3 premultiplied =
+            uCharcoalColor * sweptBase +
+            edgeColor * strokeAlpha * (1.0 - sweptBase);
+          outputColor = vec4(premultiplied, alpha);
+        }
+        return;
+      }
+
       float contentX = (vUv.x - uContentRect.x) / uContentRect.z;
       float rawPulse = 0.5 + 0.5 * sin(uTime * 0.9);
       float pulse = rawPulse * rawPulse * (3.0 - 2.0 * rawPulse);
@@ -500,6 +583,9 @@
       displayP3: gl.getUniformLocation(program, "uDisplayP3"),
       warmOnly: gl.getUniformLocation(program, "uWarmOnly"),
       radiate: gl.getUniformLocation(program, "uRadiate"),
+      sweep: gl.getUniformLocation(program, "uSweep"),
+      sweepProgress: gl.getUniformLocation(program, "uSweepProgress"),
+      sweepDirection: gl.getUniformLocation(program, "uSweepDirection"),
       time: gl.getUniformLocation(program, "uTime"),
     };
     blurUniformLocations = {
@@ -590,7 +676,7 @@
     sourceContext.textBaseline = "alphabetic";
     (
       sourceContext as CanvasRenderingContext2D & { letterSpacing: string }
-    ).letterSpacing = style.letterSpacing;
+    ).letterSpacing = layout === "error-status" ? "0px" : style.letterSpacing;
 
     const metrics = sourceContext.measureText(text);
     const inkHeight =
@@ -598,7 +684,15 @@
     const inkTop = verticalOverscan + (height - inkHeight) / 2;
     const baseline = inkTop + metrics.actualBoundingBoxAscent;
     const textX = horizontalOverscan;
-    if (text === shaderWordmarkPrefix + shaderWordmarkSuffix) {
+    if (layout === "error-status" && text.length === 3) {
+      let glyphX = textX;
+      for (const [index, glyph] of [...text].entries()) {
+        if (index === 1) glyphX -= fontSize * 0.27;
+        else if (index > 1) glyphX -= fontSize * 0.25;
+        sourceContext.fillText(glyph, glyphX, baseline);
+        glyphX += sourceContext.measureText(glyph).width;
+      }
+    } else if (text === shaderWordmarkPrefix + shaderWordmarkSuffix) {
       const prefixMetrics = sourceContext.measureText(shaderWordmarkPrefix);
       const suffixMetrics = sourceContext.measureText(shaderWordmarkSuffix);
       const joinedSuffixX =
@@ -708,8 +802,14 @@
     gl.useProgram(program);
     gl.uniform1i(
       uniformLocations.radiate,
-      effect === "radiate" ? 1 : 0,
+      visualEffect === "radiate" ? 1 : 0,
     );
+    gl.uniform1i(
+      uniformLocations.sweep,
+      visualEffect === "dam-sweep" ? 1 : 0,
+    );
+    gl.uniform1f(uniformLocations.sweepProgress, sweepProgress);
+    gl.uniform1f(uniformLocations.sweepDirection, sweepDirection);
     gl.uniform1f(uniformLocations.time, radiateTime);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
@@ -768,7 +868,7 @@
   };
 
   const animateRadiation = (timestamp: number) => {
-    if (!rendererActive || contextLost || effect !== "radiate") {
+    if (!rendererActive || contextLost || visualEffect !== "radiate") {
       radiateRenderFrame = null;
       return;
     }
@@ -788,11 +888,38 @@
       !rendererActive
       || contextLost
       || radiateRenderFrame !== null
-      || effect !== "radiate"
+      || visualEffect !== "radiate"
     ) return;
     radiateStartedAt = 0;
     lastRadiateFrame = -Infinity;
     radiateRenderFrame = requestAnimationFrame(animateRadiation);
+  };
+
+  const animateSweep = (timestamp: number) => {
+    if (!rendererActive || contextLost || visualEffect !== "dam-sweep") {
+      sweepRenderFrame = null;
+      return;
+    }
+    sweepProgress = Math.min(1, (timestamp - sweepStartedAt) / 820);
+    renderCanvas();
+    if (sweepProgress < 1) {
+      sweepRenderFrame = requestAnimationFrame(animateSweep);
+    } else {
+      sweepRenderFrame = null;
+    }
+  };
+
+  const requestSweep = () => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!rendererActive || contextLost || !canvasReady) {
+      sweepRequested = true;
+      return;
+    }
+    sweepRequested = false;
+    if (sweepRenderFrame !== null) cancelAnimationFrame(sweepRenderFrame);
+    sweepProgress = 0;
+    sweepStartedAt = performance.now();
+    sweepRenderFrame = requestAnimationFrame(animateSweep);
   };
 
   const updateTitleSound = (titleLayout?: RangeLayoutSnapshot) => {
@@ -1029,6 +1156,7 @@
   };
 
   const primeTitleSound = async (event: PointerEvent) => {
+    if (!sound) return;
     const audio = await soundManager?.resume();
     if (!audio || !soundManager) return;
     soundManager.setEnabled(true);
@@ -1100,14 +1228,16 @@
         updateTitleSound(snapshot);
       },
     );
-    titleElement.addEventListener("pointerdown", primeTitleSound);
+    if (sound) titleElement.addEventListener("pointerdown", primeTitleSound);
     const handleContextLost = () => {
       contextLost = true;
       canvasReady = false;
       if (pointerRenderFrame !== null) cancelAnimationFrame(pointerRenderFrame);
       if (radiateRenderFrame !== null) cancelAnimationFrame(radiateRenderFrame);
+      if (sweepRenderFrame !== null) cancelAnimationFrame(sweepRenderFrame);
       pointerRenderFrame = null;
       radiateRenderFrame = null;
+      sweepRenderFrame = null;
     };
     canvas.addEventListener("webglcontextlost", handleContextLost);
 
@@ -1127,6 +1257,7 @@
       resizeObserver.observe(titleElement);
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         startRadiating();
+        if (sweepRequested) requestSweep();
       }
     };
     void renderWhenReady();
@@ -1141,13 +1272,16 @@
       if (radiateRenderFrame !== null) {
         cancelAnimationFrame(radiateRenderFrame);
       }
+      if (sweepRenderFrame !== null) {
+        cancelAnimationFrame(sweepRenderFrame);
+      }
       if (idleTimeout !== null) clearTimeout(idleTimeout);
       if (reanchorTimeout !== null) clearTimeout(reanchorTimeout);
       window.removeEventListener("pointermove", trackPointer);
       window.removeEventListener("pointerout", handlePointerWindowExit);
       window.removeEventListener("blur", stopTrackingPointer);
       stopTrackingTitleLayout?.();
-      titleElement.removeEventListener("pointerdown", primeTitleSound);
+      if (sound) titleElement.removeEventListener("pointerdown", primeTitleSound);
       canvas.removeEventListener("webglcontextlost", handleContextLost);
       titleSound?.dispose();
       titleSoundRoute?.dispose();
@@ -1167,6 +1301,18 @@
       if (gl && blurProgram) gl.deleteProgram(blurProgram);
     };
   });
+
+  $effect(() => {
+    const nextTrigger = trigger;
+    if (
+      visualEffect !== "dam-sweep"
+      || nextTrigger <= 0
+      || nextTrigger === lastSweepTrigger
+    ) return;
+    lastSweepTrigger = nextTrigger;
+    sweepDirection = nextTrigger % 2 === 1 ? 1 : -1;
+    requestSweep();
+  });
 </script>
 
 <span
@@ -1177,7 +1323,15 @@
   class:darkBase={base === "dark"}
   bind:this={titleElement}
 >
-  <span class="rangeTitleMeasure">{text}</span>
+  {#if layout === "error-status"}
+    <span class="rangeTitleMeasure errorStatusMeasure" aria-hidden="true">
+      {#each [...text] as glyph}
+        <span class="errorStatusDigit">{glyph}</span>
+      {/each}
+    </span>
+  {:else}
+    <span class="rangeTitleMeasure">{text}</span>
+  {/if}
   <canvas
     class="rangeTitleCanvas"
     data-range-layout="range-title-canvas"
@@ -1199,6 +1353,27 @@
 
   .rangeTitleMeasure {
     display: block;
+  }
+
+  .errorStatusMeasure {
+    display: inline-flex;
+    align-items: center;
+    letter-spacing: 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .errorStatusDigit {
+    position: relative;
+    display: block;
+  }
+
+  .errorStatusDigit + .errorStatusDigit {
+    margin-left: -0.25em;
+  }
+
+  .errorStatusDigit:first-child + .errorStatusDigit {
+    margin-left: -0.27em;
   }
 
   .darkBase .rangeTitleMeasure {

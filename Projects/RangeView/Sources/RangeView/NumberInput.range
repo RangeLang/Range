@@ -1,0 +1,13 @@
+@view
+construct NumberInput {
+    state value: Float
+    state size: Vector(2, Float) {
+        width: 1.4,
+        height: 0.6
+    }
+
+    derived body: @view {
+        Rectangle()
+        Rectangle()
+    }
+}

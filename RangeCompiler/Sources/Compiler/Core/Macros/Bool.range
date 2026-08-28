@@ -1,0 +1,69 @@
+macro bool(): Construct {
+}
+
+macro collectionModifier(): Macro {}
+
+macro collection(): Macro {
+
+  let modifiers: #environment.filter(
+    for: @collectionModifier
+  )
+
+  if modifiers.isEmpty {}
+
+}
+
+@collectionModifier
+macro filter(named: String): @many -> @any {
+    state input: #environment.target
+    state output: @any(capacity: input.capacity)
+    state index: Int(0)
+
+    while index < input.count {
+        let element: input.element(index: index)
+
+        if element.name == named {
+            output.append(element)
+        }
+
+        index: index + 1
+    }
+
+    output
+}
+
+@collectionModifier
+macro isEmpty(): @many -> Bool {
+    #environment.target.count == 0
+}
+
+@collectionModifier
+macro each(): @many -> @one {
+    let action: #environment.Application.children.filter(all: Closure)
+
+    state input: #environment.target
+    state index: Int(0)
+
+    while index < input.count {
+        let element: input.element(index: index)
+        action(element)
+        index: index + 1
+    }
+}
+
+@collectionModifier
+macro map(): @many -> @many {
+    let transform: #environment.Application.children.filter(all: Closure)
+
+    state input: #environment.target
+    state output: @many(capacity: input.count)
+    state index: Int(0)
+
+    while index < input.count {
+        let element: input.element(index: index)
+        output.append(transform(element))
+        index: index + 1
+    }
+
+    output
+}

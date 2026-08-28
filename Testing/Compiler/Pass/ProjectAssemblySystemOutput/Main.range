@@ -1,0 +1,10 @@
+function start(): Int {
+    if true {
+        @write(bytes: "A\0B".bytes, destination: .standard)
+        print(message: "")
+        @write(bytes: "E".bytes, destination: .diagnostic)
+        @write(bytes: "\n".bytes, destination: .diagnostic)
+        return 0
+    }
+    return 1
+}

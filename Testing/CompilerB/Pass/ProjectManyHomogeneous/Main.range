@@ -1,3 +1,0 @@
-function start(): Int {
-    Buffer(Int(5), Int(4)).count
-}

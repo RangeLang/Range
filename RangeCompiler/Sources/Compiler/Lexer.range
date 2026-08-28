@@ -1,0 +1,44 @@
+function compilerBLex(source: String, output: String): Int {
+    let tokens: CompilerBRetainedTokenStore(compilerBLexRetained(source: source))
+    state tokenIndex: Int(0)
+    output.append(text: "lex\tvalid=true\n")
+    while tokenIndex < tokens.kinds.count {
+        let token: CompilerBToken(compilerBRetainedToken(store: tokens, id: TokenID(value: tokenIndex)))
+        let text: String(source.substring(start: token.start, end: token.end))
+        output.append(text: "token\tid=\(token.id.value)\tkind=\(compilerBTokenKindName(kind: token.kind))\ttext=\(text)\tstart=\(token.start)\tend=\(token.end)\n")
+        tokenIndex: tokenIndex + 1
+    }
+    output.append(text: "tokenCount=\(tokens.kinds.count)\n")
+    return compilerBRetainedTokenStoreDestroy(store: tokens)
+}
+
+function compilerBParse(
+    source: String,
+    rendered: String,
+    diagnostic: String
+): Int {
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: source))
+    rendered.append(text: compilerBRenderSyntaxRevision(revision: revision))
+    state valid: Bool(revision.valid)
+    if !valid { diagnostic.append(text: revision.diagnostic) }
+    if valid {
+        let macroValidation: CompilerBMacroValidationResult(
+            compilerBValidateDeclaredMacroApplications(revision: revision)
+        )
+        if !macroValidation.valid {
+            valid: false
+            diagnostic.append(text: macroValidation.diagnostic)
+        }
+    }
+    if valid && compilerBRunFreestandingMacros(revision: revision) != 0 {
+        valid: false
+        diagnostic.append(text: "unable to execute freestanding macro")
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
+        valid: false
+        diagnostic.append(text: "unable to destroy syntax revision")
+    }
+    rendered.append(text: "syntax\tvalid=\(valid)\tdiagnostic=\(diagnostic)\n")
+    if !valid { return 0 - 1 }
+    return 0
+}

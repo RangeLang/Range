@@ -3,224 +3,49 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/RangeCompilerBootstrap.json"
+MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/Manifest.json"
 
 usage() {
     cat >&2 <<'USAGE'
 Usage:
   range version
-  range compile <FILE-OR-DIR> [--source FILE-OR-DIR]...
-  range compile-graph <FILE-OR-DIR>
-  range shape <FILE-OR-DIR>
-  range run <PROGRAM-OR-DIR> [--source FILE-OR-DIR]... [-- ARGS...]
-  range lsp
-  range compiler next
-  range compiler next --cached-only
-  range compiler b [check|--emit-assembly <PROJECT>|run <PROJECT> [-- ARGS...]]
-  range compiler progression
-  range compiler progression --cached-only
-  range compiler promote --approve
-  range compiler profile [COMPILER-DIR]
-  range compiler COMMAND [ARGS...]
-  range check-build-plan
-  range check-value-ownership [DIR]
-  range check-composition
-  range benchmark-composition
-  range check-shape
-  range check-compiler-smoke [DIR]
-  range check-compiler-b
-  range check-compiler-b-self-host
-  range check-compiler-b-source-graph
-  range check-compiler-v1
-  range check-compiler-graph
-  range check-compiler-graph-revision
-  range check-compiler-v1-generation
-  range check-compiler-candidate [DIR]
-  range check-document-store
-  range check-gpu-canvas
-  range check-compiler-integrity
+  range compiler --emit-assembly <PROJECT>
+  range run <PROJECT> [-- ARGS...]
   range check-compiler
-
-The supported native surface is the self-hosted compiler kernel and its proof
-commands. Broader language commands return only after their implementations are
-Range-owned and covered by the native proof boundary.
-
-The run command infers the .range extension when an extensionless program path
-names an existing .range file.
+  range check-compiler-self-host [--audit-only|--expect-boundary]
 USAGE
 }
 
 command="${1:-}"
-if [[ -z "$command" ]]; then
-    usage
-    exit 1
-fi
+if [[ -z "$command" ]]; then usage; exit 64; fi
 shift
 
 case "$command" in
     version|--version)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        compiler_name="$(/usr/bin/plutil -extract compiler.name raw -o - "$MANIFEST")"
-        compiler_version="$(/usr/bin/plutil -extract compiler.version raw -o - "$MANIFEST")"
-        compiler_channel="$(/usr/bin/plutil -extract compiler.channel raw -o - "$MANIFEST")"
-        bootstrap_hash="$(/usr/bin/plutil -extract bootstrap.sha256 raw -o - "$MANIFEST")"
-        /usr/bin/printf '%s %s (%s) %s\n' \
-            "$compiler_name" "$compiler_version" "$compiler_channel" "$bootstrap_hash"
-        ;;
-    compile)
-        if [[ $# -lt 1 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/compile-range-project" "$@"
-        ;;
-    compile-graph)
-        if [[ $# -ne 1 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/compile-range-project" --graph "$1"
-        ;;
-    shape)
-        if [[ $# -ne 1 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/compile-range-project" --shape "$1"
-        ;;
-    run)
-        if [[ $# -lt 1 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/run-range-project" "$@"
-        ;;
-    lsp)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        exec /usr/bin/python3 "$REPO_ROOT/Editor/LanguageServer/range_lsp.py"
+        [[ $# -eq 0 ]] || { usage; exit 64; }
+        name="$(/usr/bin/plutil -extract compiler.name raw -o - "$MANIFEST")"
+        channel="$(/usr/bin/plutil -extract compiler.channel raw -o - "$MANIFEST")"
+        hash="$(/usr/bin/plutil -extract compiler.sha256 raw -o - "$MANIFEST")"
+        printf '%s (%s) %s\n' "$name" "$channel" "$hash"
         ;;
     compiler)
-        compiler_command="${1:-}"
-        if [[ -z "$compiler_command" ]]; then usage; exit 1; fi
-        shift
-        case "$compiler_command" in
-            b)
-                "$REPO_ROOT/scripts/run-range-compiler-b" "$@"
-                ;;
-            next)
-                if [[ $# -eq 0 ]]; then
-                    "$REPO_ROOT/scripts/range-native" compiler-next
-                elif [[ $# -eq 1 && "$1" == "--cached-only" ]]; then
-                    "$REPO_ROOT/scripts/range-native" compiler-next-cached
-                else
-                    usage
-                    exit 1
-                fi
-                ;;
-            progression)
-                if [[ $# -eq 0 ]]; then
-                    "$REPO_ROOT/scripts/range-native" compiler-progression
-                elif [[ $# -eq 1 && "$1" == "--cached-only" ]]; then
-                    "$REPO_ROOT/scripts/range-native" compiler-progression-cached
-                else
-                    usage
-                    exit 1
-                fi
-                ;;
-            promote)
-                if [[ $# -ne 1 || "$1" != "--approve" ]]; then
-                    usage
-                    exit 1
-                fi
-                compiler_directory="$REPO_ROOT/RangeCompiler/Sources/Compiler"
-                candidate_directory="$compiler_directory/.range/Build/candidate"
-                reproduction_directory="$compiler_directory/.range/Build/reproduction"
-                "$REPO_ROOT/scripts/check-range-compiler-candidate" \
-                    --allow-runtime-roll "$compiler_directory"
-                "$REPO_ROOT/scripts/promote-range-compiler" \
-                    --approve \
-                    --candidate-llvm "$candidate_directory/RangeCompiler.ll" \
-                    --reproduction-llvm "$reproduction_directory/RangeCompiler.ll" \
-                    --candidate-executable "$candidate_directory/RangeCompiler" \
-                    --reproduction-executable "$reproduction_directory/RangeCompiler"
-                "$REPO_ROOT/scripts/verify-range-compiler" --integrity-only
-                ;;
-            profile)
-                if [[ $# -gt 1 ]]; then usage; exit 1; fi
-                "$REPO_ROOT/scripts/profile-range-compiler" "$@"
-                ;;
-            *)
-                "$REPO_ROOT/scripts/range-native" compiler-command "$compiler_command" "$@"
-                ;;
-        esac
+        [[ $# -eq 2 && "$1" == "--emit-assembly" ]] || { usage; exit 64; }
+        exec "$SCRIPT_DIR/run-range-compiler" "$@"
         ;;
-    check-build-plan)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-build-plan"
-        ;;
-    check-value-ownership)
-        if [[ $# -gt 2 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-value-ownership" "$@"
-        ;;
-    check-composition)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-composition"
-        ;;
-    benchmark-composition)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/benchmark-range-composition"
-        ;;
-    check-shape)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-shape"
-        ;;
-    check-compiler-smoke)
-        if [[ $# -gt 1 ]]; then usage; exit 1; fi
-        if [[ $# -eq 1 ]]; then
-            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint candidate-plan "$1"
-        else
-            "$REPO_ROOT/scripts/check-range-compiler-candidate" --checkpoint candidate-plan
-        fi
-        ;;
-    check-compiler-b)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-compiler-b"
-        ;;
-    check-compiler-b-self-host)
-        if [[ $# -gt 1 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-compiler-b-self-host" "$@"
-        ;;
-    check-compiler-b-source-graph)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-compiler-b-source-graph"
-        ;;
-    check-compiler-v1)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-compiler-v1"
-        ;;
-    check-compiler-graph)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-compiler-graph"
-        ;;
-    check-compiler-graph-revision)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-compiler-graph-revision"
-        ;;
-    check-compiler-v1-generation)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-compiler-v1-generation"
-        ;;
-    check-compiler-candidate)
-        if [[ $# -gt 1 ]]; then usage; exit 1; fi
-        compiler_dir="${1:-$REPO_ROOT/RangeCompiler/Sources/Compiler}"
-        "$REPO_ROOT/scripts/check-range-compiler-candidate" "$compiler_dir"
-        ;;
-    check-document-store)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-document-store"
-        ;;
-    check-gpu-canvas)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/check-range-gpu-canvas"
+    run)
+        [[ $# -ge 1 ]] || { usage; exit 64; }
+        exec "$SCRIPT_DIR/run-range-project" "$@"
         ;;
     check-compiler)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/verify-range-compiler"
+        [[ $# -eq 0 ]] || { usage; exit 64; }
+        exec "$SCRIPT_DIR/check-range-compiler"
         ;;
-    check-compiler-integrity)
-        if [[ $# -ne 0 ]]; then usage; exit 1; fi
-        "$REPO_ROOT/scripts/verify-range-compiler" --integrity-only
+    check-compiler-self-host)
+        [[ $# -le 1 ]] || { usage; exit 64; }
+        exec "$SCRIPT_DIR/check-range-compiler-self-host" "$@"
         ;;
     *)
         usage
-        exit 1
+        exit 64
         ;;
 esac

@@ -1,0 +1,11 @@
+@syntax {
+    $target(
+        $arguments
+    )
+}
+construct Application {
+    state target: Identity
+
+    @many
+    state arguments: @syntax
+}

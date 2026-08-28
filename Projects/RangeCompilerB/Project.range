@@ -1,8 +1,0 @@
-@project
-construct RangeCompiler {
-    let version: Version(0.1.0)
-    let author: "George"
-    let commandLine: "Sources/CompilerB"
-    @many
-    let remotes: Remote
-}

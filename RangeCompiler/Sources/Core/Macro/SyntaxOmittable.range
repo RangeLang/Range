@@ -1,3 +1,0 @@
-construct SyntaxOmittable {
-    function omit(): RangeGraphDelta
-}

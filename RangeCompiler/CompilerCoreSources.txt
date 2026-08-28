@@ -1,8 +1,0 @@
-RangeCompiler/Sources/Core/Package/LinkPlan.range
-RangeCompiler/Sources/Core/Macro/Extern.range
-RangeCompiler/Sources/Core/System/Memory/RawBuffer.range
-RangeCompiler/Sources/Core/System/Memory/Buffer.range
-RangeCompiler/Sources/Core/System/Process.range
-RangeCompiler/Sources/Core/System/Target.range
-RangeCompiler/Sources/Core/System/Text/String.range
-RangeCompiler/Sources/Core/Coding/UUID.range

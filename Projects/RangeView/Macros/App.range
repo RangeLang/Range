@@ -1,10 +1,7 @@
 macro app(): Construct -> Void {
     #environment {
         @main {
-            Window(
-                title: #environment.target.Declaration.identifier.name,
-                application: #environment.target.Declaration.identity()
-            )
+            rangeViewLaunch()
         }
     }
 }

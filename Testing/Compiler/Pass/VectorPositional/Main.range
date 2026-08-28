@@ -1,0 +1,14 @@
+derived direction: Vector(3, Float) {
+    10.0,
+    50.0,
+    20.0
+}
+
+function second(): Float {
+    return direction.components.element(index: 1)
+}
+
+function start(): Int {
+    second()
+    return 0
+}

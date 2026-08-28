@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER="${RANGE_COMPILER_EXECUTABLE:-}"
+
+fail() {
+    echo "RangeView layout check: $*" >&2
+    exit 1
+}
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-view-layout.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT
+
+output="$work_root/range-view.out"
+if [[ -n "$COMPILER" ]]; then
+    [[ -x "$COMPILER" ]] || fail "Range Compiler executable is not runnable"
+    RANGE_COMPILER_EXECUTABLE="$COMPILER" \
+        "$REPO_ROOT/scripts/run-range-compiler" "$REPO_ROOT/Projects/RangeView" > "$output"
+else
+    "$REPO_ROOT/scripts/run-range-compiler" "$REPO_ROOT/Projects/RangeView" > "$output"
+fi
+grep -F $'projectSyntax\tvalid=true\tfailures=0' "$output" >/dev/null \
+    || fail "RangeView project graph is invalid"
+
+layout="$REPO_ROOT/Projects/RangeView/Drawing/Layout.range"
+modifiers="$REPO_ROOT/Projects/RangeView/Drawing/LayoutModifiers.range"
+circuit="$REPO_ROOT/Projects/RangeView/Drawing/LayoutCircuit.range"
+stack="$REPO_ROOT/Projects/RangeView/Views/Stack.range"
+proof="$REPO_ROOT/Projects/RangeView/Sources/RangeView/RecursiveStackProof.range"
+app="$REPO_ROOT/Projects/RangeView/Sources/RangeView/RangeViewApp.range"
+render="$REPO_ROOT/Projects/RangeView/Drawing/RenderGraph.range"
+
+for modifier in minWidth idealWidth maxWidth minHeight idealHeight maxHeight \
+    parentWidth parentHeight padding position offset layer; do
+    rg -q "function ${modifier}\\(" "$modifiers" \
+        || fail "missing @view layout modifier: $modifier"
+done
+
+for relationship in DimensionRange ViewDimensions ResolvedViewGeometry \
+    localPosition worldPosition parentRelative; do
+    rg -q "$relationship" "$layout" \
+        || fail "missing layout relationship: $relationship"
+done
+
+for relationship in MeasuredView AxisAllocation StackLayoutInput StackLayoutOutput \
+    clampScrollOffset paintCommandPrecedes; do
+    rg -q "$relationship" "$circuit" \
+        || fail "missing layout circuit relationship: $relationship"
+done
+
+[[ "$(rg -c 'Stack\(' "$proof")" -ge 2 ]] \
+    || fail "recursive proof must contain nested Stack applications"
+rg -q '\.parentWidth\(1\.0\)' "$proof" \
+    || fail "recursive proof is missing parent-relative sizing"
+rg -q '\.alignment\(' "$proof" \
+    || fail "recursive proof is missing alignment"
+rg -q 'let viewport: Viewport' "$circuit" \
+    || fail "layout circuit does not receive the graph-owned viewport"
+if rg -q 'viewport: Viewport' "$stack"; then
+    fail "Stack stores viewport state instead of deriving layout from the graph circuit"
+fi
+rg -q 'width: 800\.0' "$app" \
+    || fail "RangeView app viewport width is not 800"
+rg -q 'height: 600\.0' "$app" \
+    || fail "RangeView app viewport height is not 600"
+rg -q 'let shape: Identity' "$render" \
+    || fail "render graph does not retain the canonical shape identity"
+
+if rg -n 'LayoutRect|RectangleRepresentation|ShapeRepresentation|PageWorldView|OBox' \
+    "$REPO_ROOT/Projects/RangeView" \
+    "$REPO_ROOT/Testing/Compiler" >/dev/null; then
+    fail "retired nominal layout or rectangle representation remains"
+fi
+
+if rg -n 'StackLayoutInput|DimensionRange|ResolvedViewGeometry|RangeView' \
+    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Project/Construction.range" \
+    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Syntax/Parser.range" \
+    >/dev/null; then
+    fail "Compiler B contains a RangeView-specific identity check"
+fi
+
+echo "RangeView layout check: pass (Range Compiler graph and canonical layout relationships)"
