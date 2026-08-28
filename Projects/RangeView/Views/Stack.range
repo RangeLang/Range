@@ -1,11 +1,23 @@
-@entry
 @view
 construct Stack {
+    binding viewport: Viewport
+
     state axis: Axis
     state spacing: Float
     state alignment: LayoutAlignment
+    state padding: EdgeInsets
+    state shape: @shape?
+    state scrolling: Bool
+    state scrollOffset: Vector
+
+    @many
+    let children: @view
+
+    derived boundary: @view {
+        Rectangle()
+    }
 
     derived body: @view {
-        // The stack body is its composed view content.
+        children
     }
 }

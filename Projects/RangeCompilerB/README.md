@@ -7,10 +7,9 @@ Compiler B is the new compiler. Build it out in small runnable slices.
   identity, cardinality, and input/output correspondence are graph
   relationships; operations such as `filter` preserve or transform those
   relationships without authored `<Element>` parameters.
-- The remaining `Buffer<Int>` and `Buffer<Byte>` spellings in B's implementation
-  are accepted-Compiler-A bootstrap storage, not B language semantics. Replace
-  them with graph-native cardinality storage before B parses and compiles its
-  complete source set itself.
+- Compiler tables and String own graph-native `@many state` relationships.
+  Compiler A's raw-buffer ABI is hidden behind opaque seed-only cardinality
+  carriers and is excluded from candidate and reproduction inputs.
 - Range owns ordinary runtime behavior. Use `@extern` only to declare an actual
   foreign ABI symbol such as a libc or operating-system function; do not place
   a second implementation of B behind a C wrapper.

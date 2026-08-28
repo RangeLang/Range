@@ -1,0 +1,4 @@
+@floating
+construct Float {
+    let bits: Int(64)
+}

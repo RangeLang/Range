@@ -1,0 +1,9 @@
+function start(): Int {
+    state result: Int(7)
+    if false {
+        result: Int(5)
+    } else {
+        result: Int(42)
+    }
+    result
+}

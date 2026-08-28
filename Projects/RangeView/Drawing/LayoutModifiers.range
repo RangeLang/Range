@@ -4,11 +4,61 @@ function alignment(_ vertical: VerticalAlignment, _ horizontal: HorizontalAlignm
 }
 
 @modifier(.layout)
-function position(x: Int, y: Int): LayoutTransform {
-    return LayoutTransform(.position(value: Point(x: x, y: y)))
+function minWidth(_ value: Float): LayoutTransform {
+    return LayoutTransform(.minWidth(value: NonnegativeDimension(value: value)))
 }
 
 @modifier(.layout)
-function offset(x: Int, y: Int): LayoutTransform {
-    return LayoutTransform(.offset(value: Point(x: x, y: y)))
+function idealWidth(_ value: Float): LayoutTransform {
+    return LayoutTransform(.idealWidth(value: NonnegativeDimension(value: value)))
+}
+
+@modifier(.layout)
+function maxWidth(_ value: Float): LayoutTransform {
+    return LayoutTransform(.maxWidth(value: NonnegativeDimension(value: value)))
+}
+
+@modifier(.layout)
+function minHeight(_ value: Float): LayoutTransform {
+    return LayoutTransform(.minHeight(value: NonnegativeDimension(value: value)))
+}
+
+@modifier(.layout)
+function idealHeight(_ value: Float): LayoutTransform {
+    return LayoutTransform(.idealHeight(value: NonnegativeDimension(value: value)))
+}
+
+@modifier(.layout)
+function maxHeight(_ value: Float): LayoutTransform {
+    return LayoutTransform(.maxHeight(value: NonnegativeDimension(value: value)))
+}
+
+@modifier(.layout)
+function parentWidth(_ fraction: Float): LayoutTransform {
+    return LayoutTransform(.parentWidth(fraction: ParentFraction(value: fraction)))
+}
+
+@modifier(.layout)
+function parentHeight(_ fraction: Float): LayoutTransform {
+    return LayoutTransform(.parentHeight(fraction: ParentFraction(value: fraction)))
+}
+
+@modifier(.layout)
+function padding(_ value: EdgeInsets): LayoutTransform {
+    return LayoutTransform(.padding(value: value))
+}
+
+@modifier(.layout)
+function position(x: Float, y: Float): LayoutTransform {
+    return LayoutTransform(.position(value: Vector(2, Float) { x: x, y: y }))
+}
+
+@modifier(.layout)
+function offset(x: Float, y: Float): LayoutTransform {
+    return LayoutTransform(.offset(value: Vector(2, Float) { x: x, y: y }))
+}
+
+@modifier(.layout)
+function layer(_ value: Int): LayoutTransform {
+    return LayoutTransform(.layer(value: value))
 }

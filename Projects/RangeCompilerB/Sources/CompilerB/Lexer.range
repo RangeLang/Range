@@ -1,7 +1,7 @@
-function compilerBLex(source: String): String {
+function compilerBLex(source: String, output: String): Int {
     let tokens: CompilerBRetainedTokenStore(compilerBLexRetained(source: source))
     state tokenIndex: Int(0)
-    state output: String("lex\tvalid=true\n")
+    output.append(text: "lex\tvalid=true\n")
     while tokenIndex < tokens.kinds.count {
         let token: CompilerBToken(compilerBRetainedToken(store: tokens, id: TokenID(value: tokenIndex)))
         let text: String(source.substring(start: token.start, end: token.end))
@@ -9,31 +9,36 @@ function compilerBLex(source: String): String {
         tokenIndex: tokenIndex + 1
     }
     output.append(text: "tokenCount=\(tokens.kinds.count)\n")
-    compilerBRetainedTokenStoreDestroy(store: tokens)
-    return output
+    return compilerBRetainedTokenStoreDestroy(store: tokens)
 }
 
-function compilerBParse(source: String): CompilerBSyntaxSummary {
+function compilerBParse(
+    source: String,
+    rendered: String,
+    diagnostic: String
+): Int {
     let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevision(source: source))
-    let rendered: String(compilerBRenderSyntaxRevision(revision: revision))
+    rendered.append(text: compilerBRenderSyntaxRevision(revision: revision))
     state valid: Bool(revision.valid)
-    state diagnostic: String(revision.diagnostic)
+    if !valid { diagnostic.append(text: revision.diagnostic) }
     if valid {
         let macroValidation: CompilerBMacroValidationResult(
             compilerBValidateDeclaredMacroApplications(revision: revision)
         )
         if !macroValidation.valid {
             valid: false
-            diagnostic: macroValidation.diagnostic
+            diagnostic.append(text: macroValidation.diagnostic)
         }
     }
     if valid && compilerBRunFreestandingMacros(revision: revision) != 0 {
         valid: false
-        diagnostic: "unable to execute freestanding macro"
+        diagnostic.append(text: "unable to execute freestanding macro")
     }
     if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
         valid: false
-        diagnostic: "unable to destroy syntax revision"
+        diagnostic.append(text: "unable to destroy syntax revision")
     }
-    return CompilerBSyntaxSummary(rendered: rendered, valid: valid, diagnostic: diagnostic)
+    rendered.append(text: "syntax\tvalid=\(valid)\tdiagnostic=\(diagnostic)\n")
+    if !valid { return 0 - 1 }
+    return 0
 }

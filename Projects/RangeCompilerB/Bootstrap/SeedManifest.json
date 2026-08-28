@@ -1,10 +1,11 @@
 {
   "formatVersion": 1,
   "purpose": "Compiler A transport for the first runnable Compiler B seed only",
-  "target": {
-    "platform": "macOS",
-    "architecture": "arm64",
-    "pointerBits": 64
+    "target": {
+        "platform": "macOS",
+        "architecture": "arm64",
+        "pointerBits": 64,
+        "minimumOS": "27.0"
   },
   "acceptedCompilerA": {
     "path": "RangeCompiler/Bootstrap/RangeCompilerBootstrap.ll",
@@ -13,11 +14,19 @@
   "sourceManifest": "Projects/RangeCompilerB/CompilerSelfHostSources.txt",
   "transport": {
     "path": "Projects/RangeCompilerB/Bootstrap/SeedBufferTransport.range",
-    "sha256": "d3866d1a88ce1411cadd8fae7e00216d756cb6c7a2983fccbf63d56f1de0bfb0",
-    "purpose": "Map canonical IntMany and ByteMany identities to Compiler A's generic Buffer ABI while building the initial seed",
+    "sha256": "d7eaa840c33aae253cf92e60c7f76e8d355bc37e16410bafa8111bbe808d8837",
+    "purpose": "Provide transparent Compiler A-only Int and Byte cardinality carriers with explicit RawBuffer storage over its frozen ABI",
     "candidateInput": false,
     "reproductionInput": false,
     "removalCondition": "Remove after the promoted Compiler B recreates candidate and reproduction without Compiler A"
+  },
+  "sourceTransport": {
+    "path": "Projects/RangeCompilerB/Bootstrap/seed_source_transport.py",
+    "sha256": "869657651f89210d77818775778a0ec9ee68cbb384cd61e0d6f30d2e1c07287d",
+    "purpose": "Translate canonical @many relationships, Execution relationships, and graph-native output effects to Compiler A-only carriers and String sinks for the seed build only",
+    "candidateInput": false,
+    "reproductionInput": false,
+    "removalCondition": "Remove with the A-to-B seed runner after Compiler B promotion"
   },
   "entryTransport": {
     "path": "Projects/RangeCompilerB/Bootstrap/SeedEntryTransport.range",
@@ -46,6 +55,7 @@
     "transportSymbols": [
       "bufferCreateInt",
       "bufferCreateUnsigned8",
+      "bufferTruncateInt",
       "rawBufferAppendInt",
       "rawBufferCount",
       "rawBufferLoadInt",

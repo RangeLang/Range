@@ -26,7 +26,7 @@ not organized around URLs or a virtual DOM.
 - `Drawing/` owns backend-neutral geometry, shapes, and styles.
 - `Application/` owns application-level views such as `Window` and
   `NavigationStack`.
-- `Views/` owns reusable general views such as `Stack` and `Fragment`.
+- `Views/` owns reusable general views such as `Stack`.
 - `Sources/RangeView/` keeps the example app and every independent example view
   in its own file.
 - `@view` is the single identity for every presentable value.
@@ -100,8 +100,10 @@ special-casing `Stack` or reparsing its source.
 
 Placement is a local layout relationship. `alignment`, `position`, and
 `offset` are layout modifiers attached to individual view values; a
-container supplies the available rectangle and resolves those values. The
-result is backend-neutral `LayoutRect` data, not HTML or native drawing calls.
+container supplies the available boundary and resolves those values. The
+result is backend-neutral `ResolvedViewGeometry`: local position, world
+position, 2D size, and a separate paint layer. Occupancy is derived from that
+geometry and is never stored on a view.
 
 The trailing closure is a view's direct construction input. A
 `derived body: @view` is an ordinary derived Range value and is consumed before
@@ -155,8 +157,18 @@ there is no source-level renderer identity or native-C-string wrapper.
 Window dimensions and placement are not intrinsic fields. They will arrive
 through the same layout-modifier graph as other views (`frame`, `position`,
 and related operations), after which platform lowering consumes the resolved
-layout. The current Compiler B GPUI artifact route remains a transitional
-backend proof until it consumes this real `@app` expansion and Window graph.
+layout. Compiler B must consume the real `@app` expansion and Window graph
+through its ordinary project pipeline; RangeView has no dedicated backend.
+
+The first executable project slice now runs with
+`scripts/range run Projects/RangeView`. The accepted compiler builds Compiler
+B, Compiler B discovers the RangeView sources separately, and its ordinary
+project emitter lowers the generated `@main` Process and the Range-authored
+native lifecycle directly to LLVM. `@framework(name:)` relationships select
+Metal and AppKit at link time, and the linked application contains no compiler
+runtime, raw-buffer runtime, C adapter, Rust crate, or GPUI layer. This proves
+the application/Metal boundary; lowering the authored Window and complete view
+tree remains the next rendering slice.
 
 The canonical application example is
 `Sources/RangeView/RangeViewApp.range`. Its app/view surface is intentionally
@@ -231,9 +243,8 @@ The current declaration establishes ownership only. Path mutation, destination
 selection, restoration, and backend presentation still require focused graph
 and compiler proofs before they are claimed as executable Range behavior.
 
-Builder output is backend-neutral view and geometry intent. It is not an HTML
-node tree. The current backend lowers that intent into HTML, CSS, and only the
-JavaScript required for observation, interaction, or runtime updates.
+Builder output is a graph of backend-neutral view, layout, and geometry intent.
+It is not an HTML node tree and it is not a text-to-CSS program.
 
 Functions marked `@modifier` contribute typed values to the current
 view's ordered modifier relationship:
@@ -250,19 +261,17 @@ observation and transformation boundary.
 
 ## Drawing model
 
-`Point`, `Size`, and `DrawingSpace` are the first backend-neutral 2D values.
-Window dimensions come from the drawing space instead of being repeated in a
-native backend call.
+`Vector(2, Float)`, `Size`, and `DrawingSpace` are the backend-neutral 2D
+values. The graph-owned `Viewport` is fixed at 800 x 600 for the first native
+proof and flows into recursive Stack layout.
 
-`Matrix<Element>` is both the ordered collection and multidimensional layout
-substrate. A list is a one-column matrix; tables, grids, and kanbans retain the
-same model instead of introducing parallel container types or flexbox
-semantics. `ForEachRepresentation<Element, Representation>` maps each element
-and `MatrixPosition` directly into its output representation.
+`Stack` owns an ordered `@many` collection of `@view` children. Nested stacks
+express composition recursively; layout does not need a parallel matrix or
+position representation.
 
-`RectangleRepresentation` is the first area primitive, defined by an origin
-and size. The native checkpoint fills rectangles with horizontal scanlines
-until a direct native rectangle ABI is proven.
+`Rectangle` is the canonical first area primitive. Its four ordered points are
+transformed by resolved position and size; there is no second rectangle or
+layout-rectangle representation.
 
 Shapes are their ordered points. `@shape` contributes `@view`, and the ordered
 `@many` value is the path that Compiler B lowers directly:
@@ -279,10 +288,11 @@ construct Triangle {
 }
 ```
 
-The first point is GPUI's move target, each successor is a line target, and the
-path closes after the final point. There is no `draw()` registration wrapper
-and no Triangle-specific backend rule; the exact `@shape` and `@many`
-relationships select the canonical applications.
+The first point starts the path, each successor extends it, and the path closes
+after the final point. There is no `draw()` registration wrapper and no
+Triangle-specific backend rule; the exact `@shape` and `@many` relationships
+select the canonical applications. A Range-authored Metal pipeline must consume
+that ordered path through general Application and foreign-call lowering.
 
 `Color` is ordinary open data, and palettes are ordinary compositions of those
 values:
@@ -356,9 +366,9 @@ values owned by `Color`. An `RGBA(...)` or `OKLCH(...)` application is already
 the color representation emitted into the graph. Renderer lowering consumes
 that application and maps its fields to the selected platform format; RangeView
 does not route color semantics through a native `Color.c` implementation or a
-parallel conversion identity. The current Compiler B GPUI material proof still
-uses packed integer placeholders and must be replaced by graph-resolved
-`@color` applications before it proves this complete route.
+parallel conversion identity. Compiler B must lower the graph-resolved
+`@color` applications directly; no extraction fixture or packed renderer
+placeholder represents this route.
 
 `Sources/RangeView/RangeViewApp.range` is the source-first reference for the
 intended app, navigation, view, rendering, and command-line shapes.

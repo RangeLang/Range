@@ -1,0 +1,8 @@
+construct Pair {
+    let first: Int
+    let second: Int
+}
+
+function start(): Int {
+    Pair(first: Int(7), second: Int(42)).second
+}

@@ -1,48 +1,23 @@
-function compilerBProjectEntry(route: String): Int {
-    let revision: CompilerBProjectRevision(compilerBProjectRevisionCreate(route: route))
-    print(value: compilerBRenderProjectRevision(revision: revision))
-    state result: Int(0)
-    if !revision.valid { result: 65 }
-    if compilerBProjectRevisionDestroy(revision: revision) != 0 { result: 70 }
-    return result
-}
+function compilerBProjectModeGraph(): Int { return 1 }
+function compilerBProjectModeLLVM(): Int { return 2 }
+function compilerBProjectModeAssembly(): Int { return 3 }
 
-function compilerBProjectLLVMEntry(route: String): Int {
-    let revision: CompilerBProjectRevision(compilerBProjectRevisionCreate(route: route))
-    state output: String("")
+function compilerBInspectSourceFile(route: String): Int {
+    let source: String(fileManagerReadFile(path: route))
+    state output: String("route=\(route)\n")
     state diagnostic: String("")
-    let status: Int(compilerBEmitProjectLLVM(
-        project: revision,
-        output: output,
+    state status: Int(0)
+    if compilerBLex(source: source, output: output) != 0 { status: 65 }
+    if compilerBParse(
+        source: source,
+        rendered: output,
         diagnostic: diagnostic
-    ))
-    state result: Int(0)
-    if status == 0 { print(value: output) }
-    if status != 0 {
-        print(value: "compilerBProjectLLVMError\t\(diagnostic)")
-        result: 65
+    ) != 0 { status: 65 }
+    if output != "" { print(value: output) }
+    if diagnostic != "" {
+        print(value: "compilerBSyntaxError\t\(diagnostic)")
     }
-    if compilerBProjectRevisionDestroy(revision: revision) != 0 { result: 70 }
-    return result
-}
-
-function compilerBProjectAssemblyEntry(route: String): Int {
-    let revision: CompilerBProjectRevision(compilerBProjectRevisionCreate(route: route))
-    state output: String("")
-    state diagnostic: String("")
-    let status: Int(compilerBEmitProjectAssembly(
-        project: revision,
-        output: output,
-        diagnostic: diagnostic
-    ))
-    state result: Int(0)
-    if status == 0 { print(value: output) }
-    if status != 0 {
-        print(value: "compilerBProjectAssemblyError\t\(diagnostic)")
-        result: 65
-    }
-    if compilerBProjectRevisionDestroy(revision: revision) != 0 { result: 70 }
-    return result
+    return status
 }
 
 function compilerBEntry(): Int {
@@ -70,36 +45,115 @@ function compilerBEntry(): Int {
         print(value: "compiler-b: route does not exist: \(route)")
         return 66
     }
-    if filePrimitivePathKind(path: route) == 2 {
-        if emitLLVM { return compilerBProjectLLVMEntry(route: route) }
-        if emitAssembly { return compilerBProjectAssemblyEntry(route: route) }
-        return compilerBProjectEntry(route: route)
+    let routeKind: Int(filePrimitivePathKind(path: route))
+    if routeKind == 1 && !emitLLVM && !emitAssembly {
+        return compilerBInspectSourceFile(route: route)
     }
-    if emitLLVM || emitAssembly { return 64 }
-    let sourcePaths: String(compilerBDiscoverSourcePaths(route: route))
-    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
-    if sourceCount == 0 {
-        print(value: "compiler-b: route contains no Range source: \(route)")
+    if routeKind != 2 {
+        print(value: "compiler-b: route must be a project directory")
         return 66
     }
-
-    print(value: "project\troute=\(route)\tsources=\(sourceCount)\n")
-    state sourceIndex: Int(0)
-    while sourceIndex < sourceCount {
-        let sourcePath: String(compilerBSourceSetPathAt(
-            paths: sourcePaths,
-            index: sourceIndex
-        ))
-        let source: String(fileManagerReadFile(path: sourcePath))
-        let lexed: String(compilerBLex(source: source))
-        print(value: "sourceFile\tid=\(sourceIndex)\tpath=\(sourcePath)\n\(lexed)")
-        let syntax: CompilerBSyntaxSummary(compilerBParse(source: source))
-        print(value: syntax.rendered)
-        print(value: "syntax\tvalid=\(syntax.valid)\tdiagnostic=\(syntax.diagnostic)\n")
-        if !syntax.valid { return 65 }
-        sourceIndex: sourceIndex + 1
+    state mode: Int(compilerBProjectModeGraph())
+    if emitLLVM { mode: compilerBProjectModeLLVM() }
+    if emitAssembly { mode: compilerBProjectModeAssembly() }
+    state output: String("")
+    state diagnostic: String("")
+    let sourcePaths: String(compilerBDiscoverProjectSourcePaths(route: route))
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    state failures: Int(0)
+    let revision: CompilerBProjectRevision(
+        sourcePaths: sourcePaths,
+        sourceCount: sourceCount,
+        declarations: compilerBProjectDeclarationStoreCreate(
+            capacity: sourceCount * 32
+        ),
+        macroApplications: compilerBProjectMacroApplicationStoreCreate(
+            capacity: sourceCount * 32
+        ),
+        emittedMacroBlocks: compilerBProjectEmittedMacroBlockStoreCreate(
+            capacity: sourceCount * 4
+        ),
+        syntaxGraph: compilerBSyntaxGraphCreate(capacity: sourceCount * 8),
+        syntaxCaptureValues: compilerBSyntaxCaptureValueGraphCreate(
+            captureCapacity: sourceCount * 64,
+            valueCapacity: sourceCount * 256
+        )
+    )
+    failures: compilerBPopulateProjectRevision(
+        sourcePaths: revision.sourcePaths,
+        declarations: revision.declarations,
+        applications: revision.macroApplications,
+        emittedMacroBlocks: revision.emittedMacroBlocks,
+        syntaxGraph: revision.syntaxGraph
+    )
+    if compilerBDeriveSyntaxCaptureValues(
+        graph: revision.syntaxGraph,
+        applications: revision.macroApplications,
+        values: revision.syntaxCaptureValues
+    ) != 0 { failures: failures + 1 }
+    if compilerBValidateSyntaxCaptureCardinalities(
+        graph: revision.syntaxGraph,
+        values: revision.syntaxCaptureValues
+    ) != 0 { failures: failures + 1 }
+    if compilerBValidateSyntaxCaptureIdentities(
+        graph: revision.syntaxGraph,
+        values: revision.syntaxCaptureValues,
+        sourcePaths: revision.sourcePaths,
+        declarations: revision.declarations
+    ) != 0 { failures: failures + 1 }
+    failures: failures + compilerBValidateCountedConstructions(
+        sourcePaths: revision.sourcePaths,
+        declarations: revision.declarations,
+        renderFacts: mode == compilerBProjectModeGraph()
+    )
+    if failures != 0 {
+        compilerBProjectReportSyntaxDiagnostics(
+            sourcePaths: revision.sourcePaths
+        )
+        compilerBProjectReportResolutionDiagnostics(
+            sourcePaths: revision.sourcePaths,
+            declarations: revision.declarations
+        )
     }
-    return 0
+    state result: Int(0)
+    if mode == compilerBProjectModeGraph() {
+        output.append(text: compilerBRenderProjectRevision(
+            revision: revision,
+            diagnosticCount: failures
+        ))
+        if failures != 0 {
+            diagnostic.append(text: compilerBProjectRevisionDiagnostic(
+                diagnosticCount: failures
+            ))
+            result: 65
+        }
+    } else if mode == compilerBProjectModeLLVM() {
+        if failures != 0 {
+            diagnostic.append(text: compilerBProjectRevisionDiagnostic(
+                diagnosticCount: failures
+            ))
+            result: 65
+        } else if compilerBEmitProjectLLVM(
+            project: revision,
+            output: output,
+            diagnostic: diagnostic
+        ) != 0 { result: 65 }
+    } else {
+        if failures != 0 {
+            diagnostic.append(text: compilerBProjectRevisionDiagnostic(
+                diagnosticCount: failures
+            ))
+            result: 65
+        } else if compilerBEmitProjectAssembly(
+            project: revision,
+            output: output,
+            diagnostic: diagnostic
+        ) != 0 { result: 65 }
+    }
+    if output != "" { print(value: output) }
+    if diagnostic != "" { print(value: "compilerBProjectError\t\(diagnostic)") }
+    if compilerBProjectRevisionDestroy(revision: revision) != 0 { result: 70 }
+    return result
 }
 
 macro compilerEntry(): Construct -> Void {

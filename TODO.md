@@ -25,12 +25,12 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [x] Replace the remaining accepted-A `Buffer<Int>` and `Buffer<Byte>`
       bootstrap storage spellings with B-owned graph-native cardinality storage
       before the complete Compiler B source set becomes a self-source fixture.
-      - Compiler B now names nongeneric `IntMany` and `ByteMany` carriers whose
-        element identities come from one attached `@many` relationship. The
-        frozen A-only seed bundle deterministically maps those identities back
-        to A's generic Buffer ABI; candidate and reproduction manifests exclude
-        that transport source and canonical B contains zero `Buffer<...>`
-        syntax.
+      - Compiler B tables now declare direct `@many state ...: Int`
+        relationships and String declares `@many state bytes: Byte`; there are
+        no scalar-specific collection identities. The frozen A-only source
+        transport maps those relationships to opaque A-only cardinality
+        carriers over its frozen raw-buffer ABI and is excluded from candidate
+        and reproduction inputs.
   - [ ] Materialize graph-native `@many` collections.
     - [x] Retain Functions nested directly in a Macro as declarations owned by
       that Macro, without executing their declaration tokens as body calls.
@@ -42,20 +42,33 @@ owns the actionable checkboxes for the active and deliberately deferred work.
     - [ ] Materialize constructor identities and values into homogeneous or
       identity-bucket storage, including order, count, capacity, promotion,
       filtering, fixed-count validation, mutation capability, and cleanup.
-      - [x] Materialize the first closed two-value homogeneous descriptor from
-        `Buffer(Int(...), Int(...))` and `Buffer(Byte(...), Byte(...))` graph
-        applications. The native renderer emits `{pointer, count, capacity}`
-        plus compact contiguous 64-bit or byte storage, and executes `count`
-        and bounded ordered `element(index:)` through Macro-owned Functions.
+      - [x] Materialize closed homogeneous descriptors from
+        `Buffer(Int(...))` and `Buffer(Byte(...))` graph applications without a
+        fixed value-count record. The lowered plan owns an ordered direct
+        `@many state values: Int` relationship; the native renderer emits
+        `{pointer, count, capacity}` plus compact contiguous 64-bit or byte
+        storage for every value.
       - [x] Reject mixed identities at the explicit homogeneous-only boundary;
         bucket promotion remains the next representation key, not an implicit
         widening of contiguous storage.
       - [x] Admit a bare identity without incrementing count: `Buffer(Int)`
         materializes a zero-count, zero-capacity descriptor and no value slots.
-      - [ ] Generalize beyond two values, dynamic capacity growth,
-        append/update, and representation-keyed shared operation code.
-    - [ ] Replace `Many.range`'s authored LLVM strings with target-neutral
-      representation and operation facts consumed only by backends.
+      - [x] Generalize native project construction beyond two values and emit
+        constants and stores by iterating the lowered value relationship.
+      - [ ] Add runtime dynamic capacity growth, mutation cleanup, and one
+        shared operation variant per representation key. Compiler B's own
+        tables already use direct growing `@many state` relationships through
+        the seed-only transport.
+      - [x] Bridge the accepted Compiler A ownership-proof gap without making
+        a collection carrier part of canonical lowering.
+        - `compilerBLowerManyOperation` now writes values into caller-owned
+          scratch storage and returns scalar representation facts. The frozen
+          seed transport exposes an explicit transparent `RawBuffer` field, so
+          A can prove carrier destruction; the full seed build passes beyond
+          the former ownership detail `600011`.
+    - [x] Remove `Many.range`'s authored LLVM strings. Backends now consume the
+      materialized application, admission identity, cardinality, ordering, and
+      storage relationships directly.
   - [ ] Complete Compiler B freeform syntax materialization.
     - [x] Retain parenthesized and brace-form `@syntax` recipes as ordered
       literal, delimiter, and arbitrary `$capture` parts. Bind every capture to
@@ -108,12 +121,67 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         no `hasMany`, element-value, count, capacity, or operation-code fields.
         Do not reintroduce representation-specific string-renderer argument
         lists or return rendered text merely to append it at the caller.
+    - [x] Separate semantic execution operations from Apple arm64 instructions.
+      - Storage, constants, reads, writes, calls, lifetime endings, returns,
+        conditional edges, jumps, and labels first materialize as target-neutral
+        graph rows. A distinct instruction graph owns registers, stack
+        locations, Apple instructions, labels, and call targets; the assembly
+        renderer is now only a deterministic serializer of that graph.
+      - Darwin-local `LRange_*` labels assemble correctly. Repeated emission,
+        explicit stable-name assembly to `Program.o`, and stable-name linking
+        produce byte-identical `.s`, object, and executable pairs for the
+        focused native fixtures without disabling the required Mach-O UUID.
     - [x] Expose the bounded backend as `scripts/range compiler b
       --emit-assembly <project>` and `scripts/range compiler b run <project>`
       without prematurely replacing the accepted compiler's broader `run`.
     - [ ] Lower parameters, locals, stack slots, arithmetic, comparisons,
       branches, aggregate addressing, identity dispatch, extern/libSystem
       calls, and graph-native many operations.
+      - [x] Retain immutable and mutable local kinds, assignments, returns, and
+        source ownership provenance in the concrete process graph. Operational
+        ordering belongs to the declaration/execution compass, not recursive
+        ownership lowering.
+      - [x] Lower a terminal immutable local, straight-line mutable state, and
+        ordered top-level `if`/`else` relationships through explicit stack
+        storage. `Execution.next` stores ordered guarded successors; Apple
+        labels and branches are derived during instruction materialization.
+        The focused local, state, true/false branch, and two-conditional
+        sequence executables all return `42`.
+      - [ ] Continue `compilerBEntry` from its next honest native boundary:
+        schedule its remaining effects through the linear execution compass,
+        beginning with the continuation after its first conditional successor,
+        then dynamic String/argument, file services, and cleanup.
+        - [x] Retain ordinary `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`,
+          unary `!`, and parenthesized predicates as recursively related
+          comparison/logical syntax values. Materialize comparison effects and
+          short-circuit logical relationships without a logical bytecode value.
+          `ProjectAssemblyExecutionCompass` proves an extern Int call, local
+          storage, two comparisons, early completion, and continuation with
+          deterministic assembly; the executable returns `64` with no argument
+          and `42` with one argument.
+        - [x] Remove the dead semantic `BranchIfFalse`, `Jump`, and `Label`
+          operation path. Apple branches and labels are derived only from
+          `Execution.next`; assignment-based branch fixtures retain their
+          source facts but use the same relationship materializer.
+        - [x] Materialize graph-native system output. `@write` executes during
+          compilation and emits a nominal `Execution(effect: Write(...))` into
+          the owning runtime compass; `Output` is only the destination identity,
+          and `Write.bytes` is a borrowed ordered `@many Byte` relationship.
+          String callers project `message.bytes`; the effect does not own or
+          require a String value.
+          Apple arm64 materialization supplies x0/x1/x2 plus `_write`.
+          `ProjectAssemblySystemOutput` proves direct writes, `print` expansion,
+          stdout, stderr, embedded NUL bytes, ordering, and repeated assembly.
+      - [x] Lower ordinary multi-field construct construction and projection.
+        - The lowered aggregate path resolves stored relationships in source
+          order, derives widths from each relationship type's integer facts,
+          validates labeled values, and emits ordinary stack allocation,
+          constant, store, load, release, and return operations. The Apple
+          arm64 renderer contains no construct or field-name special case.
+          `ProjectAssemblyAggregate` proves `Pair(first: Int(7), second:
+          Int(42)).second` through a 16-byte frame and returns `42`; repeated
+          assembly is byte-identical and the existing Int/Byte many fixtures
+          remain green.
       - [x] Lower the first stack-resident many descriptor and aggregate
         addressing for Int and Byte count/positional-read operations.
         - The many graph facts disappear during lowering into the same ordered
@@ -145,6 +213,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         Comment regions remain pending.
     - [x] Make parsing consume retained token identities instead of rescanning
       raw source for declaration keywords and balanced braces.
+    - [x] Parse the exact canonical Compiler B self-source manifest without a
+      syntax failure. Process discovery now tracks parentheses, brackets, and
+      braces before recognizing assignments, distinguishes grouped operator
+      expressions from calls, recursively retains conditional branch
+      processes, and preserves stage-specific parser failures instead of
+      flattening them into a node-store diagnostic. Native self-emission now
+      reaches the honest ordered-multiple-CFG lowering boundary.
     - [ ] Extend `scripts/range check-compiler-b` to parse B's own `Main.range`
       and `Lexer.range` and assert their exact expected top-level declarations
       and Block relationships.
@@ -156,10 +231,10 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       Declaration discovery deliberately runs twice through one canonical
       identity index, but emits exactly one LLVM function definition.
     - [x] Add B's first literal scalar data unit: `Byte` is one unsigned
-      eight-bit value, `String` owns `Buffer<Byte>`, and integer lowering
-      carries byte count explicitly (`Byte = 1`, current `Int = 4`) through
-      indexing and IR. The focused runtime-free products prove `Byte` lowers
-      to LLVM `i8`, `Int` lowers to LLVM `i32`, and both execute with exit 42.
+      eight-bit value, `String` owns direct `@many state bytes: Byte` storage,
+      and integer lowering carries byte count explicitly through indexing and
+      IR. The canonical `Int` graph fact is 64 bits; the frozen A transport's
+      older 32-bit scalar ABI is not the permanent Range layout.
     - [x] Replace Compiler B Core UUID's transitional String storage with one
       immutable `@many(count: 16) let bytes: Byte` relationship.
       - The focused graph proof retains the Byte `let` property, typed count argument,
@@ -198,10 +273,11 @@ owns the actionable checkboxes for the active and deliberately deferred work.
         token range for a later pattern interpreter. Partial arithmetic cases
       such as `case < 0` receive the switch subject as their left operand,
       `.none` is an absence comparison, and `default` has no condition.
-    - [ ] Replace the bootstrap-bounded `Buffer<Int>` scalar value column in
-      the canonical Return facet with a canonical arbitrary-precision value
-      identity. Token and literal identities are already separate; this is
-      required before integer literals can exceed the accepted compiler's Int.
+    - [ ] Replace the bootstrap-bounded scalar value column in the canonical
+      Process expression graph with an arbitrary-precision value identity.
+      The column is now a direct `@many state ...: Int` relationship rather
+      than a Buffer type, but the accepted compiler's transport value remains
+      the limit until B owns literal materialization.
     - [x] Replace the disposable/backend lexer split with one retained token
       store and concrete `CompilerBToken { id, kind, start, end }` values.
       Identity equality compares `TokenID`; lexical equality compares source
@@ -440,15 +516,13 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       - [x] Execute freestanding macros as targetless process applications.
         - `macro print(message: String): Void` has no target node. Its
           `@print("...")` Applications retain positional String arguments,
-          process ownership, and control-flow ordering; selected `if` branches
-          execute its ordinary `stringPrint(value:)` call through the
-          function's `@extern` relationship, while unselected branches remain
-          silent. A non-Void target signature rejects when invoked
-          freestanding.
-        - `macro diagnostic(message: String): Void` uses the same execution
-          path. Its temporary `stringDiagnostic(value:)` extern writes to the
-          host diagnostic sink; switch cases retain nested freestanding
-          Applications and select them through the canonical comparison graph.
+          process ownership, and control-flow ordering. Canonical B delegates
+          runtime output to two ordered `@write` applications for the message
+          and newline; only the A seed transport rewrites print to its old
+          String sink.
+        - `macro diagnostic(message: String): Void` remains a separate
+          compile-time nominal `Diagnostic` product. Switch cases retain nested
+          freestanding Applications and select them through the canonical graph.
         - [x] Resolve freestanding macro overloads from argument cardinality
           and lift plural execution over the selected graph collection.
           - `macro print(nodes: @many): Void` now coexists with the scalar
@@ -652,13 +726,32 @@ owns the actionable checkboxes for the active and deliberately deferred work.
       failures. Remove the duplicate experimental String source, add ordinary
       B `Bool` and `builtin` declarations, and exclude A-only reflection and
       integer shims from the canonical manifest.
-    - [ ] Finish reachable architecture-neutral lowering. The current proof
-      reaches `compilerBEntry`, unwraps typed one-value nominal construction,
-      records ordinary direct-call reachability and parameter operands, then
-      stops at control-flow/process lowering inside a reachable callee.
-    - [ ] Require byte-identical candidate/reproduction LLVM and executables,
-      compare focused fixture output, and record A/B cold and warm timings
-      before describing B as self-hosting.
+    - [ ] Finish reachable architecture-neutral lowering. The runnable seed
+      now parses and materializes the complete canonical manifest, resolves
+      `@main`, and lowers ordinary multi-field aggregate construction and
+      projection. Native candidate emission now lowers `compilerBEntry`'s
+      first compound comparison/logical predicate and early return through the
+      execution compass. `@write` materializes nominal ordered runtime effects;
+      `print` expands `String.bytes` and a newline byte relationship into two of
+      them, while compile-time `@diagnostic` remains separate. The Apple backend
+      lowers writes to byte-counted `_write` calls
+      without exposing descriptors or assembly to Range source. Full
+      self-source now advances to `execution compass continuation effect is not
+      materialized`; lower the later String/argument continuation next.
+    - [ ] Port or remove the remaining accepted-A custom-entry backend
+      fixtures. The reusable-seed focused gate now clears ordinary syntax,
+      graph, macro, and many checks, but the legacy `EmitIntegerLLVM.range`
+      entry rebuild reaches A's `compilerBRenderSourceTemplate` discovery
+      failure code `1`. These fixtures must execute through the produced B
+      compiler rather than remain separate A-built compiler entrypoints.
+    - [ ] Require byte-identical candidate/reproduction Apple arm64 assembly,
+      objects, and executables; compare focused fixture output and record seed,
+      candidate, and reproduction timings before describing B as self-hosting.
+      - [x] Convert the self-host harness to `.s` -> `.o` -> executable with
+        frozen runtime objects, deployment target, input order, and
+        `-Wl,-no_uuid`. The gate now stops honestly with `execution compass
+        successor call effect is not materialized` before candidate assembly
+        exists.
   - [ ] Use the Compiler A escape valve only for a concrete focused blocker,
     with no architecture-preserving B solution, and only after explicit
     maintainer approval of the general A change and bootstrap promotion.

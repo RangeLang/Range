@@ -13,150 +13,296 @@ construct SyntaxNode {
 }
 
 construct SyntaxNodeStore {
-    let ids: IntMany
-    let firstTokenIDs: IntMany
-    let afterLastTokenIDs: IntMany
+    @many
+    state ids: Int
+    @many
+    state firstTokenIDs: Int
+    @many
+    state afterLastTokenIDs: Int
 }
 
 construct CompilerBDeclarationFacetStore {
-    let syntaxIDs: IntMany
-    let identityTokenIDs: IntMany
-    let bodySyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state bodySyntaxIDs: Int
 }
 
 construct CompilerBBlockFacetStore {
-    let syntaxIDs: IntMany
-    let parentSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state parentSyntaxIDs: Int
 }
 
 construct CompilerBEnumCaseFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let identityTokenIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBMacroApplicationStore {
-    let syntaxIDs: IntMany
-    let identityTokenIDs: IntMany
-    let macroDeclarationSyntaxIDs: IntMany
-    let firstArgumentTokenIDs: IntMany
-    let afterLastArgumentTokenIDs: IntMany
-    let targetSyntaxIDs: IntMany
-    let targetIdentityTokenIDs: IntMany
-    let ordinals: IntMany
-    let argumentApplicationSyntaxIDs: IntMany
-    let argumentLabelTokenIDs: IntMany
-    let argumentValueExpressionSyntaxIDs: IntMany
-    let argumentOrdinals: IntMany
-    let environmentApplicationSyntaxIDs: IntMany
-    let environmentSyntaxIDs: IntMany
-    let environmentOrdinals: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state macroDeclarationSyntaxIDs: Int
+    @many
+    state firstArgumentTokenIDs: Int
+    @many
+    state afterLastArgumentTokenIDs: Int
+    @many
+    state targetSyntaxIDs: Int
+    @many
+    state targetIdentityTokenIDs: Int
+    @many
+    state ordinals: Int
+    @many
+    state argumentApplicationSyntaxIDs: Int
+    @many
+    state argumentLabelTokenIDs: Int
+    @many
+    state argumentValueExpressionSyntaxIDs: Int
+    @many
+    state argumentOrdinals: Int
+    @many
+    state environmentApplicationSyntaxIDs: Int
+    @many
+    state environmentSyntaxIDs: Int
+    @many
+    state environmentOrdinals: Int
 }
 
 construct CompilerBFunctionSignatureFacetStore {
-    let functionSyntaxIDs: IntMany
-    let syntaxIDs: IntMany
-    let returnTypeTokenIDs: IntMany
-    let inputCardinalityTokenIDs: IntMany
-    let outputCardinalityTokenIDs: IntMany
+    @many
+    state functionSyntaxIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state returnTypeTokenIDs: Int
+    @many
+    state inputCardinalityTokenIDs: Int
+    @many
+    state outputCardinalityTokenIDs: Int
 }
 
 construct CompilerBFunctionParameterFacetStore {
-    let functionSyntaxIDs: IntMany
-    let externalLabelTokenIDs: IntMany
-    let identityTokenIDs: IntMany
-    let typeTokenIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state functionSyntaxIDs: Int
+    @many
+    state externalLabelTokenIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state typeTokenIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBFunctionOwnerFacetStore {
-    let functionSyntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
+    @many
+    state functionSyntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
 }
 
 construct CompilerBProcessFacetStore {
-    let ownerSyntaxIDs: IntMany
-    let bodySyntaxIDs: IntMany
-    let resultExpressionSyntaxIDs: IntMany
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state bodySyntaxIDs: Int
+    @many
+    state resultExpressionSyntaxIDs: Int
 }
 
 construct CompilerBExpressionFacetStore {
-    let syntaxIDs: IntMany
-    let kindCodes: IntMany
-    let firstTokenIDs: IntMany
-    let afterLastTokenIDs: IntMany
-    let integerValues: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state kindCodes: Int
+    @many
+    state firstTokenIDs: Int
+    @many
+    state afterLastTokenIDs: Int
+    @many
+    state integerValues: Int
 }
 
 construct CompilerBApplicationFacetStore {
-    let syntaxIDs: IntMany
-    let predecessorSyntaxIDs: IntMany
-    let declarationSyntaxIDs: IntMany
-    let identityTokenIDs: IntMany
-    let firstTokenIDs: IntMany
-    let afterLastTokenIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state predecessorSyntaxIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state firstTokenIDs: Int
+    @many
+    state afterLastTokenIDs: Int
 }
 
 construct CompilerBApplicationArgumentFacetStore {
-    let applicationSyntaxIDs: IntMany
-    let labelTokenIDs: IntMany
-    let valueExpressionSyntaxIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state labelTokenIDs: Int
+    @many
+    state valueExpressionSyntaxIDs: Int
+    @many
+    state ordinals: Int
+}
+
+construct CompilerBApplicationComponentFacetStore {
+    @many
+    state ownerApplicationSyntaxIDs: Int
+    @many
+    state labelTokenIDs: Int
+    @many
+    state firstValueTokenIDs: Int
+    @many
+    state afterLastValueTokenIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBProjectionSegmentStore {
-    let expressionSyntaxIDs: IntMany
-    let tokenIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state expressionSyntaxIDs: Int
+    @many
+    state tokenIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBLocalBindingFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let identityTokenIDs: IntMany
-    let valueExpressionSyntaxIDs: IntMany
-    let firstValueTokenIDs: IntMany
-    let afterLastValueTokenIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state kindCodes: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state valueExpressionSyntaxIDs: Int
+    @many
+    state firstValueTokenIDs: Int
+    @many
+    state afterLastValueTokenIDs: Int
+}
+
+construct CompilerBAssignmentFacetStore {
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state valueExpressionSyntaxIDs: Int
+    @many
+    state ordinals: Int
+}
+
+construct CompilerBReturnFacetStore {
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state valueExpressionSyntaxIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBNoValueFallbackFacetStore {
-    let expressionSyntaxIDs: IntMany
-    let questionTokenIDs: IntMany
-    let firstTargetTokenIDs: IntMany
-    let afterLastTargetTokenIDs: IntMany
-    let firstRHSTokenIDs: IntMany
-    let afterLastRHSTokenIDs: IntMany
+    @many
+    state expressionSyntaxIDs: Int
+    @many
+    state questionTokenIDs: Int
+    @many
+    state firstTargetTokenIDs: Int
+    @many
+    state afterLastTargetTokenIDs: Int
+    @many
+    state firstRHSTokenIDs: Int
+    @many
+    state afterLastRHSTokenIDs: Int
 }
 
 construct CompilerBConditionalFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let firstConditionTokenIDs: IntMany
-    let afterLastConditionTokenIDs: IntMany
-    let bodySyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state firstConditionTokenIDs: Int
+    @many
+    state afterLastConditionTokenIDs: Int
+    @many
+    state conditionExpressionSyntaxIDs: Int
+    @many
+    state bodySyntaxIDs: Int
+    @many
+    state alternativeSyntaxIDs: Int
+    @many
+    state alternativeKindCodes: Int
+}
+
+construct CompilerBLogicalFacetStore {
+    @many
+    state syntaxIDs: Int
+    @many
+    state leftExpressionSyntaxIDs: Int
+    @many
+    state rightExpressionSyntaxIDs: Int
+    @many
+    state operatorCodes: Int
 }
 
 construct CompilerBSwitchFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let subjectExpressionSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state subjectExpressionSyntaxIDs: Int
 }
 
 construct CompilerBSwitchCaseFacetStore {
-    let syntaxIDs: IntMany
-    let switchSyntaxIDs: IntMany
-    let conditionExpressionSyntaxIDs: IntMany
-    let firstBodyTokenIDs: IntMany
-    let afterLastBodyTokenIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state switchSyntaxIDs: Int
+    @many
+    state conditionExpressionSyntaxIDs: Int
+    @many
+    state firstBodyTokenIDs: Int
+    @many
+    state afterLastBodyTokenIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBComparisonFacetStore {
-    let syntaxIDs: IntMany
-    let leftExpressionSyntaxIDs: IntMany
-    let rightExpressionSyntaxIDs: IntMany
-    let operatorCodes: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state leftExpressionSyntaxIDs: Int
+    @many
+    state rightExpressionSyntaxIDs: Int
+    @many
+    state operatorCodes: Int
 }
 
 construct CompilerBCompileTimeInteger {
@@ -166,58 +312,89 @@ construct CompilerBCompileTimeInteger {
 }
 
 construct CompilerBApplicationProvisionFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let environmentSyntaxIDs: IntMany
-    let extensionSyntaxIDs: IntMany
-    let targetApplicationSyntaxIDs: IntMany
-    let sourceSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state environmentSyntaxIDs: Int
+    @many
+    state extensionSyntaxIDs: Int
+    @many
+    state targetApplicationSyntaxIDs: Int
+    @many
+    state sourceSyntaxIDs: Int
 }
 
 construct CompilerBEnvironmentFacetStore {
-    let syntaxIDs: IntMany
-    let ownerDeclarationSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerDeclarationSyntaxIDs: Int
 }
 
 construct CompilerBEnvironmentNodeFacetStore {
-    let environmentSyntaxIDs: IntMany
-    let syntaxIDs: IntMany
-    let parentSyntaxIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state environmentSyntaxIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state parentSyntaxIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBEmittedMacroBlockFacetStore {
-    let syntaxIDs: IntMany
-    let identityTokenIDs: IntMany
-    let bodySyntaxIDs: IntMany
-    let openingTokenIDs: IntMany
-    let closingTokenIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state bodySyntaxIDs: Int
+    @many
+    state openingTokenIDs: Int
+    @many
+    state closingTokenIDs: Int
 }
 
 construct CompilerBExtensionFacetStore {
-    let syntaxIDs: IntMany
-    let targetApplicationSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state targetApplicationSyntaxIDs: Int
 }
 
 construct CompilerBCollectionFacetStore {
-    let syntaxIDs: IntMany
-    let selectorIdentityTokenIDs: IntMany
-    let selectorMacroSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state selectorIdentityTokenIDs: Int
+    @many
+    state selectorMacroSyntaxIDs: Int
 }
 
 construct CompilerBCollectionProductionFacetStore {
-    let syntaxIDs: IntMany
-    let sourceIdentityTokenIDs: IntMany
-    let sourceCollectionSyntaxIDs: IntMany
-    let outputIdentityTokenIDs: IntMany
-    let outputDeclarationSyntaxIDs: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state sourceIdentityTokenIDs: Int
+    @many
+    state sourceCollectionSyntaxIDs: Int
+    @many
+    state outputIdentityTokenIDs: Int
+    @many
+    state outputDeclarationSyntaxIDs: Int
 }
 
 construct CompilerBExecutionFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let expressionSyntaxIDs: IntMany
-    let ordinals: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state expressionSyntaxIDs: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBProcessGraph {
@@ -225,13 +402,17 @@ construct CompilerBProcessGraph {
     let expressions: CompilerBExpressionFacetStore
     let applications: CompilerBApplicationFacetStore
     let arguments: CompilerBApplicationArgumentFacetStore
+    let components: CompilerBApplicationComponentFacetStore
     let projections: CompilerBProjectionSegmentStore
     let locals: CompilerBLocalBindingFacetStore
+    let assignments: CompilerBAssignmentFacetStore
+    let returns: CompilerBReturnFacetStore
     let noValueFallbacks: CompilerBNoValueFallbackFacetStore
     let conditionals: CompilerBConditionalFacetStore
     let switches: CompilerBSwitchFacetStore
     let switchCases: CompilerBSwitchCaseFacetStore
     let comparisons: CompilerBComparisonFacetStore
+    let logicals: CompilerBLogicalFacetStore
     let applicationProvisions: CompilerBApplicationProvisionFacetStore
     let environments: CompilerBEnvironmentFacetStore
     let environmentNodes: CompilerBEnvironmentNodeFacetStore
@@ -244,36 +425,63 @@ construct CompilerBProcessGraph {
 }
 
 construct CompilerBMacroSignatureFacetStore {
-    let macroSyntaxIDs: IntMany
-    let syntaxIDs: IntMany
-    let targetTypeTokenIDs: IntMany
-    let afterLastTargetTypeTokenIDs: IntMany
-    let resultTypeTokenIDs: IntMany
-    let inputCardinalityTokenIDs: IntMany
-    let outputCardinalityTokenIDs: IntMany
-    let parameterMacroSyntaxIDs: IntMany
-    let parameterIdentityTokenIDs: IntMany
-    let parameterTypeTokenIDs: IntMany
-    let parameterCardinalityValues: IntMany
-    let parameterOptionalValues: IntMany
-    let parameterDefaultFirstTokenIDs: IntMany
-    let parameterDefaultAfterLastTokenIDs: IntMany
-    let parameterOrdinals: IntMany
+    @many
+    state macroSyntaxIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state targetTypeTokenIDs: Int
+    @many
+    state afterLastTargetTypeTokenIDs: Int
+    @many
+    state resultTypeTokenIDs: Int
+    @many
+    state inputCardinalityTokenIDs: Int
+    @many
+    state outputCardinalityTokenIDs: Int
+    @many
+    state parameterMacroSyntaxIDs: Int
+    @many
+    state parameterIdentityTokenIDs: Int
+    @many
+    state parameterTypeTokenIDs: Int
+    @many
+    state parameterCardinalityValues: Int
+    @many
+    state parameterOptionalValues: Int
+    @many
+    state parameterDefaultFirstTokenIDs: Int
+    @many
+    state parameterDefaultAfterLastTokenIDs: Int
+    @many
+    state parameterOrdinals: Int
 }
 
 construct CompilerBMemberFacetStore {
-    let syntaxIDs: IntMany
-    let ownerSyntaxIDs: IntMany
-    let kindCodes: IntMany
-    let keywordTokenIDs: IntMany
-    let identityTokenIDs: IntMany
-    let typeTokenIDs: IntMany
-    let firstInitializerTokenIDs: IntMany
-    let afterLastInitializerTokenIDs: IntMany
-    let initializerExpressionSyntaxIDs: IntMany
-    let bodySyntaxIDs: IntMany
-    let initializerKindCodes: IntMany
-    let initializerValues: IntMany
+    @many
+    state syntaxIDs: Int
+    @many
+    state ownerSyntaxIDs: Int
+    @many
+    state kindCodes: Int
+    @many
+    state keywordTokenIDs: Int
+    @many
+    state identityTokenIDs: Int
+    @many
+    state typeTokenIDs: Int
+    @many
+    state firstInitializerTokenIDs: Int
+    @many
+    state afterLastInitializerTokenIDs: Int
+    @many
+    state initializerExpressionSyntaxIDs: Int
+    @many
+    state bodySyntaxIDs: Int
+    @many
+    state initializerKindCodes: Int
+    @many
+    state initializerValues: Int
 }
 
 enum CompilerBScalarKind {
@@ -291,12 +499,7 @@ enum CompilerBExpressionKind {
     case string
     case noValueFallback
     case comparison
-}
-
-construct CompilerBSyntaxSummary {
-    let rendered: String
-    let valid: Bool
-    let diagnostic: String
+    case logical
 }
 
 construct CompilerBSyntaxRevision {
@@ -415,10 +618,14 @@ construct CompilerBExpandedMacroRelationshipQueryResult {
 
 
 construct CompilerBSyntaxDeltaStore {
-    let kinds: IntMany
-    let revisions: IntMany
-    let identities: IntMany
-    let counterparts: IntMany
+    @many
+    state kinds: Int
+    @many
+    state revisions: Int
+    @many
+    state identities: Int
+    @many
+    state counterparts: Int
 }
 
 construct CompilerBSyntaxDelta {

@@ -34,6 +34,7 @@
   let isHome = $derived(page.url.pathname === "/");
   let isPreview = $derived(page.url.pathname.startsWith("/__preview/"));
   let isOgCard = $derived(page.url.pathname.startsWith("/__og-card/"));
+  let isError = $derived(page.status >= 400);
   let hasCompactHeader = $derived(page.url.pathname.startsWith("/posts/"));
 
   const soundManager = createRangeSoundManager();
@@ -118,7 +119,7 @@
     <SoundOnboarding />
   {/if}
   <range-site-content data-range-site-content>
-    {#if !isHome && !isPreview && !isOgCard}
+    {#if !isHome && !isPreview && !isOgCard && !isError}
       <div class="persistentSiteHeader" class:compact={hasCompactHeader}>
         <SiteHeader />
       </div>
@@ -126,7 +127,7 @@
     <range-route-view>
       {@render children()}
     </range-route-view>
-    {#if !isPreview && !isOgCard}
+    {#if !isPreview && !isOgCard && !isError}
       <Footer />
     {/if}
   </range-site-content>

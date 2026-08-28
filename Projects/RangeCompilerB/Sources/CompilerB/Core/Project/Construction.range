@@ -1,0 +1,824 @@
+function compilerBConstructionArgumentExpression(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    ordinal: Int
+): Int {
+    state match: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+                == applicationSyntaxID
+            && revision.process.arguments.ordinals.element(index: row) == ordinal {
+            match: revision.process.arguments.valueExpressionSyntaxIDs.element(
+                index: row
+            )
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - 1 }
+    return match
+}
+
+function compilerBConstructionArgumentCount(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.arguments.applicationSyntaxIDs.count {
+        if revision.process.arguments.applicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBConstructionComponentCount(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.components.ownerApplicationSyntaxIDs.count {
+        if revision.process.components.ownerApplicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBConstructionExpressionFirstTokenID(
+    revision: CompilerBSyntaxRevision,
+    expressionSyntaxID: Int
+): Int {
+    let row: Int(revision.process.expressions.syntaxIDs.firstIndex(
+        value: expressionSyntaxID
+    ))
+    if row < 0 { return 0 - 1 }
+    return revision.process.expressions.firstTokenIDs.element(index: row)
+}
+
+function compilerBConstructionExpressionAfterLastTokenID(
+    revision: CompilerBSyntaxRevision,
+    expressionSyntaxID: Int
+): Int {
+    let row: Int(revision.process.expressions.syntaxIDs.firstIndex(
+        value: expressionSyntaxID
+    ))
+    if row < 0 { return 0 - 1 }
+    return revision.process.expressions.afterLastTokenIDs.element(index: row)
+}
+
+function compilerBConstructionTokenText(
+    revision: CompilerBSyntaxRevision,
+    tokenID: Int
+): String {
+    if tokenID < 0 || tokenID >= revision.tokens.kinds.count { return "" }
+    let token: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: tokenID)
+    ))
+    return revision.source.substring(start: token.start, end: token.end)
+}
+
+function compilerBConstructionDeclarationHasMember(
+    revision: CompilerBSyntaxRevision,
+    declarationSyntaxID: Int,
+    name: String
+): Bool {
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        if revision.members.ownerSyntaxIDs.element(index: row)
+                == declarationSyntaxID
+            && compilerBConstructionTokenText(
+                revision: revision,
+                tokenID: revision.members.identityTokenIDs.element(index: row)
+            ) == name { return true }
+        row: row + 1
+    }
+    return false
+}
+
+function compilerBConstructionIsCountedVectorDeclaration(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    declarationRow: Int
+): Bool {
+    if declarationRow < 0 { return false }
+    if declarationRow >= declarations.kindCodes.count { return false }
+    if declarations.kindCodes.element(index: declarationRow)
+        != compilerBProjectDeclarationKindConstruct() { return false }
+    let sourceID: Int(declarations.sourceIDs.element(index: declarationRow))
+    let syntaxID: Int(declarations.syntaxIDs.element(index: declarationRow))
+    let path: String(compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: sourceID
+    ))
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevisionWithResolution(
+        source: fileManagerReadFile(path: path),
+        resolveRelationships: false
+    ))
+    state valid: Bool(revision.valid)
+    if valid {
+        valid: compilerBConstructionDeclarationHasMember(
+            revision: revision,
+            declarationSyntaxID: syntaxID,
+            name: "multiplicity"
+        ) && compilerBConstructionDeclarationHasMember(
+            revision: revision,
+            declarationSyntaxID: syntaxID,
+            name: "component"
+        ) && compilerBConstructionDeclarationHasMember(
+            revision: revision,
+            declarationSyntaxID: syntaxID,
+            name: "components"
+        )
+    }
+    if valid {
+        state componentsMemberSyntaxID: Int(0 - 1)
+        state memberRow: Int(0)
+        while memberRow < revision.members.syntaxIDs.count {
+            if revision.members.ownerSyntaxIDs.element(index: memberRow) == syntaxID
+                && compilerBConstructionTokenText(
+                    revision: revision,
+                    tokenID: revision.members.identityTokenIDs.element(index: memberRow)
+                ) == String("components") {
+                componentsMemberSyntaxID: revision.members.syntaxIDs.element(
+                    index: memberRow
+                )
+            }
+            memberRow: memberRow + 1
+        }
+        state manyCount: Int(0)
+        state applicationRow: Int(0)
+        while applicationRow < revision.macroApplications.syntaxIDs.count {
+            if revision.macroApplications.targetSyntaxIDs.element(
+                    index: applicationRow
+                ) == componentsMemberSyntaxID
+                && compilerBConstructionTokenText(
+                    revision: revision,
+                    tokenID: revision.macroApplications.identityTokenIDs.element(
+                        index: applicationRow
+                    )
+                ) == String("many") { manyCount: manyCount + 1 }
+            applicationRow: applicationRow + 1
+        }
+        valid: manyCount == 1
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 { return false }
+    return valid
+}
+
+function compilerBConstructionDeclarationRow(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(
+        value: applicationSyntaxID
+    ))
+    if applicationRow < 0 { return 0 - 1 }
+    let identity: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: revision.process.applications.identityTokenIDs.element(
+            index: applicationRow
+        ))
+    ))
+    state row: Int(0)
+    while row < declarations.syntaxIDs.count {
+        if declarations.kindCodes.element(index: row)
+                == compilerBProjectDeclarationKindConstruct()
+            && declarations.nameByteCounts.element(index: row)
+                == identity.end - identity.start {
+            let byteStart: Int(declarations.nameByteStarts.element(index: row))
+            state offset: Int(0)
+            state matches: Bool(true)
+            while offset < identity.end - identity.start && matches {
+                if declarations.nameBytes.element(index: byteStart + offset)
+                    != revision.source.byte(index: identity.start + offset) {
+                    matches: false
+                }
+                offset: offset + 1
+            }
+            if matches { return row }
+        }
+        row: row + 1
+    }
+    return 0 - 1
+}
+
+function compilerBConstructionMultiplicity(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    let expressionSyntaxID: Int(compilerBConstructionArgumentExpression(
+        revision: revision,
+        applicationSyntaxID: applicationSyntaxID,
+        ordinal: 0
+    ))
+    let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(
+        value: expressionSyntaxID
+    ))
+    if expressionRow < 0 { return 0 - 1 }
+    if revision.process.expressions.kindCodes.element(index: expressionRow)
+        != compilerBParserExpressionKindIntegerCode() { return 0 - 1 }
+    return revision.process.expressions.integerValues.element(index: expressionRow)
+}
+
+function compilerBConstructionComponentTypeTokenID(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Int {
+    let expressionSyntaxID: Int(compilerBConstructionArgumentExpression(
+        revision: revision,
+        applicationSyntaxID: applicationSyntaxID,
+        ordinal: 1
+    ))
+    let first: Int(compilerBConstructionExpressionFirstTokenID(
+        revision: revision,
+        expressionSyntaxID: expressionSyntaxID
+    ))
+    let afterLast: Int(compilerBConstructionExpressionAfterLastTokenID(
+        revision: revision,
+        expressionSyntaxID: expressionSyntaxID
+    ))
+    if first < 0 { return 0 - 1 }
+    if afterLast != first + 1 { return 0 - 1 }
+    if afterLast > revision.tokens.kinds.count { return 0 - 1 }
+    let token: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: first)
+    ))
+    if token.kind != .identity { return 0 - 1 }
+    return first
+}
+
+function compilerBConstructionComponentValueIsFloat(
+    revision: CompilerBSyntaxRevision,
+    componentRow: Int
+): Bool {
+    let first: Int(revision.process.components.firstValueTokenIDs.element(
+        index: componentRow
+    ))
+    let afterLast: Int(revision.process.components.afterLastValueTokenIDs.element(
+        index: componentRow
+    ))
+    if first < 0 { return false }
+    if afterLast > revision.tokens.kinds.count { return false }
+    if afterLast == first + 1 {
+        return compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: first)
+        ).kind == .integer
+    }
+    if afterLast != first + 3 { return false }
+    if compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: first)
+    ).kind != .integer { return false }
+    if compilerBParserTokenByte(
+        source: revision.source,
+        tokens: revision.tokens,
+        tokenID: first + 1
+    ) != 46 { return false }
+    return compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: first + 2)
+    ).kind == .integer
+}
+
+function compilerBConstructionComponentTypeCategory(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    sourceRevision: CompilerBSyntaxRevision,
+    typeTokenID: Int
+): Int {
+    if typeTokenID < 0 { return 0 }
+    let typeToken: CompilerBToken(compilerBRetainedToken(
+        store: sourceRevision.tokens,
+        id: TokenID(value: typeTokenID)
+    ))
+    let declarationRow: Int(compilerBProjectDeclarationRowForToken(
+        declarations: declarations,
+        source: sourceRevision.source,
+        token: typeToken,
+        kindCode: compilerBProjectDeclarationKindConstruct()
+    ))
+    if declarationRow < 0 { return 0 }
+    let declarationSourceID: Int(declarations.sourceIDs.element(
+        index: declarationRow
+    ))
+    let declarationSyntaxID: Int(declarations.syntaxIDs.element(
+        index: declarationRow
+    ))
+    let path: String(compilerBSourceSetPathAt(
+        paths: sourcePaths,
+        index: declarationSourceID
+    ))
+    let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevisionWithResolution(
+        source: fileManagerReadFile(path: path),
+        resolveRelationships: false
+    ))
+    state category: Int(0)
+    state row: Int(0)
+    while row < revision.macroApplications.syntaxIDs.count {
+        if revision.macroApplications.targetSyntaxIDs.element(index: row)
+            == declarationSyntaxID {
+            let name: String(compilerBConstructionTokenText(
+                revision: revision,
+                tokenID: revision.macroApplications.identityTokenIDs.element(
+                    index: row
+                )
+            ))
+            if name == String("floating") { category: 1 }
+            if name == String("integer") { category: 2 }
+            if name == String("bool") { category: 3 }
+        }
+        row: row + 1
+    }
+    if compilerBSyntaxRevisionDestroy(revision: revision) != 0 { return 0 }
+    return category
+}
+
+function compilerBConstructionComponentValueMatchesType(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    revision: CompilerBSyntaxRevision,
+    componentTypeTokenID: Int,
+    componentRow: Int
+): Bool {
+    let category: Int(compilerBConstructionComponentTypeCategory(
+        sourcePaths: sourcePaths,
+        declarations: declarations,
+        sourceRevision: revision,
+        typeTokenID: componentTypeTokenID
+    ))
+    if category == 1 {
+        return compilerBConstructionComponentValueIsFloat(
+            revision: revision,
+            componentRow: componentRow
+        )
+    }
+    let first: Int(revision.process.components.firstValueTokenIDs.element(
+        index: componentRow
+    ))
+    let afterLast: Int(revision.process.components.afterLastValueTokenIDs.element(
+        index: componentRow
+    ))
+    if category == 2 {
+        if first < 0 { return false }
+        if afterLast != first + 1 { return false }
+        if afterLast > revision.tokens.kinds.count { return false }
+        return compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: first)
+        ).kind == .integer
+    }
+    if category == 3 {
+        if first < 0 { return false }
+        if afterLast != first + 1 { return false }
+        let value: String(compilerBConstructionTokenText(
+            revision: revision,
+            tokenID: first
+        ))
+        if value == String("true") { return true }
+        return value == String("false")
+    }
+    return false
+}
+
+function compilerBConstructionLabelsValid(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int
+): Bool {
+    state labeledCount: Int(0)
+    state positionalCount: Int(0)
+    state row: Int(0)
+    while row < revision.process.components.ownerApplicationSyntaxIDs.count {
+        if revision.process.components.ownerApplicationSyntaxIDs.element(index: row)
+            == applicationSyntaxID {
+            let labelTokenID: Int(revision.process.components.labelTokenIDs.element(
+                index: row
+            ))
+            if labelTokenID < 0 {
+                positionalCount: positionalCount + 1
+            } else {
+                labeledCount: labeledCount + 1
+                state prior: Int(0)
+                while prior < row {
+                    if revision.process.components.ownerApplicationSyntaxIDs.element(
+                            index: prior
+                        ) == applicationSyntaxID {
+                        let priorLabelTokenID: Int(
+                            revision.process.components.labelTokenIDs.element(
+                                index: prior
+                            )
+                        )
+                        if priorLabelTokenID >= 0
+                            && compilerBConstructionTokenText(
+                                revision: revision,
+                                tokenID: priorLabelTokenID
+                            ) == compilerBConstructionTokenText(
+                                revision: revision,
+                                tokenID: labelTokenID
+                            ) { return false }
+                    }
+                    prior: prior + 1
+                }
+            }
+        }
+        row: row + 1
+    }
+    return labeledCount == 0 || positionalCount == 0
+}
+
+function compilerBConstructionLabelCount(
+    revision: CompilerBSyntaxRevision,
+    applicationSyntaxID: Int,
+    label: String
+): Int {
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.process.components.ownerApplicationSyntaxIDs.count {
+        if revision.process.components.ownerApplicationSyntaxIDs.element(index: row)
+                == applicationSyntaxID
+            && compilerBConstructionTokenText(
+                revision: revision,
+                tokenID: revision.process.components.labelTokenIDs.element(index: row)
+            ) == label { count: count + 1 }
+        row: row + 1
+    }
+    return count
+}
+
+function compilerBConstructionMemberApplicationForName(
+    revision: CompilerBSyntaxRevision,
+    name: String
+): Int {
+    state match: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        if compilerBConstructionTokenText(
+            revision: revision,
+            tokenID: revision.members.identityTokenIDs.element(index: row)
+        ) == name {
+            match: revision.members.initializerExpressionSyntaxIDs.element(
+                index: row
+            )
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - 1 }
+    return match
+}
+
+function compilerBConstructionMemberKindForName(
+    revision: CompilerBSyntaxRevision,
+    name: String
+): Int {
+    state match: Int(0 - 1)
+    state count: Int(0)
+    state row: Int(0)
+    while row < revision.members.syntaxIDs.count {
+        if compilerBConstructionTokenText(
+            revision: revision,
+            tokenID: revision.members.identityTokenIDs.element(index: row)
+        ) == name {
+            match: revision.members.kindCodes.element(index: row)
+            count: count + 1
+        }
+        row: row + 1
+    }
+    if count != 1 { return 0 - 1 }
+    return match
+}
+
+function compilerBConstructionMemberReplacementStartsAt(
+    revision: CompilerBSyntaxRevision,
+    tokenID: Int
+): Bool {
+    if tokenID < 8 { return false }
+    if tokenID + 2 >= revision.tokens.kinds.count { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID)
+        != String("$") { return false }
+    let root: CompilerBToken(compilerBRetainedToken(
+        store: revision.tokens,
+        id: TokenID(value: tokenID - 8)
+    ))
+    if root.kind != .identity { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID - 7)
+        != String(".") { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID - 6)
+        != String("components") { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID - 5)
+        != String(".") { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID - 4)
+        != String("each") { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID - 3)
+        != String("{") { return false }
+    let parameter: String(compilerBConstructionTokenText(
+        revision: revision,
+        tokenID: tokenID - 2
+    ))
+    if parameter == String("") { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID - 1)
+        != String("in") { return false }
+    if compilerBConstructionTokenText(revision: revision, tokenID: tokenID + 1)
+        != parameter { return false }
+    return compilerBConstructionTokenText(
+        revision: revision,
+        tokenID: tokenID + 2
+    ) == String(":")
+}
+
+function compilerBValidateCountedConstructionReplacements(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    revision: CompilerBSyntaxRevision,
+    path: String,
+    renderFacts: Bool
+): Int {
+    state failures: Int(0)
+    state tokenID: Int(0)
+    while tokenID < revision.tokens.kinds.count {
+        if compilerBConstructionMemberReplacementStartsAt(
+            revision: revision,
+            tokenID: tokenID
+        ) {
+            let ownerName: String(compilerBConstructionTokenText(
+                revision: revision,
+                tokenID: tokenID - 8
+            ))
+            let applicationSyntaxID: Int(
+                compilerBConstructionMemberApplicationForName(
+                    revision: revision,
+                    name: ownerName
+                )
+            )
+            let declarationRow: Int(compilerBConstructionDeclarationRow(
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                revision: revision,
+                applicationSyntaxID: applicationSyntaxID
+            ))
+            if compilerBConstructionIsCountedVectorDeclaration(
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                declarationRow: declarationRow
+            ) {
+                let memberKind: Int(compilerBConstructionMemberKindForName(
+                    revision: revision,
+                    name: ownerName
+                ))
+                if memberKind != compilerBParserMemberKindStateCode()
+                    && memberKind != compilerBParserMemberKindBindingCode() {
+                    print(value: "\(path): $member requires a vector rooted in state or binding\n")
+                    failures: failures + 1
+                } else if renderFacts {
+                    print(value: "projectConstructionReplacement\towner=\(applicationSyntaxID)\treadRevision=\(applicationSyntaxID)\toccurrences=\(compilerBConstructionComponentCount(revision: revision, applicationSyntaxID: applicationSyntaxID))\tcommitCount=1\n")
+                }
+            }
+        }
+        tokenID: tokenID + 1
+    }
+    return failures
+}
+
+function compilerBValidateCountedConstructionProjections(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    revision: CompilerBSyntaxRevision,
+    path: String
+): Int {
+    state failures: Int(0)
+    state expressionRow: Int(0)
+    while expressionRow < revision.process.expressions.syntaxIDs.count {
+        let first: Int(revision.process.expressions.firstTokenIDs.element(
+            index: expressionRow
+        ))
+        let afterLast: Int(revision.process.expressions.afterLastTokenIDs.element(
+            index: expressionRow
+        ))
+        state isProjection: Bool(false)
+        if revision.process.expressions.kindCodes.element(index: expressionRow)
+            == compilerBParserExpressionKindUnknownCode() {
+            if first >= 0 {
+                if afterLast == first + 3 {
+                    if afterLast <= revision.tokens.kinds.count {
+                        if compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: first)
+                        ).kind == .identity {
+                            if compilerBParserTokenByte(
+                                source: revision.source,
+                                tokens: revision.tokens,
+                                tokenID: first + 1
+                            ) == 46 {
+                                if compilerBRetainedToken(
+                                    store: revision.tokens,
+                                    id: TokenID(value: first + 2)
+                                ).kind == .identity {
+                                    isProjection: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if isProjection {
+            let ownerName: String(compilerBConstructionTokenText(
+                revision: revision,
+                tokenID: first
+            ))
+            let projectionName: String(compilerBConstructionTokenText(
+                revision: revision,
+                tokenID: first + 2
+            ))
+            let applicationSyntaxID: Int(
+                compilerBConstructionMemberApplicationForName(
+                    revision: revision,
+                    name: ownerName
+                )
+            )
+            let declarationRow: Int(compilerBConstructionDeclarationRow(
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                revision: revision,
+                applicationSyntaxID: applicationSyntaxID
+            ))
+            if compilerBConstructionIsCountedVectorDeclaration(
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                declarationRow: declarationRow
+            ) {
+                if projectionName != String("components") {
+                    if compilerBConstructionLabelCount(
+                        revision: revision,
+                        applicationSyntaxID: applicationSyntaxID,
+                        label: projectionName
+                    ) != 1 {
+                        print(value: "\(path): named access requires one unique labeled occurrence\n")
+                        failures: failures + 1
+                    }
+                }
+            }
+        }
+        expressionRow: expressionRow + 1
+    }
+    return failures
+}
+
+function compilerBValidateCountedConstructions(
+    sourcePaths: String,
+    declarations: CompilerBProjectDeclarationStore,
+    renderFacts: Bool
+): Int {
+    state failures: Int(0)
+    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
+    state sourceID: Int(0)
+    while sourceID < sourceCount {
+        let path: String(compilerBSourceSetPathAt(
+            paths: sourcePaths,
+            index: sourceID
+        ))
+        let revision: CompilerBSyntaxRevision(compilerBParseSyntaxRevisionWithResolution(
+            source: fileManagerReadFile(path: path),
+            resolveRelationships: false
+        ))
+        state memberRow: Int(0)
+        while memberRow < revision.members.syntaxIDs.count {
+            let applicationSyntaxID: Int(
+                revision.members.initializerExpressionSyntaxIDs.element(
+                    index: memberRow
+                )
+            )
+            let declarationRow: Int(compilerBConstructionDeclarationRow(
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                revision: revision,
+                applicationSyntaxID: applicationSyntaxID
+            ))
+            if compilerBConstructionIsCountedVectorDeclaration(
+                sourcePaths: sourcePaths,
+                declarations: declarations,
+                declarationRow: declarationRow
+            ) {
+                let argumentCount: Int(compilerBConstructionArgumentCount(
+                    revision: revision,
+                    applicationSyntaxID: applicationSyntaxID
+                ))
+                let multiplicity: Int(compilerBConstructionMultiplicity(
+                    revision: revision,
+                    applicationSyntaxID: applicationSyntaxID
+                ))
+                let componentTypeTokenID: Int(
+                    compilerBConstructionComponentTypeTokenID(
+                        revision: revision,
+                        applicationSyntaxID: applicationSyntaxID
+                    )
+                )
+                let componentCount: Int(compilerBConstructionComponentCount(
+                    revision: revision,
+                    applicationSyntaxID: applicationSyntaxID
+                ))
+                state occurrenceRow: Int(0)
+                while occurrenceRow
+                    < revision.process.components.ownerApplicationSyntaxIDs.count {
+                    if revision.process.components.ownerApplicationSyntaxIDs.element(
+                            index: occurrenceRow
+                        ) == applicationSyntaxID {
+                        let labelTokenID: Int(
+                            revision.process.components.labelTokenIDs.element(
+                                index: occurrenceRow
+                            )
+                        )
+                        state label: String("_")
+                        if labelTokenID >= 0 {
+                            label: compilerBConstructionTokenText(
+                                revision: revision,
+                                tokenID: labelTokenID
+                            )
+                        }
+                        let firstValueTokenID: Int(
+                            revision.process.components.firstValueTokenIDs.element(
+                                index: occurrenceRow
+                            )
+                        )
+                        let afterLastValueTokenID: Int(
+                            revision.process.components.afterLastValueTokenIDs.element(
+                                index: occurrenceRow
+                            )
+                        )
+                        let firstValue: CompilerBToken(compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: firstValueTokenID)
+                        ))
+                        let lastValue: CompilerBToken(compilerBRetainedToken(
+                            store: revision.tokens,
+                            id: TokenID(value: afterLastValueTokenID - 1)
+                        ))
+                        if renderFacts {
+                            print(value: "projectConstructionOccurrence\tsource=\(sourceID)\towner=\(applicationSyntaxID)\tordinal=\(revision.process.components.ordinals.element(index: occurrenceRow))\ttype=\(compilerBConstructionTokenText(revision: revision, tokenID: componentTypeTokenID))\tlabel=\(label)\tvalue=\(revision.source.substring(start: firstValue.start, end: lastValue.end))\n")
+                        }
+                    }
+                    occurrenceRow: occurrenceRow + 1
+                }
+                state valid: Bool(argumentCount == 2)
+                if valid { valid: multiplicity >= 0 }
+                if valid { valid: componentTypeTokenID >= 0 }
+                if valid { valid: componentCount == multiplicity }
+                if valid {
+                    valid: compilerBConstructionLabelsValid(
+                        revision: revision,
+                        applicationSyntaxID: applicationSyntaxID
+                    )
+                }
+                state componentRow: Int(0)
+                while componentRow
+                    < revision.process.components.ownerApplicationSyntaxIDs.count {
+                    if revision.process.components.ownerApplicationSyntaxIDs.element(
+                        index: componentRow
+                    ) == applicationSyntaxID {
+                        if !compilerBConstructionComponentValueMatchesType(
+                            sourcePaths: sourcePaths,
+                            declarations: declarations,
+                            revision: revision,
+                            componentTypeTokenID: componentTypeTokenID,
+                            componentRow: componentRow
+                        ) { valid: false }
+                    }
+                    componentRow: componentRow + 1
+                }
+                if !valid {
+                    print(value: "\(path): counted construction requires two constructor values, an exact component count, uniform unique labels, and compatible component values\n")
+                    failures: failures + 1
+                }
+            }
+            memberRow: memberRow + 1
+        }
+        failures: failures + compilerBValidateCountedConstructionProjections(
+            sourcePaths: sourcePaths,
+            declarations: declarations,
+            revision: revision,
+            path: path
+        )
+        failures: failures + compilerBValidateCountedConstructionReplacements(
+            sourcePaths: sourcePaths,
+            declarations: declarations,
+            revision: revision,
+            path: path,
+            renderFacts: renderFacts
+        )
+        if compilerBSyntaxRevisionDestroy(revision: revision) != 0 {
+            failures: failures + 1
+        }
+        sourceID: sourceID + 1
+    }
+    return failures
+}

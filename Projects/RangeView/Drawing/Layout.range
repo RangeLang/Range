@@ -16,21 +16,52 @@ construct LayoutAlignment {
 }
 
 construct Viewport {
-    let size: Size
+    // Applications provide Vector(2, Float); the current graph type surface
+    // records the counted component contract on the value application.
+    let size: Vector
 }
 
-construct LayoutSize {
-    let width: Int
-    let height: Int
+construct NonnegativeDimension {
+    @lowerBounded(minimum: 0)
+    let value: Float
 }
 
-construct LayoutRect {
-    let origin: Point
-    let size: LayoutSize
+construct ParentFraction {
+    @bounded(minimum: 0, maximum: 1)
+    let value: Float
+}
+
+construct DimensionRange {
+    let minimum: NonnegativeDimension
+    let ideal: NonnegativeDimension
+    let maximum: NonnegativeDimension
+    let parentRelative: ParentFraction?
+}
+
+construct ViewDimensions {
+    let width: DimensionRange
+    let height: DimensionRange
+}
+
+construct ResolvedViewGeometry {
+    let localPosition: Vector
+    let worldPosition: Vector
+    let size: Vector
+    let layer: Int
 }
 
 enum LayoutTransform {
+    case minWidth(value: NonnegativeDimension)
+    case idealWidth(value: NonnegativeDimension)
+    case maxWidth(value: NonnegativeDimension)
+    case minHeight(value: NonnegativeDimension)
+    case idealHeight(value: NonnegativeDimension)
+    case maxHeight(value: NonnegativeDimension)
+    case parentWidth(fraction: ParentFraction)
+    case parentHeight(fraction: ParentFraction)
+    case padding(value: EdgeInsets)
     case alignment(value: LayoutAlignment)
-    case position(value: Point)
-    case offset(value: Point)
+    case position(value: Vector)
+    case offset(value: Vector)
+    case layer(value: Int)
 }

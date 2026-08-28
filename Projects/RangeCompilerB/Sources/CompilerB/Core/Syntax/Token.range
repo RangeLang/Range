@@ -20,9 +20,12 @@ construct CompilerBToken {
 }
 
 construct CompilerBRetainedTokenStore {
-    let kinds: IntMany
-    let starts: IntMany
-    let ends: IntMany
+    @many
+    state kinds: Int
+    @many
+    state starts: Int
+    @many
+    state ends: Int
 }
 
 function compilerBTokenKindIdentityCode(): Int { return 1 }
@@ -75,9 +78,9 @@ function compilerBIsRightDelimiter(byte: Int): Bool {
 
 function compilerBRetainedTokenStoreCreate(capacity: Int): CompilerBRetainedTokenStore {
     return CompilerBRetainedTokenStore(
-        kinds: bufferCreateInt(capacity: capacity),
-        starts: bufferCreateInt(capacity: capacity),
-        ends: bufferCreateInt(capacity: capacity)
+        kinds: @many(capacity: capacity),
+        starts: @many(capacity: capacity),
+        ends: @many(capacity: capacity)
     )
 }
 

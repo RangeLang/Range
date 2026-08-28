@@ -7,14 +7,6 @@ function commandLineArgumentCount(): Int
 function commandLineArgument(index: Int): String
 
 @extern
-@builtin
-function stringPrint(value: String): Int
-
-@extern
-@builtin
-function stringDiagnostic(value: String): Int
-
-@extern
 function invokeExternStringToInt(identity: String, value: String): Int
 
 construct ProcessPlan {

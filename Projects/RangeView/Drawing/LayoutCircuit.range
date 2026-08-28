@@ -1,0 +1,90 @@
+// Layout is a graph circuit: measurement facts flow upward, the viewport flows
+// downward, and resolved geometry is a derived product. Nothing here stores
+// parent or viewport occupancy; consumers derive it from these values.
+
+construct MeasuredView {
+    let identity: Identity
+    let dimensions: ViewDimensions
+}
+
+construct AxisAllocationItem {
+    let identity: Identity
+    let minimum: Float
+    let ideal: Float
+    let maximum: Float
+    let sourceOrder: Int
+    state resolved: Float
+}
+
+construct AxisAllocation {
+    let available: Float
+    let spacing: Float
+
+    @many
+    state items: AxisAllocationItem
+}
+
+construct StackLayoutInput {
+    let identity: Identity
+    let viewport: Viewport
+    let axis: Axis
+    let alignment: LayoutAlignment
+    let padding: EdgeInsets
+    let spacing: Float
+    let boundary: Identity
+    let scrolling: Bool
+    let requestedScrollOffset: Vector
+
+    @many
+    let children: MeasuredView
+}
+
+construct StackLayoutOutput {
+    let identity: Identity
+    let geometry: ResolvedViewGeometry
+    let contentExtent: Vector
+    let scrollOffset: Vector
+    let clip: Identity
+
+    @many
+    let children: StackLayoutOutput
+}
+
+function clampLayoutValue(value: Float, minimum: Float, maximum: Float): Float {
+    if value < minimum { return minimum }
+    if value > maximum { return maximum }
+    return value
+}
+
+function resolveDimension(value: DimensionRange, parent: Float): Float {
+    if value.parentRelative.isSome {
+        return clampLayoutValue(
+            value: parent * value.parentRelative.value.value,
+            minimum: value.minimum.value,
+            maximum: value.maximum.value
+        )
+    }
+
+    return clampLayoutValue(
+        value: value.ideal.value,
+        minimum: value.minimum.value,
+        maximum: value.maximum.value
+    )
+}
+
+function clampScrollOffset(requested: Float, content: Float, viewport: Float): Float {
+    let maximum: Float(content - viewport)
+    if maximum <= 0.0 { return 0.0 }
+    return clampLayoutValue(value: requested, minimum: 0.0, maximum: maximum)
+}
+
+function dimensionRangeIsOrdered(value: DimensionRange): Bool {
+    return value.minimum.value <= value.ideal.value
+        && value.ideal.value <= value.maximum.value
+}
+
+function paintCommandPrecedes(left: PaintCommand, right: PaintCommand): Bool {
+    if left.geometry.layer < right.geometry.layer { return true }
+    if left.geometry.layer > right.geometry.layer { return false }
+    return left.sourceOrder < right.sourceOrder
+}

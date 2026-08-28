@@ -1,48 +1,82 @@
 construct CompilerBProjectDeclarationStore {
-    let sourceIDs: IntMany
-    let syntaxIDs: IntMany
-    let kindCodes: IntMany
-    let nameStarts: IntMany
-    let nameEnds: IntMany
-    let nameByteStarts: IntMany
-    let nameByteCounts: IntMany
-    let nameBytes: IntMany
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state kindCodes: Int
+    @many
+    state nameStarts: Int
+    @many
+    state nameEnds: Int
+    @many
+    state nameByteStarts: Int
+    @many
+    state nameByteCounts: Int
+    @many
+    state nameBytes: Int
 }
 
 construct CompilerBProjectMacroArgumentStore {
-    let sourceIDs: IntMany
-    let applicationSyntaxIDs: IntMany
-    let labelByteStarts: IntMany
-    let labelByteCounts: IntMany
-    let labelBytes: IntMany
-    let valueSourceStarts: IntMany
-    let valueSourceEnds: IntMany
-    let ordinals: IntMany
+    @many
+    state sourceIDs: Int
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state labelByteStarts: Int
+    @many
+    state labelByteCounts: Int
+    @many
+    state labelBytes: Int
+    @many
+    state valueSourceStarts: Int
+    @many
+    state valueSourceEnds: Int
+    @many
+    state ordinals: Int
 }
 
 construct CompilerBProjectMacroApplicationStore {
-    let sourceIDs: IntMany
-    let syntaxIDs: IntMany
-    let declarationSourceIDs: IntMany
-    let declarationSyntaxIDs: IntMany
-    let targetSourceIDs: IntMany
-    let targetSyntaxIDs: IntMany
-    let ordinals: IntMany
-    let rawArgumentSourceStarts: IntMany
-    let rawArgumentSourceEnds: IntMany
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state targetSourceIDs: Int
+    @many
+    state targetSyntaxIDs: Int
+    @many
+    state ordinals: Int
+    @many
+    state rawArgumentSourceStarts: Int
+    @many
+    state rawArgumentSourceEnds: Int
     let arguments: CompilerBProjectMacroArgumentStore
 }
 
 construct CompilerBProjectEmittedMacroBlockStore {
-    let sourceIDs: IntMany
-    let syntaxIDs: IntMany
-    let producerSourceIDs: IntMany
-    let producerApplicationSyntaxIDs: IntMany
-    let declarationSourceIDs: IntMany
-    let declarationSyntaxIDs: IntMany
-    let bodySyntaxIDs: IntMany
-    let identityStarts: IntMany
-    let identityEnds: IntMany
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state producerSourceIDs: Int
+    @many
+    state producerApplicationSyntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state bodySyntaxIDs: Int
+    @many
+    state identityStarts: Int
+    @many
+    state identityEnds: Int
 }
 
 construct CompilerBProjectRevision {
@@ -53,9 +87,6 @@ construct CompilerBProjectRevision {
     let emittedMacroBlocks: CompilerBProjectEmittedMacroBlockStore
     let syntaxGraph: CompilerBSyntaxGraph
     let syntaxCaptureValues: CompilerBSyntaxCaptureValueGraph
-    let valid: Bool
-    let diagnosticCount: Int
-    let diagnostic: String
 }
 
 function compilerBProjectDeclarationKindFunction(): Int { return 1 }
@@ -67,14 +98,14 @@ function compilerBProjectDeclarationStoreCreate(
     capacity: Int
 ): CompilerBProjectDeclarationStore {
     return CompilerBProjectDeclarationStore(
-        sourceIDs: bufferCreateInt(capacity: capacity),
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        kindCodes: bufferCreateInt(capacity: capacity),
-        nameStarts: bufferCreateInt(capacity: capacity),
-        nameEnds: bufferCreateInt(capacity: capacity),
-        nameByteStarts: bufferCreateInt(capacity: capacity),
-        nameByteCounts: bufferCreateInt(capacity: capacity),
-        nameBytes: bufferCreateInt(capacity: capacity)
+        sourceIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        kindCodes: @many(capacity: capacity),
+        nameStarts: @many(capacity: capacity),
+        nameEnds: @many(capacity: capacity),
+        nameByteStarts: @many(capacity: capacity),
+        nameByteCounts: @many(capacity: capacity),
+        nameBytes: @many(capacity: capacity)
     )
 }
 
@@ -82,15 +113,15 @@ function compilerBProjectMacroApplicationStoreCreate(
     capacity: Int
 ): CompilerBProjectMacroApplicationStore {
     return CompilerBProjectMacroApplicationStore(
-        sourceIDs: bufferCreateInt(capacity: capacity),
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        declarationSourceIDs: bufferCreateInt(capacity: capacity),
-        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        targetSourceIDs: bufferCreateInt(capacity: capacity),
-        targetSyntaxIDs: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity),
-        rawArgumentSourceStarts: bufferCreateInt(capacity: capacity),
-        rawArgumentSourceEnds: bufferCreateInt(capacity: capacity),
+        sourceIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        targetSourceIDs: @many(capacity: capacity),
+        targetSyntaxIDs: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity),
+        rawArgumentSourceStarts: @many(capacity: capacity),
+        rawArgumentSourceEnds: @many(capacity: capacity),
         arguments: compilerBProjectMacroArgumentStoreCreate(capacity: capacity)
     )
 }
@@ -99,14 +130,14 @@ function compilerBProjectMacroArgumentStoreCreate(
     capacity: Int
 ): CompilerBProjectMacroArgumentStore {
     return CompilerBProjectMacroArgumentStore(
-        sourceIDs: bufferCreateInt(capacity: capacity),
-        applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        labelByteStarts: bufferCreateInt(capacity: capacity),
-        labelByteCounts: bufferCreateInt(capacity: capacity),
-        labelBytes: bufferCreateInt(capacity: capacity),
-        valueSourceStarts: bufferCreateInt(capacity: capacity),
-        valueSourceEnds: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity)
+        sourceIDs: @many(capacity: capacity),
+        applicationSyntaxIDs: @many(capacity: capacity),
+        labelByteStarts: @many(capacity: capacity),
+        labelByteCounts: @many(capacity: capacity),
+        labelBytes: @many(capacity: capacity),
+        valueSourceStarts: @many(capacity: capacity),
+        valueSourceEnds: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity)
     )
 }
 
@@ -114,15 +145,15 @@ function compilerBProjectEmittedMacroBlockStoreCreate(
     capacity: Int
 ): CompilerBProjectEmittedMacroBlockStore {
     return CompilerBProjectEmittedMacroBlockStore(
-        sourceIDs: bufferCreateInt(capacity: capacity),
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        producerSourceIDs: bufferCreateInt(capacity: capacity),
-        producerApplicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        declarationSourceIDs: bufferCreateInt(capacity: capacity),
-        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        bodySyntaxIDs: bufferCreateInt(capacity: capacity),
-        identityStarts: bufferCreateInt(capacity: capacity),
-        identityEnds: bufferCreateInt(capacity: capacity)
+        sourceIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        producerSourceIDs: @many(capacity: capacity),
+        producerApplicationSyntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        bodySyntaxIDs: @many(capacity: capacity),
+        identityStarts: @many(capacity: capacity),
+        identityEnds: @many(capacity: capacity)
     )
 }
 
@@ -643,10 +674,7 @@ function compilerBProjectResolveSourceMacroApplications(
                             index: argumentRow
                         )
                     )
-                    let expressionRow: Int(compilerBFacetRowForSyntaxID(
-                        syntaxIDs: revision.process.expressions.syntaxIDs,
-                        syntaxID: expressionSyntaxID
-                    ))
+                    let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
                     if expressionRow >= 0 {
                         state labelStart: Int(0)
                         state labelEnd: Int(0)
@@ -753,18 +781,12 @@ function compilerBProjectEnvironmentOwnerForNode(
     revision: CompilerBSyntaxRevision,
     syntaxID: Int
 ): Int {
-    let nodeRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.environmentNodes.syntaxIDs,
-        syntaxID: syntaxID
-    ))
+    let nodeRow: Int(revision.process.environmentNodes.syntaxIDs.firstIndex(value: syntaxID))
     if nodeRow < 0 { return 0 - 1 }
     let environmentSyntaxID: Int(
         revision.process.environmentNodes.environmentSyntaxIDs.element(index: nodeRow)
     )
-    let environmentRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.environments.syntaxIDs,
-        syntaxID: environmentSyntaxID
-    ))
+    let environmentRow: Int(revision.process.environments.syntaxIDs.firstIndex(value: environmentSyntaxID))
     if environmentRow < 0 { return 0 - 1 }
     return revision.process.environments.ownerDeclarationSyntaxIDs.element(
         index: environmentRow
@@ -963,73 +985,11 @@ function compilerBPopulateProjectRevision(
     return derivationFailures
 }
 
-function compilerBProjectRevisionCreate(route: String): CompilerBProjectRevision {
-    let sourcePaths: String(compilerBDiscoverProjectSourcePaths(route: route))
-    let sourceCount: Int(compilerBSourceSetLineCount(lines: sourcePaths))
-    let declarations: CompilerBProjectDeclarationStore(
-        compilerBProjectDeclarationStoreCreate(capacity: sourceCount * 32)
-    )
-    let applications: CompilerBProjectMacroApplicationStore(
-        compilerBProjectMacroApplicationStoreCreate(capacity: sourceCount * 32)
-    )
-    let emittedMacroBlocks: CompilerBProjectEmittedMacroBlockStore(
-        compilerBProjectEmittedMacroBlockStoreCreate(capacity: sourceCount * 4)
-    )
-    let syntaxGraph: CompilerBSyntaxGraph(
-        compilerBSyntaxGraphCreate(capacity: sourceCount * 8)
-    )
-    state failures: Int(compilerBPopulateProjectRevision(
-        sourcePaths: sourcePaths,
-        declarations: declarations,
-        applications: applications,
-        emittedMacroBlocks: emittedMacroBlocks,
-        syntaxGraph: syntaxGraph
-    ))
-    let syntaxCaptureValues: CompilerBSyntaxCaptureValueGraph(
-        compilerBDeriveSyntaxCaptureValues(
-            graph: syntaxGraph,
-            applications: applications
-        )
-    )
-    if compilerBValidateSyntaxCaptureCardinalities(
-        graph: syntaxGraph,
-        values: syntaxCaptureValues
-    ) != 0 {
-        failures: failures + 1
-    }
-    if compilerBValidateSyntaxCaptureIdentities(
-        graph: syntaxGraph,
-        values: syntaxCaptureValues,
-        sourcePaths: sourcePaths,
-        declarations: declarations
-    ) != 0 {
-        failures: failures + 1
-    }
-    state diagnostics: String("")
-    if failures != 0 {
-        let reported: Int(compilerBProjectReportSyntaxDiagnostics(sourcePaths: sourcePaths))
-        if reported == 0 {
-            let resolved: Int(compilerBProjectReportResolutionDiagnostics(
-                sourcePaths: sourcePaths,
-                declarations: declarations
-            ))
-            if resolved == 0 && syntaxGraph.diagnosticCodes.count == 0 {
-                diagnostics.append(text: "unable to compose project revision\n")
-            }
-        }
-    }
-    return CompilerBProjectRevision(
-        sourcePaths: sourcePaths,
-        sourceCount: sourceCount,
-        declarations: declarations,
-        macroApplications: applications,
-        emittedMacroBlocks: emittedMacroBlocks,
-        syntaxGraph: syntaxGraph,
-        syntaxCaptureValues: syntaxCaptureValues,
-        valid: failures == 0,
-        diagnosticCount: failures,
-        diagnostic: diagnostics
-    )
+function compilerBProjectRevisionDiagnostic(
+    diagnosticCount: Int
+): String {
+    if diagnosticCount == 0 { return String("") }
+    return String("unable to compose project revision\n")
 }
 
 function compilerBProjectRevisionDestroy(revision: CompilerBProjectRevision): Int {
@@ -1049,10 +1009,14 @@ function compilerBProjectRevisionDestroy(revision: CompilerBProjectRevision): In
     if compilerBProjectDeclarationStoreDestroy(
         store: revision.declarations
     ) != 0 { status: 0 - 1 }
+    if stringDestroy(value: revision.sourcePaths) != 0 { status: 0 - 1 }
     return status
 }
 
-function compilerBRenderProjectRevision(revision: CompilerBProjectRevision): String {
+function compilerBRenderProjectRevision(
+    revision: CompilerBProjectRevision,
+    diagnosticCount: Int
+): String {
     state output: String("")
     state declarationRow: Int(0)
     while declarationRow < revision.declarations.syntaxIDs.count {
@@ -1081,7 +1045,9 @@ function compilerBRenderProjectRevision(revision: CompilerBProjectRevision): Str
         sourcePaths: revision.sourcePaths,
         declarations: revision.declarations
     ))
-    output.append(text: revision.diagnostic)
-    output.append(text: "projectSyntax\tvalid=\(revision.valid)\tfailures=\(revision.diagnosticCount)\n")
+    output.append(text: compilerBProjectRevisionDiagnostic(
+        diagnosticCount: diagnosticCount
+    ))
+    output.append(text: "projectSyntax\tvalid=\(diagnosticCount == 0)\tfailures=\(diagnosticCount)\n")
     return output
 }

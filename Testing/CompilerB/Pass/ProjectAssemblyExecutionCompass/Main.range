@@ -1,0 +1,12 @@
+@extern
+function commandLineArgumentCount(): Int
+
+function start(): Int {
+    let argumentCount: Int(commandLineArgumentCount())
+
+    if argumentCount != 1 && argumentCount != 2 {
+        return 64
+    }
+
+    return 42
+}

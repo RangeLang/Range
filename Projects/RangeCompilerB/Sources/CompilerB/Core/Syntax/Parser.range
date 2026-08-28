@@ -1,8 +1,8 @@
 function compilerBSyntaxNodeStoreCreate(capacity: Int): SyntaxNodeStore {
     return SyntaxNodeStore(
-        ids: bufferCreateInt(capacity: capacity),
-        firstTokenIDs: bufferCreateInt(capacity: capacity),
-        afterLastTokenIDs: bufferCreateInt(capacity: capacity)
+        ids: @many(capacity: capacity),
+        firstTokenIDs: @many(capacity: capacity),
+        afterLastTokenIDs: @many(capacity: capacity)
     )
 }
 
@@ -48,9 +48,9 @@ function compilerBDeclarationFacetStoreCreate(
     capacity: Int
 ): CompilerBDeclarationFacetStore {
     return CompilerBDeclarationFacetStore(
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        identityTokenIDs: bufferCreateInt(capacity: capacity),
-        bodySyntaxIDs: bufferCreateInt(capacity: capacity)
+        syntaxIDs: @many(capacity: capacity),
+        identityTokenIDs: @many(capacity: capacity),
+        bodySyntaxIDs: @many(capacity: capacity)
     )
 }
 
@@ -77,8 +77,8 @@ function compilerBDeclarationFacetStoreDestroy(
 
 function compilerBBlockFacetStoreCreate(capacity: Int): CompilerBBlockFacetStore {
     return CompilerBBlockFacetStore(
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        parentSyntaxIDs: bufferCreateInt(capacity: capacity)
+        syntaxIDs: @many(capacity: capacity),
+        parentSyntaxIDs: @many(capacity: capacity)
     )
 }
 
@@ -100,10 +100,10 @@ function compilerBBlockFacetStoreDestroy(store: CompilerBBlockFacetStore): Int {
 
 function compilerBEnumCaseFacetStoreCreate(capacity: Int): CompilerBEnumCaseFacetStore {
     return CompilerBEnumCaseFacetStore(
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-        identityTokenIDs: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity)
+        syntaxIDs: @many(capacity: capacity),
+        ownerSyntaxIDs: @many(capacity: capacity),
+        identityTokenIDs: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity)
     )
 }
 
@@ -131,21 +131,21 @@ function compilerBEnumCaseFacetStoreDestroy(store: CompilerBEnumCaseFacetStore):
 
 function compilerBMacroApplicationStoreCreate(capacity: Int): CompilerBMacroApplicationStore {
     return CompilerBMacroApplicationStore(
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        identityTokenIDs: bufferCreateInt(capacity: capacity),
-        macroDeclarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        firstArgumentTokenIDs: bufferCreateInt(capacity: capacity),
-        afterLastArgumentTokenIDs: bufferCreateInt(capacity: capacity),
-        targetSyntaxIDs: bufferCreateInt(capacity: capacity),
-        targetIdentityTokenIDs: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity),
-        argumentApplicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        argumentLabelTokenIDs: bufferCreateInt(capacity: capacity),
-        argumentValueExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-        argumentOrdinals: bufferCreateInt(capacity: capacity),
-        environmentApplicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        environmentSyntaxIDs: bufferCreateInt(capacity: capacity),
-        environmentOrdinals: bufferCreateInt(capacity: capacity)
+        syntaxIDs: @many(capacity: capacity),
+        identityTokenIDs: @many(capacity: capacity),
+        macroDeclarationSyntaxIDs: @many(capacity: capacity),
+        firstArgumentTokenIDs: @many(capacity: capacity),
+        afterLastArgumentTokenIDs: @many(capacity: capacity),
+        targetSyntaxIDs: @many(capacity: capacity),
+        targetIdentityTokenIDs: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity),
+        argumentApplicationSyntaxIDs: @many(capacity: capacity),
+        argumentLabelTokenIDs: @many(capacity: capacity),
+        argumentValueExpressionSyntaxIDs: @many(capacity: capacity),
+        argumentOrdinals: @many(capacity: capacity),
+        environmentApplicationSyntaxIDs: @many(capacity: capacity),
+        environmentSyntaxIDs: @many(capacity: capacity),
+        environmentOrdinals: @many(capacity: capacity)
     )
 }
 
@@ -258,10 +258,7 @@ function compilerBSwitchCaseRowContainingEnvironment(
     process: CompilerBProcessGraph,
     environmentSyntaxID: Int
 ): Int {
-    let environmentNodeRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: nodes.ids,
-        syntaxID: environmentSyntaxID
-    ))
+    let environmentNodeRow: Int(nodes.ids.firstIndex(value: environmentSyntaxID))
     if environmentNodeRow < 0 { return 0 - 1 }
     let firstTokenID: Int(nodes.firstTokenIDs.element(index: environmentNodeRow))
     state result: Int(0 - 1)
@@ -286,10 +283,7 @@ function compilerBEvaluateCompileTimeIntegerExpression(
     macroSyntaxID: Int,
     expressionSyntaxID: Int
 ): CompilerBCompileTimeInteger {
-    let subjectRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: process.expressions.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let subjectRow: Int(process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if subjectRow < 0 {
         return CompilerBCompileTimeInteger(found: false, hasValue: false, value: 0)
     }
@@ -360,10 +354,7 @@ function compilerBEvaluateCompileTimeIntegerExpression(
         row: row + 1
     }
     if argumentRow >= 0 {
-        let expressionRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: process.expressions.syntaxIDs,
-            syntaxID: applications.argumentValueExpressionSyntaxIDs.element(index: argumentRow)
-        ))
+        let expressionRow: Int(process.expressions.syntaxIDs.firstIndex(value: applications.argumentValueExpressionSyntaxIDs.element(index: argumentRow)))
         if expressionRow >= 0
             && process.expressions.kindCodes.element(index: expressionRow)
                 == compilerBParserExpressionKindIntegerCode() {
@@ -414,10 +405,7 @@ function compilerBEvaluateCompileTimeBooleanExpression(
     macroSyntaxID: Int,
     expressionSyntaxID: Int
 ): Bool {
-    let comparisonRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: process.comparisons.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let comparisonRow: Int(process.comparisons.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if comparisonRow < 0 { return false }
     let left: CompilerBCompileTimeInteger(compilerBEvaluateCompileTimeIntegerExpression(
         source: source,
@@ -453,6 +441,9 @@ function compilerBEvaluateCompileTimeBooleanExpression(
     if operatorCode == compilerBComparisonOperatorEqualCode() {
         return left.value == right.value
     }
+    if operatorCode == compilerBComparisonOperatorNotEqualCode() {
+        return left.value != right.value
+    }
     if operatorCode == compilerBComparisonOperatorLessCode() {
         return left.value < right.value
     }
@@ -480,10 +471,7 @@ function compilerBMacroSwitchCaseIsSelected(
 ): Bool {
     if caseRow < 0 || caseRow >= process.switchCases.syntaxIDs.count { return false }
     let switchSyntaxID: Int(process.switchCases.switchSyntaxIDs.element(index: caseRow))
-    let switchRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: process.switches.syntaxIDs,
-        syntaxID: switchSyntaxID
-    ))
+    let switchRow: Int(process.switches.syntaxIDs.firstIndex(value: switchSyntaxID))
     if switchRow < 0 { return false }
     let conditionExpressionSyntaxID: Int(
         process.switchCases.conditionExpressionSyntaxIDs.element(index: caseRow)
@@ -580,12 +568,7 @@ function compilerBMacroApplicationArgumentsMatchSignature(
                 tokens: tokens,
                 members: members,
                 process: process,
-                argumentApplicationSyntaxIDs: applications.argumentApplicationSyntaxIDs,
-                argumentLabelTokenIDs: applications.argumentLabelTokenIDs,
-                argumentOrdinals: applications.argumentOrdinals,
-                argumentValueExpressionSyntaxIDs: applications.argumentValueExpressionSyntaxIDs,
-                expressionSyntaxIDs: process.expressions.syntaxIDs,
-                expressionKindCodes: process.expressions.kindCodes,
+                applications: applications,
                 applicationSyntaxID: applicationSyntaxID,
                 parameterIdentityTokenID: signatures.parameterIdentityTokenIDs.element(
                     index: parameterRow
@@ -804,18 +787,18 @@ function compilerBResolveApplications(
 
 function compilerBMemberFacetStoreCreate(capacity: Int): CompilerBMemberFacetStore {
     return CompilerBMemberFacetStore(
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-        kindCodes: bufferCreateInt(capacity: capacity),
-        keywordTokenIDs: bufferCreateInt(capacity: capacity),
-        identityTokenIDs: bufferCreateInt(capacity: capacity),
-        typeTokenIDs: bufferCreateInt(capacity: capacity),
-        firstInitializerTokenIDs: bufferCreateInt(capacity: capacity),
-        afterLastInitializerTokenIDs: bufferCreateInt(capacity: capacity),
-        initializerExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-        bodySyntaxIDs: bufferCreateInt(capacity: capacity),
-        initializerKindCodes: bufferCreateInt(capacity: capacity),
-        initializerValues: bufferCreateInt(capacity: capacity)
+        syntaxIDs: @many(capacity: capacity),
+        ownerSyntaxIDs: @many(capacity: capacity),
+        kindCodes: @many(capacity: capacity),
+        keywordTokenIDs: @many(capacity: capacity),
+        identityTokenIDs: @many(capacity: capacity),
+        typeTokenIDs: @many(capacity: capacity),
+        firstInitializerTokenIDs: @many(capacity: capacity),
+        afterLastInitializerTokenIDs: @many(capacity: capacity),
+        initializerExpressionSyntaxIDs: @many(capacity: capacity),
+        bodySyntaxIDs: @many(capacity: capacity),
+        initializerKindCodes: @many(capacity: capacity),
+        initializerValues: @many(capacity: capacity)
     )
 }
 
@@ -873,11 +856,11 @@ function compilerBMemberFacetStoreAppend(
 
 function compilerBFunctionSignatureFacetStoreCreate(capacity: Int): CompilerBFunctionSignatureFacetStore {
     return CompilerBFunctionSignatureFacetStore(
-        functionSyntaxIDs: bufferCreateInt(capacity: capacity),
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        returnTypeTokenIDs: bufferCreateInt(capacity: capacity),
-        inputCardinalityTokenIDs: bufferCreateInt(capacity: capacity),
-        outputCardinalityTokenIDs: bufferCreateInt(capacity: capacity)
+        functionSyntaxIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        returnTypeTokenIDs: @many(capacity: capacity),
+        inputCardinalityTokenIDs: @many(capacity: capacity),
+        outputCardinalityTokenIDs: @many(capacity: capacity)
     )
 }
 
@@ -895,11 +878,11 @@ function compilerBFunctionParameterFacetStoreCreate(
     capacity: Int
 ): CompilerBFunctionParameterFacetStore {
     return CompilerBFunctionParameterFacetStore(
-        functionSyntaxIDs: bufferCreateInt(capacity: capacity),
-        externalLabelTokenIDs: bufferCreateInt(capacity: capacity),
-        identityTokenIDs: bufferCreateInt(capacity: capacity),
-        typeTokenIDs: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity)
+        functionSyntaxIDs: @many(capacity: capacity),
+        externalLabelTokenIDs: @many(capacity: capacity),
+        identityTokenIDs: @many(capacity: capacity),
+        typeTokenIDs: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity)
     )
 }
 
@@ -936,21 +919,21 @@ function compilerBMacroSignatureFacetStoreCreate(
     capacity: Int
 ): CompilerBMacroSignatureFacetStore {
     return CompilerBMacroSignatureFacetStore(
-        macroSyntaxIDs: bufferCreateInt(capacity: capacity),
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        targetTypeTokenIDs: bufferCreateInt(capacity: capacity),
-        afterLastTargetTypeTokenIDs: bufferCreateInt(capacity: capacity),
-        resultTypeTokenIDs: bufferCreateInt(capacity: capacity),
-        inputCardinalityTokenIDs: bufferCreateInt(capacity: capacity),
-        outputCardinalityTokenIDs: bufferCreateInt(capacity: capacity),
-        parameterMacroSyntaxIDs: bufferCreateInt(capacity: capacity),
-        parameterIdentityTokenIDs: bufferCreateInt(capacity: capacity),
-        parameterTypeTokenIDs: bufferCreateInt(capacity: capacity),
-        parameterCardinalityValues: bufferCreateInt(capacity: capacity),
-        parameterOptionalValues: bufferCreateInt(capacity: capacity),
-        parameterDefaultFirstTokenIDs: bufferCreateInt(capacity: capacity),
-        parameterDefaultAfterLastTokenIDs: bufferCreateInt(capacity: capacity),
-        parameterOrdinals: bufferCreateInt(capacity: capacity)
+        macroSyntaxIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        targetTypeTokenIDs: @many(capacity: capacity),
+        afterLastTargetTypeTokenIDs: @many(capacity: capacity),
+        resultTypeTokenIDs: @many(capacity: capacity),
+        inputCardinalityTokenIDs: @many(capacity: capacity),
+        outputCardinalityTokenIDs: @many(capacity: capacity),
+        parameterMacroSyntaxIDs: @many(capacity: capacity),
+        parameterIdentityTokenIDs: @many(capacity: capacity),
+        parameterTypeTokenIDs: @many(capacity: capacity),
+        parameterCardinalityValues: @many(capacity: capacity),
+        parameterOptionalValues: @many(capacity: capacity),
+        parameterDefaultFirstTokenIDs: @many(capacity: capacity),
+        parameterDefaultAfterLastTokenIDs: @many(capacity: capacity),
+        parameterOrdinals: @many(capacity: capacity)
     )
 }
 
@@ -1002,128 +985,158 @@ function compilerBMacroSignatureFacetStoreAppend(
 function compilerBProcessGraphCreate(capacity: Int): CompilerBProcessGraph {
     return CompilerBProcessGraph(
         processes: CompilerBProcessFacetStore(
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-            bodySyntaxIDs: bufferCreateInt(capacity: capacity),
-            resultExpressionSyntaxIDs: bufferCreateInt(capacity: capacity)
+            ownerSyntaxIDs: @many(capacity: capacity),
+            bodySyntaxIDs: @many(capacity: capacity),
+            resultExpressionSyntaxIDs: @many(capacity: capacity)
         ),
         expressions: CompilerBExpressionFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            kindCodes: bufferCreateInt(capacity: capacity),
-            firstTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastTokenIDs: bufferCreateInt(capacity: capacity),
-            integerValues: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            kindCodes: @many(capacity: capacity),
+            firstTokenIDs: @many(capacity: capacity),
+            afterLastTokenIDs: @many(capacity: capacity),
+            integerValues: @many(capacity: capacity)
         ),
         applications: CompilerBApplicationFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            predecessorSyntaxIDs: bufferCreateInt(capacity: capacity),
-            declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-            identityTokenIDs: bufferCreateInt(capacity: capacity),
-            firstTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastTokenIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            predecessorSyntaxIDs: @many(capacity: capacity),
+            declarationSyntaxIDs: @many(capacity: capacity),
+            identityTokenIDs: @many(capacity: capacity),
+            firstTokenIDs: @many(capacity: capacity),
+            afterLastTokenIDs: @many(capacity: capacity)
         ),
         arguments: CompilerBApplicationArgumentFacetStore(
-            applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-            labelTokenIDs: bufferCreateInt(capacity: capacity),
-            valueExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            ordinals: bufferCreateInt(capacity: capacity)
+            applicationSyntaxIDs: @many(capacity: capacity),
+            labelTokenIDs: @many(capacity: capacity),
+            valueExpressionSyntaxIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
+        ),
+        components: CompilerBApplicationComponentFacetStore(
+            ownerApplicationSyntaxIDs: @many(capacity: capacity),
+            labelTokenIDs: @many(capacity: capacity),
+            firstValueTokenIDs: @many(capacity: capacity),
+            afterLastValueTokenIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
         ),
         projections: CompilerBProjectionSegmentStore(
-            expressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            tokenIDs: bufferCreateInt(capacity: capacity),
-            ordinals: bufferCreateInt(capacity: capacity)
+            expressionSyntaxIDs: @many(capacity: capacity),
+            tokenIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
         ),
         locals: CompilerBLocalBindingFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-            identityTokenIDs: bufferCreateInt(capacity: capacity),
-            valueExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            firstValueTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastValueTokenIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            kindCodes: @many(capacity: capacity),
+            identityTokenIDs: @many(capacity: capacity),
+            valueExpressionSyntaxIDs: @many(capacity: capacity),
+            firstValueTokenIDs: @many(capacity: capacity),
+            afterLastValueTokenIDs: @many(capacity: capacity)
+        ),
+        assignments: CompilerBAssignmentFacetStore(
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            identityTokenIDs: @many(capacity: capacity),
+            valueExpressionSyntaxIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
+        ),
+        returns: CompilerBReturnFacetStore(
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            valueExpressionSyntaxIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
         ),
         noValueFallbacks: CompilerBNoValueFallbackFacetStore(
-            expressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            questionTokenIDs: bufferCreateInt(capacity: capacity),
-            firstTargetTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastTargetTokenIDs: bufferCreateInt(capacity: capacity),
-            firstRHSTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastRHSTokenIDs: bufferCreateInt(capacity: capacity)
+            expressionSyntaxIDs: @many(capacity: capacity),
+            questionTokenIDs: @many(capacity: capacity),
+            firstTargetTokenIDs: @many(capacity: capacity),
+            afterLastTargetTokenIDs: @many(capacity: capacity),
+            firstRHSTokenIDs: @many(capacity: capacity),
+            afterLastRHSTokenIDs: @many(capacity: capacity)
         ),
         conditionals: CompilerBConditionalFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-            firstConditionTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastConditionTokenIDs: bufferCreateInt(capacity: capacity),
-            bodySyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            firstConditionTokenIDs: @many(capacity: capacity),
+            afterLastConditionTokenIDs: @many(capacity: capacity),
+            conditionExpressionSyntaxIDs: @many(capacity: capacity),
+            bodySyntaxIDs: @many(capacity: capacity),
+            alternativeSyntaxIDs: @many(capacity: capacity),
+            alternativeKindCodes: @many(capacity: capacity)
         ),
         switches: CompilerBSwitchFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-            subjectExpressionSyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            subjectExpressionSyntaxIDs: @many(capacity: capacity)
         ),
         switchCases: CompilerBSwitchCaseFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            switchSyntaxIDs: bufferCreateInt(capacity: capacity),
-            conditionExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            firstBodyTokenIDs: bufferCreateInt(capacity: capacity),
-            afterLastBodyTokenIDs: bufferCreateInt(capacity: capacity),
-            ordinals: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            switchSyntaxIDs: @many(capacity: capacity),
+            conditionExpressionSyntaxIDs: @many(capacity: capacity),
+            firstBodyTokenIDs: @many(capacity: capacity),
+            afterLastBodyTokenIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
         ),
         comparisons: CompilerBComparisonFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            leftExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            rightExpressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            operatorCodes: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            leftExpressionSyntaxIDs: @many(capacity: capacity),
+            rightExpressionSyntaxIDs: @many(capacity: capacity),
+            operatorCodes: @many(capacity: capacity)
+        ),
+        logicals: CompilerBLogicalFacetStore(
+            syntaxIDs: @many(capacity: capacity),
+            leftExpressionSyntaxIDs: @many(capacity: capacity),
+            rightExpressionSyntaxIDs: @many(capacity: capacity),
+            operatorCodes: @many(capacity: capacity)
         ),
         applicationProvisions: CompilerBApplicationProvisionFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-            environmentSyntaxIDs: bufferCreateInt(capacity: capacity),
-            extensionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            targetApplicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-            sourceSyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            environmentSyntaxIDs: @many(capacity: capacity),
+            extensionSyntaxIDs: @many(capacity: capacity),
+            targetApplicationSyntaxIDs: @many(capacity: capacity),
+            sourceSyntaxIDs: @many(capacity: capacity)
         ),
         environments: CompilerBEnvironmentFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerDeclarationSyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            ownerDeclarationSyntaxIDs: @many(capacity: capacity)
         ),
         environmentNodes: CompilerBEnvironmentNodeFacetStore(
-            environmentSyntaxIDs: bufferCreateInt(capacity: capacity),
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            parentSyntaxIDs: bufferCreateInt(capacity: capacity),
-            ordinals: bufferCreateInt(capacity: capacity)
+            environmentSyntaxIDs: @many(capacity: capacity),
+            syntaxIDs: @many(capacity: capacity),
+            parentSyntaxIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
         ),
         emittedMacroBlocks: CompilerBEmittedMacroBlockFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            identityTokenIDs: bufferCreateInt(capacity: capacity),
-            bodySyntaxIDs: bufferCreateInt(capacity: capacity),
-            openingTokenIDs: bufferCreateInt(capacity: capacity),
-            closingTokenIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            identityTokenIDs: @many(capacity: capacity),
+            bodySyntaxIDs: @many(capacity: capacity),
+            openingTokenIDs: @many(capacity: capacity),
+            closingTokenIDs: @many(capacity: capacity)
         ),
         extensions: CompilerBExtensionFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            targetApplicationSyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            targetApplicationSyntaxIDs: @many(capacity: capacity)
         ),
         collections: CompilerBCollectionFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            selectorIdentityTokenIDs: bufferCreateInt(capacity: capacity),
-            selectorMacroSyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            selectorIdentityTokenIDs: @many(capacity: capacity),
+            selectorMacroSyntaxIDs: @many(capacity: capacity)
         ),
         collectionProductions: CompilerBCollectionProductionFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            sourceIdentityTokenIDs: bufferCreateInt(capacity: capacity),
-            sourceCollectionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            outputIdentityTokenIDs: bufferCreateInt(capacity: capacity),
-            outputDeclarationSyntaxIDs: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            sourceIdentityTokenIDs: @many(capacity: capacity),
+            sourceCollectionSyntaxIDs: @many(capacity: capacity),
+            outputIdentityTokenIDs: @many(capacity: capacity),
+            outputDeclarationSyntaxIDs: @many(capacity: capacity)
         ),
         executions: CompilerBExecutionFacetStore(
-            syntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity),
-            expressionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            ordinals: bufferCreateInt(capacity: capacity)
+            syntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity),
+            expressionSyntaxIDs: @many(capacity: capacity),
+            ordinals: @many(capacity: capacity)
         ),
         functionOwners: CompilerBFunctionOwnerFacetStore(
-            functionSyntaxIDs: bufferCreateInt(capacity: capacity),
-            ownerSyntaxIDs: bufferCreateInt(capacity: capacity)
+            functionSyntaxIDs: @many(capacity: capacity),
+            ownerSyntaxIDs: @many(capacity: capacity)
         )
     )
 }
@@ -1148,15 +1161,34 @@ function compilerBProcessGraphDestroy(graph: CompilerBProcessGraph): Int {
     if graph.arguments.labelTokenIDs.destroy() != 0 { status: 0 - 1 }
     if graph.arguments.valueExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.arguments.ordinals.destroy() != 0 { status: 0 - 1 }
+    if graph.components.ownerApplicationSyntaxIDs.destroy() != 0 {
+        status: 0 - 1
+    }
+    if graph.components.labelTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.components.firstValueTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.components.afterLastValueTokenIDs.destroy() != 0 {
+        status: 0 - 1
+    }
+    if graph.components.ordinals.destroy() != 0 { status: 0 - 1 }
     if graph.projections.expressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.projections.tokenIDs.destroy() != 0 { status: 0 - 1 }
     if graph.projections.ordinals.destroy() != 0 { status: 0 - 1 }
     if graph.locals.syntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.locals.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.locals.kindCodes.destroy() != 0 { status: 0 - 1 }
     if graph.locals.identityTokenIDs.destroy() != 0 { status: 0 - 1 }
     if graph.locals.valueExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.locals.firstValueTokenIDs.destroy() != 0 { status: 0 - 1 }
     if graph.locals.afterLastValueTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.assignments.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.assignments.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.assignments.identityTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.assignments.valueExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.assignments.ordinals.destroy() != 0 { status: 0 - 1 }
+    if graph.returns.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.returns.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.returns.valueExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.returns.ordinals.destroy() != 0 { status: 0 - 1 }
     if graph.noValueFallbacks.expressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.noValueFallbacks.questionTokenIDs.destroy() != 0 { status: 0 - 1 }
     if graph.noValueFallbacks.firstTargetTokenIDs.destroy() != 0 { status: 0 - 1 }
@@ -1167,7 +1199,10 @@ function compilerBProcessGraphDestroy(graph: CompilerBProcessGraph): Int {
     if graph.conditionals.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.conditionals.firstConditionTokenIDs.destroy() != 0 { status: 0 - 1 }
     if graph.conditionals.afterLastConditionTokenIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.conditionals.conditionExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.conditionals.bodySyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.conditionals.alternativeSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.conditionals.alternativeKindCodes.destroy() != 0 { status: 0 - 1 }
     if graph.switches.syntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.switches.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.switches.subjectExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
@@ -1181,6 +1216,10 @@ function compilerBProcessGraphDestroy(graph: CompilerBProcessGraph): Int {
     if graph.comparisons.leftExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.comparisons.rightExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.comparisons.operatorCodes.destroy() != 0 { status: 0 - 1 }
+    if graph.logicals.syntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.logicals.leftExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.logicals.rightExpressionSyntaxIDs.destroy() != 0 { status: 0 - 1 }
+    if graph.logicals.operatorCodes.destroy() != 0 { status: 0 - 1 }
     if graph.applicationProvisions.syntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.applicationProvisions.ownerSyntaxIDs.destroy() != 0 { status: 0 - 1 }
     if graph.applicationProvisions.environmentSyntaxIDs.destroy() != 0 {
@@ -1241,6 +1280,7 @@ function compilerBParserExpressionKindCallCode(): Int { return 4 }
 function compilerBParserExpressionKindStringCode(): Int { return 5 }
 function compilerBParserExpressionKindNoValueFallbackCode(): Int { return 6 }
 function compilerBParserExpressionKindComparisonCode(): Int { return 7 }
+function compilerBParserExpressionKindLogicalCode(): Int { return 8 }
 
 function compilerBComparisonOperatorEqualCode(): Int { return 1 }
 function compilerBComparisonOperatorLessCode(): Int { return 2 }
@@ -1248,6 +1288,18 @@ function compilerBComparisonOperatorLessOrEqualCode(): Int { return 3 }
 function compilerBComparisonOperatorGreaterCode(): Int { return 4 }
 function compilerBComparisonOperatorGreaterOrEqualCode(): Int { return 5 }
 function compilerBComparisonOperatorNoneCode(): Int { return 6 }
+function compilerBComparisonOperatorNotEqualCode(): Int { return 7 }
+
+function compilerBLogicalOperatorAndCode(): Int { return 1 }
+function compilerBLogicalOperatorOrCode(): Int { return 2 }
+function compilerBLogicalOperatorNotCode(): Int { return 3 }
+
+function compilerBLogicalOperatorName(operatorCode: Int): String {
+    if operatorCode == compilerBLogicalOperatorAndCode() { return "and" }
+    if operatorCode == compilerBLogicalOperatorOrCode() { return "or" }
+    if operatorCode == compilerBLogicalOperatorNotCode() { return "not" }
+    return "unknown"
+}
 
 function compilerBComparisonOperatorName(operatorCode: Int): String {
     if operatorCode == compilerBComparisonOperatorEqualCode() { return "equal" }
@@ -1260,6 +1312,7 @@ function compilerBComparisonOperatorName(operatorCode: Int): String {
         return "greaterOrEqual"
     }
     if operatorCode == compilerBComparisonOperatorNoneCode() { return "none" }
+    if operatorCode == compilerBComparisonOperatorNotEqualCode() { return "notEqual" }
     return "unknown"
 }
 
@@ -1897,6 +1950,7 @@ function compilerBParseMemberFacet(
     state firstInitializerTokenID: Int(afterLastTypeTokenID)
     state afterLastInitializerTokenID: Int(afterLastTypeTokenID)
     state afterLastMemberTokenID: Int(afterLastTypeTokenID)
+    state constructionBodySyntaxID: Int(0 - 1)
     if directValue {
         firstInitializerTokenID: typeTokenID
         afterLastInitializerTokenID: typeTokenID + 1
@@ -1916,6 +1970,28 @@ function compilerBParseMemberFacet(
             firstInitializerTokenID: afterLastTypeTokenID + 1
             afterLastInitializerTokenID: closing
             afterLastMemberTokenID: closing + 1
+        }
+    }
+    if afterLastMemberTokenID < tokens.kinds.count {
+        if compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: afterLastMemberTokenID
+            ) == 123 {
+            let constructionBodyClosingTokenID: Int(
+                compilerBParserMatchingRightBrace(
+                    source: source,
+                    tokens: tokens,
+                    openingTokenID: afterLastMemberTokenID,
+                    limitTokenID: tokens.kinds.count
+                )
+            )
+            if constructionBodyClosingTokenID < 0 { return 0 - 2 }
+            constructionBodySyntaxID: compilerBRetainedToken(
+                store: tokens,
+                id: TokenID(value: afterLastMemberTokenID)
+            ).start
+            afterLastMemberTokenID: constructionBodyClosingTokenID + 1
         }
     }
     state initializerKindCode: Int(compilerBParserScalarKindNoneCode())
@@ -1944,19 +2020,15 @@ function compilerBParseMemberFacet(
     if firstInitializerTokenID < afterLastInitializerTokenID {
         state expressionFirstTokenID: Int(firstInitializerTokenID)
         state expressionAfterLastTokenID: Int(afterLastInitializerTokenID)
-        let firstInitializer: CompilerBToken(compilerBRetainedToken(
-            store: tokens,
-            id: TokenID(value: firstInitializerTokenID)
-        ))
-        if firstInitializer.kind == .identity
-            && firstInitializerTokenID + 1 < afterLastInitializerTokenID
-            && compilerBParserTokenByte(
+        if afterLastTypeTokenID < tokens.kinds.count {
+            if compilerBParserTokenByte(
                 source: source,
                 tokens: tokens,
-                tokenID: firstInitializerTokenID + 1
+                tokenID: afterLastTypeTokenID
             ) == 40 {
-            expressionFirstTokenID: typeTokenID
-            expressionAfterLastTokenID: afterLastMemberTokenID
+                expressionFirstTokenID: typeTokenID
+                expressionAfterLastTokenID: afterLastMemberTokenID
+            }
         }
         initializerExpressionSyntaxID: compilerBParseExpressionFacet(
             source: source,
@@ -1998,7 +2070,7 @@ function compilerBParseMemberFacet(
         firstInitializerTokenID: firstInitializerTokenID,
         afterLastInitializerTokenID: afterLastInitializerTokenID,
         initializerExpressionSyntaxID: initializerExpressionSyntaxID,
-        bodySyntaxID: 0 - 1,
+        bodySyntaxID: constructionBodySyntaxID,
         initializerKindCode: initializerKindCode,
         initializerValue: initializerValue
     ) != 0 { return 0 - 3 }
@@ -2208,10 +2280,7 @@ function compilerBResolveCollectionProductions(
         state sourceCount: Int(0)
         collectionRow: 0
         while collectionRow < process.collections.syntaxIDs.count {
-            let memberRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: members.syntaxIDs,
-                syntaxID: process.collections.syntaxIDs.element(index: collectionRow)
-            ))
+            let memberRow: Int(members.syntaxIDs.firstIndex(value: process.collections.syntaxIDs.element(index: collectionRow)))
             if memberRow >= 0 {
                 let candidate: CompilerBToken(compilerBRetainedToken(
                     store: tokens,
@@ -2229,10 +2298,7 @@ function compilerBResolveCollectionProductions(
             collectionRow: collectionRow + 1
         }
         if sourceCount != 1 { return 0 - sourceCount - 1 }
-        let sourceCollectionRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: process.collections.syntaxIDs,
-            syntaxID: sourceSyntaxID
-        ))
+        let sourceCollectionRow: Int(process.collections.syntaxIDs.firstIndex(value: sourceSyntaxID))
         let selectorMacroSyntaxID: Int(
             process.collections.selectorMacroSyntaxIDs.element(index: sourceCollectionRow)
         )
@@ -2257,10 +2323,7 @@ function compilerBResolveCollectionProductions(
                         let containedSyntaxID: Int(
                             process.environmentNodes.syntaxIDs.element(index: nodeRow)
                         )
-                let emittedApplicationRow: Int(compilerBFacetRowForSyntaxID(
-                    syntaxIDs: process.applications.syntaxIDs,
-                            syntaxID: containedSyntaxID
-                ))
+                let emittedApplicationRow: Int(process.applications.syntaxIDs.firstIndex(value: containedSyntaxID))
                 if emittedApplicationRow >= 0 {
                     let emittedIdentity: CompilerBToken(compilerBRetainedToken(
                         store: tokens,
@@ -2303,20 +2366,8 @@ function compilerBResolveCollectionProductions(
     return 0
 }
 
-function compilerBFacetRowForSyntaxID(
-    syntaxIDs: IntMany,
-    syntaxID: Int
-): Int {
-    state row: Int(0)
-    while row < syntaxIDs.count {
-        if syntaxIDs.element(index: row) == syntaxID { return row }
-        row: row + 1
-    }
-    return 0 - 1
-}
-
 function compilerBSyntaxNodeRowForID(store: SyntaxNodeStore, syntaxID: Int): Int {
-    return compilerBFacetRowForSyntaxID(syntaxIDs: store.ids, syntaxID: syntaxID)
+    return store.ids.firstIndex(value: syntaxID)
 }
 
 function compilerBParseLeafExpressionFacet(
@@ -2376,7 +2427,7 @@ function compilerBParseLeafExpressionFacet(
         id: syntaxID,
         firstTokenID: firstTokenID,
         afterLastTokenID: afterLastTokenID
-    ) != 0 { return 0 - 1 }
+    ) != 0 { return 0 - 61 }
     if compilerBExpressionFacetStoreAppend(
         store: process.expressions,
         syntaxID: syntaxID,
@@ -2384,7 +2435,7 @@ function compilerBParseLeafExpressionFacet(
         firstTokenID: firstTokenID,
         afterLastTokenID: afterLastTokenID,
         integerValue: integerValue
-    ) != 0 { return 0 - 1 }
+    ) != 0 { return 0 - 62 }
 
     if kindCode == compilerBParserExpressionKindProjectionCode() {
         state ordinal: Int(0)
@@ -2538,7 +2589,7 @@ function compilerBApplicationArgumentFacetStoreAppend(
     return store.ordinals.append(element: ordinal)
 }
 
-function compilerBParseExpressionFacet(
+function compilerBParseStructuredExpressionFacet(
     source: String,
     tokens: CompilerBRetainedTokenStore,
     nodes: SyntaxNodeStore,
@@ -2546,6 +2597,399 @@ function compilerBParseExpressionFacet(
     firstTokenID: Int,
     afterLastTokenID: Int
 ): Int {
+    if firstTokenID < 0 || firstTokenID >= afterLastTokenID { return 0 - 1 }
+    if compilerBParserTokenByte(
+        source: source,
+        tokens: tokens,
+        tokenID: firstTokenID
+    ) == 40 {
+        let closing: Int(compilerBParserMatchingRightParenthesis(
+            source: source,
+            tokens: tokens,
+            openingTokenID: firstTokenID
+        ))
+        if closing == afterLastTokenID - 1 {
+            return compilerBParseExpressionFacet(
+                source: source,
+                tokens: tokens,
+                nodes: nodes,
+                process: process,
+                firstTokenID: firstTokenID + 1,
+                afterLastTokenID: closing
+            )
+        }
+    }
+    state operatorTokenID: Int(0 - 1)
+    state operatorCode: Int(0)
+    state depth: Int(0)
+    state tokenID: Int(firstTokenID)
+    while tokenID + 1 < afterLastTokenID && operatorTokenID < 0 {
+        let byte: Int(compilerBParserTokenByte(
+            source: source,
+            tokens: tokens,
+            tokenID: tokenID
+        ))
+        if byte == 40 || byte == 91 || byte == 123 { depth: depth + 1 }
+        if byte == 41 || byte == 93 || byte == 125 { depth: depth - 1 }
+        if depth == 0 {
+            let nextByte: Int(compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: tokenID + 1
+            ))
+            if byte == 124 && nextByte == 124 {
+                operatorTokenID: tokenID
+                operatorCode: compilerBLogicalOperatorOrCode()
+            }
+        }
+        tokenID: tokenID + 1
+    }
+    if operatorTokenID < 0 {
+        depth: 0
+        tokenID: firstTokenID
+        while tokenID + 1 < afterLastTokenID && operatorTokenID < 0 {
+            let byte: Int(compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: tokenID
+            ))
+            if byte == 40 || byte == 91 || byte == 123 { depth: depth + 1 }
+            if byte == 41 || byte == 93 || byte == 125 { depth: depth - 1 }
+            if depth == 0 {
+                let nextByte: Int(compilerBParserTokenByte(
+                    source: source,
+                    tokens: tokens,
+                    tokenID: tokenID + 1
+                ))
+                if byte == 38 && nextByte == 38 {
+                    operatorTokenID: tokenID
+                    operatorCode: compilerBLogicalOperatorAndCode()
+                }
+            }
+            tokenID: tokenID + 1
+        }
+    }
+    if operatorTokenID >= 0 {
+        let leftSyntaxID: Int(compilerBParseExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: operatorTokenID
+        ))
+        let rightSyntaxID: Int(compilerBParseExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: operatorTokenID + 2,
+            afterLastTokenID: afterLastTokenID
+        ))
+        if leftSyntaxID < 0 || rightSyntaxID < 0 { return 0 - 1 }
+        let operatorToken: CompilerBToken(compilerBRetainedToken(
+            store: tokens,
+            id: TokenID(value: operatorTokenID)
+        ))
+        let syntaxID: Int(operatorToken.start)
+        if compilerBSyntaxNodeStoreAppend(
+            store: nodes,
+            id: syntaxID,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        ) != 0 || compilerBExpressionFacetStoreAppend(
+            store: process.expressions,
+            syntaxID: syntaxID,
+            kindCode: compilerBParserExpressionKindLogicalCode(),
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID,
+            integerValue: 0
+        ) != 0 { return 0 - 1 }
+        if process.logicals.syntaxIDs.append(element: syntaxID) != 0 {
+            return 0 - 1
+        }
+        if process.logicals.leftExpressionSyntaxIDs.append(
+            element: leftSyntaxID
+        ) != 0 || process.logicals.rightExpressionSyntaxIDs.append(
+            element: rightSyntaxID
+        ) != 0 || process.logicals.operatorCodes.append(
+            element: operatorCode
+        ) != 0 { return 0 - 1 }
+        return syntaxID
+    }
+    depth: 0
+    tokenID: firstTokenID
+    state comparisonTokenID: Int(0 - 1)
+    state comparisonAfterOperatorTokenID: Int(0 - 1)
+    state comparisonCode: Int(0)
+    while tokenID < afterLastTokenID && comparisonTokenID < 0 {
+        let byte: Int(compilerBParserTokenByte(
+            source: source,
+            tokens: tokens,
+            tokenID: tokenID
+        ))
+        if byte == 40 || byte == 91 || byte == 123 { depth: depth + 1 }
+        if byte == 41 || byte == 93 || byte == 125 { depth: depth - 1 }
+        if depth == 0 && (byte == 33 || byte == 60 || byte == 61 || byte == 62) {
+            state nextByte: Int(0 - 1)
+            if tokenID + 1 < afterLastTokenID {
+                nextByte: compilerBParserTokenByte(
+                    source: source,
+                    tokens: tokens,
+                    tokenID: tokenID + 1
+                )
+            }
+            if byte == 61 && nextByte == 61 {
+                comparisonCode: compilerBComparisonOperatorEqualCode()
+            } else if byte == 33 && nextByte == 61 {
+                comparisonCode: compilerBComparisonOperatorNotEqualCode()
+            } else if byte == 60 && nextByte == 61 {
+                comparisonCode: compilerBComparisonOperatorLessOrEqualCode()
+            } else if byte == 62 && nextByte == 61 {
+                comparisonCode: compilerBComparisonOperatorGreaterOrEqualCode()
+            } else if byte == 60 {
+                comparisonCode: compilerBComparisonOperatorLessCode()
+            } else if byte == 62 {
+                comparisonCode: compilerBComparisonOperatorGreaterCode()
+            }
+            if comparisonCode != 0 {
+                comparisonTokenID: tokenID
+                comparisonAfterOperatorTokenID: tokenID + 1
+                if nextByte == 61 { comparisonAfterOperatorTokenID: tokenID + 2 }
+            }
+        }
+        tokenID: tokenID + 1
+    }
+    if comparisonTokenID >= 0 {
+        let leftSyntaxID: Int(compilerBParseExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: comparisonTokenID
+        ))
+        let rightSyntaxID: Int(compilerBParseExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: comparisonAfterOperatorTokenID,
+            afterLastTokenID: afterLastTokenID
+        ))
+        if leftSyntaxID < 0 || rightSyntaxID < 0 { return 0 - 1 }
+        let operatorToken: CompilerBToken(compilerBRetainedToken(
+            store: tokens,
+            id: TokenID(value: comparisonTokenID)
+        ))
+        let syntaxID: Int(operatorToken.start)
+        if compilerBSyntaxNodeStoreAppend(
+            store: nodes,
+            id: syntaxID,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        ) != 0 || compilerBExpressionFacetStoreAppend(
+            store: process.expressions,
+            syntaxID: syntaxID,
+            kindCode: compilerBParserExpressionKindComparisonCode(),
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID,
+            integerValue: 0
+        ) != 0 { return 0 - 1 }
+        if process.comparisons.syntaxIDs.append(element: syntaxID) != 0 {
+            return 0 - 1
+        }
+        if process.comparisons.leftExpressionSyntaxIDs.append(
+            element: leftSyntaxID
+        ) != 0 || process.comparisons.rightExpressionSyntaxIDs.append(
+            element: rightSyntaxID
+        ) != 0 || process.comparisons.operatorCodes.append(
+            element: comparisonCode
+        ) != 0 { return 0 - 1 }
+        return syntaxID
+    }
+    if compilerBParserTokenByte(
+        source: source,
+        tokens: tokens,
+        tokenID: firstTokenID
+    ) == 33 {
+        let operandSyntaxID: Int(compilerBParseExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: firstTokenID + 1,
+            afterLastTokenID: afterLastTokenID
+        ))
+        if operandSyntaxID < 0 { return 0 - 1 }
+        let operatorToken: CompilerBToken(compilerBRetainedToken(
+            store: tokens,
+            id: TokenID(value: firstTokenID)
+        ))
+        let syntaxID: Int(operatorToken.start)
+        if compilerBSyntaxNodeStoreAppend(
+            store: nodes,
+            id: syntaxID,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        ) != 0 || compilerBExpressionFacetStoreAppend(
+            store: process.expressions,
+            syntaxID: syntaxID,
+            kindCode: compilerBParserExpressionKindLogicalCode(),
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID,
+            integerValue: 0
+        ) != 0 { return 0 - 1 }
+        if process.logicals.syntaxIDs.append(element: syntaxID) != 0 {
+            return 0 - 1
+        }
+        if process.logicals.leftExpressionSyntaxIDs.append(
+            element: operandSyntaxID
+        ) != 0 || process.logicals.rightExpressionSyntaxIDs.append(
+            element: 0 - 1
+        ) != 0 || process.logicals.operatorCodes.append(
+            element: compilerBLogicalOperatorNotCode()
+        ) != 0 { return 0 - 1 }
+        return syntaxID
+    }
+    return 0 - 2
+}
+
+function compilerBParserApplicationCallAfterLast(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    state openingTokenID: Int(firstTokenID)
+    state searching: Bool(true)
+    while openingTokenID < afterLastTokenID && searching {
+        if compilerBParserTokenByte(
+            source: source,
+            tokens: tokens,
+            tokenID: openingTokenID
+        ) == 40 {
+            searching: false
+        } else {
+            openingTokenID: openingTokenID + 1
+        }
+    }
+    if openingTokenID <= firstTokenID || openingTokenID >= afterLastTokenID {
+        return afterLastTokenID
+    }
+    let closingTokenID: Int(compilerBParserMatchingRightParenthesis(
+        source: source,
+        tokens: tokens,
+        openingTokenID: openingTokenID
+    ))
+    if closingTokenID < 0 || closingTokenID + 1 >= afterLastTokenID {
+        return afterLastTokenID
+    }
+    if compilerBParserTokenByte(
+            source: source,
+            tokens: tokens,
+            tokenID: closingTokenID + 1
+        ) != 123 {
+        return afterLastTokenID
+    }
+    if compilerBParserMatchingRightBrace(
+        source: source,
+        tokens: tokens,
+        openingTokenID: closingTokenID + 1,
+        limitTokenID: afterLastTokenID
+    ) != afterLastTokenID - 1 {
+        return afterLastTokenID
+    }
+    return closingTokenID + 1
+}
+
+function compilerBParseApplicationComponentFacets(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    process: CompilerBProcessGraph,
+    ownerApplicationSyntaxID: Int,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    state ordinal: Int(0)
+    state cursor: Int(firstTokenID)
+    while cursor < afterLastTokenID {
+        state labelTokenID: Int(0 - 1)
+        state firstValueTokenID: Int(cursor)
+        if cursor + 2 < afterLastTokenID {
+            if compilerBRetainedToken(
+                store: tokens,
+                id: TokenID(value: cursor)
+            ).kind == .identity
+            && compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: cursor + 1
+                ) == 58 {
+                labelTokenID: cursor
+                firstValueTokenID: cursor + 2
+            }
+        }
+        state valueAfterLastTokenID: Int(firstValueTokenID)
+        state delimiterDepth: Int(0)
+        state foundSeparator: Bool(false)
+        while valueAfterLastTokenID < afterLastTokenID && !foundSeparator {
+            let byte: Int(compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: valueAfterLastTokenID
+            ))
+            if byte == 40 || byte == 91 || byte == 123 {
+                delimiterDepth: delimiterDepth + 1
+            }
+            if byte == 41 || byte == 93 || byte == 125 {
+                delimiterDepth: delimiterDepth - 1
+            }
+            if byte == 44 && delimiterDepth == 0 {
+                foundSeparator: true
+            } else {
+                valueAfterLastTokenID: valueAfterLastTokenID + 1
+            }
+        }
+        if firstValueTokenID >= valueAfterLastTokenID { return 0 - 1 }
+        if process.components.ownerApplicationSyntaxIDs.append(
+            element: ownerApplicationSyntaxID
+        ) != 0 { return 0 - 1 }
+        if process.components.labelTokenIDs.append(
+            element: labelTokenID
+        ) != 0 { return 0 - 1 }
+        if process.components.firstValueTokenIDs.append(
+            element: firstValueTokenID
+        ) != 0 { return 0 - 1 }
+        if process.components.afterLastValueTokenIDs.append(
+            element: valueAfterLastTokenID
+        ) != 0 { return 0 - 1 }
+        if process.components.ordinals.append(element: ordinal) != 0 {
+            return 0 - 1
+        }
+        ordinal: ordinal + 1
+        cursor: valueAfterLastTokenID + 1
+    }
+    return 0
+}
+
+function compilerBParseExpressionFacetCore(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    nodes: SyntaxNodeStore,
+    process: CompilerBProcessGraph,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let structured: Int(compilerBParseStructuredExpressionFacet(
+        source: source,
+        tokens: tokens,
+        nodes: nodes,
+        process: process,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: afterLastTokenID
+    ))
+    if structured != 0 - 2 { return structured }
     state openingTokenID: Int(0 - 1)
     state cursor: Int(firstTokenID)
     while cursor < afterLastTokenID && openingTokenID < 0 {
@@ -2555,6 +2999,19 @@ function compilerBParseExpressionFacet(
         cursor: cursor + 1
     }
     if openingTokenID < 0 {
+        return compilerBParseLeafExpressionFacet(
+            source: source,
+            tokens: tokens,
+            nodes: nodes,
+            process: process,
+            firstTokenID: firstTokenID,
+            afterLastTokenID: afterLastTokenID
+        )
+    }
+    if openingTokenID <= firstTokenID || compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: openingTokenID - 1)
+    ).kind != .identity {
         return compilerBParseLeafExpressionFacet(
             source: source,
             tokens: tokens,
@@ -2604,7 +3061,8 @@ function compilerBParseExpressionFacet(
                         tokens: tokens,
                         openingTokenID: shapeCursor + 2
                     )
-                    if shapeClosingTokenID < 0 || shapeClosingTokenID >= afterLastTokenID {
+                    if shapeClosingTokenID < 0
+                        || shapeClosingTokenID >= afterLastTokenID {
                         return 0 - 1
                     }
                     shapeCursor: shapeClosingTokenID + 1
@@ -2826,6 +3284,42 @@ function compilerBParseExpressionFacet(
     return finalApplicationSyntaxID
 }
 
+function compilerBParseExpressionFacet(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    nodes: SyntaxNodeStore,
+    process: CompilerBProcessGraph,
+    firstTokenID: Int,
+    afterLastTokenID: Int
+): Int {
+    let callAfterLastTokenID: Int(compilerBParserApplicationCallAfterLast(
+        source: source,
+        tokens: tokens,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: afterLastTokenID
+    ))
+    let syntaxID: Int(compilerBParseExpressionFacetCore(
+        source: source,
+        tokens: tokens,
+        nodes: nodes,
+        process: process,
+        firstTokenID: firstTokenID,
+        afterLastTokenID: callAfterLastTokenID
+    ))
+    if syntaxID < 0 || callAfterLastTokenID == afterLastTokenID {
+        return syntaxID
+    }
+    if compilerBParseApplicationComponentFacets(
+        source: source,
+        tokens: tokens,
+        process: process,
+        ownerApplicationSyntaxID: syntaxID,
+        firstTokenID: callAfterLastTokenID + 1,
+        afterLastTokenID: afterLastTokenID - 1
+    ) != 0 { return 0 - 1 }
+    return syntaxID
+}
+
 function compilerBParserHasLineBreak(
     source: String,
     left: CompilerBToken,
@@ -2967,10 +3461,7 @@ function compilerBParseLocalBindingProcessFacet(
         firstTokenID: memberTokenID,
         afterLastTokenID: afterLastValueTokenID
     ) != 0 { return 0 - 1 }
-    let expressionRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: process.expressions.syntaxIDs,
-        syntaxID: valueExpressionSyntaxID
-    ))
+    let expressionRow: Int(process.expressions.syntaxIDs.firstIndex(value: valueExpressionSyntaxID))
     if expressionRow < 0 { return 0 - 1 }
     if questionTokenID >= 0 {
         if process.expressions.kindCodes.update(
@@ -2980,6 +3471,9 @@ function compilerBParseLocalBindingProcessFacet(
     }
     if process.locals.syntaxIDs.append(element: keyword.start) != 0 { return 0 - 1 }
     if process.locals.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 { return 0 - 1 }
+    state localKindCode: Int(compilerBParserMemberKindLetCode())
+    if isState { localKindCode: compilerBParserMemberKindStateCode() }
+    if process.locals.kindCodes.append(element: localKindCode) != 0 { return 0 - 1 }
     if process.locals.identityTokenIDs.append(element: memberTokenID + 1) != 0 {
         return 0 - 1
     }
@@ -3016,6 +3510,126 @@ function compilerBParseLocalBindingProcessFacet(
             return 0 - 1
         }
     }
+    return afterLastValueTokenID
+}
+
+function compilerBParseAssignmentProcessFacet(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    nodes: SyntaxNodeStore,
+    process: CompilerBProcessGraph,
+    ownerSyntaxID: Int,
+    identityTokenID: Int,
+    limitTokenID: Int
+): Int {
+    if identityTokenID + 2 >= limitTokenID
+        || compilerBParserTokenByte(
+            source: source,
+            tokens: tokens,
+            tokenID: identityTokenID + 1
+        ) != 58 { return 0 - 1 }
+    let identity: CompilerBToken(compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: identityTokenID)
+    ))
+    let firstValueTokenID: Int(identityTokenID + 2)
+    let afterLastValueTokenID: Int(compilerBParserLineAfterLastTokenID(
+        source: source,
+        tokens: tokens,
+        firstTokenID: firstValueTokenID,
+        limitTokenID: limitTokenID
+    ))
+    let valueExpressionSyntaxID: Int(compilerBParseExpressionFacet(
+        source: source,
+        tokens: tokens,
+        nodes: nodes,
+        process: process,
+        firstTokenID: firstValueTokenID,
+        afterLastTokenID: afterLastValueTokenID
+    ))
+    if valueExpressionSyntaxID < 0 { return valueExpressionSyntaxID }
+    if compilerBSyntaxNodeStoreAppend(
+        store: nodes,
+        id: identity.start,
+        firstTokenID: identityTokenID,
+        afterLastTokenID: afterLastValueTokenID
+    ) != 0 { return 0 - 1 }
+    state ordinal: Int(0)
+    state row: Int(0)
+    while row < process.assignments.ownerSyntaxIDs.count {
+        if process.assignments.ownerSyntaxIDs.element(index: row) == ownerSyntaxID {
+            ordinal: ordinal + 1
+        }
+        row: row + 1
+    }
+    if process.assignments.syntaxIDs.append(element: identity.start) != 0 {
+        return 0 - 1
+    }
+    if process.assignments.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 {
+        return 0 - 1
+    }
+    if process.assignments.identityTokenIDs.append(element: identityTokenID) != 0 {
+        return 0 - 1
+    }
+    if process.assignments.valueExpressionSyntaxIDs.append(
+        element: valueExpressionSyntaxID
+    ) != 0 { return 0 - 1 }
+    if process.assignments.ordinals.append(element: ordinal) != 0 { return 0 - 1 }
+    return afterLastValueTokenID
+}
+
+function compilerBParseReturnProcessFacet(
+    source: String,
+    tokens: CompilerBRetainedTokenStore,
+    nodes: SyntaxNodeStore,
+    process: CompilerBProcessGraph,
+    ownerSyntaxID: Int,
+    returnTokenID: Int,
+    limitTokenID: Int
+): Int {
+    if returnTokenID + 1 >= limitTokenID { return 0 - 1 }
+    let keyword: CompilerBToken(compilerBRetainedToken(
+        store: tokens,
+        id: TokenID(value: returnTokenID)
+    ))
+    let firstValueTokenID: Int(returnTokenID + 1)
+    let afterLastValueTokenID: Int(compilerBParserLineAfterLastTokenID(
+        source: source,
+        tokens: tokens,
+        firstTokenID: firstValueTokenID,
+        limitTokenID: limitTokenID
+    ))
+    let valueExpressionSyntaxID: Int(compilerBParseExpressionFacet(
+        source: source,
+        tokens: tokens,
+        nodes: nodes,
+        process: process,
+        firstTokenID: firstValueTokenID,
+        afterLastTokenID: afterLastValueTokenID
+    ))
+    if valueExpressionSyntaxID < 0 { return valueExpressionSyntaxID }
+    if compilerBSyntaxNodeStoreAppend(
+        store: nodes,
+        id: keyword.start,
+        firstTokenID: returnTokenID,
+        afterLastTokenID: afterLastValueTokenID
+    ) != 0 { return 0 - 1 }
+    state ordinal: Int(0)
+    state row: Int(0)
+    while row < process.returns.ownerSyntaxIDs.count {
+        if process.returns.ownerSyntaxIDs.element(index: row) == ownerSyntaxID {
+            ordinal: ordinal + 1
+        }
+        row: row + 1
+    }
+    if process.returns.syntaxIDs.append(element: keyword.start) != 0 { return 0 - 1 }
+    if process.returns.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 {
+        return 0 - 1
+    }
+    if process.returns.valueExpressionSyntaxIDs.append(
+        element: valueExpressionSyntaxID
+    ) != 0 { return 0 - 1 }
+    if process.returns.ordinals.append(element: ordinal) != 0 { return 0 - 1 }
     return afterLastValueTokenID
 }
 
@@ -3056,10 +3670,7 @@ function compilerBParseLocalMacroApplication(
         store: tokens,
         id: TokenID(value: applicationTokenID)
     ))
-    let existingRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: applications.syntaxIDs,
-        syntaxID: application.start
-    ))
+    let existingRow: Int(applications.syntaxIDs.firstIndex(value: application.start))
     if existingRow < 0 {
         state firstArgumentTokenID: Int(applicationTokenID + 2)
         state afterLastArgumentTokenID: Int(applicationTokenID + 2)
@@ -3239,10 +3850,7 @@ function compilerBEnvironmentSyntaxIDContainingToken(
         if process.environments.ownerDeclarationSyntaxIDs.element(index: row)
             == ownerSyntaxID {
             let environmentSyntaxID: Int(process.environments.syntaxIDs.element(index: row))
-            let nodeRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: nodes.ids,
-                syntaxID: environmentSyntaxID
-            ))
+            let nodeRow: Int(nodes.ids.firstIndex(value: environmentSyntaxID))
             if nodeRow >= 0
                 && tokenID >= nodes.firstTokenIDs.element(index: nodeRow)
                 && tokenID < nodes.afterLastTokenIDs.element(index: nodeRow) {
@@ -3271,10 +3879,7 @@ function compilerBParseEmittedMacroBlockFacets(
             let environmentSyntaxID: Int(
                 process.environments.syntaxIDs.element(index: environmentRow)
             )
-            let environmentNodeRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: nodes.ids,
-                syntaxID: environmentSyntaxID
-            ))
+            let environmentNodeRow: Int(nodes.ids.firstIndex(value: environmentSyntaxID))
             if environmentNodeRow < 0 { return 0 - 1 }
             let environmentOpeningTokenID: Int(
                 nodes.firstTokenIDs.element(index: environmentNodeRow) + 2
@@ -3675,12 +4280,9 @@ function compilerBParseApplicationProvisionFacets(
                         while extensionMemberRow < members.syntaxIDs.count {
                             if members.ownerSyntaxIDs.element(index: extensionMemberRow)
                                 == extensionSyntaxID {
-                                let memberNodeRow: Int(compilerBFacetRowForSyntaxID(
-                                    syntaxIDs: nodes.ids,
-                                    syntaxID: members.syntaxIDs.element(
+                                let memberNodeRow: Int(nodes.ids.firstIndex(value: members.syntaxIDs.element(
                                         index: extensionMemberRow
-                                    )
-                                ))
+                                    )))
                                 if memberNodeRow >= 0
                                     && spliceTokenID >= nodes.firstTokenIDs.element(
                                         index: memberNodeRow
@@ -4061,6 +4663,10 @@ function compilerBParseSwitchProcessFacet(
     return closingTokenID + 1
 }
 
+function compilerBConditionalAlternativeNone(): Int { return 0 }
+function compilerBConditionalAlternativeConditional(): Int { return 1 }
+function compilerBConditionalAlternativeBlock(): Int { return 2 }
+
 function compilerBParseConditionalProcessFacet(
     source: String,
     tokens: CompilerBRetainedTokenStore,
@@ -4068,6 +4674,7 @@ function compilerBParseConditionalProcessFacet(
     blocks: CompilerBBlockFacetStore,
     macroApplications: CompilerBMacroApplicationStore,
     process: CompilerBProcessGraph,
+    members: CompilerBMemberFacetStore,
     ownerSyntaxID: Int,
     ifTokenID: Int,
     limitTokenID: Int
@@ -4085,14 +4692,14 @@ function compilerBParseConditionalProcessFacet(
         ) != 123 {
         openingTokenID: openingTokenID + 1
     }
-    if openingTokenID >= limitTokenID { return 0 - 1 }
+    if openingTokenID >= limitTokenID { return 0 - 41 }
     let closingTokenID: Int(compilerBParserMatchingRightBrace(
         source: source,
         tokens: tokens,
         openingTokenID: openingTokenID,
         limitTokenID: limitTokenID
     ))
-    if closingTokenID < 0 { return 0 - 1 }
+    if closingTokenID < 0 { return 0 - 42 }
     let opening: CompilerBToken(compilerBRetainedToken(
         store: tokens,
         id: TokenID(value: openingTokenID)
@@ -4102,42 +4709,156 @@ function compilerBParseConditionalProcessFacet(
         id: keyword.start,
         firstTokenID: ifTokenID,
         afterLastTokenID: closingTokenID + 1
-    ) != 0 { return 0 - 1 }
+    ) != 0 { return 0 - 43 }
     if compilerBSyntaxNodeStoreAppend(
         store: nodes,
         id: opening.start,
         firstTokenID: openingTokenID,
         afterLastTokenID: closingTokenID + 1
-    ) != 0 { return 0 - 1 }
+    ) != 0 { return 0 - 43 }
     if compilerBBlockFacetStoreAppend(
         store: blocks,
         syntaxID: opening.start,
         parentSyntaxID: keyword.start
-    ) != 0 { return 0 - 1 }
-    if process.conditionals.syntaxIDs.append(element: keyword.start) != 0 { return 0 - 1 }
-    if process.conditionals.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 {
-        return 0 - 1
-    }
-    if process.conditionals.firstConditionTokenIDs.append(element: ifTokenID + 1) != 0 {
-        return 0 - 1
-    }
-    if process.conditionals.afterLastConditionTokenIDs.append(element: openingTokenID) != 0 {
-        return 0 - 1
-    }
-    if process.conditionals.bodySyntaxIDs.append(element: opening.start) != 0 {
-        return 0 - 1
-    }
-    if compilerBParseFreestandingMacroApplicationsInBlock(
+    ) != 0 { return 0 - 44 }
+    let conditionExpressionSyntaxID: Int(compilerBParseExpressionFacet(
         source: source,
         tokens: tokens,
         nodes: nodes,
-        applications: macroApplications,
         process: process,
-        ownerSyntaxID: keyword.start,
+        firstTokenID: ifTokenID + 1,
+        afterLastTokenID: openingTokenID
+    ))
+    if conditionExpressionSyntaxID < 0 { return conditionExpressionSyntaxID }
+    let conditionalRow: Int(process.conditionals.syntaxIDs.count)
+    if process.conditionals.syntaxIDs.append(element: keyword.start) != 0 { return 0 - 46 }
+    if process.conditionals.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 {
+        return 0 - 46
+    }
+    if process.conditionals.firstConditionTokenIDs.append(element: ifTokenID + 1) != 0 {
+        return 0 - 46
+    }
+    if process.conditionals.afterLastConditionTokenIDs.append(element: openingTokenID) != 0 {
+        return 0 - 46
+    }
+    if process.conditionals.conditionExpressionSyntaxIDs.append(
+        element: conditionExpressionSyntaxID
+    ) != 0 { return 0 - 46 }
+    if process.conditionals.bodySyntaxIDs.append(element: opening.start) != 0 {
+        return 0 - 46
+    }
+    if process.conditionals.alternativeSyntaxIDs.append(element: 0 - 1) != 0 {
+        return 0 - 46
+    }
+    if process.conditionals.alternativeKindCodes.append(
+        element: compilerBConditionalAlternativeNone()
+    ) != 0 { return 0 - 46 }
+    let bodyStatus: Int(compilerBParseProcessFacets(
+        source: source,
+        tokens: tokens,
+        nodes: nodes,
+        process: process,
+        blocks: blocks,
+        macroApplications: macroApplications,
+        members: members,
+        ownerSyntaxID: opening.start,
+        bodySyntaxID: opening.start,
         openingTokenID: openingTokenID,
-        closingTokenID: closingTokenID
-    ) != 0 { return 0 - 1 }
-    return closingTokenID + 1
+        afterLastTokenID: closingTokenID + 1
+    ))
+    if bodyStatus != 0 { return bodyStatus }
+    state afterConditionalTokenID: Int(closingTokenID + 1)
+    if afterConditionalTokenID < limitTokenID {
+        let alternative: CompilerBToken(compilerBRetainedToken(
+            store: tokens,
+            id: TokenID(value: afterConditionalTokenID)
+        ))
+        if alternative.kind == .identity && compilerBTokenMatchesBytes(
+            source: source,
+            token: alternative,
+            expected: "else"
+        ) {
+            if afterConditionalTokenID + 1 >= limitTokenID { return 0 - 48 }
+            let nextTokenID: Int(afterConditionalTokenID + 1)
+            let next: CompilerBToken(compilerBRetainedToken(
+                store: tokens,
+                id: TokenID(value: nextTokenID)
+            ))
+            if next.kind == .identity && compilerBTokenMatchesBytes(
+                source: source,
+                token: next,
+                expected: "if"
+            ) {
+                if process.conditionals.alternativeSyntaxIDs.update(
+                    element: next.start,
+                    index: conditionalRow
+                ) != 0 || process.conditionals.alternativeKindCodes.update(
+                    element: compilerBConditionalAlternativeConditional(),
+                    index: conditionalRow
+                ) != 0 { return 0 - 49 }
+                afterConditionalTokenID: compilerBParseConditionalProcessFacet(
+                    source: source,
+                    tokens: tokens,
+                    nodes: nodes,
+                    blocks: blocks,
+                    macroApplications: macroApplications,
+                    process: process,
+                    members: members,
+                    ownerSyntaxID: keyword.start,
+                    ifTokenID: nextTokenID,
+                    limitTokenID: limitTokenID
+                )
+                if afterConditionalTokenID < 0 { return afterConditionalTokenID }
+            } else if compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: nextTokenID
+            ) == 123 {
+                let alternativeClosingTokenID: Int(compilerBParserMatchingRightBrace(
+                    source: source,
+                    tokens: tokens,
+                    openingTokenID: nextTokenID,
+                    limitTokenID: limitTokenID
+                ))
+                if alternativeClosingTokenID < 0 { return 0 - 50 }
+                if compilerBSyntaxNodeStoreAppend(
+                    store: nodes,
+                    id: next.start,
+                    firstTokenID: nextTokenID,
+                    afterLastTokenID: alternativeClosingTokenID + 1
+                ) != 0 || compilerBBlockFacetStoreAppend(
+                    store: blocks,
+                    syntaxID: next.start,
+                    parentSyntaxID: keyword.start
+                ) != 0 { return 0 - 51 }
+                if process.conditionals.alternativeSyntaxIDs.update(
+                    element: next.start,
+                    index: conditionalRow
+                ) != 0 || process.conditionals.alternativeKindCodes.update(
+                    element: compilerBConditionalAlternativeBlock(),
+                    index: conditionalRow
+                ) != 0 { return 0 - 52 }
+                let alternativeStatus: Int(compilerBParseProcessFacets(
+                    source: source,
+                    tokens: tokens,
+                    nodes: nodes,
+                    process: process,
+                    blocks: blocks,
+                    macroApplications: macroApplications,
+                    members: members,
+                    ownerSyntaxID: next.start,
+                    bodySyntaxID: next.start,
+                    openingTokenID: nextTokenID,
+                    afterLastTokenID: alternativeClosingTokenID + 1
+                ))
+                if alternativeStatus != 0 { return alternativeStatus }
+                afterConditionalTokenID: alternativeClosingTokenID + 1
+            } else {
+                return 0 - 54
+            }
+        }
+    }
+    return afterConditionalTokenID
 }
 
 function compilerBParseExecutionProcessFacet(
@@ -4422,7 +5143,7 @@ function compilerBParseProcessFacets(
                 applicationTokenID: operationTokenID,
                 limitTokenID: afterLastTokenID - 1
             ))
-            if targetTokenID < 0 { return targetTokenID }
+            if targetTokenID < 0 { return 0 - 21 }
             operationTokenID: targetTokenID
         } else if operationDepth == 0 && operation.kind == .identity
             && compilerBTokenMatchesBytes(
@@ -4434,7 +5155,7 @@ function compilerBParseProcessFacets(
                 store: nodes,
                 syntaxID: operation.start
             ))
-            if declarationNodeRow < 0 { return 0 - 1 }
+            if declarationNodeRow < 0 { return 0 - 22 }
             operationTokenID: nodes.afterLastTokenIDs.element(
                 index: declarationNodeRow
             )
@@ -4454,7 +5175,7 @@ function compilerBParseProcessFacets(
                 memberTokenID: operationTokenID,
                 limitTokenID: afterLastTokenID - 1
             ))
-            if afterLocal < 0 { return afterLocal }
+            if afterLocal < 0 { return 0 - 23 }
             operationTokenID: afterLocal
         } else if operationDepth == 0 && operation.kind == .identity
             && compilerBTokenMatchesBytes(source: source, token: operation, expected: "if") {
@@ -4465,6 +5186,7 @@ function compilerBParseProcessFacets(
                 blocks: blocks,
                 macroApplications: macroApplications,
                 process: process,
+                members: members,
                 ownerSyntaxID: ownerSyntaxID,
                 ifTokenID: operationTokenID,
                 limitTokenID: afterLastTokenID - 1
@@ -4487,8 +5209,43 @@ function compilerBParseProcessFacets(
                 switchTokenID: operationTokenID,
                 limitTokenID: afterLastTokenID - 1
             ))
-            if afterSwitch < 0 { return afterSwitch }
+            if afterSwitch < 0 { return 0 - 25 }
             operationTokenID: afterSwitch
+        } else if operationDepth == 0 && operation.kind == .identity
+            && compilerBTokenMatchesBytes(
+                source: source,
+                token: operation,
+                expected: "return"
+            ) {
+            let afterReturn: Int(compilerBParseReturnProcessFacet(
+                source: source,
+                tokens: tokens,
+                nodes: nodes,
+                process: process,
+                ownerSyntaxID: ownerSyntaxID,
+                returnTokenID: operationTokenID,
+                limitTokenID: afterLastTokenID - 1
+            ))
+            if afterReturn < 0 { return 0 - 26 }
+            operationTokenID: afterReturn
+        } else if operationDepth == 0 && operation.kind == .identity
+            && operationTokenID + 1 < afterLastTokenID - 1
+            && compilerBParserTokenByte(
+                source: source,
+                tokens: tokens,
+                tokenID: operationTokenID + 1
+            ) == 58 {
+            let afterAssignment: Int(compilerBParseAssignmentProcessFacet(
+                source: source,
+                tokens: tokens,
+                nodes: nodes,
+                process: process,
+                ownerSyntaxID: ownerSyntaxID,
+                identityTokenID: operationTokenID,
+                limitTokenID: afterLastTokenID - 1
+            ))
+            if afterAssignment < 0 { return 0 - 27 }
+            operationTokenID: afterAssignment
         } else if operationDepth == 0 && operation.kind == .identity
             && compilerBParserCallStartsAt(
                 source: source,
@@ -4505,11 +5262,15 @@ function compilerBParseProcessFacets(
                 firstTokenID: operationTokenID,
                 limitTokenID: afterLastTokenID - 1
             ))
-            if afterExecution < 0 { return afterExecution }
+            if afterExecution < 0 { return 0 - 28 }
             operationTokenID: afterExecution
         } else {
-            if operationByte == 123 { operationDepth: operationDepth + 1 }
-            if operationByte == 125 { operationDepth: operationDepth - 1 }
+            if operationByte == 40 || operationByte == 91 || operationByte == 123 {
+                operationDepth: operationDepth + 1
+            }
+            if operationByte == 41 || operationByte == 93 || operationByte == 125 {
+                operationDepth: operationDepth - 1
+            }
             operationTokenID: operationTokenID + 1
         }
     }
@@ -4523,7 +5284,7 @@ function compilerBParseProcessFacets(
         ownerSyntaxID: ownerSyntaxID,
         openingTokenID: openingTokenID,
         afterLastTokenID: afterLastTokenID
-    ) != 0 { return 0 - 1 }
+    ) != 0 { return 0 - 29 }
     let resultExpressionSyntaxID: Int(compilerBProcessTerminalExpressionSyntaxID(
         source: source,
         tokens: tokens,
@@ -4533,13 +5294,18 @@ function compilerBParseProcessFacets(
         afterLastTokenID: afterLastTokenID
     ))
     if resultExpressionSyntaxID < 0 && resultExpressionSyntaxID != 0 - 1 {
-        return 0 - 1
+        return 0 - 30
     }
-    if process.processes.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 { return 0 - 1 }
-    if process.processes.bodySyntaxIDs.append(element: bodySyntaxID) != 0 { return 0 - 1 }
-    return process.processes.resultExpressionSyntaxIDs.append(
+    if process.processes.ownerSyntaxIDs.append(element: ownerSyntaxID) != 0 {
+        return 0 - 31
+    }
+    if process.processes.bodySyntaxIDs.append(element: bodySyntaxID) != 0 {
+        return 0 - 32
+    }
+    if process.processes.resultExpressionSyntaxIDs.append(
         element: resultExpressionSyntaxID
-    )
+    ) != 0 { return 0 - 33 }
+    return 0
 }
 
 function compilerBParseFunctionParameterFacets(
@@ -5210,7 +5976,7 @@ function compilerBParseDeclarationTokens(
         ) != 0 { return 0 - 17 }
     }
     if isFunction || isMacro {
-        if compilerBParseProcessFacets(
+        let processStatus: Int(compilerBParseProcessFacets(
             source: source,
             tokens: tokens,
             nodes: nodes,
@@ -5222,7 +5988,8 @@ function compilerBParseDeclarationTokens(
             bodySyntaxID: opening.start,
             openingTokenID: openingIndex,
             afterLastTokenID: closingIndex
-        ) != 0 { return 0 - 13 }
+        ))
+        if processStatus != 0 { return processStatus }
     }
     if isMemberOwner {
         let memberStatus: Int(compilerBParseOwnedMemberFacets(
@@ -5697,39 +6464,15 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
         let id: Int(revision.nodes.ids.element(index: index))
         let start: Int(compilerBSyntaxNodeStart(revision: revision, row: index))
         let end: Int(compilerBSyntaxNodeEnd(revision: revision, row: index))
-        let functionRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.functionDeclarations.syntaxIDs,
-            syntaxID: id
-        ))
-        let constructRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.constructDeclarations.syntaxIDs,
-            syntaxID: id
-        ))
-        let enumRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.enumDeclarations.syntaxIDs,
-            syntaxID: id
-        ))
-        let enumCaseRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.enumCases.syntaxIDs,
-            syntaxID: id
-        ))
-        let macroRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.macroDeclarations.syntaxIDs,
-            syntaxID: id
-        ))
-        let blockRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.blocks.syntaxIDs,
-            syntaxID: id
-        ))
-        let memberRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.members.syntaxIDs,
-            syntaxID: id
-        ))
+        let functionRow: Int(revision.functionDeclarations.syntaxIDs.firstIndex(value: id))
+        let constructRow: Int(revision.constructDeclarations.syntaxIDs.firstIndex(value: id))
+        let enumRow: Int(revision.enumDeclarations.syntaxIDs.firstIndex(value: id))
+        let enumCaseRow: Int(revision.enumCases.syntaxIDs.firstIndex(value: id))
+        let macroRow: Int(revision.macroDeclarations.syntaxIDs.firstIndex(value: id))
+        let blockRow: Int(revision.blocks.syntaxIDs.firstIndex(value: id))
+        let memberRow: Int(revision.members.syntaxIDs.firstIndex(value: id))
         if functionRow >= 0 {
-            let ownerRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.functionOwners.functionSyntaxIDs,
-                syntaxID: id
-            ))
+            let ownerRow: Int(revision.process.functionOwners.functionSyntaxIDs.firstIndex(value: id))
             state functionOwnerSyntaxID: Int(0 - 1)
             if ownerRow >= 0 {
                 functionOwnerSyntaxID: revision.process.functionOwners.ownerSyntaxIDs.element(
@@ -5754,10 +6497,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                 revision: revision,
                 query: CompilerBMacroDeclarationQuery(identity: SyntaxNodeID(value: id))
             ))
-            let signatureRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.macroSignatures.macroSyntaxIDs,
-                syntaxID: id
-            ))
+            let signatureRow: Int(revision.macroSignatures.macroSyntaxIDs.firstIndex(value: id))
             state targetType: String("")
             state resultType: String("")
             if signatureRow >= 0 {
@@ -5914,10 +6654,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
         state declarationKind: String("")
         state inputCardinality: String("")
         state outputCardinality: String("")
-        let macroDeclarationRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.macroDeclarations.syntaxIDs,
-            syntaxID: declarationSyntaxID
-        ))
+        let macroDeclarationRow: Int(revision.macroDeclarations.syntaxIDs.firstIndex(value: declarationSyntaxID))
         if macroDeclarationRow >= 0 {
             declarationKind: "macro"
             let cardinality: CompilerBFunctionCardinalityQueryResult(
@@ -5944,14 +6681,42 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                     end: cardinalityOutput.end
                 )
             }
-        } else if compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.functionDeclarations.syntaxIDs,
-            syntaxID: declarationSyntaxID
-        ) >= 0 {
+        } else if revision.functionDeclarations.syntaxIDs.firstIndex(value: declarationSyntaxID) >= 0 {
             declarationKind: "function"
         }
         output.append(text: "application\tid=\(applicationSyntaxID)\tpredecessor=\(revision.process.applications.predecessorSyntaxIDs.element(index: applicationRow))\tdeclaration=\(declarationSyntaxID)\tkind=\(declarationKind)\tname=\(revision.source.substring(start: identity.start, end: identity.end))\tinput=\(inputCardinality)\toutput=\(outputCardinality)\n")
         applicationRow: applicationRow + 1
+    }
+    state componentRow: Int(0)
+    while componentRow < revision.process.components.ownerApplicationSyntaxIDs.count {
+        let labelTokenID: Int(
+            revision.process.components.labelTokenIDs.element(index: componentRow)
+        )
+        state label: String("_")
+        if labelTokenID >= 0 {
+            let labelToken: CompilerBToken(compilerBRetainedToken(
+                store: revision.tokens,
+                id: TokenID(value: labelTokenID)
+            ))
+            label: revision.source.substring(
+                start: labelToken.start,
+                end: labelToken.end
+            )
+        }
+        let firstValue: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: revision.process.components.firstValueTokenIDs.element(
+                index: componentRow
+            ))
+        ))
+        let lastValue: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: revision.process.components.afterLastValueTokenIDs.element(
+                index: componentRow
+            ) - 1)
+        ))
+        output.append(text: "applicationComponent\towner=\(revision.process.components.ownerApplicationSyntaxIDs.element(index: componentRow))\tordinal=\(revision.process.components.ordinals.element(index: componentRow))\tlabel=\(label)\tvalue=\(revision.source.substring(start: firstValue.start, end: lastValue.end))\n")
+        componentRow: componentRow + 1
     }
     state processRow: Int(0)
     while processRow < revision.process.processes.ownerSyntaxIDs.count {
@@ -5961,10 +6726,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
             )
         )
         if resultExpressionSyntaxID >= 0 {
-            let resultExpressionRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.expressions.syntaxIDs,
-                syntaxID: resultExpressionSyntaxID
-            ))
+            let resultExpressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: resultExpressionSyntaxID))
             if resultExpressionRow >= 0 {
                 state kind: String("unknown")
                 let kindCode: Int(revision.process.expressions.kindCodes.element(
@@ -5978,6 +6740,12 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                 }
                 if kindCode == compilerBParserExpressionKindStringCode() {
                     kind: "string"
+                }
+                if kindCode == compilerBParserExpressionKindComparisonCode() {
+                    kind: "comparison"
+                }
+                if kindCode == compilerBParserExpressionKindLogicalCode() {
+                    kind: "logical"
                 }
                 let first: CompilerBToken(compilerBRetainedToken(
                     store: revision.tokens,
@@ -6007,10 +6775,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
         let expressionSyntaxID: Int(
             revision.process.locals.valueExpressionSyntaxIDs.element(index: localRow)
         )
-        let fallbackRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.noValueFallbacks.expressionSyntaxIDs,
-            syntaxID: expressionSyntaxID
-        ))
+        let fallbackRow: Int(revision.process.noValueFallbacks.expressionSyntaxIDs.firstIndex(value: expressionSyntaxID))
         state hasNoValueFallback: Bool(false)
         state rhsKind: String("")
         if fallbackRow >= 0 {
@@ -6023,12 +6788,28 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
             ))
             rhsKind: compilerBTokenKindName(kind: rhs.kind)
         }
-        output.append(text: "processLocal\tid=\(revision.process.locals.syntaxIDs.element(index: localRow))\towner=\(revision.process.locals.ownerSyntaxIDs.element(index: localRow))\tname=\(revision.source.substring(start: identity.start, end: identity.end))\tvalue=\(expressionSyntaxID)\tnoValueFallback=\(hasNoValueFallback)\trhsKind=\(rhsKind)\n")
+        output.append(text: "processLocal\tid=\(revision.process.locals.syntaxIDs.element(index: localRow))\towner=\(revision.process.locals.ownerSyntaxIDs.element(index: localRow))\tkind=\(revision.process.locals.kindCodes.element(index: localRow))\tname=\(revision.source.substring(start: identity.start, end: identity.end))\tvalue=\(expressionSyntaxID)\tnoValueFallback=\(hasNoValueFallback)\trhsKind=\(rhsKind)\n")
         localRow: localRow + 1
+    }
+    state assignmentRow: Int(0)
+    while assignmentRow < revision.process.assignments.syntaxIDs.count {
+        let identity: CompilerBToken(compilerBRetainedToken(
+            store: revision.tokens,
+            id: TokenID(value: revision.process.assignments.identityTokenIDs.element(
+                index: assignmentRow
+            ))
+        ))
+        output.append(text: "processAssignment\tid=\(revision.process.assignments.syntaxIDs.element(index: assignmentRow))\towner=\(revision.process.assignments.ownerSyntaxIDs.element(index: assignmentRow))\tname=\(revision.source.substring(start: identity.start, end: identity.end))\tvalue=\(revision.process.assignments.valueExpressionSyntaxIDs.element(index: assignmentRow))\tordinal=\(revision.process.assignments.ordinals.element(index: assignmentRow))\n")
+        assignmentRow: assignmentRow + 1
+    }
+    state returnRow: Int(0)
+    while returnRow < revision.process.returns.syntaxIDs.count {
+        output.append(text: "processReturn\tid=\(revision.process.returns.syntaxIDs.element(index: returnRow))\towner=\(revision.process.returns.ownerSyntaxIDs.element(index: returnRow))\tvalue=\(revision.process.returns.valueExpressionSyntaxIDs.element(index: returnRow))\tordinal=\(revision.process.returns.ordinals.element(index: returnRow))\n")
+        returnRow: returnRow + 1
     }
     state conditionalRow: Int(0)
     while conditionalRow < revision.process.conditionals.syntaxIDs.count {
-        output.append(text: "processIf\tid=\(revision.process.conditionals.syntaxIDs.element(index: conditionalRow))\towner=\(revision.process.conditionals.ownerSyntaxIDs.element(index: conditionalRow))\tconditionStart=\(revision.process.conditionals.firstConditionTokenIDs.element(index: conditionalRow))\tconditionEnd=\(revision.process.conditionals.afterLastConditionTokenIDs.element(index: conditionalRow))\tbody=\(revision.process.conditionals.bodySyntaxIDs.element(index: conditionalRow))\n")
+        output.append(text: "processIf\tid=\(revision.process.conditionals.syntaxIDs.element(index: conditionalRow))\towner=\(revision.process.conditionals.ownerSyntaxIDs.element(index: conditionalRow))\tcondition=\(revision.process.conditionals.conditionExpressionSyntaxIDs.element(index: conditionalRow))\tbody=\(revision.process.conditionals.bodySyntaxIDs.element(index: conditionalRow))\talternative=\(revision.process.conditionals.alternativeSyntaxIDs.element(index: conditionalRow))\talternativeKind=\(revision.process.conditionals.alternativeKindCodes.element(index: conditionalRow))\n")
         conditionalRow: conditionalRow + 1
     }
     state switchRow: Int(0)
@@ -6040,6 +6821,11 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
     while comparisonRow < revision.process.comparisons.syntaxIDs.count {
         output.append(text: "processComparison\tid=\(revision.process.comparisons.syntaxIDs.element(index: comparisonRow))\tleft=\(revision.process.comparisons.leftExpressionSyntaxIDs.element(index: comparisonRow))\tright=\(revision.process.comparisons.rightExpressionSyntaxIDs.element(index: comparisonRow))\toperator=\(compilerBComparisonOperatorName(operatorCode: revision.process.comparisons.operatorCodes.element(index: comparisonRow)))\n")
         comparisonRow: comparisonRow + 1
+    }
+    state logicalRow: Int(0)
+    while logicalRow < revision.process.logicals.syntaxIDs.count {
+        output.append(text: "processLogical\tid=\(revision.process.logicals.syntaxIDs.element(index: logicalRow))\tleft=\(revision.process.logicals.leftExpressionSyntaxIDs.element(index: logicalRow))\tright=\(revision.process.logicals.rightExpressionSyntaxIDs.element(index: logicalRow))\toperator=\(compilerBLogicalOperatorName(operatorCode: revision.process.logicals.operatorCodes.element(index: logicalRow)))\n")
+        logicalRow: logicalRow + 1
     }
     state switchCaseRow: Int(0)
     while switchCaseRow < revision.process.switchCases.syntaxIDs.count {
@@ -6053,10 +6839,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                 index: provisionRow
             )
         )
-        let sourceRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.locals.syntaxIDs,
-            syntaxID: sourceSyntaxID
-        ))
+        let sourceRow: Int(revision.process.locals.syntaxIDs.firstIndex(value: sourceSyntaxID))
         let sourceIdentity: CompilerBToken(compilerBRetainedToken(
             store: revision.tokens,
             id: TokenID(value: revision.process.locals.identityTokenIDs.element(index: sourceRow))
@@ -6076,10 +6859,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
         )
         state containedKind: String("extension")
         state containedValue: String("")
-        let containedMacroBlockRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.emittedMacroBlocks.syntaxIDs,
-            syntaxID: containedSyntaxID
-        ))
+        let containedMacroBlockRow: Int(revision.process.emittedMacroBlocks.syntaxIDs.firstIndex(value: containedSyntaxID))
         if containedMacroBlockRow >= 0 {
             containedKind: "macroBlock"
             let identity: CompilerBToken(compilerBRetainedToken(
@@ -6090,10 +6870,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
             ))
             containedValue: revision.source.substring(start: identity.start, end: identity.end)
         } else {
-            let containedApplicationRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.applications.syntaxIDs,
-                syntaxID: containedSyntaxID
-            ))
+            let containedApplicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: containedSyntaxID))
             if containedApplicationRow >= 0 {
                 containedKind: "application"
                 let identity: CompilerBToken(compilerBRetainedToken(
@@ -6104,10 +6881,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                 ))
                 containedValue: revision.source.substring(start: identity.start, end: identity.end)
             } else {
-                let containedMemberRow: Int(compilerBFacetRowForSyntaxID(
-                    syntaxIDs: revision.members.syntaxIDs,
-                    syntaxID: containedSyntaxID
-                ))
+                let containedMemberRow: Int(revision.members.syntaxIDs.firstIndex(value: containedSyntaxID))
                 if containedMemberRow >= 0 {
                     containedKind: "member"
                     let identity: CompilerBToken(compilerBRetainedToken(
@@ -6142,14 +6916,8 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
         let targetSyntaxID: Int(revision.macroApplications.targetSyntaxIDs.element(
             index: materializationApplicationRow
         ))
-        let targetCollectionRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.collections.syntaxIDs,
-            syntaxID: targetSyntaxID
-        ))
-        let targetMemberRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.members.syntaxIDs,
-            syntaxID: targetSyntaxID
-        ))
+        let targetCollectionRow: Int(revision.process.collections.syntaxIDs.firstIndex(value: targetSyntaxID))
+        let targetMemberRow: Int(revision.members.syntaxIDs.firstIndex(value: targetSyntaxID))
         if targetCollectionRow >= 0 && targetMemberRow >= 0 {
             let kindToken: CompilerBToken(compilerBRetainedToken(
                 store: revision.tokens,
@@ -6178,20 +6946,14 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
             revision.process.executions.expressionSyntaxIDs.element(index: executionRow)
         )
         state callee: String("")
-        let applicationRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.applications.syntaxIDs,
-            syntaxID: expressionSyntaxID
-        ))
+        let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: expressionSyntaxID))
         if applicationRow >= 0 {
             let predecessorSyntaxID: Int(
                 revision.process.applications.predecessorSyntaxIDs.element(
                     index: applicationRow
                 )
             )
-            let predecessorRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.applications.syntaxIDs,
-                syntaxID: predecessorSyntaxID
-            ))
+            let predecessorRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: predecessorSyntaxID))
             if predecessorRow >= 0 {
                 let predecessorIdentity: CompilerBToken(compilerBRetainedToken(
                     store: revision.tokens,
@@ -6216,10 +6978,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                 end: applicationIdentity.end
             ))
         } else {
-            let macroApplicationRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.macroApplications.syntaxIDs,
-                syntaxID: expressionSyntaxID
-            ))
+            let macroApplicationRow: Int(revision.macroApplications.syntaxIDs.firstIndex(value: expressionSyntaxID))
             if macroApplicationRow >= 0 {
                 let macroIdentity: CompilerBToken(compilerBRetainedToken(
                     store: revision.tokens,
@@ -6292,10 +7051,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
             ))
             label: revision.source.substring(start: labelToken.start, end: labelToken.end)
         }
-        let expressionRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.expressions.syntaxIDs,
-            syntaxID: revision.macroApplications.argumentValueExpressionSyntaxIDs.element(index: argumentRow)
-        ))
+        let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: revision.macroApplications.argumentValueExpressionSyntaxIDs.element(index: argumentRow)))
         state kind: String("unknown")
         if expressionRow >= 0 {
             let kindCode: Int(revision.process.expressions.kindCodes.element(index: expressionRow))
@@ -6342,10 +7098,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                     ordinal: expandedRelationshipOrdinal
                 )
             )
-            let targetApplicationRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.applications.syntaxIDs,
-                syntaxID: relationship.extensionTarget.value
-            ))
+            let targetApplicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: relationship.extensionTarget.value))
             state channel: String("")
             if targetApplicationRow >= 0 {
                 let channelIdentity: CompilerBToken(compilerBRetainedToken(
@@ -6360,10 +7113,7 @@ function compilerBRenderSyntaxRevision(revision: CompilerBSyntaxRevision): Strin
                 )
             }
             state emissionName: String("")
-            let memberRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.members.syntaxIDs,
-                syntaxID: relationship.emission.value
-            ))
+            let memberRow: Int(revision.members.syntaxIDs.firstIndex(value: relationship.emission.value))
             if memberRow >= 0 {
                 let memberIdentity: CompilerBToken(compilerBRetainedToken(
                     store: revision.tokens,

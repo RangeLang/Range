@@ -48,10 +48,10 @@ function compilerBSourceRangesEqual(
 
 function compilerBSyntaxDeltaStoreCreate(capacity: Int): CompilerBSyntaxDeltaStore {
     return CompilerBSyntaxDeltaStore(
-        kinds: bufferCreateInt(capacity: capacity),
-        revisions: bufferCreateInt(capacity: capacity),
-        identities: bufferCreateInt(capacity: capacity),
-        counterparts: bufferCreateInt(capacity: capacity)
+        kinds: @many(capacity: capacity),
+        revisions: @many(capacity: capacity),
+        identities: @many(capacity: capacity),
+        counterparts: @many(capacity: capacity)
     )
 }
 

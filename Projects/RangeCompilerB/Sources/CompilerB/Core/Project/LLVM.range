@@ -52,10 +52,7 @@ function compilerBProjectFunctionReturnType(
     revision: CompilerBSyntaxRevision,
     functionSyntaxID: Int
 ): String {
-    let row: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.functionSignatures.functionSyntaxIDs,
-        syntaxID: functionSyntaxID
-    ))
+    let row: Int(revision.functionSignatures.functionSyntaxIDs.firstIndex(value: functionSyntaxID))
     if row < 0 { return "" }
     let tokenID: Int(revision.functionSignatures.returnTypeTokenIDs.element(index: row))
     if tokenID < 0 { return "Void" }
@@ -67,7 +64,7 @@ function compilerBProjectFunctionReturnType(
 }
 
 function compilerBProjectStoredBytesEqual(
-    bytes: IntMany,
+    arguments: CompilerBProjectMacroArgumentStore,
     start: Int,
     count: Int,
     expected: String
@@ -75,7 +72,8 @@ function compilerBProjectStoredBytesEqual(
     if count != expected.count { return false }
     state offset: Int(0)
     while offset < count {
-        if bytes.element(index: start + offset) != expected.byte(index: offset) {
+        if arguments.labelBytes.element(index: start + offset)
+            != expected.byte(index: offset) {
             return false
         }
         offset: offset + 1
@@ -84,15 +82,36 @@ function compilerBProjectStoredBytesEqual(
 }
 
 function compilerBProjectLLVMReachabilityAppend(
-    rows: IntMany,
+    reachability: String,
     declarationRow: Int
 ): Int {
     state row: Int(0)
-    while row < rows.count {
-        if rows.element(index: row) == declarationRow { return 0 }
+    while row < compilerBProjectLLVMReachabilityCount(reachability: reachability) {
+        if compilerBProjectLLVMReachabilityElement(
+            reachability: reachability,
+            index: row
+        ) == declarationRow { return 0 }
         row: row + 1
     }
-    return rows.append(element: declarationRow)
+    return reachability.append(text: "\(declarationRow)\n")
+}
+
+function compilerBProjectLLVMReachabilityCount(reachability: String): Int {
+    return compilerBSourceSetLineCount(lines: reachability)
+}
+
+function compilerBProjectLLVMReachabilityElement(
+    reachability: String,
+    index: Int
+): Int {
+    let value: String(compilerBSourceSetPathAt(paths: reachability, index: index))
+    state result: Int(0)
+    state cursor: Int(0)
+    while cursor < value.count {
+        result: result * 10 + value.byte(index: cursor) - 48
+        cursor: cursor + 1
+    }
+    return result
 }
 
 function compilerBProjectExternSymbol(
@@ -143,7 +162,7 @@ function compilerBProjectExternSymbol(
                 index: argumentRow
             ) == applicationSyntaxID
             && compilerBProjectStoredBytesEqual(
-                bytes: project.macroApplications.arguments.labelBytes,
+                arguments: project.macroApplications.arguments,
                 start: project.macroApplications.arguments.labelByteStarts.element(
                     index: argumentRow
                 ),
@@ -184,10 +203,7 @@ function compilerBProjectLLVMExpressionType(
     expressionSyntaxID: Int
 ): String {
     state currentID: Int(expressionSyntaxID)
-    state row: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.expressions.syntaxIDs,
-        syntaxID: currentID
-    ))
+    state row: Int(revision.process.expressions.syntaxIDs.firstIndex(value: currentID))
     if row < 0 { return "" }
     state kind: Int(revision.process.expressions.kindCodes.element(index: row))
     state following: Bool(true)
@@ -215,10 +231,7 @@ function compilerBProjectLLVMExpressionType(
                     currentID: revision.process.locals.valueExpressionSyntaxIDs.element(
                         index: localRow
                     )
-                    row: compilerBFacetRowForSyntaxID(
-                        syntaxIDs: revision.process.expressions.syntaxIDs,
-                        syntaxID: currentID
-                    )
+                    row: revision.process.expressions.syntaxIDs.firstIndex(value: currentID)
                     if row >= 0 {
                         kind: revision.process.expressions.kindCodes.element(index: row)
                         following: true
@@ -232,10 +245,7 @@ function compilerBProjectLLVMExpressionType(
     if kind == compilerBParserExpressionKindBooleanCode() { return "i1" }
     if kind == compilerBParserExpressionKindStringCode() { return "ptr" }
     if kind != compilerBParserExpressionKindCallCode() { return "" }
-    let applicationRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.applications.syntaxIDs,
-        syntaxID: currentID
-    ))
+    let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: currentID))
     if applicationRow < 0 { return "" }
     let identity: CompilerBToken(compilerBRetainedToken(
         store: revision.tokens,
@@ -276,10 +286,7 @@ function compilerBProjectLLVMExpressionOperand(
     ownerSyntaxID: Int,
     expressionSyntaxID: Int
 ): String {
-    let row: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.expressions.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let row: Int(revision.process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if row < 0 { return "" }
     let kind: Int(revision.process.expressions.kindCodes.element(index: row))
     if kind != compilerBParserExpressionKindProjectionCode()
@@ -343,10 +350,7 @@ function compilerBProjectLLVMLowerLeaf(
     globals: String,
     instructions: String
 ): Int {
-    let row: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.expressions.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let row: Int(revision.process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if row < 0 { return 0 - 1 }
     let kind: Int(revision.process.expressions.kindCodes.element(index: row))
     if kind == compilerBParserExpressionKindProjectionCode()
@@ -397,12 +401,9 @@ function compilerBProjectLLVMLowerExpression(
     globals: String,
     declarations: String,
     instructions: String,
-    reachableDeclarations: IntMany
+    reachableDeclarations: String
 ): Int {
-    let row: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.expressions.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let row: Int(revision.process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if row < 0 { return 0 - 1 }
     if revision.process.expressions.kindCodes.element(index: row)
         != compilerBParserExpressionKindCallCode() {
@@ -416,10 +417,7 @@ function compilerBProjectLLVMLowerExpression(
             instructions: instructions
         )
     }
-    let applicationRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.applications.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if applicationRow < 0 { return 0 - 2 }
     let identity: CompilerBToken(compilerBRetainedToken(
         store: revision.tokens,
@@ -602,7 +600,7 @@ function compilerBProjectLLVMLowerExpression(
         }
     } else {
         if compilerBProjectLLVMReachabilityAppend(
-            rows: reachableDeclarations,
+            reachability: reachableDeclarations,
             declarationRow: declarationRow
         ) != 0 {
             compilerBSyntaxRevisionDestroy(revision: declarationRevision)
@@ -626,12 +624,9 @@ function compilerBProjectLLVMLowerProcess(
     globals: String,
     declarations: String,
     instructions: String,
-    reachableDeclarations: IntMany
+    reachableDeclarations: String
 ): Int {
-    let processRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.processes.ownerSyntaxIDs,
-        syntaxID: ownerSyntaxID
-    ))
+    let processRow: Int(revision.process.processes.ownerSyntaxIDs.firstIndex(value: ownerSyntaxID))
     if processRow < 0 { return 0 - 1 }
     let resultID: Int(
         revision.process.processes.resultExpressionSyntaxIDs.element(index: processRow)
@@ -716,7 +711,7 @@ function compilerBProjectLLVMFunctionDefinition(
     globals: String,
     declarations: String,
     definitions: String,
-    reachableDeclarations: IntMany
+    reachableDeclarations: String
 ): Int {
     let sourceID: Int(project.declarations.sourceIDs.element(index: declarationRow))
     let syntaxID: Int(project.declarations.syntaxIDs.element(index: declarationRow))
@@ -858,10 +853,7 @@ function compilerBProjectLLVMFunctionDefinition(
     definitions.append(text: "; range-function source=\(sourceID) syntax=\(syntaxID)\n")
     definitions.append(text: "define \(returnType) @Range.function.\(sourceID).\(syntaxID)(\(parameters)) {\nentry:\n")
     definitions.append(text: instructions)
-    let processRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.processes.ownerSyntaxIDs,
-        syntaxID: syntaxID
-    ))
+    let processRow: Int(revision.process.processes.ownerSyntaxIDs.firstIndex(value: syntaxID))
     let resultID: Int(revision.process.processes.resultExpressionSyntaxIDs.element(
         index: processRow
     ))
@@ -883,10 +875,6 @@ function compilerBEmitProjectLLVMLegacy(
     output: String,
     diagnostic: String
 ): Int {
-    if !project.valid {
-        diagnostic.append(text: project.diagnostic)
-        return 0 - 1
-    }
     state entryRow: Int(0 - 1)
     state entryCount: Int(0)
     state row: Int(0)
@@ -928,10 +916,7 @@ function compilerBEmitProjectLLVMLegacy(
         source: fileManagerReadFile(path: sourcePath),
         resolveRelationships: false
     ))
-    let processRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.processes.ownerSyntaxIDs,
-        syntaxID: entrySyntaxID
-    ))
+    let processRow: Int(revision.process.processes.ownerSyntaxIDs.firstIndex(value: entrySyntaxID))
     if processRow < 0 {
         compilerBSyntaxRevisionDestroy(revision: revision)
         diagnostic.append(text: "emitted @main Process is missing")
@@ -940,10 +925,7 @@ function compilerBEmitProjectLLVMLegacy(
     let resultID: Int(revision.process.processes.resultExpressionSyntaxIDs.element(
         index: processRow
     ))
-    let applicationRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.applications.syntaxIDs,
-        syntaxID: resultID
-    ))
+    let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: resultID))
     if applicationRow < 0 {
         compilerBSyntaxRevisionDestroy(revision: revision)
         diagnostic.append(text: "emitted @main result is not a Function call")
@@ -979,17 +961,22 @@ function compilerBEmitProjectLLVMLegacy(
     state globals: String("")
     state declarations: String("")
     state definitions: String("")
-    let reachableDeclarations: IntMany(bufferCreateInt(capacity: 32))
+    state reachableDeclarations: String("")
     compilerBProjectLLVMReachabilityAppend(
-        rows: reachableDeclarations,
+        reachability: reachableDeclarations,
         declarationRow: declarationRow
     )
     state functionStatus: Int(0)
     state reachableIndex: Int(0)
-    while reachableIndex < reachableDeclarations.count && functionStatus == 0 {
+    while reachableIndex < compilerBProjectLLVMReachabilityCount(
+        reachability: reachableDeclarations
+    ) && functionStatus == 0 {
         functionStatus: compilerBProjectLLVMFunctionDefinition(
             project: project,
-            declarationRow: reachableDeclarations.element(index: reachableIndex),
+            declarationRow: compilerBProjectLLVMReachabilityElement(
+                reachability: reachableDeclarations,
+                index: reachableIndex
+            ),
             globals: globals,
             declarations: declarations,
             definitions: definitions,
@@ -998,7 +985,6 @@ function compilerBEmitProjectLLVMLegacy(
         reachableIndex: reachableIndex + 1
     }
     if functionStatus != 0 {
-        reachableDeclarations.destroy()
         compilerBSyntaxRevisionDestroy(revision: revision)
         diagnostic.append(text: "unable to lower reachable Function status=\(0 - functionStatus)")
         return 0 - 8
@@ -1044,7 +1030,6 @@ function compilerBEmitProjectLLVMLegacy(
     if declarations != String("") { output.append(text: "\n") }
     output.append(text: definitions)
     output.append(text: main)
-    reachableDeclarations.destroy()
     compilerBSyntaxRevisionDestroy(revision: declarationRevision)
     compilerBSyntaxRevisionDestroy(revision: revision)
     return 0
@@ -1089,19 +1074,13 @@ function compilerBProjectEntryFunctionDeclarationRow(
         resolveRelationships: false
     ))
     let entrySyntaxID: Int(project.emittedMacroBlocks.syntaxIDs.element(index: entryRow))
-    let processRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.processes.ownerSyntaxIDs,
-        syntaxID: entrySyntaxID
-    ))
+    let processRow: Int(revision.process.processes.ownerSyntaxIDs.firstIndex(value: entrySyntaxID))
     state result: Int(0 - 1)
     if processRow >= 0 {
         let resultID: Int(revision.process.processes.resultExpressionSyntaxIDs.element(
             index: processRow
         ))
-        let applicationRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.applications.syntaxIDs,
-            syntaxID: resultID
-        ))
+        let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: resultID))
         if applicationRow >= 0 {
             let identity: CompilerBToken(compilerBRetainedToken(
                 store: revision.tokens,
@@ -1184,7 +1163,7 @@ function compilerBProjectLinkMetadata(project: CompilerBProjectRevision): String
                         index: argumentRow
                     ) == applicationSyntaxID
                     && compilerBProjectStoredBytesEqual(
-                        bytes: project.macroApplications.arguments.labelBytes,
+                        arguments: project.macroApplications.arguments,
                         start: project.macroApplications.arguments.labelByteStarts.element(
                             index: argumentRow
                         ),
@@ -1227,10 +1206,6 @@ function compilerBEmitProjectLLVM(
     output: String,
     diagnostic: String
 ): Int {
-    if !project.valid {
-        diagnostic.append(text: project.diagnostic)
-        return 0 - 1
-    }
     let entryRow: Int(compilerBProjectMainEntryRow(project: project))
     if entryRow == 0 - 1 {
         diagnostic.append(text: "project has no emitted @main block")
@@ -1249,28 +1224,34 @@ function compilerBEmitProjectLLVM(
         return 0 - 4
     }
     state foreignSymbol: String("")
-    if compilerBProjectExternSymbol(
+    let entryExternStatus: Int(compilerBProjectExternSymbol(
         project: project,
         declarationRow: declarationRow,
         output: foreignSymbol
-    ) == 0 {
+    ))
+    if entryExternStatus == 0 {
         diagnostic.append(text: "emitted @main must call an ordinary Range Function")
         return 0 - 5
     }
     state globals: String("")
     state declarations: String("")
     state definitions: String("")
-    let reachableDeclarations: IntMany(bufferCreateInt(capacity: 64))
+    state reachableDeclarations: String("")
     compilerBProjectLLVMReachabilityAppend(
-        rows: reachableDeclarations,
+        reachability: reachableDeclarations,
         declarationRow: declarationRow
     )
     state functionStatus: Int(0)
     state reachableIndex: Int(0)
-    while reachableIndex < reachableDeclarations.count && functionStatus == 0 {
+    while reachableIndex < compilerBProjectLLVMReachabilityCount(
+        reachability: reachableDeclarations
+    ) && functionStatus == 0 {
         functionStatus: compilerBProjectLLVMFunctionDefinition(
             project: project,
-            declarationRow: reachableDeclarations.element(index: reachableIndex),
+            declarationRow: compilerBProjectLLVMReachabilityElement(
+                reachability: reachableDeclarations,
+                index: reachableIndex
+            ),
             globals: globals,
             declarations: declarations,
             definitions: definitions,
@@ -1278,44 +1259,46 @@ function compilerBEmitProjectLLVM(
         )
         reachableIndex: reachableIndex + 1
     }
+    state status: Int(0)
     if functionStatus != 0 {
-        reachableDeclarations.destroy()
         diagnostic.append(text: "unable to lower reachable Function status=\(0 - functionStatus)")
-        return 0 - 6
+        status: 0 - 6
     }
     state returnType: String("")
-    if compilerBProjectFunctionLLVMReturnType(
-        project: project,
-        declarationRow: declarationRow,
-        output: returnType
-    ) != 0 {
-        reachableDeclarations.destroy()
-        diagnostic.append(text: "unable to lower entry Function return type")
-        return 0 - 7
-    }
-    let sourceID: Int(project.declarations.sourceIDs.element(index: declarationRow))
-    let syntaxID: Int(project.declarations.syntaxIDs.element(index: declarationRow))
-    output.append(text: "; Compiler B ordinary project LLVM\n")
-    output.append(text: compilerBProjectLinkMetadata(project: project))
-    output.append(text: globals)
-    if globals != String("") { output.append(text: "\n") }
-    output.append(text: declarations)
-    if declarations != String("") { output.append(text: "\n") }
-    output.append(text: definitions)
-    output.append(text: "define i32 @main() {\nentry:\n")
-    if returnType == String("void") {
-        output.append(text: "  call void @Range.function.\(sourceID).\(syntaxID)()\n")
-        output.append(text: "  ret i32 0\n")
-    } else {
-        output.append(text: "  %range.result = call \(returnType) @Range.function.\(sourceID).\(syntaxID)()\n")
-        if returnType == String("i64") {
-            output.append(text: "  %range.exit = trunc i64 %range.result to i32\n")
-            output.append(text: "  ret i32 %range.exit\n")
-        } else {
-            output.append(text: "  ret i32 0\n")
+    if status == 0 {
+        if compilerBProjectFunctionLLVMReturnType(
+            project: project,
+            declarationRow: declarationRow,
+            output: returnType
+        ) != 0 {
+            diagnostic.append(text: "unable to lower entry Function return type")
+            status: 0 - 7
         }
     }
-    output.append(text: "}\n")
-    reachableDeclarations.destroy()
-    return 0
+    if status == 0 {
+        let sourceID: Int(project.declarations.sourceIDs.element(index: declarationRow))
+        let syntaxID: Int(project.declarations.syntaxIDs.element(index: declarationRow))
+        output.append(text: "; Compiler B ordinary project LLVM\n")
+        output.append(text: compilerBProjectLinkMetadata(project: project))
+        output.append(text: globals)
+        if globals != String("") { output.append(text: "\n") }
+        output.append(text: declarations)
+        if declarations != String("") { output.append(text: "\n") }
+        output.append(text: definitions)
+        output.append(text: "define i32 @main() {\nentry:\n")
+        if returnType == String("void") {
+            output.append(text: "  call void @Range.function.\(sourceID).\(syntaxID)()\n")
+            output.append(text: "  ret i32 0\n")
+        } else {
+            output.append(text: "  %range.result = call \(returnType) @Range.function.\(sourceID).\(syntaxID)()\n")
+            if returnType == String("i64") {
+                output.append(text: "  %range.exit = trunc i64 %range.result to i32\n")
+                output.append(text: "  ret i32 %range.exit\n")
+            } else {
+                output.append(text: "  ret i32 0\n")
+            }
+        }
+        output.append(text: "}\n")
+    }
+    return status
 }

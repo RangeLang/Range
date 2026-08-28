@@ -1,11 +1,13 @@
 macro print(message: String): Void {
-    stringPrint(value: message)
+    @write(bytes: message.bytes, destination: .standard)
+    @write(bytes: "\n".bytes, destination: .standard)
 }
 
 macro print(nodes: @many): Void {
 
   nodes.each { node in
-    stringPrint(value: node)
+    @write(bytes: node.bytes, destination: .standard)
+    @write(bytes: "\n".bytes, destination: .standard)
   }
 
 }

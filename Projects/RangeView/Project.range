@@ -2,5 +2,5 @@
 construct RangeViewProject {
     let name: Title("RangeView")
     let version: Version(0.1.0)
-    let author: "George"
+    let author: String("George")
 }

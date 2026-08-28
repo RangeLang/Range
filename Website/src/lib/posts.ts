@@ -233,6 +233,24 @@ export const posts: Post[] = [
     },
   },
   {
+    slug: "what-is-an-expression",
+    href: "/posts/what-is-an-expression",
+    category: "Language design",
+    cardTitle: "What Is an Expression?",
+    cardDescription:
+      "A condition is a value: a split between possible states of execution.",
+    description:
+      "In Range, an expression is a condition: a composable value that divides possible states of execution.",
+    palette: 8,
+    draft: true,
+    cardPalette: {
+      foreground: "rgb(24 28 65)",
+      mutedForeground: "rgb(67 70 109)",
+      background: "rgb(214 228 255)",
+      contrast: 10.4,
+    },
+  },
+  {
     slug: "requirement-and-provision",
     href: "/posts/requirement-and-provision",
     category: "Language design",

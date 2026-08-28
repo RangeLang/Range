@@ -1,0 +1,17 @@
+derived size: Vector(3, Float) {
+    width: 6.0,
+    height: 15.0,
+    depth: 1.2
+}
+
+function positiveComponents(): Int {
+    let positive: size.components.filter { component in
+        component > 0.0
+    }
+    return positive.count
+}
+
+function start(): Int {
+    positiveComponents()
+    return 0
+}

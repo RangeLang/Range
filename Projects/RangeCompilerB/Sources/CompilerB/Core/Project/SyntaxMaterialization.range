@@ -1,78 +1,138 @@
 construct CompilerBSyntaxTemplatePartStore {
-    let templateRows: IntMany
-    let kindCodes: IntMany
-    let ordinals: IntMany
-    let textByteStarts: IntMany
-    let textByteCounts: IntMany
-    let textBytes: IntMany
-    let sourceStarts: IntMany
-    let sourceEnds: IntMany
-    let relationshipSyntaxIDs: IntMany
-    let relationshipTypeTokenIDs: IntMany
-    let relationshipCardinalityCodes: IntMany
+    @many
+    state templateRows: Int
+    @many
+    state kindCodes: Int
+    @many
+    state ordinals: Int
+    @many
+    state textByteStarts: Int
+    @many
+    state textByteCounts: Int
+    @many
+    state textBytes: Int
+    @many
+    state sourceStarts: Int
+    @many
+    state sourceEnds: Int
+    @many
+    state relationshipSyntaxIDs: Int
+    @many
+    state relationshipTypeTokenIDs: Int
+    @many
+    state relationshipCardinalityCodes: Int
 }
 
 construct CompilerBSyntaxTemplateStore {
-    let applicationSourceIDs: IntMany
-    let applicationSyntaxIDs: IntMany
-    let declarationSourceIDs: IntMany
-    let declarationSyntaxIDs: IntMany
-    let partStarts: IntMany
-    let partCounts: IntMany
-    let declarationNameStarts: IntMany
-    let declarationNameEnds: IntMany
+    @many
+    state applicationSourceIDs: Int
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state partStarts: Int
+    @many
+    state partCounts: Int
+    @many
+    state declarationNameStarts: Int
+    @many
+    state declarationNameEnds: Int
     let parts: CompilerBSyntaxTemplatePartStore
 }
 
 construct CompilerBStorageRelationshipStore {
-    let applicationSourceIDs: IntMany
-    let applicationSyntaxIDs: IntMany
-    let declarationSourceIDs: IntMany
-    let declarationSyntaxIDs: IntMany
-    let modeCodes: IntMany
+    @many
+    state applicationSourceIDs: Int
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state modeCodes: Int
 }
 
 construct CompilerBSyntaxCaptureStore {
-    let materializationRows: IntMany
-    let ordinals: IntMany
-    let templatePartRows: IntMany
-    let sourceStarts: IntMany
-    let sourceEnds: IntMany
+    @many
+    state materializationRows: Int
+    @many
+    state ordinals: Int
+    @many
+    state templatePartRows: Int
+    @many
+    state sourceStarts: Int
+    @many
+    state sourceEnds: Int
 }
 
 construct CompilerBSyntaxMaterializationStore {
-    let sourceIDs: IntMany
-    let syntaxIDs: IntMany
-    let declarationSourceIDs: IntMany
-    let declarationSyntaxIDs: IntMany
-    let templateRows: IntMany
-    let storageModeCodes: IntMany
-    let captureStarts: IntMany
-    let captureCounts: IntMany
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state declarationSourceIDs: Int
+    @many
+    state declarationSyntaxIDs: Int
+    @many
+    state templateRows: Int
+    @many
+    state storageModeCodes: Int
+    @many
+    state captureStarts: Int
+    @many
+    state captureCounts: Int
     let captures: CompilerBSyntaxCaptureStore
 }
 
 construct CompilerBSyntaxCaptureValueGraph {
-    let captureStarts: IntMany
-    let captureCounts: IntMany
-    let captureRows: IntMany
-    let ordinals: IntMany
-    let sourceIDs: IntMany
-    let syntaxIDs: IntMany
-    let sourceStarts: IntMany
-    let sourceEnds: IntMany
-    let kindCodes: IntMany
+    @many
+    state captureStarts: Int
+    @many
+    state captureCounts: Int
+    @many
+    state captureRows: Int
+    @many
+    state ordinals: Int
+    @many
+    state sourceIDs: Int
+    @many
+    state syntaxIDs: Int
+    @many
+    state sourceStarts: Int
+    @many
+    state sourceEnds: Int
+    @many
+    state kindCodes: Int
+}
+
+construct CompilerBSyntaxWork {
+    @many
+    state syntaxIDs: Int
+}
+
+function compilerBSyntaxWorkCreate(capacity: Int): CompilerBSyntaxWork {
+    return CompilerBSyntaxWork(syntaxIDs: @many(capacity: capacity))
 }
 
 construct CompilerBSyntaxGraph {
     let templates: CompilerBSyntaxTemplateStore
     let storage: CompilerBStorageRelationshipStore
     let materializations: CompilerBSyntaxMaterializationStore
-    let diagnosticCodes: IntMany
-    let diagnosticSourceIDs: IntMany
-    let diagnosticStarts: IntMany
-    let diagnosticEnds: IntMany
-    let diagnosticTemplateRows: IntMany
+    @many
+    state diagnosticCodes: Int
+    @many
+    state diagnosticSourceIDs: Int
+    @many
+    state diagnosticStarts: Int
+    @many
+    state diagnosticEnds: Int
+    @many
+    state diagnosticTemplateRows: Int
 }
 
 function compilerBSyntaxTemplatePartLiteral(): Int { return 1 }
@@ -92,17 +152,17 @@ function compilerBSyntaxTemplatePartStoreCreate(
     capacity: Int
 ): CompilerBSyntaxTemplatePartStore {
     return CompilerBSyntaxTemplatePartStore(
-        templateRows: bufferCreateInt(capacity: capacity),
-        kindCodes: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity),
-        textByteStarts: bufferCreateInt(capacity: capacity),
-        textByteCounts: bufferCreateInt(capacity: capacity),
-        textBytes: bufferCreateInt(capacity: capacity * 8),
-        sourceStarts: bufferCreateInt(capacity: capacity),
-        sourceEnds: bufferCreateInt(capacity: capacity),
-        relationshipSyntaxIDs: bufferCreateInt(capacity: capacity),
-        relationshipTypeTokenIDs: bufferCreateInt(capacity: capacity),
-        relationshipCardinalityCodes: bufferCreateInt(capacity: capacity)
+        templateRows: @many(capacity: capacity),
+        kindCodes: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity),
+        textByteStarts: @many(capacity: capacity),
+        textByteCounts: @many(capacity: capacity),
+        textBytes: @many(capacity: capacity * 8),
+        sourceStarts: @many(capacity: capacity),
+        sourceEnds: @many(capacity: capacity),
+        relationshipSyntaxIDs: @many(capacity: capacity),
+        relationshipTypeTokenIDs: @many(capacity: capacity),
+        relationshipCardinalityCodes: @many(capacity: capacity)
     )
 }
 
@@ -110,14 +170,14 @@ function compilerBSyntaxTemplateStoreCreate(
     capacity: Int
 ): CompilerBSyntaxTemplateStore {
     return CompilerBSyntaxTemplateStore(
-        applicationSourceIDs: bufferCreateInt(capacity: capacity),
-        applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        declarationSourceIDs: bufferCreateInt(capacity: capacity),
-        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        partStarts: bufferCreateInt(capacity: capacity),
-        partCounts: bufferCreateInt(capacity: capacity),
-        declarationNameStarts: bufferCreateInt(capacity: capacity),
-        declarationNameEnds: bufferCreateInt(capacity: capacity),
+        applicationSourceIDs: @many(capacity: capacity),
+        applicationSyntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        partStarts: @many(capacity: capacity),
+        partCounts: @many(capacity: capacity),
+        declarationNameStarts: @many(capacity: capacity),
+        declarationNameEnds: @many(capacity: capacity),
         parts: compilerBSyntaxTemplatePartStoreCreate(capacity: capacity * 8)
     )
 }
@@ -126,21 +186,21 @@ function compilerBStorageRelationshipStoreCreate(
     capacity: Int
 ): CompilerBStorageRelationshipStore {
     return CompilerBStorageRelationshipStore(
-        applicationSourceIDs: bufferCreateInt(capacity: capacity),
-        applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        declarationSourceIDs: bufferCreateInt(capacity: capacity),
-        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        modeCodes: bufferCreateInt(capacity: capacity)
+        applicationSourceIDs: @many(capacity: capacity),
+        applicationSyntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        modeCodes: @many(capacity: capacity)
     )
 }
 
 function compilerBSyntaxCaptureStoreCreate(capacity: Int): CompilerBSyntaxCaptureStore {
     return CompilerBSyntaxCaptureStore(
-        materializationRows: bufferCreateInt(capacity: capacity),
-        ordinals: bufferCreateInt(capacity: capacity),
-        templatePartRows: bufferCreateInt(capacity: capacity),
-        sourceStarts: bufferCreateInt(capacity: capacity),
-        sourceEnds: bufferCreateInt(capacity: capacity)
+        materializationRows: @many(capacity: capacity),
+        ordinals: @many(capacity: capacity),
+        templatePartRows: @many(capacity: capacity),
+        sourceStarts: @many(capacity: capacity),
+        sourceEnds: @many(capacity: capacity)
     )
 }
 
@@ -148,14 +208,14 @@ function compilerBSyntaxMaterializationStoreCreate(
     capacity: Int
 ): CompilerBSyntaxMaterializationStore {
     return CompilerBSyntaxMaterializationStore(
-        sourceIDs: bufferCreateInt(capacity: capacity),
-        syntaxIDs: bufferCreateInt(capacity: capacity),
-        declarationSourceIDs: bufferCreateInt(capacity: capacity),
-        declarationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        templateRows: bufferCreateInt(capacity: capacity),
-        storageModeCodes: bufferCreateInt(capacity: capacity),
-        captureStarts: bufferCreateInt(capacity: capacity),
-        captureCounts: bufferCreateInt(capacity: capacity),
+        sourceIDs: @many(capacity: capacity),
+        syntaxIDs: @many(capacity: capacity),
+        declarationSourceIDs: @many(capacity: capacity),
+        declarationSyntaxIDs: @many(capacity: capacity),
+        templateRows: @many(capacity: capacity),
+        storageModeCodes: @many(capacity: capacity),
+        captureStarts: @many(capacity: capacity),
+        captureCounts: @many(capacity: capacity),
         captures: compilerBSyntaxCaptureStoreCreate(capacity: capacity * 4)
     )
 }
@@ -167,11 +227,11 @@ function compilerBSyntaxGraphCreate(capacity: Int): CompilerBSyntaxGraph {
         materializations: compilerBSyntaxMaterializationStoreCreate(
             capacity: capacity * 8
         ),
-        diagnosticCodes: bufferCreateInt(capacity: capacity),
-        diagnosticSourceIDs: bufferCreateInt(capacity: capacity),
-        diagnosticStarts: bufferCreateInt(capacity: capacity),
-        diagnosticEnds: bufferCreateInt(capacity: capacity),
-        diagnosticTemplateRows: bufferCreateInt(capacity: capacity)
+        diagnosticCodes: @many(capacity: capacity),
+        diagnosticSourceIDs: @many(capacity: capacity),
+        diagnosticStarts: @many(capacity: capacity),
+        diagnosticEnds: @many(capacity: capacity),
+        diagnosticTemplateRows: @many(capacity: capacity)
     )
 }
 
@@ -180,15 +240,15 @@ function compilerBSyntaxCaptureValueGraphCreate(
     valueCapacity: Int
 ): CompilerBSyntaxCaptureValueGraph {
     return CompilerBSyntaxCaptureValueGraph(
-        captureStarts: bufferCreateInt(capacity: captureCapacity),
-        captureCounts: bufferCreateInt(capacity: captureCapacity),
-        captureRows: bufferCreateInt(capacity: valueCapacity),
-        ordinals: bufferCreateInt(capacity: valueCapacity),
-        sourceIDs: bufferCreateInt(capacity: valueCapacity),
-        syntaxIDs: bufferCreateInt(capacity: valueCapacity),
-        sourceStarts: bufferCreateInt(capacity: valueCapacity),
-        sourceEnds: bufferCreateInt(capacity: valueCapacity),
-        kindCodes: bufferCreateInt(capacity: valueCapacity)
+        captureStarts: @many(capacity: captureCapacity),
+        captureCounts: @many(capacity: captureCapacity),
+        captureRows: @many(capacity: valueCapacity),
+        ordinals: @many(capacity: valueCapacity),
+        sourceIDs: @many(capacity: valueCapacity),
+        syntaxIDs: @many(capacity: valueCapacity),
+        sourceStarts: @many(capacity: valueCapacity),
+        sourceEnds: @many(capacity: valueCapacity),
+        kindCodes: @many(capacity: valueCapacity)
     )
 }
 
@@ -1194,14 +1254,9 @@ function compilerBDeriveSyntaxCaptureValueRow(
 
 function compilerBDeriveSyntaxCaptureValues(
     graph: CompilerBSyntaxGraph,
-    applications: CompilerBProjectMacroApplicationStore
-): CompilerBSyntaxCaptureValueGraph {
-    let values: CompilerBSyntaxCaptureValueGraph(
-        compilerBSyntaxCaptureValueGraphCreate(
-            captureCapacity: graph.materializations.captures.ordinals.count,
-            valueCapacity: graph.materializations.captures.ordinals.count * 4
-        )
-    )
+    applications: CompilerBProjectMacroApplicationStore,
+    values: CompilerBSyntaxCaptureValueGraph
+): Int {
     state captureRow: Int(0)
     while captureRow < graph.materializations.captures.ordinals.count {
         values.captureStarts.append(element: values.ordinals.count)
@@ -1213,7 +1268,7 @@ function compilerBDeriveSyntaxCaptureValues(
         ))
         captureRow: captureRow + 1
     }
-    return values
+    return 0
 }
 
 function compilerBValidateSyntaxCaptureCardinalities(
@@ -1482,7 +1537,7 @@ function compilerBSyntaxExactCandidateCount(
     afterLastTokenID: Int
 ): Int {
     state exactCount: Int(0)
-    state bestLiteralCount: Int(0 - 1)
+    state bestSpecificity: Int(0 - 1)
     state templateRow: Int(0)
     while templateRow < graph.templates.applicationSyntaxIDs.count {
         if compilerBSyntaxTemplateExactMatch(
@@ -1498,20 +1553,22 @@ function compilerBSyntaxExactCandidateCount(
             let partCount: Int(graph.templates.partCounts.element(
                 index: templateRow
             ))
-            state literalCount: Int(0)
+            state specificity: Int(0)
             state partOffset: Int(0)
             while partOffset < partCount {
                 if graph.templates.parts.kindCodes.element(
                     index: partStart + partOffset
                 ) == compilerBSyntaxTemplatePartLiteral() {
-                    literalCount: literalCount + 1
+                    specificity: specificity + graph.templates.parts.textByteCounts.element(
+                        index: partStart + partOffset
+                    )
                 }
                 partOffset: partOffset + 1
             }
-            if literalCount > bestLiteralCount {
-                bestLiteralCount: literalCount
+            if specificity > bestSpecificity {
+                bestSpecificity: specificity
                 exactCount: 1
-            } else if literalCount == bestLiteralCount {
+            } else if specificity == bestSpecificity {
                 exactCount: exactCount + 1
             }
         }
@@ -1527,7 +1584,7 @@ function compilerBSyntaxExactCandidateRow(
     afterLastTokenID: Int
 ): Int {
     state exactRow: Int(0 - 1)
-    state bestLiteralCount: Int(0 - 1)
+    state bestSpecificity: Int(0 - 1)
     state templateRow: Int(0)
     while templateRow < graph.templates.applicationSyntaxIDs.count {
         if compilerBSyntaxTemplateExactMatch(
@@ -1543,18 +1600,20 @@ function compilerBSyntaxExactCandidateRow(
             let partCount: Int(graph.templates.partCounts.element(
                 index: templateRow
             ))
-            state literalCount: Int(0)
+            state specificity: Int(0)
             state partOffset: Int(0)
             while partOffset < partCount {
                 if graph.templates.parts.kindCodes.element(
                     index: partStart + partOffset
                 ) == compilerBSyntaxTemplatePartLiteral() {
-                    literalCount: literalCount + 1
+                    specificity: specificity + graph.templates.parts.textByteCounts.element(
+                        index: partStart + partOffset
+                    )
                 }
                 partOffset: partOffset + 1
             }
-            if literalCount > bestLiteralCount {
-                bestLiteralCount: literalCount
+            if specificity > bestSpecificity {
+                bestSpecificity: specificity
                 exactRow: templateRow
             }
         }
@@ -1701,39 +1760,89 @@ function compilerBMaterializeSyntaxNode(
 }
 
 function compilerBSyntaxWorkAppend(
-    work: IntMany,
+    work: CompilerBSyntaxWork,
     syntaxID: Int
 ): Int {
     state row: Int(0)
-    while row < work.count {
-        let existing: Int(work.element(index: row))
+    while row < work.syntaxIDs.count {
+        let existing: Int(work.syntaxIDs.element(index: row))
         if existing == syntaxID { return 0 }
         if existing > syntaxID {
-            if work.append(element: syntaxID) != 0 { return 0 - 1 }
-            state shift: Int(work.count - 1)
+            if work.syntaxIDs.append(element: syntaxID) != 0 { return 0 - 1 }
+            state shift: Int(work.syntaxIDs.count - 1)
             while shift > row {
-                if work.update(
-                    element: work.element(index: shift - 1),
+                if work.syntaxIDs.update(
+                    element: work.syntaxIDs.element(index: shift - 1),
                     index: shift
                 ) != 0 { return 0 - 1 }
                 shift: shift - 1
             }
-            return work.update(element: syntaxID, index: row)
+            return work.syntaxIDs.update(element: syntaxID, index: row)
         }
         row: row + 1
     }
-    return work.append(element: syntaxID)
+    return work.syntaxIDs.append(element: syntaxID)
 }
 
-function compilerBSyntaxWorkAppendAll(
-    work: IntMany,
-    syntaxIDs: IntMany
+function compilerBSyntaxWorkCollectionCount(
+    revision: CompilerBSyntaxRevision,
+    collection: Int
+): Int {
+    if collection == 1 { return revision.members.syntaxIDs.count }
+    if collection == 2 { return revision.functionDeclarations.syntaxIDs.count }
+    if collection == 3 { return revision.constructDeclarations.syntaxIDs.count }
+    if collection == 4 { return revision.enumDeclarations.syntaxIDs.count }
+    if collection == 5 { return revision.enumCases.syntaxIDs.count }
+    if collection == 6 { return revision.macroDeclarations.syntaxIDs.count }
+    if collection == 7 { return revision.blocks.syntaxIDs.count }
+    if collection == 8 { return revision.functionSignatures.syntaxIDs.count }
+    if collection == 9 { return revision.macroSignatures.syntaxIDs.count }
+    if collection == 10 { return revision.process.extensions.syntaxIDs.count }
+    return 0
+}
+
+function compilerBSyntaxWorkCollectionElement(
+    revision: CompilerBSyntaxRevision,
+    collection: Int,
+    index: Int
+): Int {
+    if collection == 1 { return revision.members.syntaxIDs.element(index: index) }
+    if collection == 2 {
+        return revision.functionDeclarations.syntaxIDs.element(index: index)
+    }
+    if collection == 3 {
+        return revision.constructDeclarations.syntaxIDs.element(index: index)
+    }
+    if collection == 4 { return revision.enumDeclarations.syntaxIDs.element(index: index) }
+    if collection == 5 { return revision.enumCases.syntaxIDs.element(index: index) }
+    if collection == 6 { return revision.macroDeclarations.syntaxIDs.element(index: index) }
+    if collection == 7 { return revision.blocks.syntaxIDs.element(index: index) }
+    if collection == 8 { return revision.functionSignatures.syntaxIDs.element(index: index) }
+    if collection == 9 { return revision.macroSignatures.syntaxIDs.element(index: index) }
+    if collection == 10 {
+        return revision.process.extensions.syntaxIDs.element(index: index)
+    }
+    return 0 - 1
+}
+
+function compilerBSyntaxWorkAppendCollection(
+    work: CompilerBSyntaxWork,
+    revision: CompilerBSyntaxRevision,
+    collection: Int
 ): Int {
     state row: Int(0)
-    while row < syntaxIDs.count {
+    let count: Int(compilerBSyntaxWorkCollectionCount(
+        revision: revision,
+        collection: collection
+    ))
+    while row < count {
         if compilerBSyntaxWorkAppend(
             work: work,
-            syntaxID: syntaxIDs.element(index: row)
+            syntaxID: compilerBSyntaxWorkCollectionElement(
+                revision: revision,
+                collection: collection,
+                index: row
+            )
         ) != 0 { return 0 - 1 }
         row: row + 1
     }
@@ -1741,50 +1850,54 @@ function compilerBSyntaxWorkAppendAll(
 }
 
 function compilerBConcreteSyntaxWork(
+    graph: CompilerBSyntaxGraph,
+    work: CompilerBSyntaxWork,
     revision: CompilerBSyntaxRevision
-): IntMany {
-    let work: IntMany(bufferCreateInt(capacity: revision.nodes.ids.count))
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.members.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.functionDeclarations.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.constructDeclarations.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.enumDeclarations.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.enumCases.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.macroDeclarations.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.blocks.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.functionSignatures.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.macroSignatures.syntaxIDs
-    )
-    compilerBSyntaxWorkAppendAll(
-        work: work,
-        syntaxIDs: revision.process.extensions.syntaxIDs
-    )
-    return work
+): Int {
+    state collection: Int(1)
+    while collection <= 10 {
+        compilerBSyntaxWorkAppendCollection(
+            work: work,
+            revision: revision,
+            collection: collection
+        )
+        collection: collection + 1
+    }
+    state applicationRow: Int(0)
+    while applicationRow < revision.process.applications.syntaxIDs.count {
+        let applicationSyntaxID: Int(
+            revision.process.applications.syntaxIDs.element(
+                index: applicationRow
+            )
+        )
+        let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(
+            value: applicationSyntaxID
+        ))
+        if revision.process.applications.predecessorSyntaxIDs.element(
+            index: applicationRow
+        ) < 0
+            && expressionRow >= 0
+            && revision.process.expressions.kindCodes.element(
+                index: expressionRow
+            ) == compilerBParserExpressionKindCallCode()
+            && compilerBSyntaxExactCandidateCount(
+                graph: graph,
+                revision: revision,
+                firstTokenID: revision.process.applications.firstTokenIDs.element(
+                    index: applicationRow
+                ),
+                afterLastTokenID: revision.process.applications.afterLastTokenIDs.element(
+                    index: applicationRow
+                )
+            ) > 0 {
+            if compilerBSyntaxWorkAppend(
+                work: work,
+                syntaxID: applicationSyntaxID
+            ) != 0 { return 0 - 1 }
+        }
+        applicationRow: applicationRow + 1
+    }
+    return 0
 }
 
 function compilerBMaterializeSourceSyntax(
@@ -1804,20 +1917,27 @@ function compilerBMaterializeSourceSyntax(
         compilerBSyntaxRevisionDestroy(revision: revision)
         return 0 - 1
     }
-    let work: IntMany(compilerBConcreteSyntaxWork(revision: revision))
+    let work: CompilerBSyntaxWork(compilerBSyntaxWorkCreate(
+        capacity: revision.nodes.ids.count
+    ))
     state workRow: Int(0)
     state status: Int(0)
-    while workRow < work.count && status == 0 {
+    status: compilerBConcreteSyntaxWork(
+        graph: graph,
+        work: work,
+        revision: revision
+    )
+    while workRow < work.syntaxIDs.count && status == 0 {
         status: compilerBMaterializeSyntaxNode(
             graph: graph,
             sourcePaths: sourcePaths,
             sourceID: sourceID,
             revision: revision,
-            syntaxID: work.element(index: workRow)
+            syntaxID: work.syntaxIDs.element(index: workRow)
         )
         workRow: workRow + 1
     }
-    if work.destroy() != 0 && status == 0 { status: 0 - 1 }
+    if work.syntaxIDs.destroy() != 0 && status == 0 { status: 0 - 1 }
     if compilerBSyntaxRevisionDestroy(revision: revision) != 0 && status == 0 {
         status: 0 - 1
     }

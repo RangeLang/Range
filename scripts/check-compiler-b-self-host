@@ -62,6 +62,9 @@ done < "$SOURCE_MANIFEST"
 if xargs rg -n 'Buffer<' < "$SOURCE_MANIFEST" > /dev/null; then
     fail "canonical Compiler B source still contains generic Buffer syntax"
 fi
+if xargs rg -n 'IntMany|ByteMany|bufferCreateInt|bufferCreateUnsigned8|rawBuffer(Create|Append|Load|Store|Count|Destroy)' < "$SOURCE_MANIFEST" > /dev/null; then
+    fail "canonical Compiler B source still contains a scalar-specific or raw-buffer ABI"
+fi
 if xargs rg -n '[A-Za-z_][A-Za-z0-9_]*<' < "$SOURCE_MANIFEST" > /dev/null; then
     fail "canonical Compiler B source still contains generic type syntax"
 fi
@@ -69,7 +72,12 @@ fi
 transport_relative="$(manifest_value transport.path)"
 transport_expected="$(manifest_value transport.sha256)"
 [[ "$(sha256 "$REPO_ROOT/$transport_relative")" == "$transport_expected" ]] \
-    || fail "seed Buffer transport hash changed; update and review SeedManifest.json"
+    || fail "seed cardinality transport hash changed; update and review SeedManifest.json"
+
+source_transport_relative="$(manifest_value sourceTransport.path)"
+source_transport_expected="$(manifest_value sourceTransport.sha256)"
+[[ "$(sha256 "$REPO_ROOT/$source_transport_relative")" == "$source_transport_expected" ]] \
+    || fail "seed source transport hash changed; update and review SeedManifest.json"
 
 entry_transport_relative="$(manifest_value entryTransport.path)"
 entry_transport_expected="$(manifest_value entryTransport.sha256)"
@@ -83,6 +91,8 @@ accepted_expected="$(manifest_value acceptedCompilerA.sha256)"
 
 runtime_count="$(manifest_value runtimeABI.sourceCount)"
 runtime_sources=()
+minimum_os="$(manifest_value target.minimumOS)"
+target_flags=(-arch arm64 "-mmacosx-version-min=$minimum_os")
 runtime_index=0
 while [[ "$runtime_index" -lt "$runtime_count" ]]; do
     runtime_relative="$(manifest_value "runtimeABI.sources.$runtime_index.path")"
@@ -93,7 +103,7 @@ while [[ "$runtime_index" -lt "$runtime_count" ]]; do
     runtime_index=$((runtime_index + 1))
 done
 
-echo "compiler-b self-host audit: pass sources=$source_count genericTypes=0"
+echo "compiler-b self-host audit: pass sources=$source_count genericTypes=0 scalarManyAliases=0"
 if [[ "$AUDIT_ONLY" -eq 1 ]]; then
     exit 0
 fi
@@ -105,6 +115,8 @@ source_root="$work_root/source"
 candidate_root="$work_root/candidate"
 reproduction_root="$work_root/reproduction"
 mkdir -p "$seed_root" "$source_root" "$candidate_root" "$reproduction_root"
+runtime_root="$work_root/runtime"
+mkdir -p "$runtime_root"
 
 while IFS= read -r relative; do
     staged_relative="${relative#Projects/RangeCompilerB/}"
@@ -120,46 +132,60 @@ seed_started="$(elapsed_start)"
 "$SCRIPT_DIR/run-compiler-b-bootstrap" --build-only "$seed_root"
 seed_seconds="$(elapsed_finish "$seed_started")"
 
+runtime_objects=()
+runtime_index=0
+while [[ "$runtime_index" -lt "${#runtime_sources[@]}" ]]; do
+    runtime_source="${runtime_sources[$runtime_index]}"
+    runtime_object="$runtime_root/Runtime-$runtime_index.o"
+    clang "${target_flags[@]}" -O0 -fno-lto -c "$runtime_source" -o "$runtime_object"
+    runtime_objects+=("$runtime_object")
+    runtime_index=$((runtime_index + 1))
+done
+
 candidate_started="$(elapsed_start)"
 candidate_status=0
-"$seed_root/CompilerB" --emit-llvm "$source_root" \
-    > "$candidate_root/CompilerB.ll" || candidate_status=$?
+"$seed_root/CompilerB" --emit-assembly "$source_root" \
+    > "$candidate_root/RangeCompiler.s" || candidate_status=$?
 candidate_seconds="$(elapsed_finish "$candidate_started")"
 if [[ "$candidate_status" -ne 0 ]]; then
-    echo "compiler-b self-host boundary: seed B could not lower the canonical manifest" >&2
-    /usr/bin/sed -n '1,120p' "$candidate_root/CompilerB.ll" >&2
+    echo "compiler-b self-host boundary: seed B could not emit native assembly for the canonical manifest" >&2
+    /usr/bin/sed -n '1,120p' "$candidate_root/RangeCompiler.s" >&2
     exit "$candidate_status"
 fi
 
-clang -O0 -fno-lto -Wno-override-module \
-    "$candidate_root/CompilerB.ll" \
-    "${runtime_sources[@]}" \
-    -o "$candidate_root/CompilerB"
+clang "${target_flags[@]}" -c "$candidate_root/RangeCompiler.s" \
+    -o "$candidate_root/RangeCompiler.o"
+clang "${target_flags[@]}" -Wl,-no_uuid \
+    "$candidate_root/RangeCompiler.o" "${runtime_objects[@]}" \
+    -o "$candidate_root/RangeCompiler"
 
 reproduction_started="$(elapsed_start)"
 reproduction_status=0
-"$candidate_root/CompilerB" --emit-llvm "$source_root" \
-    > "$reproduction_root/CompilerB.ll" || reproduction_status=$?
+"$candidate_root/RangeCompiler" --emit-assembly "$source_root" \
+    > "$reproduction_root/RangeCompiler.s" || reproduction_status=$?
 reproduction_seconds="$(elapsed_finish "$reproduction_started")"
 if [[ "$reproduction_status" -ne 0 ]]; then
-    echo "compiler-b self-host boundary: candidate B could not produce reproduction LLVM" >&2
-    /usr/bin/sed -n '1,120p' "$reproduction_root/CompilerB.ll" >&2
+    echo "compiler-b self-host boundary: candidate B could not produce reproduction assembly" >&2
+    /usr/bin/sed -n '1,120p' "$reproduction_root/RangeCompiler.s" >&2
     exit "$reproduction_status"
 fi
 
-clang -O0 -fno-lto -Wno-override-module \
-    "$reproduction_root/CompilerB.ll" \
-    "${runtime_sources[@]}" \
-    -o "$reproduction_root/CompilerB"
+clang "${target_flags[@]}" -c "$reproduction_root/RangeCompiler.s" \
+    -o "$reproduction_root/RangeCompiler.o"
+clang "${target_flags[@]}" -Wl,-no_uuid \
+    "$reproduction_root/RangeCompiler.o" "${runtime_objects[@]}" \
+    -o "$reproduction_root/RangeCompiler"
 
-cmp "$candidate_root/CompilerB.ll" "$reproduction_root/CompilerB.ll" >/dev/null \
-    || fail "candidate and reproduction LLVM differ"
-cmp "$candidate_root/CompilerB" "$reproduction_root/CompilerB" >/dev/null \
+cmp "$candidate_root/RangeCompiler.s" "$reproduction_root/RangeCompiler.s" >/dev/null \
+    || fail "candidate and reproduction assembly differ"
+cmp "$candidate_root/RangeCompiler.o" "$reproduction_root/RangeCompiler.o" >/dev/null \
+    || fail "candidate and reproduction objects differ"
+cmp "$candidate_root/RangeCompiler" "$reproduction_root/RangeCompiler" >/dev/null \
     || fail "candidate and reproduction executables differ"
 
 fixture="$REPO_ROOT/Testing/CompilerB/Pass/ProjectLanguageSurface"
-"$candidate_root/CompilerB" "$fixture" > "$candidate_root/fixture.out"
-"$reproduction_root/CompilerB" "$fixture" > "$reproduction_root/fixture.out"
+"$candidate_root/RangeCompiler" "$fixture" > "$candidate_root/fixture.out"
+"$reproduction_root/RangeCompiler" "$fixture" > "$reproduction_root/fixture.out"
 cmp "$candidate_root/fixture.out" "$reproduction_root/fixture.out" >/dev/null \
     || fail "candidate and reproduction fixture output differs"
 

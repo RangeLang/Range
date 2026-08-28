@@ -1,26 +1,34 @@
 construct CompilerBMacroProductStore {
-    let statuses: IntMany
-    let emittedValues: IntMany
-    let collectionProductionSyntaxIDs: IntMany
-    let applicationSyntaxIDs: IntMany
-    let bitCounts: IntMany
-    let signedValues: IntMany
-    let hasValues: IntMany
-    let values: IntMany
+    @many
+    state statuses: Int
+    @many
+    state emittedValues: Int
+    @many
+    state collectionProductionSyntaxIDs: Int
+    @many
+    state applicationSyntaxIDs: Int
+    @many
+    state bitCounts: Int
+    @many
+    state signedValues: Int
+    @many
+    state hasValues: Int
+    @many
+    state values: Int
 }
 
 function compilerBMacroProductStoreCreate(
     capacity: Int
 ): CompilerBMacroProductStore {
     return CompilerBMacroProductStore(
-        statuses: bufferCreateInt(capacity: capacity),
-        emittedValues: bufferCreateInt(capacity: capacity),
-        collectionProductionSyntaxIDs: bufferCreateInt(capacity: capacity),
-        applicationSyntaxIDs: bufferCreateInt(capacity: capacity),
-        bitCounts: bufferCreateInt(capacity: capacity),
-        signedValues: bufferCreateInt(capacity: capacity),
-        hasValues: bufferCreateInt(capacity: capacity),
-        values: bufferCreateInt(capacity: capacity)
+        statuses: @many(capacity: capacity),
+        emittedValues: @many(capacity: capacity),
+        collectionProductionSyntaxIDs: @many(capacity: capacity),
+        applicationSyntaxIDs: @many(capacity: capacity),
+        bitCounts: @many(capacity: capacity),
+        signedValues: @many(capacity: capacity),
+        hasValues: @many(capacity: capacity),
+        values: @many(capacity: capacity)
     )
 }
 
@@ -77,7 +85,7 @@ function compilerBMacroProductStoreDiagnostic(
     if status == 3 { return "macro execution is missing" }
     if status == 11 { return "integer LLVM execution requires an integer bits query" }
     if status == 12 { return "integer LLVM execution requires a boolean signed query" }
-    if status == 13 { return "integer LLVM bits must be byte-aligned and at most 32" }
+    if status == 13 { return "integer representation bits must be byte-aligned and at most 64" }
     if status == 15 { return "integer literal does not fit represented type" }
     return ""
 }
@@ -235,10 +243,7 @@ function compilerBRenderSourceTemplate(
     targetSyntaxID: Int,
     applicationValue: Int
 ): String {
-    let expressionRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.expressions.syntaxIDs,
-        syntaxID: templateExpressionSyntaxID
-    ))
+    let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: templateExpressionSyntaxID))
     if expressionRow < 0 { return "" }
     let token: CompilerBToken(compilerBRetainedToken(
         store: revision.tokens,
@@ -310,8 +315,7 @@ function compilerBRenderSourceTemplate(
                             let argumentRow: Int(compilerBMacroArgumentRowForParameter(
                                 source: revision.source,
                                 tokens: revision.tokens,
-                                argumentApplicationSyntaxIDs: revision.macroApplications.argumentApplicationSyntaxIDs,
-                                argumentLabelTokenIDs: revision.macroApplications.argumentLabelTokenIDs,
+                                applications: revision.macroApplications,
                                 applicationSyntaxID: applicationSyntaxID,
                                 parameterIdentityTokenID: revision.macroSignatures.parameterIdentityTokenIDs.element(
                                     index: parameterRow
@@ -327,10 +331,7 @@ function compilerBRenderSourceTemplate(
                     parameterRow: parameterRow + 1
                 }
                 if argumentExpressionSyntaxID >= 0 {
-                    let argumentExpressionRow: Int(compilerBFacetRowForSyntaxID(
-                        syntaxIDs: revision.process.expressions.syntaxIDs,
-                        syntaxID: argumentExpressionSyntaxID
-                    ))
+                    let argumentExpressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: argumentExpressionSyntaxID))
                     if argumentExpressionRow < 0 { return "" }
                     let kind: Int(revision.process.expressions.kindCodes.element(
                         index: argumentExpressionRow
@@ -384,10 +385,7 @@ function compilerBMacroApplicationEnvironmentExpressionSyntaxID(
     collectionProductionSyntaxID: Int,
     hasApplicationValue: Bool
 ): Int {
-    let productionRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.collectionProductions.syntaxIDs,
-        syntaxID: collectionProductionSyntaxID
-    ))
+    let productionRow: Int(revision.process.collectionProductions.syntaxIDs.firstIndex(value: collectionProductionSyntaxID))
     if productionRow < 0 { return 0 - 1 }
     let outputIdentity: CompilerBToken(compilerBRetainedToken(
         store: revision.tokens,
@@ -418,10 +416,7 @@ function compilerBMacroApplicationEnvironmentExpressionSyntaxID(
                 if revision.process.environmentNodes.environmentSyntaxIDs.element(
                     index: nodeRow
                 ) == environmentSyntaxID {
-            let applicationRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.applications.syntaxIDs,
-                syntaxID: emissionSyntaxID
-            ))
+            let applicationRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: emissionSyntaxID))
             if applicationRow >= 0 {
                 let emittedIdentity: CompilerBToken(compilerBRetainedToken(
                     store: revision.tokens,
@@ -459,10 +454,7 @@ function compilerBMacroProductStoreLLVM(
 ): String {
     if store.emittedValues.element(index: row) == 0
         || store.statuses.element(index: row) != 0 { return "" }
-    let applicationRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.macroApplications.syntaxIDs,
-        syntaxID: store.applicationSyntaxIDs.element(index: row)
-    ))
+    let applicationRow: Int(revision.macroApplications.syntaxIDs.firstIndex(value: store.applicationSyntaxIDs.element(index: row)))
     let macroSyntaxID: Int(
         revision.macroApplications.macroDeclarationSyntaxIDs.element(index: applicationRow)
     )
@@ -579,7 +571,7 @@ function compilerBExecuteSourceTemplateMacroInto(
         bitCount: revision.members.initializerValues.element(index: bitsMemberRow)
         signedValue: revision.members.initializerValues.element(index: signedMemberRow) != 0
     }
-    if status == 0 && (bitCount <= 0 || bitCount > 32 || bitCount % 8 != 0) {
+    if status == 0 && (bitCount <= 0 || bitCount > 64 || bitCount % 8 != 0) {
         status: 13
     }
     if status == 0 && hasApplicationValue && !compilerBIntegerValueFits(
@@ -620,10 +612,7 @@ function compilerBExecuteMacroApplicationInto(
     }
     state processRow: Int(0 - 1)
     if status == 0 {
-        processRow: compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.processes.ownerSyntaxIDs,
-            syntaxID: declarationSyntaxID
-        )
+        processRow: revision.process.processes.ownerSyntaxIDs.firstIndex(value: declarationSyntaxID)
         if processRow < 0 { status: 2 }
     }
     if status == 0 {
@@ -670,10 +659,7 @@ function compilerBRunCollectionProductions(
                 index: productionRow
             )
         )
-        let collectionRow: Int(compilerBFacetRowForSyntaxID(
-            syntaxIDs: revision.process.collections.syntaxIDs,
-            syntaxID: sourceCollectionSyntaxID
-        ))
+        let collectionRow: Int(revision.process.collections.syntaxIDs.firstIndex(value: sourceCollectionSyntaxID))
         if collectionRow < 0 { return 0 - 1 }
         let selectorMacroSyntaxID: Int(
             revision.process.collections.selectorMacroSyntaxIDs.element(
@@ -709,10 +695,7 @@ function compilerBMacroProductRowForApplicationSyntaxID(
     products: CompilerBMacroProductStore,
     applicationSyntaxID: Int
 ): Int {
-    return compilerBFacetRowForSyntaxID(
-        syntaxIDs: products.applicationSyntaxIDs,
-        syntaxID: applicationSyntaxID
-    )
+    return products.applicationSyntaxIDs.firstIndex(value: applicationSyntaxID)
 }
 
 function compilerBMacroProductApplicationRowForTypeToken(
@@ -758,10 +741,7 @@ function compilerBFunctionHasExternRelationship(
             let declarationSyntaxID: Int(
                 revision.macroApplications.macroDeclarationSyntaxIDs.element(index: row)
             )
-            let declarationRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.macroDeclarations.syntaxIDs,
-                syntaxID: declarationSyntaxID
-            ))
+            let declarationRow: Int(revision.macroDeclarations.syntaxIDs.firstIndex(value: declarationSyntaxID))
             if declarationRow >= 0 {
                 let identity: CompilerBToken(compilerBRetainedToken(
                     store: revision.tokens,
@@ -787,10 +767,7 @@ function compilerBMacroBoundString(
     macroDeclarationSyntaxID: Int,
     expressionSyntaxID: Int
 ): String {
-    let expressionRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.expressions.syntaxIDs,
-        syntaxID: expressionSyntaxID
-    ))
+    let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
     if expressionRow < 0 { return "" }
     let expressionToken: CompilerBToken(compilerBRetainedToken(
         store: revision.tokens,
@@ -822,9 +799,7 @@ function compilerBMacroBoundString(
                 let argumentRow: Int(compilerBMacroArgumentRowForParameter(
                     source: revision.source,
                     tokens: revision.tokens,
-                    argumentApplicationSyntaxIDs: revision.macroApplications.argumentApplicationSyntaxIDs,
-                    argumentLabelTokenIDs: revision.macroApplications.argumentLabelTokenIDs,
-                    argumentOrdinals: revision.macroApplications.argumentOrdinals,
+                    applications: revision.macroApplications,
                     applicationSyntaxID: macroApplicationSyntaxID,
                     parameterIdentityTokenID: revision.macroSignatures.parameterIdentityTokenIDs.element(
                         index: parameterRow
@@ -856,10 +831,7 @@ function compilerBMacroExecutionConditionAllows(
     ownerSyntaxID: Int
 ): Bool {
     if ownerSyntaxID == macroDeclarationSyntaxID { return true }
-    let switchCaseRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.switchCases.syntaxIDs,
-        syntaxID: ownerSyntaxID
-    ))
+    let switchCaseRow: Int(revision.process.switchCases.syntaxIDs.firstIndex(value: ownerSyntaxID))
     if switchCaseRow >= 0 {
         return compilerBMacroSwitchCaseIsSelected(
             source: revision.source,
@@ -872,10 +844,21 @@ function compilerBMacroExecutionConditionAllows(
             caseRow: switchCaseRow
         )
     }
-    let conditionalRow: Int(compilerBFacetRowForSyntaxID(
-        syntaxIDs: revision.process.conditionals.syntaxIDs,
-        syntaxID: ownerSyntaxID
-    ))
+    state conditionalRow: Int(
+        revision.process.conditionals.syntaxIDs.firstIndex(value: ownerSyntaxID)
+    )
+    state expectsTrue: Bool(true)
+    if conditionalRow < 0 {
+        conditionalRow: revision.process.conditionals.bodySyntaxIDs.firstIndex(
+            value: ownerSyntaxID
+        )
+    }
+    if conditionalRow < 0 {
+        conditionalRow: revision.process.conditionals.alternativeSyntaxIDs.firstIndex(
+            value: ownerSyntaxID
+        )
+        expectsTrue: false
+    }
     if conditionalRow < 0 { return false }
     if revision.process.conditionals.ownerSyntaxIDs.element(index: conditionalRow)
         != macroDeclarationSyntaxID { return false }
@@ -890,11 +873,13 @@ function compilerBMacroExecutionConditionAllows(
         store: revision.tokens,
         id: TokenID(value: firstTokenID)
     ))
-    return compilerBTokenMatchesBytes(
+    let conditionIsTrue: Bool(compilerBTokenMatchesBytes(
         source: revision.source,
         token: condition,
         expected: "true"
-    )
+    ))
+    if expectsTrue { return conditionIsTrue }
+    return !conditionIsTrue
 }
 
 function compilerBExecuteFreestandingMacroApplication(
@@ -929,9 +914,7 @@ function compilerBExecuteFreestandingMacroApplication(
             let argumentRow: Int(compilerBMacroArgumentRowForParameter(
                 source: revision.source,
                 tokens: revision.tokens,
-                argumentApplicationSyntaxIDs: revision.macroApplications.argumentApplicationSyntaxIDs,
-                argumentLabelTokenIDs: revision.macroApplications.argumentLabelTokenIDs,
-                argumentOrdinals: revision.macroApplications.argumentOrdinals,
+                applications: revision.macroApplications,
                 applicationSyntaxID: applicationSyntaxID,
                 parameterIdentityTokenID: revision.macroSignatures.parameterIdentityTokenIDs.element(
                     index: cardinalityParameterRow
@@ -946,10 +929,7 @@ function compilerBExecuteFreestandingMacroApplication(
                     index: argumentRow
                 )
             )
-            let expressionRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.expressions.syntaxIDs,
-                syntaxID: expressionSyntaxID
-            ))
+            let expressionRow: Int(revision.process.expressions.syntaxIDs.firstIndex(value: expressionSyntaxID))
             if expressionRow < 0 { return 0 - 1 }
             let argumentIdentity: CompilerBToken(compilerBRetainedToken(
                 store: revision.tokens,
@@ -973,10 +953,7 @@ function compilerBExecuteFreestandingMacroApplication(
                 }
                 memberRow: memberRow + 1
             }
-            let collectionRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.process.collections.syntaxIDs,
-                syntaxID: collectionSyntaxID
-            ))
+            let collectionRow: Int(revision.process.collections.syntaxIDs.firstIndex(value: collectionSyntaxID))
             if collectionRow < 0 { return 0 - 1 }
             let selectorMacroSyntaxID: Int(
                 revision.process.collections.selectorMacroSyntaxIDs.element(index: collectionRow)
@@ -989,10 +966,7 @@ function compilerBExecuteFreestandingMacroApplication(
                     let targetSyntaxID: Int(
                         revision.macroApplications.targetSyntaxIDs.element(index: selectedRow)
                     )
-                    let nodeRow: Int(compilerBFacetRowForSyntaxID(
-                        syntaxIDs: revision.nodes.ids,
-                        syntaxID: targetSyntaxID
-                    ))
+                    let nodeRow: Int(revision.nodes.ids.firstIndex(value: targetSyntaxID))
                     if nodeRow < 0 { return 0 - 1 }
                     let first: CompilerBToken(compilerBRetainedToken(
                         store: revision.tokens,
@@ -1033,10 +1007,7 @@ function compilerBExecuteFreestandingMacroApplication(
             let expressionSyntaxID: Int(
                 revision.process.executions.expressionSyntaxIDs.element(index: executionRow)
             )
-            let nestedApplicationRow: Int(compilerBFacetRowForSyntaxID(
-                syntaxIDs: revision.macroApplications.syntaxIDs,
-                syntaxID: expressionSyntaxID
-            ))
+            let nestedApplicationRow: Int(revision.macroApplications.syntaxIDs.firstIndex(value: expressionSyntaxID))
             state isFreestandingMacro: Bool(false)
             if nestedApplicationRow >= 0 {
                 isFreestandingMacro: revision.macroApplications.targetSyntaxIDs.element(
@@ -1051,10 +1022,7 @@ function compilerBExecuteFreestandingMacroApplication(
                     liftedValue: ""
                 ) != 0 { return 0 - 1 }
             } else {
-                let callRow: Int(compilerBFacetRowForSyntaxID(
-                    syntaxIDs: revision.process.applications.syntaxIDs,
-                    syntaxID: expressionSyntaxID
-                ))
+                let callRow: Int(revision.process.applications.syntaxIDs.firstIndex(value: expressionSyntaxID))
                 if callRow >= 0 {
                     let functionSyntaxID: Int(
                         revision.process.applications.declarationSyntaxIDs.element(index: callRow)
@@ -1064,10 +1032,7 @@ function compilerBExecuteFreestandingMacroApplication(
                         revision: revision,
                         functionSyntaxID: functionSyntaxID
                     ) { return 0 - 1 }
-                    let functionRow: Int(compilerBFacetRowForSyntaxID(
-                        syntaxIDs: revision.functionDeclarations.syntaxIDs,
-                        syntaxID: functionSyntaxID
-                    ))
+                    let functionRow: Int(revision.functionDeclarations.syntaxIDs.firstIndex(value: functionSyntaxID))
                     if functionRow < 0 { return 0 - 1 }
                     let functionIdentity: CompilerBToken(compilerBRetainedToken(
                         store: revision.tokens,

@@ -1,0 +1,17 @@
+state size: Vector(3, Float) {
+    width: 6.0,
+    height: 15.0,
+    depth: 1.2
+}
+
+function replaceComponents(): Float {
+    size.components.each { member in
+        $member: 7.0
+    }
+    return size.width
+}
+
+function start(): Int {
+    replaceComponents()
+    return 0
+}

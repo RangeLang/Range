@@ -1,0 +1,5 @@
+derived size: Vector(3) {
+    width: 5.0,
+    height: 5.0,
+    depth: 5.0
+}

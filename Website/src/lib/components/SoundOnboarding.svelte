@@ -54,6 +54,10 @@
   let sphereFrame: number | undefined;
   let exitFrame: number | undefined;
   let collapseFrame: number | undefined;
+  let reentryFrame: number | undefined;
+  let reopening = $state(false);
+  let reentryWhiteUnderlay = $state(false);
+  let reentryVeilOpacity = $state(0);
   let anchorPhase = -Math.PI / 2;
   let anchorLastAt = 0;
   let anchorStartedAt = 0;
@@ -65,6 +69,7 @@
   const entryDuration = 4_200;
   const exitDuration = 600;
   const homepageRevealDuration = 480;
+  const reentryDuration = 720;
   const anchorBreathPeriod = 13_500;
   // Flip the shader to full-bleed just before the measured diagonal so the
   // antialiased corner pixels never expose a one-frame gap.
@@ -216,7 +221,10 @@
     setFisheyeAmount(0);
     setHomepageSwap(0);
     const frame = (now: number) => {
-      const entryProgress = Math.min(1, Math.max(0, (now - anchorStartedAt) / entryDuration));
+      const entryProgress = Math.min(
+        1,
+        Math.max(0, (now - anchorStartedAt) / entryDuration),
+      );
       if (entryProgress < 1) {
         anchorPhase = -Math.PI / 2 + Math.PI * entryProgress;
         const breathing = breathingFrame(anchorPhase);
@@ -347,10 +355,7 @@
         void startActivationTone(effect.input);
       } else if (effect.type === "SCHEDULE_ENTRY_FINISH") {
         window.clearTimeout(entryTimer);
-        entryTimer = window.setTimeout(() => {
-          const transition = onboardingMachine.send({ type: "ENTRY_FINISHED" });
-          runEffects(transition.effects);
-        }, effect.delay);
+        entryTimer = window.setTimeout(finishEntry, effect.delay);
       } else if (effect.type === "SCHEDULE_COMPLETION") {
         window.clearTimeout(completionTimer);
         completionTimer = window.setTimeout(
@@ -371,6 +376,14 @@
     }
   }
 
+  function finishEntry() {
+    if (onboardingMachine.getSnapshot().phase !== "entering") return;
+    window.clearTimeout(entryTimer);
+    entryTimer = undefined;
+    const transition = onboardingMachine.send({ type: "ENTRY_FINISHED" });
+    runEffects(transition.effects);
+  }
+
   function beginActivation(input: OnboardingInput) {
     if (phase !== "prompting") return;
     const transition = onboardingMachine.send({
@@ -385,6 +398,7 @@
   function unlockFromPointer(event: PointerEvent) {
     event.preventDefault();
     event.stopPropagation();
+    if (phase === "entering") return;
     if (phase === "exploring") {
       completeExperience();
       return;
@@ -410,6 +424,7 @@
 
   function unlockFromKeyboard(event: MouseEvent) {
     if (event.detail !== 0) return;
+    if (phase === "entering") return;
     if (phase === "exploring") {
       completeExperience();
       return;
@@ -418,6 +433,7 @@
   }
 
   function completeExperience() {
+    stopReentryTransition();
     stopSphereTimeline();
     const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
@@ -505,6 +521,81 @@
     collapseFrame = requestAnimationFrame(frame);
   }
 
+  function reopenOnboarding() {
+    if (onboardingMachine.getSnapshot().phase !== "complete") return;
+    window.clearTimeout(completionTimer);
+    window.clearTimeout(entryTimer);
+    window.clearTimeout(leaveTimer);
+    stopSphereTimeline();
+    if (exitFrame !== undefined) cancelAnimationFrame(exitFrame);
+    if (collapseFrame !== undefined) cancelAnimationFrame(collapseFrame);
+    if (reentryFrame !== undefined) cancelAnimationFrame(reentryFrame);
+    exitFrame = undefined;
+    collapseFrame = undefined;
+    reentryFrame = undefined;
+    stopLiveBreath();
+    route?.dispose();
+    route = undefined;
+    activationPadStarted = false;
+    activationPadStarting = false;
+    liveCollapsing = false;
+    reopening = true;
+    reentryWhiteUnderlay = false;
+    reentryVeilOpacity = 0;
+    exitDiameter = 0;
+    setSphereSize(0.5);
+    exitBlurTimeline = 0;
+    starFadeTimeline = 0;
+    exitCutoutActive = false;
+    innerCutoutTimeline = 0;
+    setFisheyeAmount(0);
+    setHomepageSwap(0);
+    onboardingMachine.send({ type: "RESET" });
+    const startedAt = performance.now();
+    const frame = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / reentryDuration);
+      if (progress < 0.5) {
+        reentryVeilOpacity = smootherstep(progress * 2);
+      } else {
+        reentryWhiteUnderlay = true;
+        reentryVeilOpacity = 1 - smootherstep((progress - 0.5) * 2);
+      }
+      setSphereSize(0.5 + 55.5 * smootherstep(progress));
+      if (progress < 1) reentryFrame = requestAnimationFrame(frame);
+      else {
+        reentryFrame = undefined;
+        setSphereSize(56);
+        reopening = false;
+        reentryWhiteUnderlay = false;
+        reentryVeilOpacity = 0;
+      }
+    };
+    reentryFrame = requestAnimationFrame(frame);
+  }
+
+  function stopReentryTransition() {
+    if (reentryFrame !== undefined) cancelAnimationFrame(reentryFrame);
+    reentryFrame = undefined;
+    reopening = false;
+    reentryWhiteUnderlay = false;
+    reentryVeilOpacity = 0;
+  }
+
+  function handleOnboardingDoubleClick() {
+    const startingPhase = onboardingMachine.getSnapshot().phase;
+    if (startingPhase === "complete") {
+      reopenOnboarding();
+      return;
+    }
+    if (startingPhase === "booting" || startingPhase === "leaving") return;
+    if (startingPhase === "prompting") beginActivation("mouse");
+    if (onboardingMachine.getSnapshot().phase === "entering") finishEntry();
+    const directOpenPhase = onboardingMachine.getSnapshot().phase;
+    if (directOpenPhase === "exploring" || directOpenPhase === "dragging") {
+      completeExperience();
+    }
+  }
+
   onMount(() => {
     const unsubscribe = onboardingMachine.subscribe((snapshot) => {
       const previousPhase = machineSnapshot.phase;
@@ -540,16 +631,19 @@
     };
     window.addEventListener("pointerdown", rearm, { passive: true });
     window.addEventListener("keydown", rearm);
+    window.addEventListener("dblclick", handleOnboardingDoubleClick);
     return () => {
       unsubscribe();
       window.removeEventListener("pointerdown", rearm);
       window.removeEventListener("keydown", rearm);
+      window.removeEventListener("dblclick", handleOnboardingDoubleClick);
       window.clearTimeout(completionTimer);
       window.clearTimeout(entryTimer);
       window.clearTimeout(leaveTimer);
       if (sphereFrame !== undefined) cancelAnimationFrame(sphereFrame);
       if (exitFrame !== undefined) cancelAnimationFrame(exitFrame);
       if (collapseFrame !== undefined) cancelAnimationFrame(collapseFrame);
+      if (reentryFrame !== undefined) cancelAnimationFrame(reentryFrame);
       delete document.documentElement.dataset.rangeOnboarding;
       document.documentElement.style.removeProperty("--range-homepage-opacity");
       stopLiveBreath();
@@ -562,9 +656,16 @@
   <div
     class="onboarding"
     class:leaving={phase === "leaving"}
+    class:reopening
+    class:reentryWhiteUnderlay
     data-sphere-stage={sphereStage}
     onpointerdown={collapseSettledSphere}
   >
+    <div
+      class="reentryVeil"
+      aria-hidden="true"
+      style={`opacity: ${reentryVeilOpacity};`}
+    ></div>
     <div
       class="skyLayer"
       aria-hidden="true"
@@ -593,7 +694,7 @@
       class="sphereControl"
       type="button"
       aria-label="Tap to discover Range and enable sound"
-      disabled={phase === "entering" || phase === "leaving" || liveCollapsing}
+      disabled={reopening || phase === "leaving" || liveCollapsing}
       onpointerdown={unlockFromPointer}
       onclick={unlockFromKeyboard}
       style={`--sphere-size: ${sphereSize}px;`}
@@ -619,6 +720,22 @@
     background-color: transparent;
   }
 
+  .onboarding.reopening {
+    background-color: transparent;
+  }
+
+  .onboarding.reopening.reentryWhiteUnderlay {
+    background-color: oklch(1 0 0);
+  }
+
+  .reentryVeil {
+    position: absolute;
+    z-index: 3;
+    inset: 0;
+    background: oklch(0 0 0);
+    pointer-events: none;
+  }
+
   .sphereControl {
     position: absolute;
     top: 50%;
@@ -639,6 +756,11 @@
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .onboarding.reopening .sphereControl {
+    min-width: 0;
+    min-height: 0;
   }
 
   .sphereControl:disabled {

@@ -1,0 +1,9 @@
+derived size: Vector(3, Float) {
+    width: 5.0,
+    height: 5.0,
+    depth: 5.0
+}
+
+function start(): Int {
+    return 0
+}

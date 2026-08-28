@@ -1,0 +1,25 @@
+@view
+construct ColorPicker {
+
+    state color: OKLCH()
+
+    derived body: @view {
+
+        Stack(.vertical, spacing: 10) {
+            Rectangle()
+              .fill(color)
+              .aspectRatio()
+
+            color.members { member in
+              Slider(lowerBound: member.lowerBound, ...)
+
+            }
+        }
+    }
+}
+
+@view
+construct Slider {
+
+
+}

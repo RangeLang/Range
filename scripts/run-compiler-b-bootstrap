@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 B_ROOT="$REPO_ROOT/Projects/RangeCompilerB"
 BOOTSTRAP="$REPO_ROOT/RangeCompiler/Bootstrap/range"
+SEED_SOURCE_TRANSPORT="$B_ROOT/Bootstrap/seed_source_transport.py"
 ENTRY_SOURCE=""
 BUILD_OUTPUT_DIRECTORY=""
 
@@ -43,6 +44,18 @@ if [[ -n "$ENTRY_SOURCE" && ! -f "$ENTRY_SOURCE" ]]; then
     exit 66
 fi
 
+if [[ -z "$BUILD_OUTPUT_DIRECTORY" && -z "$ENTRY_SOURCE"
+    && -n "${RANGE_COMPILER_B_EXECUTABLE:-}" ]]; then
+    if [[ ! -x "$RANGE_COMPILER_B_EXECUTABLE" ]]; then
+        echo "compiler-b: cached executable is not runnable: $RANGE_COMPILER_B_EXECUTABLE" >&2
+        exit 66
+    fi
+    if [[ -n "$RUN_MODE" ]]; then
+        exec "$RANGE_COMPILER_B_EXECUTABLE" "$RUN_MODE" "$ROUTE"
+    fi
+    exec "$RANGE_COMPILER_B_EXECUTABLE" "$ROUTE"
+fi
+
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-b-bootstrap.XXXXXX")"
 cleanup() {
     if [[ "${RANGE_KEEP_COMPILER_B_BOOTSTRAP_ROOT:-0}" == "1" ]]; then
@@ -64,16 +77,10 @@ append_source() {
     local source_path="$3"
     printf 'compilerSourceFile\\trole=%s\\tpath=%s\n' "$role" "$logical_path" >> "$BUNDLE"
     if [[ "$source_path" == "$B_ROOT/Sources/CompilerB/Main.range" ]]; then
-        sed \
-            -e 's/IntMany/Buffer<Int>/g' \
-            -e 's/ByteMany/Buffer<Byte>/g' \
-            -e '/^macro compilerEntry()/,$d' \
-            "$source_path" >> "$BUNDLE"
+        /usr/bin/python3 "$SEED_SOURCE_TRANSPORT" "$source_path" --strip-entry \
+            >> "$BUNDLE"
     elif [[ "$source_path" == "$B_ROOT"/Sources/CompilerB/* ]]; then
-        sed \
-            -e 's/IntMany/Buffer<Int>/g' \
-            -e 's/ByteMany/Buffer<Byte>/g' \
-            "$source_path" >> "$BUNDLE"
+        /usr/bin/python3 "$SEED_SOURCE_TRANSPORT" "$source_path" >> "$BUNDLE"
     else
         cat "$source_path" >> "$BUNDLE"
     fi
@@ -91,6 +98,7 @@ done < "$B_ROOT/CompilerCoreSources.txt"
 for relative in \
     Projects/RangeCompilerB/Sources/CompilerB/Core/Main.range \
     Projects/RangeCompilerB/Bootstrap/SeedBufferTransport.range \
+    RangeCompiler/Sources/Core/System/Memory/RawBuffer.range \
     RangeCompiler/Sources/Core/Macro/Extern.range \
     RangeCompiler/Sources/Core/Macro/Link.range \
     RangeCompiler/Sources/Core/Macro/Opaque.range \

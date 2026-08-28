@@ -1,0 +1,4 @@
+function start(): Int {
+    let result: Int(42)
+    result
+}
