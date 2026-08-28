@@ -37,8 +37,7 @@
     </div>
     <range-optical-guide aria-hidden="true"></range-optical-guide>
     <div class="landingSupport">
-      <p class="landingDescription">Range is an open-source, self-hosting programming language with graph-aware macros and a native LLVM compiler.</p>
-      <p class="landingLoveLetter">A love letter to electrons, logic and abstraction.</p>
+      <p>a love letter to electrons, logic and abstraction</p>
       <div class="landingActions"><a class="primaryAction" href="/benchmarks">Benchmarks</a><a class="secondaryAction" href={githubUrl} target="_blank" rel="noreferrer"><GithubIcon />GitHub</a></div>
     </div>
   </section>
