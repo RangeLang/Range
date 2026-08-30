@@ -2,7 +2,7 @@
   import CodeBlock from "$lib/components/CodeBlock.svelte";
   import EssayPage from "$lib/components/EssayPage.svelte";
 
-  const oldShape = `RangeCompiler/          // Compiler A
+  const oldShape = `Language/          // Compiler A
 Projects/RangeCompilerB/ // Compiler B
 
 // Two source trees.
@@ -64,7 +64,7 @@ execution compass continuation effect is not materialized`;
     </p>
 
     <p>
-      So we removed it. Compiler B moved into <code>RangeCompiler/</code> and
+      So we removed it. Compiler B moved into <code>Language/</code> and
       became simply the Range Compiler. The duplicate project, Compiler A
       source, generated LLVM bootstrap, custom-entry lifecycle, and obsolete
       fixture forest left the active checkout together.

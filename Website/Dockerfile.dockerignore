@@ -2,11 +2,11 @@
 
 !Website/
 !Website/**
-!RangeCompiler/
-!RangeCompiler/Sources/
-!RangeCompiler/Sources/Core/
-!RangeCompiler/Sources/Core/Macro/
-!RangeCompiler/Sources/Core/Macro/Codable.range
+!Language/
+!Language/Core/
+!Language/Core/Macros/
+!Language/Core/Macros/CommandGroup.range
+!Language/Core/Macros/Main.range
 !Benchmarks/
 !Benchmarks/Speed/
 !Benchmarks/Speed/results/

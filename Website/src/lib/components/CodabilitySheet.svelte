@@ -13,8 +13,8 @@
     shouldSynchronizeCodabilityChapter,
     type CodabilityFocusState,
   } from "$lib/codability-focus";
-  import codableSource from "../../../../RangeCompiler/Sources/Core/Macro/Codable.range?raw";
-  import commandGroupSource from "../../../../RangeCompiler/Sources/Core/Macro/CommandGroup.range?raw";
+  import codableSource from "$lib/sources/Codable.range?raw";
+  import commandGroupSource from "../../../../Language/Core/Macros/CommandGroup.range?raw";
 
   const layoutTracker = getContext<RangeLayoutTracker | undefined>(
     RANGE_LAYOUT_TRACKER_CONTEXT,

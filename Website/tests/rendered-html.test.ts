@@ -2123,7 +2123,7 @@ test("keeps the concrete codability application example", async () => {
       "utf8",
     ),
     readFile(
-      new URL("../../RangeCompiler/Sources/Core/Macro/Codable.range", import.meta.url),
+      new URL("../src/lib/sources/Codable.range", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),

@@ -16,9 +16,8 @@ WORKDIR /app
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY Website/ .
-COPY RangeCompiler/Sources/Core/Macro/Codable.range /RangeCompiler/Sources/Core/Macro/Codable.range
-COPY RangeCompiler/Sources/Core/Macro/CommandGroup.range /RangeCompiler/Sources/Core/Macro/CommandGroup.range
-COPY RangeCompiler/Sources/Core/Macro/Main.range /RangeCompiler/Sources/Core/Macro/Main.range
+COPY Language/Core/Macros/CommandGroup.range /Language/Core/Macros/CommandGroup.range
+COPY Language/Core/Macros/Main.range /Language/Core/Macros/Main.range
 COPY Benchmarks/Speed/results/latest.json /Benchmarks/Speed/results/latest.json
 
 RUN bun run build

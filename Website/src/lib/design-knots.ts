@@ -8,9 +8,9 @@
  * the other spellings were approximating.
  */
 
-import manySource from "../../../Projects/RangeCompilerB/Sources/CompilerB/Core/Macros/Many.range?raw";
-import constraintSource from "../../../Projects/RangeView/Macros/Constraint.range?raw";
-import commandGroupSource from "../../../RangeCompiler/Sources/Core/Macro/CommandGroup.range?raw";
+import manySource from "../../../Language/Core/Macros/Many.range?raw";
+import constraintSource from "../../../Projects/RangeView/Macros/Constraints/Bounded.range?raw";
+import commandGroupSource from "../../../Language/Core/Macros/CommandGroup.range?raw";
 import routesSource from "../../../Testing/CommandLine/Pass/Routes.range?raw";
 
 export type KnotShape = "pentagon" | "square" | "triangle" | "circle";
@@ -68,7 +68,7 @@ export const designKnots: DesignKnot[] = [
     shape: "triangle",
     sources: [
       {
-        path: "Projects/RangeCompilerB/Sources/CompilerB/Core/Macros/Many.range",
+        path: "Language/Core/Macros/Many.range",
         source: manySource,
         focusLine: 1,
       },
@@ -88,7 +88,7 @@ export const designKnots: DesignKnot[] = [
     shape: "pentagon",
     sources: [
       {
-        path: "RangeCompiler/Sources/Core/Macro/CommandGroup.range",
+        path: "Language/Core/Macros/CommandGroup.range",
         source: commandGroupSource,
         focusLine: 1,
       },
@@ -130,9 +130,9 @@ export const designKnots: DesignKnot[] = [
     shape: "circle",
     sources: [
       {
-        path: "Projects/RangeView/Macros/Constraint.range",
+        path: "Projects/RangeView/Macros/Constraints/Bounded.range",
         source: constraintSource,
-        focusLine: 37,
+        focusLine: 19,
       },
     ],
     says: "the resulting value",
