@@ -1,0 +1,171 @@
+{
+  "experiment": "The Flash synthetic HDRI capture",
+  "environment": "Poly Haven studio_small_01_1k.hdr (CC0)",
+  "capture_type": "full equirectangular HDRI",
+  "processing_space": "linear Radiance RGBE HDR",
+  "panorama_dimensions": [
+    640,
+    320
+  ],
+  "angular_field_degrees": [
+    360,
+    180
+  ],
+  "capture_contract": "ambient_before HDRI + eight flash HDRIs + ambient_after HDRI",
+  "flash_mapping": {
+    "normalization": "equal integrated incident energy in the synthetic RGB basis",
+    "vectors": {
+      "white_0": [
+        0.3333333432674408,
+        0.3333333432674408,
+        0.3333333432674408
+      ],
+      "red": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "green": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "blue": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cyan": [
+        0.0,
+        0.5,
+        0.5
+      ],
+      "yellow": [
+        0.5,
+        0.5,
+        0.0
+      ],
+      "magenta": [
+        0.5,
+        0.0,
+        0.5
+      ],
+      "white_1": [
+        0.3333333432674408,
+        0.3333333432674408,
+        0.3333333432674408
+      ]
+    },
+    "hardware_requirement": "replace RGB basis vectors with measured LED spectral power distributions"
+  },
+  "source_hdri_count": 10,
+  "derived_isolated_hdri_count": 8,
+  "registered_pose_count": 1,
+  "burst": [
+    "ambient_before",
+    "white_0",
+    "red",
+    "green",
+    "blue",
+    "cyan",
+    "yellow",
+    "magenta",
+    "white_1",
+    "ambient_after"
+  ],
+  "ambient_drift_tint": {
+    "before": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "after": [
+      1.0449999570846558,
+      1.0180000066757202,
+      0.9850000143051147
+    ]
+  },
+  "ground_truth": {
+    "base_color": [
+      0.9100000262260437,
+      0.47999998927116394,
+      0.1899999976158142
+    ],
+    "roughness": 0.22,
+    "metallic": 0.92
+  },
+  "fit_assuming_separately_measured_base_color": {
+    "roughness": 0.21999999999999997,
+    "metallic": 0.925,
+    "top_candidates": [
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.925,
+        "mse": 0.00019604337957579524
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.9,
+        "mse": 0.0002012269649756201
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.95,
+        "mse": 0.0006888951768558427
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.875,
+        "mse": 0.0007035396528329017
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.9750000000000001,
+        "mse": 0.0016808054301890947
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.8500000000000001,
+        "mse": 0.0017021870765779217
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 1.0,
+        "mse": 0.0031728937797926675
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.825,
+        "mse": 0.003196476300242648
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.8,
+        "mse": 0.005185840546498482
+      },
+      {
+        "roughness": 0.21999999999999997,
+        "metallic": 0.775,
+        "mse": 0.007669811635361478
+      }
+    ]
+  },
+  "selected_surface": {
+    "panorama_pixel_fraction": 0.03400390625,
+    "mask": "selected_surface_mask.png"
+  },
+  "local_light_hdri": {
+    "mean_before_after_absolute_delta": 0.0028285051230341196,
+    "interpolation": "linear per flash timestamp"
+  },
+  "mean_white_repeat_absolute_error": 4.31547305197455e-05,
+  "mean_linear_ambient_subtraction_absolute_error": 4.233067011227831e-05,
+  "limitations": [
+    "Synthetic renderer and inverse fit share the same simplified GGX model.",
+    "Base color is treated as separately measured, as polarization would provide.",
+    "No sensor noise, clipping, rolling shutter, motion, or polarization is simulated.",
+    "A 360 camera captures a full environment around one pose but cannot see the back of an opaque object.",
+    "Object-complete capture still requires multiple registered HDRI bursts from different poses.",
+    "C/Y/M are RGB mixtures and therefore add redundancy, not new spectral bands."
+  ]
+}
