@@ -1,0 +1,18 @@
+{
+  "name": "codex-desktop-range",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "patch": "node patch-app.mjs",
+    "direct:extract": "node --max-old-space-size=4096 direct-edit.mjs extract",
+    "direct:build": "node --max-old-space-size=4096 direct-edit.mjs build",
+    "direct:status": "node direct-edit.mjs status"
+  },
+  "dependencies": {
+    "@electron/asar": "^4.0.1",
+    "shiki": "^3.12.2",
+    "prettier": "^3.6.2"
+  }
+}
