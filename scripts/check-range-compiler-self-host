@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPILER_ROOT="$REPO_ROOT/RangeCompiler"
+COMPILER_ROOT="$REPO_ROOT/Language"
 SOURCE_MANIFEST="$COMPILER_ROOT/CompilerSources.txt"
 BOOTSTRAP_MANIFEST="$COMPILER_ROOT/Bootstrap/Manifest.json"
 MODE="proof"
@@ -35,8 +35,8 @@ previous=""
 source_count=0
 while IFS= read -r relative; do
     [[ -n "$relative" ]] || fail "source manifest contains an empty row"
-    [[ "$relative" == RangeCompiler/* && "$relative" == *.range ]] \
-        || fail "source is outside canonical RangeCompiler: $relative"
+    [[ "$relative" == Language/* && "$relative" == *.range ]] \
+        || fail "source is outside canonical Language: $relative"
     [[ -f "$REPO_ROOT/$relative" ]] || fail "missing canonical source: $relative"
     if [[ -n "$previous" && "$relative" < "$previous" ]]; then
         fail "source manifest is not bytewise sorted: $relative"
@@ -84,7 +84,7 @@ runtime_root="$work_root/runtime"
 mkdir -p "$source_root" "$candidate_root" "$reproduction_root" "$runtime_root"
 
 while IFS= read -r relative; do
-    staged_relative="${relative#RangeCompiler/}"
+    staged_relative="${relative#Language/}"
     if [[ "$staged_relative" == "Project.range" ]]; then staged_relative="CompilerProject.range"; fi
     staged="$source_root/$staged_relative"
     mkdir -p "$(dirname "$staged")"

@@ -1,6 +1,28 @@
 # Range Compiler
 
-`RangeCompiler` is the repository's only compiler implementation.
+`Language` owns the language's Core, compiler, bootstrap, and temporary
+runtime. Its `Compiler` directory is the repository's only compiler
+implementation.
+
+The root `Project.range` therefore declares `RangeLanguage`. `RangeCompiler`
+names remain component identities for the compiler executable and its runtime,
+not the identity of the enclosing project.
+
+## Layout
+
+```text
+Language/
+  Core/                Range's bootstrap core library and macro surface
+  Compiler/            compiler entry and implementation sources
+  Runtime/             temporary native runtime boundary
+  Bootstrap/           accepted hash-pinned compiler seed
+  CompilerSources.txt  canonical self-host source manifest
+  Project.range        compiler project declaration
+```
+
+There is intentionally no intermediate `Sources` directory. Core is a sibling
+of Compiler because projects consume Core; it is not owned by the compiler
+implementation.
 
 The checked-in bootstrap at `Bootstrap/range` is a hash-pinned macOS arm64
 seed. It reads the canonical source manifest, emits deterministic Apple arm64

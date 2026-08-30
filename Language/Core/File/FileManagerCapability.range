@@ -1,0 +1,3 @@
+// Marks a FileManager owned by the surrounding environment.
+// Capability lookup preserves its identity across project operations.
+macro fileManager(): Construct -> Void {}

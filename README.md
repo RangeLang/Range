@@ -97,7 +97,7 @@ candidate + same source -> reproduction
 ```
 
 Candidate and reproduction LLVM and executables must match byte for byte.
-There is one rolling compiler authority under `RangeCompiler/Bootstrap/`; Git
+There is one rolling compiler authority under `Language/Bootstrap/`; Git
 history preserves older checkpoints without turning them into competing
 authorities.
 

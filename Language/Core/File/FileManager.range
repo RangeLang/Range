@@ -188,8 +188,41 @@ function fileManagerFirstFileWithSuffix(files: String, suffix: String): String {
     return ""
 }
 
+@fileManager
 construct FileManager {
     let readChunkSize: Int
+    state revision: Int(0)
+
+    function get(_ revision: FileRevision, all suffix: String): FileQuery {
+        let paths: String(fileManagerListFiles(path: "."))
+        let snapshot: FileSnapshot(revision: self.revision)
+        self.revision: self.revision + 1
+        state query: FileQuery(
+            revision: revision,
+            suffix: suffix,
+            value: @many(.ordered, capacity: 64)
+        )
+        state start: Int(0)
+        state cursor: Int(0)
+        while cursor <= paths.count {
+            if cursor == paths.count || paths.byte(index: cursor) == 10 {
+                let path: String(paths.substring(start: start, end: cursor))
+                if path.count != 0
+                    && fileManagerHasSuffix(value: path, suffix: suffix) {
+                    let contents: String(fileManagerReadFile(path: path))
+                    query.value.append(element: File(
+                        path: path,
+                        snapshot: snapshot,
+                        encoding: UTF8(),
+                        value: contents.bytes
+                    ))
+                }
+                start: cursor + 1
+            }
+            cursor: cursor + 1
+        }
+        return query
+    }
 
     function pathKind(path: String): Int {
         return filePrimitivePathKind(path: path)

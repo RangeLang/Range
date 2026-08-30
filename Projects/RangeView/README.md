@@ -2,8 +2,8 @@
 
 This directory is the standalone RangeView project. It contains the framework
 sources plus the application entrypoint and example shapes under
-`Sources/RangeView/`. Compiler B is a separate sibling project at
-`Projects/RangeCompilerB/`.
+`Sources/RangeView/`. The compiler is owned by the repository-level
+`Language/Compiler/` directory.
 
 The old GPUCanvas and native-triangle demos are not project boundaries anymore.
 

@@ -372,23 +372,23 @@ Behavior:
 ## Relevant Files
 
 ```text
-RangeCompiler/Sources/Compiler/Driver/CompilerV1Graph.range
-RangeCompiler/Sources/Compiler/Driver/CompilerV1.range
+Language/Sources/Compiler/Driver/CompilerV1Graph.range
+Language/Sources/Compiler/Driver/CompilerV1.range
 scripts/compile-range-project
 scripts/check-range-compiler-v1
 scripts/check-range-compiler-graph
 scripts/check-range-compiler-graph-revision
-RangeCompiler/Bootstrap/RangeCompilerBootstrap.json
-RangeCompiler/Bootstrap/RangeCompilerBootstrap.ll
-RangeCompiler/Bootstrap/range
+Language/Bootstrap/RangeCompilerBootstrap.json
+Language/Bootstrap/RangeCompilerBootstrap.ll
+Language/Bootstrap/range
 ```
 
 Key supporting files:
 
 ```text
-RangeCompiler/Sources/Compiler/Syntax/CompilerParsing.range
-RangeCompiler/Sources/Compiler/Syntax/CompilerFrontend.range
-RangeCompiler/Sources/Compiler/Driver/CompilerCore.range
+Language/Sources/Compiler/Syntax/CompilerParsing.range
+Language/Sources/Compiler/Syntax/CompilerFrontend.range
+Language/Sources/Compiler/Driver/CompilerCore.range
 Testing/Syntax/Pass/V1SyntaxRecipeVerification.range
 Testing/Syntax/Fail/V1SyntaxRecipeUnknownCapture.range
 ```

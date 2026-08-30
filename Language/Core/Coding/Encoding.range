@@ -1,0 +1,3 @@
+// An encoding identifies how durable bytes represent a logical value.
+// It does not identify a file, its location, or its higher-level format.
+macro encoding(): Construct -> Void {}

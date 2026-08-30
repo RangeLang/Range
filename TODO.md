@@ -1,7 +1,7 @@
 # TODO
 
 - [x] Establish standalone project roots: `Projects/RangeView/` owns the
-  RangeView framework and example entrypoint, while `RangeCompiler/`
+  RangeView framework and example entrypoint, while `Language/`
   owns Range Compiler. Remove the obsolete GPUCanvas and native-triangle example
   projects.
 
@@ -10,9 +10,9 @@ owns the actionable checkboxes for the active and deliberately deferred work.
 
 ## Active compiler work
 
-- [x] Retire Compiler A and make `RangeCompiler/` the only compiler source authority.
+- [x] Retire Compiler A and make `Language/` the only compiler source authority.
   - The former implementation and test tree were moved out of the checkout to a recoverable `/tmp` backup.
-  - The canonical bootstrap is the macOS 27 arm64 executable at `RangeCompiler/Bootstrap/range`, SHA-256 `035abeae9c019e7be629d752bab299ec4ce6813a7655366b6639b442242f25c2`.
+  - The canonical bootstrap is the macOS 27 arm64 executable at `Language/Bootstrap/range`, SHA-256 `035abeae9c019e7be629d752bab299ec4ce6813a7655366b6639b442242f25c2`.
   - Compiler A source, generated LLVM, custom `--entry` builds, seed source transports, and duplicate lifecycle commands are no longer active.
 - [x] Capture the final pre-cleanup cached-seed proof.
   - Self-describing syntax rendered byte-identically twice.
@@ -626,7 +626,7 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
   - The bootstrap `compilerFormulaExecuteApplication` graph-name bridge still
     performs role validation; `addNode` is not yet a supported ordinary graph
     capability operation.
-- [x] Delete `RangeCompiler/Sources/Core/Macro/Storage.range` and remove the
+- [x] Delete `Language/Sources/Core/Macro/Storage.range` and remove the
   value-ownership script's direct attempt to concatenate that deleted file.
   - Storage descriptor fixtures still declare their own focused legacy macro,
     and `Int.range` still carries `@storage`; decide that remaining semantic
@@ -795,7 +795,7 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
       project blue used for properties.
   - [x] Show a concrete `User` Usage example, the exact codable Declaration,
     and one focused Field helper from
-    `RangeCompiler/Sources/Core/Macro/Codable.range`.
+    `Language/Sources/Core/Macro/Codable.range`.
     - [x] Make enum payload patterns bind bare identifiers, so focused helpers
       use `case .failure(error)` and reject the redundant `let` spelling.
     - [x] Show an immutable `let` and a `state` member in the usage example,
@@ -836,7 +836,7 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
 
   - [x] Compile and run RangeView as an ordinary Range Compiler project.
     - [x] Keep Range Compiler's copied Core under
-      `RangeCompiler/Sources/Compiler/Core/` and repair its source
+      `Language/Sources/Compiler/Core/` and repair its source
       inventory after the ownership move.
     - [x] Discover every project `.range` file in deterministic path order and
       retain each file as a separate source identity; do not select a first
@@ -2335,23 +2335,19 @@ escape valve. RangeView remains deferred unless it is explicitly reintroduced.
 
 ## Repository Layout
 
-- [ ] Adopt the proposed top-level ownership layout.
-  - [ ] Move the accepted compiler bootstrap and manifest from
-    `RangeCompiler/Bootstrap` to `Bootstrap`.
-  - [ ] Move the Range-authored compiler phases from
-    `RangeCompiler/Sources/Compiler` to `Compiler`.
-    - [ ] Keep `Body`, `Driver`, `Graph`, `LLVM`, and `Syntax` as the explicit
-      compiler implementation roots.
-    - [ ] Make compiler discovery read only those implementation roots instead
-      of recursively treating adjacent libraries as project sources.
-  - [ ] Move the C runtime from `RangeCompiler/Runtime` to `Runtime`.
-  - [ ] Move `RangeCompiler/Sources/Core` to the root `Core` folder.
-  - [ ] Move `RangeCompiler/Sources/Foundation` to the root `Foundation`
-    folder.
-  - [ ] Move `RangeCompiler/Sources/Frameworks` to the root `Frameworks`
-    folder, with RangeView at `Frameworks/RangeView`.
-  - [ ] Update `Project.range`, source manifests, build-plan logic, scripts,
-    fixtures, and documentation to the canonical paths.
+- [x] Establish `Language` as the language ownership root.
+  - [x] Keep the accepted compiler bootstrap and manifest in
+    `Language/Bootstrap`.
+  - [x] Remove the intermediate `Sources` directory.
+  - [x] Make `Language/Core` and `Language/Compiler` siblings so
+    Core is not presented as compiler-owned.
+  - [x] Keep the temporary C runtime in `Language/Runtime`.
+  - [x] Update `Project.range`, source manifests, scripts, fixtures, and
+    documentation to the canonical paths.
+  - [ ] Keep `Body`, `Driver`, `Graph`, `LLVM`, and `Syntax` as explicit
+    compiler implementation roots as those phases separate from Core.
+  - [ ] Make compiler discovery read only those implementation roots instead
+    of recursively treating adjacent libraries as project sources.
   - [ ] Reach a candidate/reproduction byte-identical fixed point, promote the
     path-aware bootstrap, and independently reproduce it before completing the
     checkpoint.
@@ -2927,7 +2923,7 @@ Discarded roadmap assumptions:
       - [ ] Move length, indexing, comparison, slicing, concatenation, and
         append behavior onto the authored String surface, then cut their
         compiler runtime builtin cases over.
-      - [x] Remove `RangeCompiler/Runtime/RangeString.c` from the runtime
+      - [x] Remove `Language/Runtime/RangeString.c` from the runtime
         manifest and every proof link.
         - Its transient allocation and legacy byte/search compatibility
           entry points temporarily live in `RangeCompilerHost.c`; this removes

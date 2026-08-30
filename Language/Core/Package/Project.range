@@ -1,0 +1,16 @@
+macro project(): Construct -> Void {
+function run() {
+//execute the graph [fast compass computation]
+state files: FileManager.get(".range")
+
+}
+function pause() {
+
+}
+function stop() {
+
+}
+function kill() {
+
+}
+}

@@ -75,8 +75,8 @@ if rg -n 'LayoutRect|RectangleRepresentation|ShapeRepresentation|PageWorldView|O
 fi
 
 if rg -n 'StackLayoutInput|DimensionRange|ResolvedViewGeometry|RangeView' \
-    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Project/Construction.range" \
-    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Syntax/Parser.range" \
+    "$REPO_ROOT/Language/Compiler/Construction.range" \
+    "$REPO_ROOT/Language/Core/Syntax/Parser.range" \
     >/dev/null; then
     fail "Compiler B contains a RangeView-specific identity check"
 fi

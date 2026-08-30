@@ -1,0 +1,225 @@
+macro main(): Void {
+    let project: #environment.filter(for: @project)
+
+    #environment {
+        function main(): Int {
+            return entry(path: project.path)
+        }
+
+        function entry(path: String): Int {
+            let commandStatus: Int(compilerBValidateCommandLine())
+            if commandStatus != 0 { return commandStatus }
+            return compilerBCompileRoute(
+                route: compilerBCommandRoute(),
+                emitAssembly: compilerBCommandEmitsAssembly()
+            )
+        }
+
+        function compilerBValidateCommandLine(): Int {
+            let argumentCount: Int(commandLineArgumentCount())
+            if argumentCount != 1 && argumentCount != 2 {
+                print(value: "usage: range-compiler [--emit-assembly] <route>")
+                return 64
+            }
+            if argumentCount == 2
+                && commandLineArgument(index: 0) != String("--emit-assembly") {
+                return 64
+            }
+            return 0
+        }
+
+        function compilerBCommandEmitsAssembly(): Bool {
+            return commandLineArgumentCount() == 2
+        }
+
+        function compilerBCommandRoute(): String {
+            let routeArgumentIndex: Int(commandLineArgumentCount() - 1)
+            return commandLineArgument(index: routeArgumentIndex)
+        }
+
+        function compilerBCompileRoute(
+            route: String,
+            emitAssembly: Bool
+        ): Int {
+            if !fileManagerPathExists(path: route) {
+                print(value: "range-compiler: route does not exist: \(route)")
+                return 66
+            }
+            let routeKind: Int(filePrimitivePathKind(path: route))
+            if routeKind == 1 && !emitAssembly {
+                return compilerBInspectSourceFile(route: route)
+            }
+            if routeKind != 2 {
+                print(value: "range-compiler: route must be a project directory")
+                return 66
+            }
+            return compilerBCompileProject(
+                route: route,
+                emitAssembly: emitAssembly
+            )
+        }
+
+        function compilerBCompileProject(
+            route: String,
+            emitAssembly: Bool
+        ): Int {
+            let mode: Int(compilerBProjectMode(emitAssembly: emitAssembly))
+            state output: String("")
+            state diagnostic: String("")
+            let sourcePaths: String(
+                compilerBDiscoverProjectSourcePaths(route: route)
+            )
+            let sourceCount: Int(
+                compilerBSourceSetLineCount(lines: sourcePaths)
+            )
+            let revision: CompilerBProjectRevision(
+                sourcePaths: sourcePaths,
+                sourceCount: sourceCount,
+                declarations: compilerBProjectDeclarationStoreCreate(
+                    capacity: sourceCount * 32
+                ),
+                macroApplications: compilerBProjectMacroApplicationStoreCreate(
+                    capacity: sourceCount * 32
+                ),
+                emittedMacroBlocks: compilerBProjectEmittedMacroBlockStoreCreate(
+                    capacity: sourceCount * 4
+                ),
+                syntaxGraph: compilerBSyntaxGraphCreate(
+                    capacity: sourceCount * 8
+                ),
+                syntaxCaptureValues: compilerBSyntaxCaptureValueGraphCreate(
+                    captureCapacity: sourceCount * 64,
+                    valueCapacity: sourceCount * 256
+                )
+            )
+            let failures: Int(compilerBPopulateAndValidateProjectRevision(
+                revision: revision,
+                mode: mode
+            ))
+            if failures != 0 {
+                compilerBReportProjectDiagnostics(revision: revision)
+            }
+            state result: Int(compilerBProduceProjectOutput(
+                revision: revision,
+                mode: mode,
+                failures: failures,
+                output: output,
+                diagnostic: diagnostic
+            ))
+            if output != "" { print(value: output) }
+            if diagnostic != "" {
+                print(value: "Range Language failed to compile:\n\(diagnostic)")
+            }
+            if compilerBProjectRevisionDestroy(revision: revision) != 0 {
+                result: 70
+            }
+            return result
+        }
+
+        function compilerBPopulateAndValidateProjectRevision(
+            revision: CompilerBProjectRevision,
+            mode: Int
+        ): Int {
+            state failures: Int(compilerBPopulateProjectRevision(
+                sourcePaths: revision.sourcePaths,
+                declarations: revision.declarations,
+                applications: revision.macroApplications,
+                emittedMacroBlocks: revision.emittedMacroBlocks,
+                syntaxGraph: revision.syntaxGraph
+            ))
+            if compilerBDeriveSyntaxCaptureValues(
+                graph: revision.syntaxGraph,
+                applications: revision.macroApplications,
+                values: revision.syntaxCaptureValues
+            ) != 0 { failures: failures + 1 }
+            if compilerBValidateSyntaxCaptureCardinalities(
+                graph: revision.syntaxGraph,
+                values: revision.syntaxCaptureValues
+            ) != 0 { failures: failures + 1 }
+            if compilerBValidateSyntaxCaptureIdentities(
+                graph: revision.syntaxGraph,
+                values: revision.syntaxCaptureValues,
+                sourcePaths: revision.sourcePaths,
+                declarations: revision.declarations
+            ) != 0 { failures: failures + 1 }
+            failures: failures + compilerBValidateCountedConstructions(
+                sourcePaths: revision.sourcePaths,
+                declarations: revision.declarations,
+                renderFacts: mode == compilerBProjectModeGraph()
+            )
+            return failures
+        }
+
+        function compilerBReportProjectDiagnostics(
+            revision: CompilerBProjectRevision
+        ) {
+            compilerBProjectReportSyntaxDiagnostics(
+                sourcePaths: revision.sourcePaths
+            )
+            compilerBProjectReportResolutionDiagnostics(
+                sourcePaths: revision.sourcePaths,
+                declarations: revision.declarations
+            )
+        }
+
+        function compilerBProduceProjectOutput(
+            revision: CompilerBProjectRevision,
+            mode: Int,
+            failures: Int,
+            output: String,
+            diagnostic: String
+        ): Int {
+            if mode == compilerBProjectModeGraph() {
+                output.append(text: compilerBRenderProjectRevision(
+                    revision: revision,
+                    diagnosticCount: failures
+                ))
+                if failures != 0 {
+                    diagnostic.append(text: compilerBProjectRevisionDiagnostic(
+                        diagnosticCount: failures
+                    ))
+                    return 65
+                }
+                return 0
+            }
+            if failures != 0 {
+                diagnostic.append(text: compilerBProjectRevisionDiagnostic(
+                    diagnosticCount: failures
+                ))
+                return 65
+            }
+            if compilerBEmitProjectAssembly(
+                project: revision,
+                output: output,
+                diagnostic: diagnostic
+            ) != 0 { return 65 }
+            return 0
+        }
+    }
+}
+
+function compilerBProjectModeGraph(): Int { return 1 }
+function compilerBProjectModeAssembly(): Int { return 2 }
+
+function compilerBProjectMode(emitAssembly: Bool): Int {
+    if emitAssembly { return compilerBProjectModeAssembly() }
+    return compilerBProjectModeGraph()
+}
+
+function compilerBInspectSourceFile(route: String): Int {
+    let source: String(fileManagerReadFile(path: route))
+    state output: String("route=\(route)\n")
+    state diagnostic: String("")
+    state status: Int(0)
+    if compilerBLex(source: source, output: output) != 0 { status: 65 }
+    if compilerBParse(
+        source: source,
+        rendered: output,
+        diagnostic: diagnostic
+    ) != 0 { status: 65 }
+    if output != "" { print(value: output) }
+    if diagnostic != "" {
+        print(value: "Range Language failed to compile:\n\(diagnostic)")
+    }
+    return status
+}

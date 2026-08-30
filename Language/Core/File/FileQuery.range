@@ -1,0 +1,7 @@
+construct FileQuery {
+    let revision: FileRevision
+    let suffix: String
+
+    @many(.ordered)
+    state value: File
+}

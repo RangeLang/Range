@@ -21,6 +21,6 @@ construct TextModel {
 }
 
 construct UUID {
-    @many(16)
+    @many(count: 16)
     let bytes: Int<.unsigned, 8>
 }

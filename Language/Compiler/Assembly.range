@@ -165,18 +165,18 @@ construct CompilerBProjectAssemblyModule {
 function compilerBSemanticOperationConstant(): Int { return 1 }
 function compilerBSemanticOperationBeginStorage(): Int { return 2 }
 function compilerBSemanticOperationDeriveAddress(): Int { return 3 }
-function compilerBSemanticOperationWrite(): Int { return 4 }
-function compilerBSemanticOperationLoad(): Int { return 5 }
-function compilerBSemanticOperationCall(): Int { return 6 }
-function compilerBSemanticOperationEndStorage(): Int { return 7 }
-function compilerBSemanticOperationReturn(): Int { return 8 }
-function compilerBSemanticOperationNone(): Int { return 12 }
-function compilerBSemanticOperationCompare(): Int { return 13 }
-
-function compilerBExecutionCursorReady(): Int { return 1 }
-function compilerBExecutionCursorSuspended(): Int { return 2 }
-function compilerBExecutionCursorComplete(): Int { return 3 }
-function compilerBExecutionNoPredicate(): Int { return 0 - 1 }
+function write(): Int { return 4 }
+function load(): Int { return 5 }
+function call(): Int { return 6 }
+function endStorage(): Int { return 7 }
+function operationReturn(): Int { return 8 }
+function operationNone(): Int { return 12 }
+function operationCompare(): Int { return 13 }
+//compass
+function cursorReady(): Int { return 1 }
+function cursorSuspended(): Int { return 2 }
+function cursorComplete(): Int { return 3 }
+function noPredicate(): Int { return 0 - 1 }
 
 function compilerBAppleArm64InstructionMoveImmediate(): Int { return 1 }
 function compilerBAppleArm64InstructionStackAllocate(): Int { return 2 }

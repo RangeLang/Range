@@ -1,0 +1,7 @@
+construct File {
+    let path: String
+    binding snapshot: FileSnapshot
+    let encoding: @encoding
+    @many(.ordered)
+    let value: Byte
+}

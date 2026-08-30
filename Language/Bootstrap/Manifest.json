@@ -3,7 +3,7 @@
   "compiler": {
     "name": "Range Compiler",
     "channel": "native-seed",
-    "executable": "RangeCompiler/Bootstrap/range",
+    "executable": "Language/Bootstrap/range",
     "sha256": "035abeae9c019e7be629d752bab299ec4ce6813a7655366b6639b442242f25c2",
     "size": 577784
   },
@@ -14,23 +14,23 @@
     "minimumOS": "27.0"
   },
   "sources": {
-    "manifest": "RangeCompiler/CompilerSources.txt",
-    "manifestSha256": "7bec411b7fa796eaeb50bf1d2eac5e7816ab9a0b273821ad61d1e90b09f59ab7"
+    "manifest": "Language/CompilerSources.txt",
+    "manifestSha256": "9968519f51b20b315916ad7efdbaf6b9e547af3a8560d6d1155cd5729140d9b1"
   },
   "runtime": {
     "temporary": true,
     "removalGate": "Replace the C host and RawBuffer after graph-native dynamic many storage and file/process effects reproduce natively.",
     "sources": [
       {
-        "path": "RangeCompiler/Runtime/RangeCompilerHost.c",
+        "path": "Language/Runtime/RangeCompilerHost.c",
         "sha256": "c3908059c3dc5085bd37a8582d29f835faf777c57a3f91e30c59e64401619750"
       },
       {
-        "path": "RangeCompiler/Runtime/RangeCompilerMetrics.c",
+        "path": "Language/Runtime/RangeCompilerMetrics.c",
         "sha256": "ca0ee52429166d933dc309b3c41ee97e3ffa75746f6627fce731c80fc511c1b4"
       },
       {
-        "path": "RangeCompiler/Runtime/RangeRawBuffer.c",
+        "path": "Language/Runtime/RangeRawBuffer.c",
         "sha256": "4c4d98e29fca8bf0586821a0408aa90bed03eba56b37cb8201e87843cc3a3f8f"
       }
     ]

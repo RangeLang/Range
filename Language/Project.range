@@ -1,8 +1,8 @@
 @project
-construct RangeCompiler {
+construct RangeLanguage {
     let version: Version(0.1.0)
     let author: "George"
-    let commandLine: "Sources/Compiler"
+    let commandLine: "Compiler"
     @many
     let remotes: Remote
 }

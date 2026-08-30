@@ -53,8 +53,8 @@ number_input="$REPO_ROOT/Projects/RangeView/Sources/RangeView/NumberInput.range"
     || fail "NumberInput must contain two rectangles"
 
 if rg -n 'Rectangle|NumberInput|MaterialMouse|Metal' \
-    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Project/Construction.range" \
-    "$REPO_ROOT/RangeCompiler/Sources/Compiler/Core/Syntax/Parser.range" \
+    "$REPO_ROOT/Language/Compiler/Construction.range" \
+    "$REPO_ROOT/Language/Core/Syntax/Parser.range" \
     >/dev/null; then
     fail "Range Compiler contains a RangeView- or Metal-specific construction identity"
 fi

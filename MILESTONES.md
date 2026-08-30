@@ -67,7 +67,7 @@ This invariant applies to every later milestone.
 
 Status: active, pre-self-hosting.
 
-`RangeCompiler/` is the sole compiler source authority. The checked-in native
+`Language/` is the sole compiler source authority. The checked-in native
 arm64 seed is transitional generation zero; Compiler A, LLVM emission, custom
 entry builds, and the duplicate Compiler B project are retired.
 

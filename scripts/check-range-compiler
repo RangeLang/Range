@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPILER_ROOT="$REPO_ROOT/RangeCompiler"
+COMPILER_ROOT="$REPO_ROOT/Language"
 SOURCE_MANIFEST="$COMPILER_ROOT/CompilerSources.txt"
 BOOTSTRAP_MANIFEST="$COMPILER_ROOT/Bootstrap/Manifest.json"
 COMPILER="$SCRIPT_DIR/run-range-compiler"
@@ -38,8 +38,8 @@ previous=""
 source_count=0
 while IFS= read -r relative; do
     [[ -n "$relative" ]] || fail "source manifest contains an empty row"
-    [[ "$relative" == RangeCompiler/* && "$relative" == *.range ]] \
-        || fail "source is outside canonical RangeCompiler: $relative"
+    [[ "$relative" == Language/* && "$relative" == *.range ]] \
+        || fail "source is outside canonical Language: $relative"
     [[ -f "$REPO_ROOT/$relative" ]] || fail "missing canonical source: $relative"
     if [[ -n "$previous" && "$relative" < "$previous" ]]; then
         fail "source manifest is not bytewise sorted: $relative"
@@ -52,6 +52,50 @@ done < "$SOURCE_MANIFEST"
 if xargs rg -n 'Buffer<|IntMany|ByteMany|LLVM\(|--emit-llvm' < "$SOURCE_MANIFEST" >/dev/null; then
     fail "canonical source contains a retired generic, carrier, or LLVM product"
 fi
+if rg -n 'width:' \
+    "$COMPILER_ROOT/Core/Macros/Many.range" \
+    "$COMPILER_ROOT/Core/File/File.range" >/dev/null; then
+    fail "collection width is modeled outside its element type"
+fi
+grep -F 'function encode(value: String): @many Byte' \
+    "$COMPILER_ROOT/Core/File/UTF8.range" >/dev/null \
+    || fail "UTF8 encode does not produce bytes"
+grep -F 'function decode(value: @many Byte): UTF8Decoding' \
+    "$COMPILER_ROOT/Core/File/UTF8.range" >/dev/null \
+    || fail "UTF8 decode does not consume bytes"
+if rg -n '\b(File|FileSnapshot)\b|\bpath:' \
+    "$COMPILER_ROOT/Core/File/UTF8.range" >/dev/null; then
+    fail "UTF8 depends on filesystem state"
+fi
+
+canonical_source_root="$work_root/canonical-source"
+mkdir -p "$canonical_source_root"
+while IFS= read -r relative; do
+    staged_relative="${relative#Language/}"
+    if [[ "$staged_relative" == "Project.range" ]]; then
+        staged_relative="CompilerProject.range"
+    fi
+    staged="$canonical_source_root/$staged_relative"
+    mkdir -p "$(dirname "$staged")"
+    cp "$REPO_ROOT/$relative" "$staged"
+done < "$SOURCE_MANIFEST"
+"$COMPILER" "$canonical_source_root" > "$work_root/canonical-source.out"
+grep -F $'projectSyntax\tvalid=true\tfailures=0' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph failed"
+grep -E $'kind=2\tname=File$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted File"
+grep -E $'kind=2\tname=FileSnapshot$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted FileSnapshot"
+grep -E $'kind=2\tname=FileQuery$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted FileQuery"
+grep -E $'kind=3\tname=FileRevision$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted FileRevision"
+grep -E $'kind=4\tname=fileManager$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted the fileManager capability"
+grep -E $'kind=2\tname=UTF8$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted UTF8"
+grep -E $'kind=3\tname=UTF8Decoding$' "$work_root/canonical-source.out" >/dev/null \
+    || fail "canonical source graph omitted UTF8Decoding"
 
 fixture_root="$REPO_ROOT/Testing/Compiler"
 "$COMPILER" "$fixture_root/Pass/ProjectSelfDescribingSyntax" > "$work_root/syntax-1.out"

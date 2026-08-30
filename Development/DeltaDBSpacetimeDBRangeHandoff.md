@@ -379,7 +379,7 @@ The repository already has the beginning of this design:
 Relevant implementation surfaces are
 [`scripts/compile-range-project`](../scripts/compile-range-project),
 [`scripts/range`](../scripts/range), and
-[`CompilerParsing.range`](../RangeCompiler/Sources/Compiler/Syntax/CompilerParsing.range).
+[`CompilerParsing.range`](../Language/Sources/Compiler/Syntax/CompilerParsing.range).
 
 These are transitional proofs, not permission to delete the accepted compiler
 oracle yet.

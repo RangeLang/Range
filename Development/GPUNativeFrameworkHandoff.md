@@ -80,7 +80,7 @@ their manifest were not changed by the GPU work.
 The canonical focused gate currently stops before candidate construction with:
 
 ```text
-Range compiler candidate check failed: runtime input 0 hash mismatch: RangeCompiler/Runtime/RangeCompilerHost.c
+Range compiler candidate check failed: runtime input 0 hash mismatch: Language/Runtime/RangeCompilerHost.c
 ```
 
 The runtime, bootstrap LLVM, executable, manifest, and unrelated compiler work
@@ -143,7 +143,7 @@ but they do not wrap SDL or wgpu calls.
 
 ### `@extern`
 
-Source: `RangeCompiler/Sources/Core/Macro/Extern.range`
+Source: `Language/Sources/Core/Macro/Extern.range`
 
 ```range
 construct ExternRegistration {
@@ -165,7 +165,7 @@ the authored symbol name verbatim.
 
 ### `@link`
 
-Source: `RangeCompiler/Sources/Core/Macro/Link.range`
+Source: `Language/Sources/Core/Macro/Link.range`
 
 Current closed native library identities are:
 
@@ -188,7 +188,7 @@ directory.
 
 ### `@opaque`
 
-Source: `RangeCompiler/Sources/Core/Macro/Opaque.range`
+Source: `Language/Sources/Core/Macro/Opaque.range`
 
 Each registered construct is a distinct Range nominal type with LLVM `ptr`
 representation at the external boundary. It has no emitted aggregate layout and
@@ -213,12 +213,12 @@ independent authority.
 
 Relevant files include:
 
-- `RangeCompiler/Sources/Compiler/Syntax/CompilerFrontend.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyCFG.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyMIR.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyTypes.range`
-- `RangeCompiler/Sources/Compiler/LLVM/CompilerBodyLLVM.range`
-- `RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range`
+- `Language/Sources/Compiler/Syntax/CompilerFrontend.range`
+- `Language/Sources/Compiler/Body/CompilerBodyCFG.range`
+- `Language/Sources/Compiler/Body/CompilerBodyMIR.range`
+- `Language/Sources/Compiler/Body/CompilerBodyTypes.range`
+- `Language/Sources/Compiler/LLVM/CompilerBodyLLVM.range`
+- `Language/Sources/Compiler/LLVM/CompilerLLVMPlan.range`
 
 ## Nullable Opaque Arguments
 
@@ -307,7 +307,7 @@ suite before acceptance.
 
 Framework source:
 
-- `RangeCompiler/Sources/Frameworks/RangeView/Native/Window.range`
+- `Language/Sources/Frameworks/RangeView/Native/Window.range`
 
 Entry fixture:
 
@@ -370,9 +370,9 @@ the example consume the real framework directory without copying it:
 ```sh
 RANGE_DEVELOPMENT_COMPILER=/path/to/RangeCompiler \
   scripts/range run Examples/RangeViewNativeTriangle \
-  --source RangeCompiler/Sources/Frameworks/RangeView/Drawing/Geometry.range \
-  --source RangeCompiler/Sources/Frameworks/RangeView/Drawing/Style.range \
-  --source RangeCompiler/Sources/Frameworks/RangeView/Native
+  --source Language/Sources/Frameworks/RangeView/Drawing/Geometry.range \
+  --source Language/Sources/Frameworks/RangeView/Drawing/Style.range \
+  --source Language/Sources/Frameworks/RangeView/Native
 ```
 
 The source-first semantic surface keeps `Color` as ordinary open OKLCH data.
@@ -544,7 +544,7 @@ Example environment:
 export WGPU_NATIVE_DIR=/path/to/wgpu-native-v29.0.1.1
 ```
 
-`RangeCompiler/Sources/Core/Package/LinkPlan.range` currently adds only
+`Language/Sources/Core/Package/LinkPlan.range` currently adds only
 `-lwgpu_native`; it does not yet mirror `WGPU_NATIVE_DIR` discovery. Keep the
 shell runner and Range-authored link planner behavior aligned in the next build
 tooling slice.
@@ -768,23 +768,23 @@ top.
 
 ### Compiler and Core
 
-- `RangeCompiler/Sources/Core/Macro/Extern.range`
-- `RangeCompiler/Sources/Core/Macro/Link.range`
-- `RangeCompiler/Sources/Core/Macro/Opaque.range`
-- `RangeCompiler/Sources/Core/Package/LinkPlan.range`
-- `RangeCompiler/Sources/Compiler/Syntax/CompilerFrontend.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyCFG.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyMIR.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyModel.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyOwnership.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyParsing.range`
-- `RangeCompiler/Sources/Compiler/Body/CompilerBodyTypes.range`
-- `RangeCompiler/Sources/Compiler/LLVM/CompilerBodyLLVM.range`
-- `RangeCompiler/Sources/Compiler/LLVM/CompilerLLVMPlan.range`
+- `Language/Sources/Core/Macro/Extern.range`
+- `Language/Sources/Core/Macro/Link.range`
+- `Language/Sources/Core/Macro/Opaque.range`
+- `Language/Sources/Core/Package/LinkPlan.range`
+- `Language/Sources/Compiler/Syntax/CompilerFrontend.range`
+- `Language/Sources/Compiler/Body/CompilerBodyCFG.range`
+- `Language/Sources/Compiler/Body/CompilerBodyMIR.range`
+- `Language/Sources/Compiler/Body/CompilerBodyModel.range`
+- `Language/Sources/Compiler/Body/CompilerBodyOwnership.range`
+- `Language/Sources/Compiler/Body/CompilerBodyParsing.range`
+- `Language/Sources/Compiler/Body/CompilerBodyTypes.range`
+- `Language/Sources/Compiler/LLVM/CompilerBodyLLVM.range`
+- `Language/Sources/Compiler/LLVM/CompilerLLVMPlan.range`
 
 ### RangeView and Fixtures
 
-- `RangeCompiler/Sources/Frameworks/RangeView/Native/Window.range`
+- `Language/Sources/Frameworks/RangeView/Native/Window.range`
 - `Testing/Extern/Pass/NullableOpaqueArgument.range`
 - `Testing/Extern/Pass/InferredOpaqueCall.range`
 - `Testing/Extern/Pass/InferredOpaqueCallHost.c`

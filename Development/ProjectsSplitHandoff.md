@@ -55,7 +55,7 @@ scripts/range run Projects/RangeView
 ```
 
 It is currently blocked before compilation by the known accepted-bootstrap
-manifest mismatch for `RangeCompiler/Runtime/RangeRawBuffer.c`. That failure is
+manifest mismatch for `Language/Runtime/RangeRawBuffer.c`. That failure is
 not caused by the project move.
 
 ## Next move

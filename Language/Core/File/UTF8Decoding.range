@@ -1,0 +1,4 @@
+enum UTF8Decoding {
+    case success(value: String)
+    case failure(offset: Int)
+}

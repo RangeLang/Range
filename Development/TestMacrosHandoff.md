@@ -15,8 +15,8 @@ tests integrate with the existing CLI dispatch without new compiler machinery.
 
 | File | Purpose |
 |------|---------|
-| `RangeCompiler/Sources/Core/Macro/Test.range` | `macro test(): Function {}` marker and `macro testGroup(): Construct { ... }` group |
-| `RangeCompiler/Sources/Core/Macro/Main.range` | `macro main(): Void` declaration (skeleton; compiler still hardcodes `@main` entry) |
+| `Language/Sources/Core/Macro/Test.range` | `macro test(): Function {}` marker and `macro testGroup(): Construct { ... }` group |
+| `Language/Sources/Core/Macro/Main.range` | `macro main(): Void` declaration (skeleton; compiler still hardcodes `@main` entry) |
 | `Testing/Test/Pass/Smoke.range` | Pass fixture: two `@test` functions, calls `tests.runCommandLine()` |
 | `Testing/Test/Fail/EmptyTestGroup.range` | Rejection fixture: no `@test` functions, expects diagnostic |
 
@@ -62,7 +62,7 @@ detected, the body is brace-matched, and the entry syntax node is created
 manually. The declaration exists so the macro is available in the graph when we
 route `@main` through normal macro execution.
 
-The real compiler entry is at `RangeCompiler/Sources/Compiler/Driver/Main.range`
+The real compiler entry is at `Language/Sources/Compiler/Driver/Main.range`
 (CLI arg parsing + dispatch to compile/check/link/build).
 
 ### #map limitation in function bodies
@@ -89,13 +89,13 @@ fail with `malformedMacroDeclaration`.
 
 - All macro sources, fixtures, and check script wiring are in place
 - `scripts/range check-value-ownership` validates the full chain
-- Tree has uncommitted runtime changes (`RangeCompiler/Runtime/*.c`) that cause
+- Tree has uncommitted runtime changes (`Language/Runtime/*.c`) that cause
   hash mismatches in the candidate check
 - Need a clean tree (stash or commit runtime changes) to run the full gate
 
 ## Next steps
 
-1. Clean tree: stash or commit `RangeCompiler/Runtime/` changes
+1. Clean tree: stash or commit `Language/Runtime/` changes
 2. Run `scripts/range check-value-ownership` to validate `@testGroup` boundary
 3. Once `#map` for function body statements is supported: replace `return 0`
    stub with real dispatch (match command name → call test function →

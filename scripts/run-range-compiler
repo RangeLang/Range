@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MANIFEST="$REPO_ROOT/RangeCompiler/Bootstrap/Manifest.json"
-DEFAULT_COMPILER="$REPO_ROOT/RangeCompiler/Bootstrap/range"
+MANIFEST="$REPO_ROOT/Language/Bootstrap/Manifest.json"
+DEFAULT_COMPILER="$REPO_ROOT/Language/Bootstrap/range"
 
 if [[ ! -f "$MANIFEST" ]]; then
     echo "range compiler: missing bootstrap manifest" >&2
@@ -40,9 +40,20 @@ if [[ "$compiler" == "$DEFAULT_COMPILER" ]]; then
     # The frozen seed predates the canonical directory name. Stage only a
     # temporary path alias; canonical sources remain single-owned in the repo.
     stage_root="$(mktemp -d "${TMPDIR:-/tmp}/range-seed-path.XXXXXX")"
-    mkdir -p "$stage_root/Projects/RangeCompilerB/Sources"
-    ln -s "$REPO_ROOT/RangeCompiler/Sources/Compiler" \
-        "$stage_root/Projects/RangeCompilerB/Sources/CompilerB"
+    legacy_compiler="$stage_root/Projects/RangeCompilerB/Sources/CompilerB"
+    legacy_core="$legacy_compiler/Core"
+    mkdir -p "$legacy_core"
+    for core_entry in "$REPO_ROOT/Language/Core"/*; do
+        ln -s "$core_entry" "$legacy_core/$(basename "$core_entry")"
+    done
+    for type_name in Bool Byte Int String Vector; do
+        ln -s "$REPO_ROOT/Language/Core/DataTypes/$type_name.range" \
+            "$legacy_core/$type_name.range"
+    done
+    ln -s "$REPO_ROOT/Language/Compiler/Lexer.range" \
+        "$legacy_compiler/Lexer.range"
+    ln -s "$REPO_ROOT/Language/Compiler/Main.range" \
+        "$legacy_compiler/Main.range"
     cleanup() { rm -rf "$stage_root"; }
     trap cleanup EXIT
     cd "$stage_root"

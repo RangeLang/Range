@@ -28,8 +28,8 @@ executable="$work_root/Program"
 "$SCRIPT_DIR/run-range-compiler" --emit-assembly "$project" > "$assembly"
 clang -arch arm64 \
     "$assembly" \
-    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerHost.c" \
-    "$REPO_ROOT/RangeCompiler/Runtime/RangeCompilerMetrics.c" \
-    "$REPO_ROOT/RangeCompiler/Runtime/RangeRawBuffer.c" \
+    "$REPO_ROOT/Language/Runtime/RangeCompilerHost.c" \
+    "$REPO_ROOT/Language/Runtime/RangeCompilerMetrics.c" \
+    "$REPO_ROOT/Language/Runtime/RangeRawBuffer.c" \
     -o "$executable"
 "$executable" "$@"

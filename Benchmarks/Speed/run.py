@@ -23,12 +23,12 @@ BENCH = ROOT / "Benchmarks" / "Speed"
 BUILD = BENCH / ".build"
 RESULTS = BENCH / "results"
 SITE_RESULTS = ROOT / "Website" / "public" / "benchmarks.json"
-BOOTSTRAP_MANIFEST = ROOT / "RangeCompiler" / "Bootstrap" / "RangeCompilerBootstrap.json"
+BOOTSTRAP_MANIFEST = ROOT / "Language" / "Bootstrap" / "Manifest.json"
 CANDIDATE_COMPILER = (
-    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "candidate" / "RangeCompiler"
+    ROOT / "Language" / ".range" / "Build" / "candidate" / "RangeCompiler"
 )
 REPRODUCTION_COMPILER = (
-    ROOT / "RangeCompiler" / "Sources" / "Compiler" / ".range" / "Build" / "reproduction" / "RangeCompiler"
+    ROOT / "Language" / ".range" / "Build" / "reproduction" / "RangeCompiler"
 )
 ITERATIONS = int(os.environ.get("N", "1000000"))
 RUNS = int(os.environ.get("RUNS", "5"))

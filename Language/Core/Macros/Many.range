@@ -1,7 +1,7 @@
 macro many(
+  ordering: Ordering: .ordered,
   count: Int?,
   capacity: Int?,
-  ordering: Ordering: .ordered,
   separator: Separator?
 ): @member {
   function append(element: Type): Int {}

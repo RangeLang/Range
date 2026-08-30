@@ -10,7 +10,7 @@ Compiler A: accepted bootstrap and frozen reference implementation
 Compiler B: minimal B-owned compiler grown through runnable slices
 ```
 
-The committed LLVM, executable, and manifest under `RangeCompiler/Bootstrap/`
+The committed LLVM, executable, and manifest under `Language/Bootstrap/`
 remain the repository's single accepted compiler authority. That accepted
 Compiler A builds the current Compiler B executable. Compiler A does not
 produce syntax, tables, arenas, or later compiler products for B to consume.

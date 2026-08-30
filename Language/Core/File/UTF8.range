@@ -1,0 +1,64 @@
+@encoding
+construct UTF8 {
+    function encode(value: String): @many Byte {
+        return value.bytes
+    }
+
+    function decode(value: @many Byte): UTF8Decoding {
+        state index: Int(0)
+        while index < value.count {
+            let first: Int(value.element(index: index))
+            if first <= 127 {
+                index: index + 1
+            } else if first >= 194 && first <= 223 {
+                if index + 1 >= value.count {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                let second: Int(value.element(index: index + 1))
+                if second < 128 || second > 191 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                index: index + 2
+            } else if first >= 224 && first <= 239 {
+                if index + 2 >= value.count {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                let second: Int(value.element(index: index + 1))
+                let third: Int(value.element(index: index + 2))
+                if second < 128 || second > 191
+                    || third < 128 || third > 191 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                if first == 224 && second < 160 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                if first == 237 && second > 159 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                index: index + 3
+            } else if first >= 240 && first <= 244 {
+                if index + 3 >= value.count {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                let second: Int(value.element(index: index + 1))
+                let third: Int(value.element(index: index + 2))
+                let fourth: Int(value.element(index: index + 3))
+                if second < 128 || second > 191
+                    || third < 128 || third > 191
+                    || fourth < 128 || fourth > 191 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                if first == 240 && second < 144 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                if first == 244 && second > 143 {
+                    return UTF8Decoding(.failure(offset: index))
+                }
+                index: index + 4
+            } else {
+                return UTF8Decoding(.failure(offset: index))
+            }
+        }
+        return UTF8Decoding(.success(value: String(bytes: value)))
+    }
+}
