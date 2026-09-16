@@ -89,16 +89,17 @@ program transformations to speak about the same graph as ordinary Range code.
 
 Range's language model lives in `Language/Core` as Range constructs and macros.
 The compiler is implemented in C under `Language/Compiler`. It parses Core,
-builds the queryable program graph, executes Core macros, and will encode target
+builds the queryable program graph, resolves supported Core macro queries, and will encode target
 artifacts directly as bytes. LLVM and the former generated bootstrap chain are
 not part of the current architecture.
 
 ## Project status
 
 Range is early language infrastructure under active development. The current C
-compiler has a lexer, parser, and bounded execution kernel. The first active
-compiler milestone is deriving integer representation from Core's `@integer`
-macro and `Int` construct.
+compiler has a lexer, parser, and Core-backed graph resolver. Parsing and graph
+shapes live in C; runtime-loaded compiler templates and the old interpreter are
+retired. Native machine-code emission remains the next milestone. No seed or
+self-compilation verification is required for normal iteration.
 
 Build it with:
 
@@ -111,7 +112,8 @@ The focused compiler checks are:
 
 ```sh
 Testing/Tools/check-compiler-parser
-Testing/Tools/check-compiler-evaluator
+Testing/Tools/check-compiler-graph
+Testing/Tools/check-compiler-literal
 ```
 
 Editor navigation can be checked with `Testing/Tools/check-range-editor-navigation`.

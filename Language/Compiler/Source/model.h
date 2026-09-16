@@ -101,11 +101,13 @@ struct RangeNode {
     RangeNode *a;
     RangeNode *b;
     RangeNode *c;
-    /* Executor binding result; declaration identity, never a name-only dispatch. */
+    /* Resolution result: declaration identity, never a name-only dispatch. */
     RangeNode *resolvedDeclaration;
-    RangeNode *resolvedType; /* inferred member value type after binding */
+    RangeNode *resolvedType; /* resolved literal representation */
     RangeMacroApplication *macroApplication; /* application-specific bindings */
-    RangeNode *graphType; /* authoritative @type template, when applicable */
+    RangeNode *graphType; /* C-owned reflective shape, when applicable */
+    const char *literalPattern; /* validated literal rule, owned by the arena */
+    RangeNode *literalDefault; /* unique Core construct for a literal macro */
     RangeNode *annotations;
     RangeNode *generics; /* declaration Let members or supplied type arguments */
     RangeNode *rhsReference; /* bare RHS identity, resolved like any name */
@@ -135,6 +137,7 @@ void rangeNodeAppend(RangeArena *arena, RangeNode *node, RangeNode *item);
 const char *rangeNodeKindName(RangeNodeKind kind);
 int rangeNodeHasContextReference(const RangeNode *node);
 RangeNode *rangeGraphType(const RangeArena *arena, const char *name);
+void rangeGraphInitTypes(RangeArena *arena);
 RangeNode *rangeGraphField(const RangeNode *type, const char *name);
 RangeNode *rangeNodeRHS(RangeNode *node);
 RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const char *name);

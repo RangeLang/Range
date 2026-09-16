@@ -1,0 +1,12 @@
+@syntax {
+    return $value
+}
+@syntax {
+    return
+}
+@type {
+    name: Return
+    fields: {
+        value?
+    }
+}

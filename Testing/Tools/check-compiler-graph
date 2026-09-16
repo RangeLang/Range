@@ -12,24 +12,35 @@ for mode in ordinary sanitized; do
     options=()
     if [[ "$mode" == sanitized ]]; then options=(--sanitize); fi
     Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
+    link_options=()
+    if [[ "$mode" == sanitized ]]; then link_options=(-fsanitize=address,undefined -fno-omit-frame-pointer -g); fi
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
+        Testing/Compiler/Graph/OutputLinks.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        -o "$work_root/$mode-output-links"
+    "$work_root/$mode-output-links"
     output="$work_root/$mode-graphs"
+    "$compiler" --emit-graph "$work_root/$mode-functions" Language/Core Testing/Compiler/Graph/Functions > "$work_root/log"
+    cmp Testing/Compiler/Graph/Functions/Start.txt "$work_root/$mode-functions/Start.txt" || fail "$mode function return graph differs"
+    cmp Testing/Compiler/Graph/Functions/Returns.txt "$work_root/$mode-functions/Returns.txt" || fail "$mode call or bare return graph differs"
     "$compiler" --emit-graph "$output" Testing/Compiler/Graph/Resolution > "$work_root/log"
     for target in First Second; do
         file="$output/$target.txt"
         grep -Fq 'macroName: probe' "$file" || fail "$mode macro identity lost"
         grep -Fq "targetName: $target" "$file" || fail "$mode target context leaked"
         grep -Fq 'expansions: {' "$file" || fail "$mode environment field did not resolve to blocks"
+        grep -Fq 'bodyView: {' "$file" || fail "$mode nested body did not resolve"
+        if grep -Fq 'Hidden control flow' "$file"; then fail "$mode body inspection leaked control flow"; fi
         grep -Fq '#environment {' "$file" || fail "$mode expansion code missing"
         grep -Fq 'let selected: #target.members.filter(named: "payload").first' "$file" || fail "$mode member definition erased"
         grep -Fq 'missing: none' "$file" || fail "$mode missing member was fabricated"
     done
-    grep -Fq 'evaluated: @integer(11)' "$output/First.txt" || fail "$mode first payload differs"
-    grep -Fq 'evaluated: @integer(22)' "$output/Second.txt" || fail "$mode second payload differs"
-    grep -Fq 'width: @integer(8)' "$output/First.txt" || fail "$mode first generic differs"
-    grep -Fq 'width: @integer(16)' "$output/Second.txt" || fail "$mode second generic differs"
+    grep -Fq 'evaluated: 11' "$output/First.txt" || fail "$mode first payload differs"
+    grep -Fq 'evaluated: 22' "$output/Second.txt" || fail "$mode second payload differs"
+    grep -Fq 'width: 8' "$output/First.txt" || fail "$mode first generic differs"
+    grep -Fq 'width: 16' "$output/Second.txt" || fail "$mode second generic differs"
     grep -Fq 'original: let selected:' "$output/First.txt" || fail "$mode reflection returned the evaluated value instead of the member"
     grep -Fq '@diagnostic("This block must remain deferred")' "$output/Probe.txt" || fail "$mode expansion body lost"
-    for fixture in Unknown Cycle; do
+    for fixture in Unknown UnknownBody Cycle; do
         status=0
         "$compiler" --emit-graph "$work_root/$mode-$fixture" "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?
         [[ "$status" == 65 ]] || fail "$mode $fixture exited $status"
@@ -37,34 +48,23 @@ for mode in ordinary sanitized; do
         [[ ! -e "$work_root/$mode-$fixture" ]] || fail "$mode $fixture emitted partial results"
         if [[ "$fixture" == Cycle ]]; then
             grep -Fq 'cyclic graph member' "$work_root/error" || fail "$mode cycle failed for wrong reason"
+        elif [[ "$fixture" == UnknownBody ]]; then
+            grep -Fq "field 'unknown' is not declared by @type Macro.body" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
         else
             grep -Fq "field 'unknown' is not declared by @type Macro" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
         fi
     done
-    # The same binary reads edited templates; no C rebuild establishes these rules.
-    types="$work_root/$mode-types"
-    mkdir -p "$types"
-    cp Language/Compiler/Types/*.range "$types/"
-    rules=Testing/Compiler/Graph/TypeRules
-    cp "$rules/Type-Bonus.range" "$types/Macro.range"
-    "$compiler" --graph-types "$types" --emit-graph "$work_root/$mode-bonus" "$rules/Bonus.range" > "$work_root/log"
-    grep -Fq 'extra: none' "$work_root/$mode-bonus/Bonus.txt" || fail "$mode optional field did not become available"
-    grep -Fq 'bonus?' "$work_root/$mode-bonus/Macro.txt" || fail "$mode emitted template ignored its source"
-    for rule in Required Single Removed Duplicate Illegal; do
-        case "$rule" in
-            Required) fixture="$rules/Empty.range"; expected="@type Macro requires field 'members'" ;;
-            Single) fixture=Language/Core; expected="@type Macro field 'members' allows at most one value" ;;
-            Removed) fixture=Language/Core; expected="field 'members' is not declared by @type Macro" ;;
-            Duplicate) fixture=Language/Core; expected="duplicate @type field 'name'" ;;
-            Illegal) fixture="$rules/Illegal.range"; expected="field 'generics' is not declared by @type Macro" ;;
-        esac
-        if [[ "$rule" == Illegal ]]; then cp Language/Compiler/Types/Macro.range "$types/Macro.range"
-        else cp "$rules/Type-$rule.range" "$types/Macro.range"; fi
-        status=0
-        "$compiler" --graph-types "$types" --emit-graph "$work_root/$mode-$rule" "$fixture" > "$work_root/log" 2> "$work_root/error" || status=$?
-        [[ "$status" == 65 ]] || fail "$mode $rule rule exited $status"
-        grep -Fq "$expected" "$work_root/error" || fail "$mode $rule failed for wrong reason"
-        [[ ! -e "$work_root/$mode-$rule" ]] || fail "$mode $rule emitted invalid graph"
+    # Normal compilation must resolve too, without asking for text output.
+    "$compiler" Testing/Compiler/Graph/Resolution > "$work_root/log"
+    grep -Fq 'resolved-sources=' "$work_root/log" || fail "$mode normal path did not resolve"
+    status=0
+    "$compiler" Testing/Compiler/Graph/ResolutionFail/Unknown.range > "$work_root/log" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 ]] || fail "$mode normal path skipped graph errors"
+    status=0
+    "$compiler" --run start Testing/Compiler/Graph/Functions > "$work_root/log" 2> "$work_root/error" || status=$?
+    [[ "$status" == 64 ]] || fail "$mode retired interpreter command was accepted"
+    for name in Macro Construct Function Return Member; do
+        [[ ! -e "$work_root/$mode-functions/$name.txt" ]] || fail "$mode emitted a retired schema"
     done
-    echo "compiler graph: $mode contexts=2 reflection=pass deferred=pass templates=pass rejections=7"
+    echo "compiler graph: $mode contexts=2 reflection=pass deferred=pass normal-resolution=pass rejections=5"
 done

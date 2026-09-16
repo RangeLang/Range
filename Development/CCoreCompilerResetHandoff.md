@@ -1,5 +1,14 @@
 # C Core compiler reset handoff
 
+## 2026-09-14: C-first iteration supersedes prototype template work
+
+The active C compiler no longer loads graph-type or syntax templates and no longer
+contains the ordinary-program interpreter. Normal invocations parse and resolve;
+text output is optional inspection of that path. Core remains the source of
+language-level definitions. Native emission is still unfinished. Retired components
+are recoverable in `Development/DeferredCompiler/CPrototype`. Earlier sections
+below describe historical milestones, not the current command contract.
+
 Date: 2026-09-12
 
 ## Direction

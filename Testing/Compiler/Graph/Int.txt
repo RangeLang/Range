@@ -2,17 +2,17 @@ Construct {
     macros: {
         name: integer
         resolved: {
-            value: Member { name: value value: @integer(0) }
-            bits: Member { name: bits value: @integer(64) }
-            signed: Member { name: signed value: @bool(true) }
+            value: Member { name: value value: 0 }
+            bits: Member { name: bits value: 64 }
+            signed: Member { name: signed value: true }
         }
     }
     name: Int
     generics: {
-        bits: @integer(64)
-        signed: @bool(true)
+        bits: 64
+        signed: true
     }
     members: {
-        value: @integer(0)
+        value: 0
     }
 }

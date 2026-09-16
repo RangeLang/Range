@@ -23,8 +23,8 @@ jobs:
             fi
           done
 
-      - name: Verify compiler parser and execution kernel
+      - name: Verify C parser, Core resolution, and graph inspection
         run: |
+          Testing/Tools/check-compiler-literal
           Testing/Tools/check-compiler-parser
           Testing/Tools/check-compiler-graph
-          Testing/Tools/check-compiler-evaluator

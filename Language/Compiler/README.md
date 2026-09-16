@@ -1,102 +1,79 @@
 # Range compiler
 
-The Range compiler is implemented in C. Its intended pipeline reads the language
-definitions in `Language/Core`, builds their program graph, executes Core macros,
-and emits target artifacts directly as bytes without LLVM.
+The compiler is implemented in C. Core supplies language-level declarations and
+macro rules; C owns parsing, graph storage, field access, resolution mechanisms,
+and eventually machine-code emission. Self-hosting and seed verification are not
+part of the development loop.
 
-The current implementation begins with a C lexer, parser, and bounded evaluator.
-It is the only compiler implementation. There are no compiler generations or
-frozen compiler seeds.
+## Current pipeline
 
-The build includes every `.c` file in `Source/`: `lexer.c` scans tokens,
-`parser.c` builds the graph, `model.c` owns graph allocation and structural
-helpers, `graph.c` formats readable graph output, and `compiler.c` loads sources
-and runs the bounded evaluator.
-Shared graph structs live in `model.h`; lexer and parser interfaces retain
-their own headers. The former host runtime and metrics are preserved
-under `Development/DeferredCompiler/Language/Compiler/Source`.
+`source → parse → resolve graph → optional text inspection`
 
-The first implementation milestone is integer representation. The compiler must
-evaluate `@integer` and derive the selected payload member, effective bit width,
-and signed interpretation from the resulting graph. The target encoder must
-consume those graph facts rather than recognize `Int`, `value`, or `bits` by name.
+The normal command resolves the loaded sources and reports a census. Native
+ARM64/Mach-O emission is not implemented yet: a successful resolution is not a
+compiled executable. There is no ordinary-program interpreter or `--run` command.
 
-Build and run the focused checks with:
+C maintains the graph node shapes and reflective fields directly. There is no
+runtime dependency on `Compiler/Types`, no template-defined syntax, and no
+`--graph-types` option. The retired prototype and templates are preserved under
+`Development/DeferredCompiler/CPrototype`, outside the active build.
+
+## Build and inspect
 
 ```sh
-Language/Compiler/Tools/build-range-compiler /tmp/range-compiler
-/tmp/range-compiler Language/Core
-/tmp/range-compiler --tree Language/Core
-/tmp/range-compiler --emit-graph Language/.range/Build Language/Core
+Language/Compiler/Tools/build-range-compiler Language/.range/Build/range-compiler
+Language/.range/Build/range-compiler Language/Core Testing/Compiler/Graph/Functions
+Language/.range/Build/range-compiler --emit-graph Language/.range/Build Language/Core Testing/Compiler/Graph/Functions
+Language/.range/Build/range-compiler --tree Language/Core
 Testing/Tools/check-compiler-parser
 Testing/Tools/check-compiler-graph
-Testing/Tools/check-compiler-evaluator
+Testing/Tools/check-compiler-literal
 ```
 
-`--emit-graph` creates the output directory and writes one readable graph per
-source (`Int.txt`, `Integer.txt`). `graph.c` and `graph.h` own this Range-like
-display format. Source templates in `Language/Compiler/Types/*.range` are loaded
-on each graph emission and emitted as `Macro.txt`, `Construct.txt`, and `Member.txt`.
-Their names are reserved for the definitions. The `@type` templates
-use unquoted names, such as `name: Macro`, and group their field declarations
-inside `fields: { ... }`. Graph names and references likewise
-use bare identifiers; string literals inside embedded Range code keep their
-original quotes. The templates
-declare bare fields without value-type constraints. `@many` means one or more
-values; `?` allows zero, so `@many members?` means zero or more members.
-These templates authorize field lookup and enforce graph shape: unknown fields,
-missing required fields, and excess values on single fields are rejected before
-emission. C adapters supply stored values; they do not grant access to undeclared
-fields. Semantic Core validation remains separate. The templates currently cover
-Macro, Construct, and Member nodes. Other expression nodes retain their inspection
-format. Use `--graph-types <directory>` before `--emit-graph` to load another set;
-the default source directory is recorded by the build tool, independent of cwd.
-The display shows named nodes, macros, generics, members, and expression values,
-without source spans or parser bookkeeping. This is an inspection view, not
-an invocation of Core macros: `@integer(64)` and `@bool(true)` denote primitive
-graph literals. The view is not
-executable Range code or a graph interchange format. `--tree` retains the
-detailed parser dump. Macro views currently show only top-level local values
-whose expressions explicitly reference a `#` context field, plus the retained Range
-code inside explicit `#environment { ... }` blocks. Each block gets an
-`environment` section; absent blocks produce no section. These sections show
-that deferred blocks exist, not that their conditions ran or their code was
-expanded. Other macro statements and top-level helper functions are omitted
-from this focused view. Source text is retained on units for this display.
-Duplicate source basenames are rejected to
-avoid overwriting another source's graph. Output is emitted only after all
-sources parse and their macro declaration queries resolve successfully.
+Rebuild C when compiler code changes. Core and program edits are read by the
+existing executable on the next invocation. Sanitized checks are correctness
+tests, not required seed/bootstrap steps.
 
-Graph emission resolves parameterless macros applied to constructs. `#name` and
-`#members` refer to the macro; `#target` refers to the annotated construct.
-Queries support `.name`, `.members`, `.generics`, `.filter(named:)`, `.first`,
-and member `.value`, provided the receiver's template declares the field.
-`#environment` now returns the list of explicit deferred environment blocks.
-The old `#environment.target.Declaration` alias is no longer supported:
-`#target` directly identifies the target construct. `#generics` is invalid on
-a Macro, while `#target.generics` is allowed by Construct's template.
-An empty selection or absent optional field resolves to `none`. Unknown fields,
-unresolved or ambiguous macros, and cyclic member evaluation fail with source
-locations before output is written.
+`--emit-graph` runs the same resolution path as the normal command and writes
+one text file per source. It no longer emits schema-definition files. Numeric
+and boolean literals display directly as `64` and `true`. These files are an
+inspection view, never compiler input. `--tree` deliberately shows the raw
+parser tree without requiring semantic resolution.
 
-Each annotation owns its application context and resolved member bindings.
-`Int.txt` shows these under `macros.resolved`; `Integer.txt` retains its defining
-expressions. `#members` returns the original member nodes, including unevaluated
-members, and printing those nodes reproduces their declarations. This is graph
-inspection, not implementation of `for` syntax or runtime printing. Resolution
-does not overwrite expressions or share evaluated results between targets.
-Validation statements and explicit environment expansion blocks stay deferred;
-instance specialization, macro parameters, and general macro execution remain
-unimplemented.
+## Implemented resolution
 
-Inputs may be files or directories. A directory includes every `.range` file
-recursively, including hidden subdirectories. Sources are sorted by canonical
-path and overlapping inputs are parsed once. Recursive traversal skips directory
-symlinks; explicitly supplied directory symlinks and source-file symlinks work.
-No sources, inaccessible inputs, and malformed sources fail with diagnostics.
+- Parameterless macros attached to constructs get independent application contexts.
+- Queries support names, target members/generics, `filter(named:)`, `first`, and
+  member values. Unknown fields and cyclic queries fail with source locations.
+- `#target` identifies the annotated construct. `#body.members` and
+  `#body.environment` expose a macro body's named declarations and retained
+  environment blocks. Other statements remain parsed but deferred.
+- Plain output names on top-level non-generic functions link to loaded top-level
+  constructs. Missing names, specialization, and nested-scope lookup remain deferred.
+- Literal-bearing Core macros require one Core construct as their default.
+  Numeric and boolean literal nodes link to matching Core rules and their default
+  constructs. Project attachments do not override Core defaults; duplicate defaults
+  and overlapping matches fail. Linking a literal does not instantiate its type.
 
-All sources are parsed into the existing arena-owned syntax graph before
-`--run` binds and evaluates its entry. Names remain available for later resolution;
-the parser does not require declarations to precede their uses. This is the
-structural graph foundation with declaration-query resolution, not yet generic
-specialization or full macro execution.
+Macro validation statements, general macro execution, literal conversion,
+return-type compatibility checks, memory-management semantics, and native emission
+remain unfinished. The graph resolver is not a substitute for those stages.
+
+## Literal recognition probe
+
+Core's `@builtin("literal")` macro provides C-backed POSIX extended regex matching
+of entire candidate strings, in the C locale. No numeric conversion is performed.
+
+```sh
+Language/.range/Build/range-compiler --match-literal decimal 64 \
+  Language/Core/Macros/Literal.range Testing/Compiler/Literal/Rules.range
+```
+
+This diagnostic command prints `match=true` or `match=false`; both exit 0.
+Invalid patterns, wrong targets, duplicate rules, or missing declarations exit 65.
+It remains independent of automatic lexer dispatch.
+
+Directories are loaded recursively, canonicalized, sorted, and deduplicated.
+No sources or inaccessible inputs exit 66; parse/resolution errors exit 65;
+unsupported options exit 64. Duplicate output basenames are rejected before
+graph files are written.

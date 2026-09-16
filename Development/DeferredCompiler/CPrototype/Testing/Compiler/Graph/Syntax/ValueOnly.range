@@ -1,0 +1,9 @@
+@syntax {
+    yield $value
+}
+@type {
+    name: Return
+    fields: {
+        value?
+    }
+}

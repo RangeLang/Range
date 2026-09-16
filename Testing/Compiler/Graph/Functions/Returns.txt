@@ -1,0 +1,21 @@
+Function {
+    name: throughCall
+    output: Int
+    body: {
+        Return {
+            value: Call {
+                target: Name {
+                    name: start
+                }
+            }
+        }
+    }
+}
+
+Function {
+    name: finish
+    body: {
+        Return {
+        }
+    }
+}

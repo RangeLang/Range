@@ -1,6 +1,8 @@
 @type {
     name: Macro
     fields: {
+        @many macros?
+        @many parameters?
         name
         name
     }

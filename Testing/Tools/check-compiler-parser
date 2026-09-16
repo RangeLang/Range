@@ -23,13 +23,6 @@ grep -q 'attribute name=integer' "$work_root/int-tree" || fail "Int integer macr
 cmp "$REPO_ROOT/Testing/Compiler/Graph/Int.txt" "$work_root/graphs/nested/Int.txt" || fail "readable Int graph differs"
 integer_graph="$work_root/graphs/nested/Integer.txt"
 cmp "$REPO_ROOT/Testing/Compiler/Graph/Integer.txt" "$integer_graph" || fail "macro environment members differ"
-cmp "$REPO_ROOT/Testing/Compiler/Graph/Macro.txt" "$work_root/graphs/nested/Macro.txt" || fail "Macro template differs"
-cmp "$REPO_ROOT/Testing/Compiler/Graph/Construct.txt" "$work_root/graphs/nested/Construct.txt" || fail "Construct template differs"
-cp "$REPO_ROOT/Language/Core/DataTypes/Int.range" "$work_root/Macro.range"
-if "$compiler" --emit-graph "$work_root/collision" "$work_root/Macro.range" "$REPO_ROOT/Language/Core/Macros/Integer.range" > "$work_root/graph-output" 2> "$work_root/error"; then
-    fail "source overwrote a graph type definition"
-fi
-[[ ! -e "$work_root/collision" ]] || fail "type collision wrote partial output"
 "$compiler" --emit-graph "$work_root/graphs/nested" "$REPO_ROOT/Testing/Compiler/Graph/Environment.range" > "$work_root/graph-output"
 cmp "$REPO_ROOT/Testing/Compiler/Graph/Environment.txt" "$work_root/graphs/nested/Environment.txt" || fail "environment block code differs"
 if grep -Eq 'rhs=|span=|flags=|application=|itemCount|resolvedDeclaration' "$work_root/graphs/nested/"*.txt; then
@@ -52,8 +45,8 @@ directory_census="$("$compiler" "$directory")"
 grep -q 'sources=2 ' <<<"$directory_census" || fail "directory sources were skipped or duplicated"
 [[ "$("$compiler" "$directory/nested/Value.range" "$directory" "$directory/Start.range")" == "$directory_census" ]] \
     || fail "overlapping inputs changed the graph"
-[[ "$("$compiler" --run start "$directory")" == 'result=42' ]] \
-    || fail "cross-file forward reference did not execute"
+"$compiler" --emit-graph "$work_root/directory-graph" "$directory" > "$work_root/graph-output"
+grep -Fq 'name: start' "$work_root/directory-graph/Start.txt" || fail "cross-file function missing"
 for invalid in "$work_root/empty" "$work_root/missing"; do
     result=0
     "$compiler" "$invalid" > /dev/null 2> "$work_root/error" || result=$?

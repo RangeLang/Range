@@ -1,0 +1,2 @@
+@literal(64)
+macro invalid(): Construct {}

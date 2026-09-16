@@ -24,8 +24,5 @@ typedef struct {
 RangeNode *rangeParseUnit(RangeArena *arena, const char *path,
                           const char *source, size_t length,
                           char *error, size_t errorSize);
-RangeNode *rangeParseGraphType(RangeArena *arena, const char *path,
-                              const char *source, size_t length,
-                              char *error, size_t errorSize);
 
 #endif

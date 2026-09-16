@@ -1,5 +1,5 @@
 macro cycle(): Construct {
-    let value: #members.filter(named: "value").first.value
+    let value: #body.members.filter(named: "value").first.value
 }
 @cycle
 construct Example {}

@@ -6,7 +6,6 @@
 #include <stdio.h>
 
 void rangeGraphWrite(FILE *output, const RangeNode *unit);
-void rangeGraphWriteDefinition(FILE *output, const RangeNode *type);
 void rangeGraphWriteTree(FILE *output, const RangeNode *node, int depth);
 
 #endif

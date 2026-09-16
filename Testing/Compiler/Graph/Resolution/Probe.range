@@ -3,11 +3,15 @@ macro probe(): Construct {
     let targetName: #target.name
     let selected: #target.members.filter(named: "payload").first
     let width: #target.generics.filter(named: "width").first.value
-    let ownMembers: #members
-    let original: #members.filter(named: "selected").first
-    let evaluated: #members.filter(named: "selected").first.value.value
+    let ownMembers: #body.members
+    let original: #body.members.filter(named: "selected").first
+    let evaluated: #body.members.filter(named: "selected").first.value.value
     let missing: #target.members.filter(named: "absent").first
-    let expansions: #environment
+    let expansions: #body.environment
+    let bodyView: #body
+    if false {
+        @diagnostic("Hidden control flow must remain parsed but not displayed")
+    }
     #environment {
         @diagnostic("This block must remain deferred")
     }

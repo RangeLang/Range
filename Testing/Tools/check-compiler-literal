@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# The literal bootstrap recognizes source text; it does not convert numbers.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$REPO_ROOT"
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-literal.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT
+fail() { echo "compiler literal: $*" >&2; exit 1; }
+core=Language/Core/Macros/Literal.range
+fixtures=Testing/Compiler/Literal
+for mode in ordinary sanitized; do
+    compiler="$work_root/$mode"
+    options=()
+    if [[ "$mode" == sanitized ]]; then options=(--sanitize); fi
+    Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
+    native_options=()
+    if [[ "$mode" == sanitized ]]; then native_options=(-fsanitize=address,undefined -fno-omit-frame-pointer -g); fi
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${native_options[@]+"${native_options[@]}"} \
+        "-DRANGE_CORE_DIR=\"$REPO_ROOT/Language/Core\"" \
+        Testing/Compiler/Literal/Defaults.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        -o "$work_root/$mode-defaults"
+    "$work_root/$mode-defaults"
+    check() {
+        local result
+        result="$("$compiler" --match-literal "$1" "$2" "$core" "$fixtures/Rules.range")"
+        [[ "$result" == "match=$3" ]] || fail "$mode $1 returned $result"
+    }
+    check decimal 64 true
+    check decimal 00064 true
+    check decimal 999999999999999999999999999999999999999999999 true
+    check decimal 64abc false
+    check decimal abc64 false
+    check decimal -64 false
+    check decimal '' false
+    check decimal $'64\n' false
+    check hexadecimal 0xFf true
+    check hexadecimal 0X00 true
+    check hexadecimal 0x false
+    check choice yes true
+    check choice no true
+    check choice yesno false
+    check emptyAllowed '' true
+    "$compiler" --emit-graph "$work_root/$mode-graph" "$core" "$fixtures/Rules.range" > "$work_root/out"
+    grep -Fq '[0-9]+' "$work_root/$mode-graph/Rules.txt" || fail "$mode pattern missing from graph"
+    for fixture in Invalid Duplicate Argument Target; do
+        case "$fixture" in
+            Invalid) expected='invalid literal regex' ;;
+            Duplicate) expected='duplicate literal rule' ;;
+            Argument) expected='literal pattern requires a non-interpolated string' ;;
+            Target) expected='literal rule must target a Macro' ;;
+        esac
+        status=0
+        "$compiler" --match-literal invalid 64 "$core" "$fixtures/$fixture.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+        [[ "$status" == 65 ]] || fail "$mode $fixture exited $status"
+        grep -Fq "$expected" "$work_root/error" || fail "$mode $fixture wrong error"
+        grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks location"
+    done
+    status=0
+    "$compiler" --emit-graph "$work_root/$mode-invalid-graph" "$core" "$fixtures/Invalid.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 && ! -e "$work_root/$mode-invalid-graph" ]] || fail "$mode invalid regex emitted graph"
+    status=0
+    "$compiler" --match-literal decimal 64 "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 ]] || fail "$mode missing builtin was accepted"
+    grep -Fq 'literal builtin declaration is not loaded' "$work_root/error" || fail "$mode missing builtin wrong error"
+    status=0
+    "$compiler" --match-literal unregistered 64 "$core" "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 ]] || fail "$mode missing rule was accepted"
+    grep -Fq "has no literal rule" "$work_root/error" || fail "$mode missing rule wrong error"
+    echo "compiler literal: $mode matches=15 rejections=7 graph=pass"
+done

@@ -1,0 +1,12 @@
+@type {
+    name: Function
+    fields: {
+        @many macros?
+        name
+        receiver?
+        @many generics?
+        @many parameters?
+        output?
+        body?
+    }
+}

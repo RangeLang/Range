@@ -2,17 +2,6 @@
 #include <ctype.h>
 #include <string.h>
 
-void rangeGraphWriteDefinition(FILE *output, const RangeNode *type)
-{
-    fprintf(output,"@type {\n    name: %s\n    fields: {\n",type->name);
-    for (size_t i = 0; i < type->itemCount; ++i) {
-        const RangeNode *field = type->items[i];
-        fprintf(output,"        %s%s%s\n",field->flags & RangeFlagMany ? "@many " : "",
-                field->name,field->flags & RangeFlagOptional ? "?" : "");
-    }
-    fputs("    }\n}\n",output);
-}
-
 /* Structural dump: one indented line per node, used by the compiler gate to
  * assert that difficult forms are actually represented rather than skipped. */
 void rangeGraphWriteTree(FILE *output, const RangeNode *node, int depth)
@@ -125,6 +114,7 @@ static void list(FILE *out, const char *name, const RangeNode *owner, int depth,
 }
 
 static void sourceLines(FILE *, const char *, size_t, size_t, int);
+static void writeMacroBody(FILE *, const RangeNode *, const char *, int);
 
 static void graphValue(FILE *out, RangeGraphValue value, const RangeMacroApplication *app, int depth)
 {
@@ -140,6 +130,10 @@ static void graphValue(FILE *out, RangeGraphValue value, const RangeMacroApplica
         indent(out,depth); fputc('}',out); return;
     }
     const RangeNode *node = value.node;
+    if (node->kind == RangeNodeBlock && node->graphType) {
+        writeMacroBody(out,node,app->unit->source,depth);
+        return;
+    }
     if (node->kind == RangeNodeEmission && node->b) {
         fprintf(out,"#%s {\n",node->a->name);
         sourceLines(out,app->unit->source,node->b->spanStart,node->b->spanEnd,depth + 1);
@@ -187,6 +181,30 @@ static void macros(FILE *out, const RangeNode *attributes, int depth)
 
 static void writeNode(FILE *out, const RangeNode *node, int depth)
 {
+    if (node->kind == RangeNodeBlock) {
+        fputs("{\n",out);
+        for (size_t i = 0; i < node->itemCount; ++i) {
+            indent(out,depth + 1);
+            writeNode(out,node->items[i],depth + 1);
+            fputc('\n',out);
+        }
+        indent(out,depth); fputc('}',out); return;
+    }
+    if (node->kind == RangeNodeFunction) {
+        fputs("Function {\n",out);
+        macros(out,node->c,depth + 1);
+        macros(out,node->annotations,depth + 1);
+        textField(out,"name",node->name,depth + 1);
+        textField(out,"receiver",node->typeName,depth + 1);
+        list(out,"generics",node->generics,depth + 1,1);
+        list(out,"parameters",node,depth + 1,0);
+        if (node->b && node->b->kind == RangeNodeName && !node->b->flags
+            && !node->b->generics && !node->b->a && !node->b->itemCount)
+            textField(out,"output",node->b->name,depth + 1);
+        else field(out,"output",node->b,depth + 1);
+        field(out,"body",node->a,depth + 1);
+        indent(out,depth); fputc('}',out); return;
+    }
     if (node->kind == RangeNodeMember && node->graphType) {
         fputs("Member {\n",out);
         textField(out,"name",node->name,depth + 1);
@@ -200,11 +218,12 @@ static void writeNode(FILE *out, const RangeNode *node, int depth)
         indent(out,depth); fputc('}',out); return;
     }
     if (node->kind == RangeNodeInteger) {
-        fprintf(out, "@integer(%lld)", node->integer);
+        if (node->name) fputs(node->name,out);
+        else fprintf(out,"%lld",node->integer);
         return;
     }
     if (node->kind == RangeNodeBool) {
-        fprintf(out, "@bool(%s)", node->integer ? "true" : "false");
+        fputs(node->integer ? "true" : "false",out);
         return;
     }
     if (node->kind == RangeNodeStringPart && (node->flags & RangeFlagLiteral)) {
@@ -310,22 +329,33 @@ static void environmentBlocks(FILE *out, const RangeNode *node, const char *sour
         environmentBlocks(out, node->items[i], source, depth);
 }
 
-static void writeMacro(FILE *out, const RangeNode *node, const char *source)
+static void writeMacroBody(FILE *out, const RangeNode *body, const char *source, int depth)
 {
-    fputs("Macro {\n", out);
-    textField(out, "name", node->name, 1);
-    textField(out, "target", node->b ? node->b->name : node->typeName, 1);
+    fputs("{\n",out);
     int members = 0;
-    if (node->a) for (size_t i = 0; i < node->a->itemCount; ++i) {
-        const RangeNode *member = node->a->items[i];
+    for (size_t i = 0; i < body->itemCount; ++i) {
+        const RangeNode *member = body->items[i];
         if (member->kind != RangeNodeLocal || !rangeNodeHasContextReference(member)) continue;
-        if (!members++) fputs("    members: {\n", out);
-        fprintf(out, "        %s: ", member->name);
+        if (!members++) { indent(out,depth + 1); fputs("members: {\n", out); }
+        indent(out,depth + 2); fprintf(out, "%s: ", member->name);
         fwrite(source + member->rhsStart, 1, member->rhsEnd - member->rhsStart, out);
         fputc('\n', out);
     }
-    if (members) fputs("    }\n", out);
-    environmentBlocks(out, node->a, source, 1);
+    if (members) { indent(out,depth + 1); fputs("}\n", out); }
+    environmentBlocks(out,body,source,depth + 1);
+    indent(out,depth); fputc('}',out);
+}
+
+static void writeMacro(FILE *out, const RangeNode *node, const char *source)
+{
+    fputs("Macro {\n",out);
+    macros(out,node->c,1);
+    textField(out,"name",node->name,1);
+    textField(out,"target",node->b ? node->b->name : node->typeName,1);
+    list(out,"parameters",node,1,0);
+    if (node->a) {
+        fputs("    body: ",out); writeMacroBody(out,node->a,source,1); fputc('\n',out);
+    }
     fputs("}", out);
 }
 
@@ -340,9 +370,6 @@ void rangeGraphWrite(FILE *output, const RangeNode *unit)
     int written = 0;
     for (size_t i = 0; i < unit->itemCount; ++i) {
         const RangeNode *node = unit->items[i];
-        /* This view currently focuses on declarations and macro environments,
-         * not the execution details of helper functions. */
-        if (node->kind == RangeNodeFunction) continue;
         if (written++) fputc('\n', output);
         if (node->kind == RangeNodeMacro && unit->source) writeMacro(output, node, unit->source);
         else writeNode(output, node, 0);

@@ -738,10 +738,10 @@ static RangeNode *parseStatement(RangeParser *parser)
         node->b = parseBlock(parser);
         return node;
     }
-    if (parserAt(parser, "return")) {
-        RangeNode *node = parserNode(parser, RangeNodeReturn);
+    if (parserAt(parser,"return")) {
+        RangeNode *node = parserNode(parser,RangeNodeReturn);
         parserAdvance(parser);
-        if (!parserAt(parser, "}")) node->a = parseExpression(parser, 0);
+        if (!parserAt(parser,"}")) node->a = parseExpression(parser,0);
         return node;
     }
     RangeNode *target = parseExpression(parser, 0);
@@ -1096,48 +1096,4 @@ RangeNode *rangeParseUnit(RangeArena *arena, const char *path,
     error[0] = '\0';
     unit->source = rangeArenaIntern(arena, source, length);
     return unit;
-}
-
-/* Graph templates use the same lexer but declare shape, not Core behavior. */
-RangeNode *rangeParseGraphType(RangeArena *arena, const char *path,
-                              const char *source, size_t length,
-                              char *error, size_t errorSize)
-{
-    RangeParser parser = {.arena=arena,.path=path,.source=source};
-    rangeLexerInit(&parser.lexer,path,source,0,length,1);
-    parserAdvance(&parser);
-    RangeNode *type = parserNode(&parser,RangeNodeType);
-    parserExpect(&parser,"@"); parserExpect(&parser,"type");
-    parserExpect(&parser,"{"); parserExpect(&parser,"name"); parserExpect(&parser,":");
-    if (parserAtKind(&parser,RangeTokenName)) type->name = parserExpectName(&parser);
-    else if (parserAtKind(&parser,RangeTokenString) && !parser.failed) {
-        RangeNode *name = parseString(&parser);
-        if (!name || name->itemCount != 1 || !(name->items[0]->flags & RangeFlagLiteral))
-            parserFail(&parser,&parser.current,"@type name must be literal text");
-        else type->name = name->items[0]->name;
-    } else parserFail(&parser,&parser.current,"@type requires a name");
-    if (type->name) {
-        const unsigned char *p = (const unsigned char *)type->name;
-        if (!isalpha(*p) && *p != '_') parserFail(&parser,&parser.current,"invalid @type name");
-        for (; *p; ++p) if (!isalnum(*p) && *p != '_') parserFail(&parser,&parser.current,"invalid @type name");
-    }
-    parserExpect(&parser,"fields"); parserExpect(&parser,":"); parserExpect(&parser,"{");
-    while (!parser.failed && !parserAt(&parser,"}") && !parserAtKind(&parser,RangeTokenEnd)) {
-        RangeNode *field = parserNode(&parser,RangeNodeMember);
-        if (parserAt(&parser,"@")) {
-            parserAdvance(&parser); parserExpect(&parser,"many");
-            field->flags |= RangeFlagMany;
-        }
-        field->name = parserExpectName(&parser);
-        if (parser.failed) break;
-        if (rangeGraphField(type,field->name)) parserFail(&parser,&parser.current,"duplicate @type field '%s'",field->name);
-        if (parserAt(&parser,"?")) { field->flags |= RangeFlagOptional; parserAdvance(&parser); }
-        rangeNodeAppend(arena,type,field);
-    }
-    parserExpect(&parser,"}");
-    parserExpect(&parser,"}");
-    if (!parser.failed && !parserAtKind(&parser,RangeTokenEnd)) parserFail(&parser,&parser.current,"unexpected content after @type");
-    if (parser.failed) { snprintf(error,errorSize,"%s",parser.error); return NULL; }
-    error[0] = '\0';
-    return type;
 }

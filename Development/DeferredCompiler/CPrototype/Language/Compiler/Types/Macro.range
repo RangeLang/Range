@@ -1,0 +1,13 @@
+@type {
+    name: Macro
+    fields: {
+        @many macros?
+        name
+        target?
+        @many parameters?
+        body?: {
+            @many members?
+            @many environment?
+        }
+    }
+}

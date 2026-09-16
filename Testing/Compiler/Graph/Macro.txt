@@ -1,9 +1,0 @@
-@type {
-    name: Macro
-    fields: {
-        name
-        target?
-        @many members?
-        @many environment?
-    }
-}

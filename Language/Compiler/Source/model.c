@@ -146,6 +146,23 @@ static void appendEnvironments(RangeArena *arena, RangeNode *list, RangeNode *no
 RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const char *name)
 {
     RangeGraphValue none = {0};
+    if (!strcmp(name,"body") && node->kind == RangeNodeMacro)
+        return node->a ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->a} : none;
+    if (!strcmp(name,"parameters") && node->kind == RangeNodeMacro)
+        return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=node->items,.count=node->itemCount};
+    if (!strcmp(name,"value") && node->kind == RangeNodeReturn)
+        return node->a ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->a} : none;
+    if (node->kind == RangeNodeFunction) {
+        if (!strcmp(name,"receiver")) return node->typeName
+            ? (RangeGraphValue){.kind=RangeGraphText,.text=node->typeName} : none;
+        if (!strcmp(name,"output")) return node->b
+            ? (RangeGraphValue){.kind=RangeGraphNode,
+                .node=node->b->resolvedDeclaration ? node->b->resolvedDeclaration : node->b} : none;
+        if (!strcmp(name,"body")) return node->a
+            ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->a} : none;
+        if (!strcmp(name,"parameters"))
+            return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=node->items,.count=node->itemCount};
+    }
     if (!strcmp(name,"name")) return node->name
         ? (RangeGraphValue){.kind=RangeGraphText,.text=node->name} : none;
     if (!strcmp(name,"target") && node->kind == RangeNodeMacro)
@@ -158,20 +175,60 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
         return rhs ? (RangeGraphValue){.kind=RangeGraphNode,.node=rhs} : none;
     }
     RangeNode *list = NULL;
-    if (!strcmp(name,"generics") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro))
+    if (!strcmp(name,"generics") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro || node->kind == RangeNodeFunction))
         list = node->generics;
-    else if (!strcmp(name,"macros") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro))
+    else if (!strcmp(name,"macros") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro || node->kind == RangeNodeFunction))
         list = node->c;
     else if (!strcmp(name,"members") && node->kind == RangeNodeConstruct) list = node;
-    else if (!strcmp(name,"members") && node->kind == RangeNodeMacro) {
+    else if (!strcmp(name,"members") && node->kind == RangeNodeBlock) {
         RangeNode result = {0};
-        if (node->a) for (size_t i = 0; i < node->a->itemCount; ++i)
-            if (node->a->items[i]->kind == RangeNodeLocal) rangeNodeAppend(arena,&result,node->a->items[i]);
+        for (size_t i = 0; i < node->itemCount; ++i)
+            if (node->items[i]->kind == RangeNodeLocal) rangeNodeAppend(arena,&result,node->items[i]);
         return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
-    } else if (!strcmp(name,"environment") && node->kind == RangeNodeMacro) {
+    } else if (!strcmp(name,"environment") && node->kind == RangeNodeBlock) {
         RangeNode result = {0};
-        appendEnvironments(arena,&result,node->a);
+        appendEnvironments(arena,&result,node);
         return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
     } else return none;
     return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=list ? list->items : NULL,.count=list ? list->itemCount : 0};
+}
+
+/* C owns node shape and reflective field access. No source templates are loaded. */
+void rangeGraphInitTypes(RangeArena *arena)
+{
+    static const struct { const char *type, *field; int flags; } fields[] = {
+        {"Construct","name",0},
+        {"Construct","macros",RangeFlagMany|RangeFlagOptional},
+        {"Construct","generics",RangeFlagMany|RangeFlagOptional},
+        {"Construct","members",RangeFlagMany|RangeFlagOptional},
+        {"Function","name",0},
+        {"Function","macros",RangeFlagMany|RangeFlagOptional},
+        {"Function","receiver",RangeFlagOptional},
+        {"Function","generics",RangeFlagMany|RangeFlagOptional},
+        {"Function","parameters",RangeFlagMany|RangeFlagOptional},
+        {"Function","output",RangeFlagOptional},
+        {"Function","body",RangeFlagOptional},
+        {"Macro","name",0},
+        {"Macro","macros",RangeFlagMany|RangeFlagOptional},
+        {"Macro","target",RangeFlagOptional},
+        {"Macro","parameters",RangeFlagMany|RangeFlagOptional},
+        {"Macro","body",RangeFlagOptional},
+        {"Member","name",0}, {"Member","value",RangeFlagOptional},
+        {"Return","value",RangeFlagOptional},
+        {"Macro.body","members",RangeFlagMany|RangeFlagOptional},
+        {"Macro.body","environment",RangeFlagMany|RangeFlagOptional}
+    };
+    arena->graphTypes = rangeNodeCreate(arena,RangeNodeUnit,"<compiler>",1,1);
+    for (size_t i = 0; i < sizeof(fields)/sizeof(*fields); ++i) {
+        RangeNode *type = rangeGraphType(arena,fields[i].type);
+        if (!type) {
+            type=rangeNodeCreate(arena,RangeNodeType,"<compiler>",1,1);
+            type->name=fields[i].type;
+            rangeNodeAppend(arena,arena->graphTypes,type);
+        }
+        RangeNode *field=rangeNodeCreate(arena,RangeNodeMember,"<compiler>",1,1);
+        field->name=fields[i].field; field->flags=fields[i].flags;
+        rangeNodeAppend(arena,type,field);
+    }
+    rangeGraphField(rangeGraphType(arena,"Macro"),"body")->a=rangeGraphType(arena,"Macro.body");
 }

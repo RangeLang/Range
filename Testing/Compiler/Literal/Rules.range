@@ -1,0 +1,13 @@
+@literal("[0-9]+")
+macro decimal(): Construct {}
+
+@literal(pattern: "0[xX][0-9a-fA-F]+")
+macro hexadecimal(): Construct {}
+
+@literal("yes|no")
+macro choice(): Construct {}
+
+@literal("a*")
+macro emptyAllowed(): Construct {}
+
+macro unregistered(): Construct {}

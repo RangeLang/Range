@@ -1,21 +1,25 @@
 Macro {
     name: example
     target: Construct
-    members: {
-        target: #target
-    }
-    environment: {
-        // Keep the emitted recipe, including nested code.
-        let message: "hello"
-        if true {
-            @diagnostic(message)
+    body: {
+        members: {
+            target: #target
         }
-    }
-    environment: {
+        environment: {
+            // Keep the emitted recipe, including nested code.
+            let message: "hello"
+            if true {
+                @diagnostic(message)
+            }
+        }
+        environment: {
+        }
     }
 }
 
 Macro {
     name: plain
     target: Construct
+    body: {
+    }
 }
