@@ -1,6 +1,5 @@
 // Proposed compiler primitives; declaration does not establish execution support.
 // These operations know memory and value layout, not Array or collection policy.
-// See MemoryMeaning.md for initialization, ownership and failure behavior.
 
 @builtin
 function allocateMemory(let bytes: Int, let alignment: Int): Address

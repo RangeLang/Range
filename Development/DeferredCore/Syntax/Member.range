@@ -1,6 +1,5 @@
 // The RHS retains syntax; resolving its target determines whether it declares
-// a requirement or supplies a value. See MemberMeaning.md for the agreed cases
-// and current parser gaps. These comments do not imply implemented semantics.
+// a requirement or supplies a value. This does not imply implemented semantics.
 @syntax($macros let $identity : $value)
 @storage(.immutable)
 construct Let {

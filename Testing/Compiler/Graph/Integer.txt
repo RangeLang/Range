@@ -60,27 +60,13 @@ Function {
         }
         Local {
             name: remaining
-            type: Int
+            type: value
             binding: state
-            arguments: {
-                Argument {
-                    value: Name {
-                        name: value
-                    }
-                }
-            }
         }
         Local {
             name: available
-            type: Int
+            type: bits
             binding: state
-            arguments: {
-                Argument {
-                    value: Name {
-                        name: bits
-                    }
-                }
-            }
         }
         If {
             condition: Name {

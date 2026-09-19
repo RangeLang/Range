@@ -20,10 +20,9 @@ macro integer(): Construct {
     )
   }
 
-  // Graph queries now resolve the member declarations for each macro application.
-  // These validation statements and their numeric operations are still deferred.
-  // Selected generic arguments and the supplied value require the same checks.
-  // This declaration lookup does not yet compute those effective values.
+  // Validation evaluates these statements and helper calls as Range code.
+  // The selected members currently expose declaration defaults; connecting a
+  // matched literal to a constructed payload is a separate, unfinished step.
   if value.isTarget && bits.isTarget && signed.isTarget {
     if bits.value <= 0 {
       @diagnostic("Integer bits must be positive")
@@ -35,12 +34,11 @@ macro integer(): Construct {
   }
 }
 
-// Bounded executable check for values representable by the recovery engine's
-// signed 64-bit Int. Literal values beyond that range still need representation.
+// Bounds are language rules. C evaluates the arithmetic and control flow.
 function integerValueFits(let value: Int, let bits: Int, let signed: Bool): Bool {
   if bits <= 0 { return false }
-  state remaining: Int(value)
-  state available: Int(bits)
+  state remaining: value
+  state available: bits
   if signed {
     available: available - 1
     // -1 - value maps negatives to their required magnitude bits without

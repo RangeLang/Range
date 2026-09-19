@@ -1,5 +1,5 @@
 // Primitive target address. This is not an owning container or a dereferenceable
-// construct with ordinary fields. See MemoryMeaning.md for the engine contract.
+// construct with ordinary fields.
 @builtin
 construct Address {}
 

@@ -28,3 +28,4 @@ jobs:
           Testing/Tools/check-compiler-literal
           Testing/Tools/check-compiler-parser
           Testing/Tools/check-compiler-graph
+          Testing/Tools/check-compiler-validation

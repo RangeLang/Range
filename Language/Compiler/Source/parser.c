@@ -164,7 +164,8 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
  * `let author: "George"` place the initialising expression in that position. */
 static int atTypePosition(RangeParser *parser)
 {
-    if (parser->current.kind == RangeTokenName) return 1;
+    if (parser->current.kind == RangeTokenName)
+        return !parserAt(parser,"true") && !parserAt(parser,"false");
     if (!parserAt(parser, "@")) return 0;
     const RangeToken *ahead = parserPeek(parser);
     return rangeTokenIs(ahead, "many") || rangeTokenIs(ahead, "syntax")

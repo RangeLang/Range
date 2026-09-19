@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Compile-time macro behavior comes from Range bodies, not concrete C type rules.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$REPO_ROOT"
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-validation.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT
+fail() { echo "compiler validation: $*" >&2; exit 1; }
+for mode in ordinary sanitized; do
+    options=()
+    link_options=()
+    if [[ "$mode" == sanitized ]]; then
+        options=(--sanitize)
+        link_options=(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    fi
+    compiler="$work_root/$mode"
+    Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
+        Testing/Compiler/Graph/Validation.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        -o "$work_root/$mode-validation"
+    "$work_root/$mode-validation"
+    "$compiler" --validate-macros Language/Grammar Language/Macros Language/Types > "$work_root/out"
+    grep -Fxq 'validated-macro-applications=1' "$work_root/out" || fail "$mode language validation failed"
+    # The Range macro reads each construct's declared fields, including project targets.
+    printf '@integer construct Wide<let bits: 128, let signed: true> { let value: 0 }\n' > "$work_root/Wide.range"
+    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Wide.range" > "$work_root/out"
+    grep -Fxq 'validated-macro-applications=2' "$work_root/out" || fail "$mode imposed a concrete width limit"
+    printf '@integer construct Narrow<let bits: 8, let signed: true> { let value: 128 }\n' > "$work_root/Narrow.range"
+    status=0
+    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Narrow.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode invalid payload was reported as validated"
+    grep -Fq 'Integer value does not fit the declared bits and signedness' "$work_root/error" || fail "$mode Range diagnostic did not execute"
+    printf '@integer construct Negative<let bits: 8, let signed: true> { let value: -128 }\n' > "$work_root/Negative.range"
+    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Negative.range" > "$work_root/out"
+    grep -Fxq 'validated-macro-applications=2' "$work_root/out" || fail "$mode negative initializer was not evaluated"
+    printf '@integer construct Unsigned<let bits: 8, let signed: false> { let value: -1 }\n' > "$work_root/Unsigned.range"
+    status=0
+    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Unsigned.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode source signedness rule was skipped"
+    grep -Fq 'Integer value does not fit the declared bits and signedness' "$work_root/error" || fail "$mode unsigned rejection came from the wrong rule"
+    status=0
+    "$compiler" --check-return start Language/Macros Language/Types > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 64 ]] || fail "$mode removed specialized checker still accepted"
+    echo "compiler validation: $mode declared-values=pass Range-rules=pass no-concrete-width-limit=pass"
+done

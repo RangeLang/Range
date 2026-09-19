@@ -1,0 +1,3 @@
+// Compiler effect: report the supplied message and fail validation.
+@builtin("diagnostic")
+macro diagnostic(let message: String)

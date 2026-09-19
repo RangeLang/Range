@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 700
 #include "model.h"
+#include <limits.h>
 #include <regex.h>
 #include <setjmp.h>
 #include <stdarg.h>
@@ -234,7 +235,7 @@ static int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const 
     return matched;
 }
 
-static int literalBuiltin(RangeNode *node)
+static int macroBuiltin(RangeNode *node, const char *tag)
 {
     if (node->kind != RangeNodeMacro || !node->c) return 0;
     for (size_t i = 0; i < node->c->itemCount; ++i) {
@@ -242,7 +243,7 @@ static int literalBuiltin(RangeNode *node)
         if (!same(a->name,"builtin") || a->itemCount != 1) continue;
         RangeNode *s = a->items[0]->a;
         if (s && s->kind == RangeNodeString && s->itemCount == 1
-            && (s->items[0]->flags & RangeFlagLiteral) && same(s->items[0]->name,"literal")) return 1;
+            && (s->items[0]->flags & RangeFlagLiteral) && same(s->items[0]->name,tag)) return 1;
     }
     return 0;
 }
@@ -252,11 +253,11 @@ static void registerLiteralRules(Resolver *vm)
     RangeNode *builtin = NULL;
     for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
         RangeNode *node = vm->units[u]->items[i];
-        if (!literalBuiltin(node)) continue;
+        if (!macroBuiltin(node,"literal")) continue;
         if (builtin) fail(vm,node,"ambiguous literal builtin");
         if (!node->b || !same(node->b->name,"Macro") || node->itemCount != 1
-            || !node->items[0]->b || !same(node->items[0]->b->name,"String") || node->a)
-            fail(vm,node,"literal builtin requires one String parameter, target Macro, and no body");
+            || !node->items[0]->b || node->a)
+            fail(vm,node,"literal builtin requires one pattern parameter, target Macro, and no body");
         builtin = node;
     }
     for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
@@ -454,7 +455,307 @@ static int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t
     return ok;
 }
 
-/* Compiler driver: load source directories, parse their graph, and inspect or run it. */
+/* Compile-time validation works on graph values, never concrete type names.
+ * Runtime execution, construction, and language type checking are separate. */
+typedef struct MetaLocal {
+    const char *name;
+    RangeGraphValue value;
+    int mutable;
+    struct MetaLocal *next;
+} MetaLocal;
+typedef struct MetaScope {
+    struct MetaScope *parent;
+    MetaLocal *locals;
+    RangeMacroApplication *application;
+} MetaScope;
+typedef struct {
+    Resolver *vm;
+    unsigned steps;
+    unsigned depth;
+} MetaEval;
+
+static void metaStep(MetaEval *eval, RangeNode *at)
+{
+    if (++eval->steps > 100000) fail(eval->vm,at,"compile-time evaluation step limit exceeded");
+}
+
+static RangeGraphValue metaScalar(MetaEval *eval, RangeNode *at, RangeNodeKind kind, long long value)
+{
+    RangeNode *node = rangeNodeCreate(eval->vm->arena,kind,at->path,at->line,at->column);
+    node->integer = value;
+    return graphNode(node);
+}
+
+static long long metaNumber(MetaEval *eval, RangeGraphValue value, RangeNode *at)
+{
+    if (value.kind != RangeGraphNode || value.node->kind != RangeNodeInteger)
+        fail(eval->vm,at,"compile-time arithmetic requires numeric graph values");
+    return value.node->integer;
+}
+
+static int metaBoolean(MetaEval *eval, RangeGraphValue value, RangeNode *at)
+{
+    if (value.kind != RangeGraphNode || value.node->kind != RangeNodeBool)
+        fail(eval->vm,at,"compile-time condition requires a boolean graph value");
+    return value.node->integer != 0;
+}
+
+static MetaLocal *metaLocal(MetaScope *scope, const char *name)
+{
+    for (; scope; scope = scope->parent)
+        for (MetaLocal *local = scope->locals; local; local = local->next)
+            if (same(local->name,name)) return local;
+    return NULL;
+}
+
+static void metaBind(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeGraphValue value)
+{
+    for (MetaLocal *local = scope->locals; local; local = local->next)
+        if (same(local->name,node->name)) fail(eval->vm,node,"duplicate compile-time local '%s'",node->name);
+    MetaLocal *local = rangeArenaAllocate(eval->vm->arena,sizeof(*local));
+    *local = (MetaLocal){.name=node->name,.value=value,.mutable=(node->flags & RangeFlagMutable)!=0,.next=scope->locals};
+    scope->locals = local;
+}
+
+static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind kind, const char *name)
+{
+    RangeNode *found = NULL;
+    for (size_t u = 0; u < eval->vm->count; ++u) for (size_t i = 0; i < eval->vm->units[u]->itemCount; ++i) {
+        RangeNode *node = eval->vm->units[u]->items[i];
+        if (node->kind != kind || !same(node->name,name)) continue;
+        if (found) fail(eval->vm,at,"ambiguous compile-time declaration '%s'",name);
+        found = node;
+    }
+    if (!found) fail(eval->vm,at,"unresolved compile-time declaration '%s'",name);
+    at->resolvedDeclaration = found;
+    return found;
+}
+
+static RangeGraphValue metaExpression(MetaEval *, MetaScope *, RangeNode *);
+static int metaStatement(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue *);
+
+static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *call)
+{
+    if (!call->a || call->a->kind != RangeNodeName || call->a->generics)
+        fail(eval->vm,call,"compile-time calls require a plain function reference");
+    RangeNode *function = metaDeclaration(eval,call->a,RangeNodeFunction,call->a->name);
+    if (!function->a || function->generics || function->flags || function->typeName
+        || (function->c && function->c->itemCount))
+        fail(eval->vm,call,"unsupported compile-time function declaration");
+    if (call->itemCount != function->itemCount)
+        fail(eval->vm,call,"compile-time call argument count differs from '%s'",function->name);
+    if (++eval->depth > 64) fail(eval->vm,call,"compile-time call depth exceeded");
+    MetaScope arguments = {0};
+    // Evaluate once, in source order. Labels select actual parameter declarations.
+    for (size_t i = 0; i < call->itemCount; ++i) {
+        RangeNode *argument = call->items[i], *parameter = NULL;
+        for (size_t j = 0; j < function->itemCount; ++j)
+            if (same(argument->name,function->items[j]->name)) parameter = function->items[j];
+        if (!parameter || parameter->flags || parameter->itemCount)
+            fail(eval->vm,argument,"compile-time call requires an explicit label for each plain parameter");
+        metaBind(eval,&arguments,parameter,metaExpression(eval,scope,argument->a));
+    }
+    RangeGraphValue result = {0};
+    if (!metaStatement(eval,&arguments,function->a,&result))
+        fail(eval->vm,function,"compile-time function did not return a value");
+    --eval->depth;
+    return result;
+}
+
+static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNode *node)
+{
+    if (!node) return (RangeGraphValue){0};
+    metaStep(eval,node);
+    switch (node->kind) {
+    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return graphNode(node);
+    case RangeNodeName: {
+        MetaLocal *local = metaLocal(scope,node->name);
+        if (!local) fail(eval->vm,node,"unresolved compile-time local '%s'",node->name);
+        return local->value;
+    }
+    case RangeNodeEnvironment:
+        if (!scope->application) fail(eval->vm,node,"graph context is unavailable in this function");
+        return graphEval(eval->vm,scope->application,node);
+    case RangeNodeMemberAccess: {
+        RangeGraphValue receiver = metaExpression(eval,scope,node->a);
+        if (same(node->name,"isTarget")) {
+            if (receiver.kind != RangeGraphNone && receiver.kind != RangeGraphNode)
+                fail(eval->vm,node,"isTarget requires a selected graph node");
+            return metaScalar(eval,node,RangeNodeBool,receiver.kind == RangeGraphNode);
+        }
+        if (!scope->application) fail(eval->vm,node,"graph reflection requires a macro context");
+        RangeGraphValue value = graphProperty(eval->vm,scope->application,receiver,node->name,node);
+        if (same(node->name,"value") && receiver.kind == RangeGraphNode
+            && receiver.node->kind == RangeNodeMember && value.kind == RangeGraphNode) {
+            // A declaration initializer is evaluated outside the inspecting
+            // macro's locals. Unsupported declaration-name lookup fails there.
+            MetaScope initializer = {0};
+            return metaExpression(eval,&initializer,value.node);
+        }
+        return value;
+    }
+    case RangeNodeCall:
+        if (node->a && node->a->kind == RangeNodeMemberAccess && same(node->a->name,"filter")) {
+            if (node->itemCount != 1 || !same(node->items[0]->name,"named"))
+                fail(eval->vm,node,"graph filter requires one named argument");
+            RangeGraphValue list = metaExpression(eval,scope,node->a->a);
+            if (list.kind != RangeGraphNodes) fail(eval->vm,node,"graph filter requires member nodes");
+            const char *name = graphText(eval->vm,metaExpression(eval,scope,node->items[0]->a),node);
+            RangeGraphValue result = {.kind=RangeGraphNodes};
+            result.nodes = rangeArenaAllocate(eval->vm->arena,list.count * sizeof(*result.nodes));
+            for (size_t i = 0; i < list.count; ++i)
+                if (same(list.nodes[i]->name,name)) result.nodes[result.count++] = list.nodes[i];
+            return result;
+        }
+        return metaCall(eval,scope,node);
+    case RangeNodeUnary: {
+        RangeGraphValue operand = metaExpression(eval,scope,node->a);
+        if (same(node->name,"!")) return metaScalar(eval,node,RangeNodeBool,!metaBoolean(eval,operand,node));
+        long long value = metaNumber(eval,operand,node);
+        if (!same(node->name,"-")) fail(eval->vm,node,"unsupported compile-time unary operator");
+        if (value == LLONG_MIN) fail(eval->vm,node,"compile-time numeric storage overflow");
+        return metaScalar(eval,node,RangeNodeInteger,-value);
+    }
+    case RangeNodeBinary: {
+        RangeGraphValue left = metaExpression(eval,scope,node->a);
+        if (same(node->name,"&&") || same(node->name,"||")) {
+            int value = metaBoolean(eval,left,node);
+            if ((same(node->name,"&&") && value) || (same(node->name,"||") && !value))
+                value = metaBoolean(eval,metaExpression(eval,scope,node->b),node);
+            return metaScalar(eval,node,RangeNodeBool,value);
+        }
+        RangeGraphValue right = metaExpression(eval,scope,node->b);
+        if (same(node->name,"==") || same(node->name,"!=")) {
+            int equal = left.kind == right.kind;
+            if (equal && left.kind == RangeGraphNode) {
+                RangeNode *a=left.node, *b=right.node;
+                if (a->kind == b->kind && (a->kind == RangeNodeInteger || a->kind == RangeNodeBool))
+                    equal = a->integer == b->integer;
+                else equal = a == b;
+            } else if (equal && left.kind != RangeGraphNone)
+                fail(eval->vm,node,"unsupported compile-time equality operands");
+            return metaScalar(eval,node,RangeNodeBool,same(node->name,"==") ? equal : !equal);
+        }
+        long long a=metaNumber(eval,left,node), b=metaNumber(eval,right,node), value=0;
+        if (same(node->name,"<")) return metaScalar(eval,node,RangeNodeBool,a < b);
+        if (same(node->name,">")) return metaScalar(eval,node,RangeNodeBool,a > b);
+        if (same(node->name,"<=")) return metaScalar(eval,node,RangeNodeBool,a <= b);
+        if (same(node->name,">=")) return metaScalar(eval,node,RangeNodeBool,a >= b);
+        int overflow = 0;
+        if (same(node->name,"+")) overflow = __builtin_add_overflow(a,b,&value);
+        else if (same(node->name,"-")) overflow = __builtin_sub_overflow(a,b,&value);
+        else if (same(node->name,"*")) overflow = __builtin_mul_overflow(a,b,&value);
+        else if (same(node->name,"/")) {
+            if (!b) fail(eval->vm,node,"compile-time division by zero");
+            if (a == LLONG_MIN && b == -1) overflow = 1;
+            else value = a / b;
+        } else fail(eval->vm,node,"unsupported compile-time binary operator");
+        if (overflow) fail(eval->vm,node,"compile-time numeric storage overflow");
+        return metaScalar(eval,node,RangeNodeInteger,value);
+    }
+    case RangeNodeAttribute: {
+        RangeNode *macro = metaDeclaration(eval,node,RangeNodeMacro,node->name);
+        if (!macroBuiltin(macro,"diagnostic") || macro->a || macro->generics || macro->itemCount != 1)
+            fail(eval->vm,node,"unsupported compile-time macro effect");
+        if (node->itemCount != 1 || (node->items[0]->name && !same(node->items[0]->name,macro->items[0]->name)))
+            fail(eval->vm,node,"diagnostic builtin requires one message argument");
+        const char *message = graphText(eval->vm,metaExpression(eval,scope,node->items[0]->a),node);
+        fail(eval->vm,node,"%s",message);
+    }
+    default: fail(eval->vm,node,"unsupported compile-time expression '%s'",rangeNodeKindName(node->kind));
+    }
+}
+
+static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeGraphValue *returned)
+{
+    if (!node) return 0;
+    metaStep(eval,node);
+    if (node->annotations) fail(eval->vm,node,"statement annotations are not supported in compile-time validation");
+    switch (node->kind) {
+    case RangeNodeBlock: {
+        MetaScope block = {.parent=scope,.application=scope->application};
+        for (size_t i = 0; i < node->itemCount; ++i)
+            if (metaStatement(eval,&block,node->items[i],returned)) return 1;
+        return 0;
+    }
+    case RangeNodeLocal: {
+        if (node->flags & ~(RangeFlagMutable|RangeFlagApplication))
+            fail(eval->vm,node,"unsupported compile-time local declaration");
+        if ((node->flags & RangeFlagApplication) && node->typeName && !node->a) {
+            // Declaration RHS applications use the parser's type-position storage.
+            // Resolve the name as a function; no type-name cast or scalar shortcut.
+            RangeNode target = {.kind=RangeNodeName,.name=node->typeName,.path=node->path,
+                .line=node->line,.column=node->column,.generics=node->generics};
+            RangeNode call = {.kind=RangeNodeCall,.a=&target,.items=node->items,.itemCount=node->itemCount,
+                .path=node->path,.line=node->line,.column=node->column};
+            metaBind(eval,scope,node,metaCall(eval,scope,&call));
+            return 0;
+        }
+        RangeNode *rhs = rangeNodeRHS(node);
+        if (!rhs) fail(eval->vm,node,"compile-time local requires an expression; construction is not implemented");
+        metaBind(eval,scope,node,metaExpression(eval,scope,rhs));
+        return 0;
+    }
+    case RangeNodeAssign: {
+        if (!node->a || node->a->kind != RangeNodeName) fail(eval->vm,node,"compile-time assignment requires a local name");
+        MetaLocal *local = metaLocal(scope,node->a->name);
+        if (!local || !local->mutable) fail(eval->vm,node,"compile-time assignment requires a state local");
+        local->value = metaExpression(eval,scope,node->b);
+        return 0;
+    }
+    case RangeNodeIf:
+        return metaStatement(eval,scope,metaBoolean(eval,metaExpression(eval,scope,node->a),node) ? node->b : node->c,returned);
+    case RangeNodeWhile:
+        while (metaBoolean(eval,metaExpression(eval,scope,node->a),node))
+            if (metaStatement(eval,scope,node->b,returned)) return 1;
+        return 0;
+    case RangeNodeReturn:
+        *returned = metaExpression(eval,scope,node->a);
+        return 1;
+    case RangeNodeExpressionStatement:
+        (void)metaExpression(eval,scope,node->a);
+        return 0;
+    default: fail(eval->vm,node,"unsupported compile-time statement '%s'",rangeNodeKindName(node->kind));
+    }
+}
+
+static void validateMacroTarget(MetaEval *eval, RangeNode *target, size_t *checked)
+{
+    if (target->kind != RangeNodeConstruct) return;
+    if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
+        RangeMacroApplication *app = target->c->items[i]->macroApplication;
+        if (!app) fail(eval->vm,target->c->items[i],"macro application was not resolved");
+        if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
+            if (same(app->declaration->c->items[j]->name,"builtin"))
+                fail(eval->vm,target->c->items[i],"builtin construct effects are not supported by compile-time validation");
+        MetaScope scope = {.application=app};
+        RangeGraphValue returned = {0};
+        (void)metaStatement(eval,&scope,app->declaration->a,&returned);
+        ++*checked;
+    }
+    for (size_t i = 0; i < target->itemCount; ++i) validateMacroTarget(eval,target->items[i],checked);
+}
+
+static int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
+    size_t *checked, char *error, size_t errorSize)
+{
+    *checked = 0;
+    Resolver *vm = calloc(1,sizeof(*vm));
+    if (!vm) { snprintf(error,errorSize,"cannot allocate macro validator"); return 0; }
+    vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
+    int ok = 0;
+    if (setjmp(vm->failure) == 0) {
+        MetaEval eval = {.vm=vm};
+        for (size_t u = 0; u < count; ++u) for (size_t i = 0; i < units[u]->itemCount; ++i)
+            validateMacroTarget(&eval,units[u]->items[i],checked);
+        ok = 1;
+    }
+    if (!ok) *checked = 0;
+    free(vm);
+    return ok;
+}
+
+/* Compiler driver: load source directories, parse their graph, and inspect it. */
 #include "parser.h"
 #include "graph.h"
 #include <dirent.h>
@@ -604,7 +905,7 @@ int main(int argc, char **argv)
 {
     RangeArena arena;
     rangeArenaInit(&arena);
-    int treeMode = 0;
+    int treeMode = 0, validationMode = 0;
     const char *literalMacro = NULL, *literalInput = NULL;
     const char *graphDirectory = NULL;
     int first = 1;
@@ -612,9 +913,10 @@ int main(int argc, char **argv)
     if (argc > option + 2 && strcmp(argv[option],"--match-literal") == 0) {
         literalMacro=argv[option + 1]; literalInput=argv[option + 2]; first=option + 3;
     }
+    else if (argc > option && strcmp(argv[option], "--validate-macros") == 0) { validationMode = 1; first = option + 1; }
     else if (argc > option && strcmp(argv[option], "--tree") == 0) { treeMode = 1; first = option + 1; }
     else if (argc > option + 1 && strcmp(argv[option], "--emit-graph") == 0) { graphDirectory = argv[option + 1]; first = option + 2; }
-    if (first >= argc) { fprintf(stderr, "usage: compiler [--tree | --emit-graph directory | --match-literal macro text] files-or-directories...\n"); return 64; }
+    if (first >= argc) { fprintf(stderr, "usage: compiler [--tree | --emit-graph directory | --match-literal macro text | --validate-macros] files-or-directories...\n"); return 64; }
     Sources sources = {0};
     RangeNode **units = NULL;
     int status = 66;
@@ -670,8 +972,14 @@ int main(int argc, char **argv)
             fprintf(stderr,"%s\n",error); failures += 1;
         } else printf("match=%s\n",matched ? "true" : "false");
     }
+    if (validationMode && !failures) {
+        char error[512]; size_t checked;
+        if (!validateMacroApplications(&arena,units,unitCount,&checked,error,sizeof(error))) {
+            fprintf(stderr,"%s\n",error); failures += 1;
+        } else printf("validated-macro-applications=%zu\n",checked);
+    }
     status = failures ? 65 : 0;
-    if (treeMode || graphDirectory || literalMacro) goto cleanup;
+    if (treeMode || graphDirectory || literalMacro || validationMode) goto cleanup;
     printf("resolved-sources=%zu nodes=%zu construct=%ld enum=%ld function=%ld macro=%ld main=%ld failures=%d\n",
            sources.count, arena.nodeCount, counts[RangeNodeConstruct], counts[RangeNodeEnum],
            counts[RangeNodeFunction], counts[RangeNodeMacro], counts[RangeNodeMain],
