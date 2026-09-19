@@ -18,7 +18,7 @@ int main(void)
         "@number construct ProjectNumber { let value: 9 } "
         "function start(): Whole { return 42 } function flag(): Logical { return true }";
     RangeNode *units[3];
-    units[0] = rangeParseUnit(&arena,RANGE_CORE_DIR "/Defaults.range",core,strlen(core),error,sizeof(error));
+    units[0] = rangeParseUnit(&arena,RANGE_LANGUAGE_DIR "/Macros/Defaults.range",core,strlen(core),error,sizeof(error));
     units[1] = rangeParseUnit(&arena,"Project.range",project,strlen(project),error,sizeof(error));
     assert(units[0] && units[1]);
     assert(resolveGraphApplications(&arena,units,2,error,sizeof(error)));
@@ -33,7 +33,7 @@ int main(void)
     assert(rangeNodeRHS(whole->items[0])->integer == 0);
     assert(whole->c->items[0]->macroApplication->declaration == number);
     const char *duplicate="@number construct Other {}";
-    units[2]=rangeParseUnit(&arena,RANGE_CORE_DIR "/Other.range",duplicate,strlen(duplicate),error,sizeof(error));
+    units[2]=rangeParseUnit(&arena,RANGE_LANGUAGE_DIR "/Macros/Other.range",duplicate,strlen(duplicate),error,sizeof(error));
     assert(units[2]);
     assert(!resolveGraphApplications(&arena,units,3,error,sizeof(error)));
     assert(strstr(error,"multiple Core constructs"));
@@ -41,9 +41,9 @@ int main(void)
     whole->path="OutsideCore.range";
     assert(!resolveGraphApplications(&arena,units,2,error,sizeof(error)));
     assert(strstr(error,"requires one Core construct"));
-    whole->path=RANGE_CORE_DIR "/Defaults.range";
+    whole->path=RANGE_LANGUAGE_DIR "/Macros/Defaults.range";
     const char *overlap="@literal(\"[0-9]+\") macro other(): Construct {} @other construct Other {}";
-    units[2]=rangeParseUnit(&arena,RANGE_CORE_DIR "/Overlap.range",overlap,strlen(overlap),error,sizeof(error));
+    units[2]=rangeParseUnit(&arena,RANGE_LANGUAGE_DIR "/Macros/Overlap.range",overlap,strlen(overlap),error,sizeof(error));
     assert(units[2]);
     assert(!resolveGraphApplications(&arena,units,3,error,sizeof(error)));
     assert(strstr(error,"ambiguous Core literal"));

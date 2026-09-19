@@ -1,0 +1,10 @@
+@syntax {
+    let $name: $value
+}
+@syntax {
+    let $name
+}
+construct Member {
+    let name: String
+    let value: Any?
+}

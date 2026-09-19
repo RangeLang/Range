@@ -87,7 +87,8 @@ program transformations to speak about the same graph as ordinary Range code.
 
 ## Core in Range, compiler in C
 
-Range's language model lives in `Language/Core` as Range constructs and macros.
+Range's language model lives in `Language/Grammar`, `Language/Macros`, and
+`Language/Types` as Range constructs and macros.
 The compiler is implemented in C under `Language/Compiler`. It parses Core,
 builds the queryable program graph, resolves supported Core macro queries, and will encode target
 artifacts directly as bytes. LLVM and the former generated bootstrap chain are
@@ -105,7 +106,7 @@ Build it with:
 
 ```sh
 Language/Compiler/Tools/build-range-compiler /tmp/range-compiler
-/tmp/range-compiler Language/Core
+/tmp/range-compiler Language/Grammar Language/Macros Language/Types
 ```
 
 The focused compiler checks are:
@@ -118,7 +119,7 @@ Testing/Tools/check-compiler-literal
 
 Editor navigation can be checked with `Testing/Tools/check-range-editor-navigation`.
 The build discovers C sources directly from `Language/Compiler/Source`, and the
-compiler discovers every Range source under a supplied directory such as `Language/Core`.
+compiler discovers every Range source under each supplied directory.
 
 Earlier Core definitions are preserved in `Development/DeferredCore`. Old
 project declarations, compiler tests, runtime support, and benchmark programs

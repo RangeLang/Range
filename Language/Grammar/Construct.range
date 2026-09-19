@@ -1,0 +1,11 @@
+@syntax {
+    construct $name {
+        $members
+    }
+}
+construct Construct {
+    let name: String
+    let members: Array<Member>
+    let generics: Array<Generic>
+    let macros: Array<Macro>
+}

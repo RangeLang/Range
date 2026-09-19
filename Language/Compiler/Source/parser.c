@@ -108,7 +108,7 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
 static RangeNode *parseBlock(RangeParser *parser);
 static RangeNode *parseStatement(RangeParser *parser);
 static void parseArgumentList(RangeParser *parser, RangeNode *owner);
-static RangeNode *parseGenericArguments(RangeParser *parser);
+static RangeNode *parseGenericArguments(RangeParser *parser, int typePosition);
 static RangeNode *parseGenericMembers(RangeParser *parser);
 
 /* ---- types ---------------------------------------------------------- */
@@ -138,7 +138,7 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
         }
     }
     const char *name = parserExpectName(parser);
-    if (parserAt(parser, "<")) *generics = parseGenericArguments(parser);
+    if (parserAt(parser, "<")) *generics = parseGenericArguments(parser, 1);
     if (parserAt(parser, "?")) { parserAdvance(parser); *flags |= RangeFlagOptional; }
     /* Retain every alternative. Execution may reject a union, but must never
      * silently interpret it as only its first alternative. */
@@ -159,9 +159,8 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
 
 /* ---- attributes ------------------------------------------------------ */
 
-/* @syntax declares surface grammar, not an expression. The compiler
- * records the template span verbatim and never interprets or rewrites it;
- * requiring one at run time is a loud failure in the evaluator. */
+/* Bootstrap parsing retains @syntax verbatim. Graph resolution validates its
+ * C adapter and binds captures to the accompanying Core declaration. */
 static void parseTemplateSpan(RangeParser *parser, RangeNode *attribute)
 {
     const char *open = NULL;
@@ -213,7 +212,7 @@ static RangeNode *parseAttributes(RangeParser *parser)
         if (strcmp(attribute->name, "syntax") == 0) {
             parseTemplateSpan(parser, attribute);
         } else {
-            if (parserAt(parser, "<")) attribute->generics = parseGenericArguments(parser);
+            if (parserAt(parser, "<")) attribute->generics = parseGenericArguments(parser, 0);
             if (parserAt(parser, "(")) parseArgumentList(parser, attribute);
         }
         rangeNodeAppend(parser->arena, list, attribute);
@@ -345,7 +344,7 @@ static void parseArgumentList(RangeParser *parser, RangeNode *owner)
     parser->genericDepth = outerGenericDepth;
 }
 
-static RangeNode *parseGenericArguments(RangeParser *parser)
+static RangeNode *parseGenericArguments(RangeParser *parser, int typePosition)
 {
     RangeNode *list = parserNode(parser, RangeNodeBlock);
     list->name = "genericArguments";
@@ -354,13 +353,20 @@ static RangeNode *parseGenericArguments(RangeParser *parser)
     if (parserAt(parser, ">")) parserFail(parser, &parser->current, "generic arguments cannot be empty");
     while (!parser->failed && !parserAt(parser, ">")) {
         RangeNode *argument = parserNode(parser, RangeNodeArgument);
-        argument->name = parserExpectName(parser);
-        if (strcmp(argument->name, "_") == 0)
-            parserFail(parser, &parser->current, "generic arguments require a named label");
-        parserExpect(parser, ":");
-        parser->genericDepth += 1;
-        argument->a = parseExpression(parser, 0);
-        parser->genericDepth -= 1;
+        if (typePosition && parser->current.kind == RangeTokenName
+            && !rangeTokenIs(parserPeek(parser), ":")) {
+            // Positional type arguments, including nested Array<Array<Member>>.
+            argument->a = parserNode(parser, RangeNodeName);
+            argument->a->name = parseTypeName(parser, &argument->a->flags, &argument->a->generics);
+        } else {
+            argument->name = parserExpectName(parser);
+            if (strcmp(argument->name, "_") == 0)
+                parserFail(parser, &parser->current, "generic arguments require a named label");
+            parserExpect(parser, ":");
+            parser->genericDepth += 1;
+            argument->a = parseExpression(parser, 0);
+            parser->genericDepth -= 1;
+        }
         rangeNodeAppend(parser->arena, list, argument);
         if (!parserAt(parser, ">")) parserExpect(parser, ",");
     }
@@ -477,7 +483,7 @@ static RangeNode *parsePostfix(RangeParser *parser)
                 parserFail(parser, &parser->current, "duplicate generic argument list");
                 break;
             }
-            value->generics = parseGenericArguments(parser);
+            value->generics = parseGenericArguments(parser, 0);
             continue;
         }
         if (parserAt(parser, ".")) {
@@ -647,6 +653,7 @@ static RangeNode *parseStatement(RangeParser *parser)
         if (parserAt(parser, "state")) node->flags |= RangeFlagMutable;
         parserAdvance(parser);
         node->name = parserExpectName(parser);
+        if (!parserAt(parser, ":") && !(node->flags & RangeFlagMutable)) return node;
         parserExpect(parser, ":");
         node->rhsStart = parser->current.offset;
         RangeToken rhsToken = parser->current;
@@ -911,6 +918,10 @@ static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
         }
         parserAdvance(parser);
         member->name = parserExpectName(parser);
+        if (!parserAt(parser, ":") && !(member->flags & (RangeFlagMutable|RangeFlagDerived|RangeFlagBinding))) {
+            rangeNodeAppend(parser->arena, node, member);
+            continue;
+        }
         parserExpect(parser, ":");
         member->rhsStart = parser->current.offset;
         RangeToken rhsToken = parser->current;

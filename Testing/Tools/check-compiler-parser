@@ -11,15 +11,18 @@ fail() { echo "compiler parser: $*" >&2; exit 1; }
 compiler="$work_root/range-compiler"
 "$REPO_ROOT/Language/Compiler/Tools/build-range-compiler" "$compiler"
 
-census="$("$compiler" "$REPO_ROOT/Language/Core")"
+language_sources=("$REPO_ROOT/Language/Grammar" "$REPO_ROOT/Language/Macros" "$REPO_ROOT/Language/Types")
+census="$("$compiler" "${language_sources[@]}")"
 grep -q 'failures=0' <<<"$census" || fail "Core did not parse"
+[[ "$("$compiler" "${language_sources[2]}" "${language_sources[0]}" "${language_sources[1]}")" == "$census" ]] \
+    || fail "language folder order changed resolution"
 
-(cd "$REPO_ROOT" && "$compiler" --tree Language/Core/DataTypes/Int.range) > "$work_root/int-tree"
+(cd "$REPO_ROOT" && "$compiler" --tree Language/Types/Int.range) > "$work_root/int-tree"
 grep -q 'construct name=Int ' "$work_root/int-tree" || fail "Int construct is missing"
 grep -q 'member name=value ' "$work_root/int-tree" || fail "Int payload member is missing"
 grep -q 'attribute name=integer' "$work_root/int-tree" || fail "Int integer macro application is missing"
 
-"$compiler" --emit-graph "$work_root/graphs/nested" "$REPO_ROOT/Language/Core" > "$work_root/graph-output"
+"$compiler" --emit-graph "$work_root/graphs/nested" "${language_sources[@]}" > "$work_root/graph-output"
 cmp "$REPO_ROOT/Testing/Compiler/Graph/Int.txt" "$work_root/graphs/nested/Int.txt" || fail "readable Int graph differs"
 integer_graph="$work_root/graphs/nested/Integer.txt"
 cmp "$REPO_ROOT/Testing/Compiler/Graph/Integer.txt" "$integer_graph" || fail "macro environment members differ"

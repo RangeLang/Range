@@ -116,6 +116,15 @@ static void list(FILE *out, const char *name, const RangeNode *owner, int depth,
 static void sourceLines(FILE *, const char *, size_t, size_t, int);
 static void writeMacroBody(FILE *, const RangeNode *, const char *, int);
 
+static void writeSyntax(FILE *out, const RangeNode *attribute, int depth)
+{
+    if (!attribute->source || !attribute->spanEnd || !attribute->name
+        || strcmp(attribute->name,"syntax")) return;
+    indent(out,depth);
+    fputs("template:\n",out);
+    sourceLines(out,attribute->source,attribute->spanStart,attribute->spanEnd,depth + 1);
+}
+
 static void graphValue(FILE *out, RangeGraphValue value, const RangeMacroApplication *app, int depth)
 {
     if (value.kind == RangeGraphNone) { fputs("none",out); return; }
@@ -173,6 +182,7 @@ static void macros(FILE *out, const RangeNode *attributes, int depth)
         indent(out, depth);
         fputs("macros: {\n", out);
         textField(out, "name", item->name, depth + 1);
+        writeSyntax(out,item,depth + 1);
         resolvedBindings(out,item->macroApplication,depth + 1);
         indent(out, depth);
         fputs("}\n", out);
@@ -247,7 +257,10 @@ static void writeNode(FILE *out, const RangeNode *node, int depth)
     if (declaration) macros(out, node->c, inner);
     macros(out, node->annotations, inner);
     textField(out, "name", node->name, inner);
-    if (node->kind == RangeNodeAttribute) resolvedBindings(out,node->macroApplication,inner);
+    if (node->kind == RangeNodeAttribute) {
+        writeSyntax(out,node,inner);
+        resolvedBindings(out,node->macroApplication,inner);
+    }
     textField(out, node->kind == RangeNodeFunction ? "receiver" : "type", node->typeName, inner);
     if (node->flags & RangeFlagMutable) textField(out, "binding", "state", inner);
     if (node->flags & RangeFlagDerived) textField(out, "binding", "derived", inner);

@@ -1,13 +1,13 @@
-# Collaborative Core design
+# Collaborative language design
 
-Applies to Range Core design and changes, including compiler and bootstrap work
-supporting a Core decision. This guidance is local to this repository.
+Applies to Range language design and changes, including compiler and bootstrap work
+supporting a language decision. This guidance is local to this repository.
 
 - Inspect the relevant definitions and agree on new semantic decisions with the
   user before implementing them. Complete already agreed work through relevant
   validation and fixes without asking for permission again. Surface any new
   semantic decision needed to proceed; keep changes within the agreed scope.
-- Reuse Core's constructs, macros, unions, identities, and relationships. Introduce
+- Reuse the language's constructs, macros, unions, identities, and relationships. Introduce
   abstractions only when the agreed semantics need them. Distinguish implemented
   behavior, accepted design, and proposed notation.
 - Explain design choices in plain English with concrete Range code where possible.

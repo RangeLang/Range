@@ -23,7 +23,7 @@ mkdir -p "$(dirname "$output")"
 temporary="$output.$$"
 trap 'rm -f "$temporary"' EXIT
 clang -std=c17 -Wall -Wextra -Werror -O1 ${sanitize[@]+"${sanitize[@]}"} \
-    "-DRANGE_CORE_DIR=\"$REPO_ROOT/Language/Core\"" \
+    "-DRANGE_LANGUAGE_DIR=\"$REPO_ROOT/Language\"" \
     "$SOURCE_DIR"/*.c \
     -o "$temporary"
 chmod 755 "$temporary"

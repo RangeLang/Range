@@ -1,0 +1,4 @@
+// Bootstrap primitive: declares surface grammar templates for grammar constructs.
+// The compiler front end records the template span and binds patterns to construct fields.
+@builtin("syntax")
+macro syntax(): Construct

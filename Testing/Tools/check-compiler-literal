@@ -7,7 +7,7 @@ cd "$REPO_ROOT"
 work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-literal.XXXXXX")"
 trap 'rm -rf "$work_root"' EXIT
 fail() { echo "compiler literal: $*" >&2; exit 1; }
-core=Language/Core/Macros/Literal.range
+core=Language/Macros/Literal.range
 fixtures=Testing/Compiler/Literal
 for mode in ordinary sanitized; do
     compiler="$work_root/$mode"
@@ -17,7 +17,7 @@ for mode in ordinary sanitized; do
     native_options=()
     if [[ "$mode" == sanitized ]]; then native_options=(-fsanitize=address,undefined -fno-omit-frame-pointer -g); fi
     clang -std=c17 -Wall -Wextra -Werror -O1 ${native_options[@]+"${native_options[@]}"} \
-        "-DRANGE_CORE_DIR=\"$REPO_ROOT/Language/Core\"" \
+        "-DRANGE_LANGUAGE_DIR=\"$REPO_ROOT/Language\"" \
         Testing/Compiler/Literal/Defaults.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
         -o "$work_root/$mode-defaults"
     "$work_root/$mode-defaults"
