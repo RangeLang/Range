@@ -20,27 +20,10 @@ for mode in ordinary sanitized; do
         Testing/Compiler/Graph/Validation.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
         -o "$work_root/$mode-validation"
     "$work_root/$mode-validation"
-    "$compiler" --validate-macros Language/Grammar Language/Macros Language/Types > "$work_root/out"
-    grep -Fxq 'validated-macro-applications=1' "$work_root/out" || fail "$mode language validation failed"
-    # The Range macro reads each construct's declared fields, including project targets.
-    printf '@integer construct Wide<let bits: 128, let signed: true> { let value: 0 }\n' > "$work_root/Wide.range"
-    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Wide.range" > "$work_root/out"
-    grep -Fxq 'validated-macro-applications=2' "$work_root/out" || fail "$mode imposed a concrete width limit"
-    printf '@integer construct Narrow<let bits: 8, let signed: true> { let value: 128 }\n' > "$work_root/Narrow.range"
-    status=0
-    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Narrow.range" > "$work_root/out" 2> "$work_root/error" || status=$?
-    [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode invalid payload was reported as validated"
-    grep -Fq 'Integer value does not fit the declared bits and signedness' "$work_root/error" || fail "$mode Range diagnostic did not execute"
-    printf '@integer construct Negative<let bits: 8, let signed: true> { let value: -128 }\n' > "$work_root/Negative.range"
-    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Negative.range" > "$work_root/out"
-    grep -Fxq 'validated-macro-applications=2' "$work_root/out" || fail "$mode negative initializer was not evaluated"
-    printf '@integer construct Unsigned<let bits: 8, let signed: false> { let value: -1 }\n' > "$work_root/Unsigned.range"
-    status=0
-    "$compiler" --validate-macros Language/Macros Language/Types "$work_root/Unsigned.range" > "$work_root/out" 2> "$work_root/error" || status=$?
-    [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode source signedness rule was skipped"
-    grep -Fq 'Integer value does not fit the declared bits and signedness' "$work_root/error" || fail "$mode unsigned rejection came from the wrong rule"
-    status=0
-    "$compiler" --check-return start Language/Macros Language/Types > "$work_root/out" 2> "$work_root/error" || status=$?
-    [[ "$status" == 64 ]] || fail "$mode removed specialized checker still accepted"
-    echo "compiler validation: $mode declared-values=pass Range-rules=pass no-concrete-width-limit=pass"
+    for option in --validate-macros --check-return; do
+        status=0
+        "$compiler" "$option" Language/Macros Language/Types > "$work_root/out" 2> "$work_root/error" || status=$?
+        [[ "$status" == 64 ]] || fail "$mode removed specialized checker still accepted"
+    done
+    echo "compiler validation: $mode internal-evaluator=pass Range-integer-rules=pass specialized-entry-removed=pass"
 done

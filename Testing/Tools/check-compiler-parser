@@ -12,9 +12,8 @@ compiler="$work_root/range-compiler"
 "$REPO_ROOT/Language/Compiler/Tools/build-range-compiler" "$compiler"
 
 language_sources=("$REPO_ROOT/Language/Grammar" "$REPO_ROOT/Language/Macros" "$REPO_ROOT/Language/Types")
-census="$("$compiler" "${language_sources[@]}")"
-grep -q 'failures=0' <<<"$census" || fail "Core did not parse"
-[[ "$("$compiler" "${language_sources[2]}" "${language_sources[0]}" "${language_sources[1]}")" == "$census" ]] \
+census="$("$compiler" --emit-graph "$work_root/census" "${language_sources[@]}")"
+[[ "$("$compiler" --emit-graph "$work_root/census" "${language_sources[2]}" "${language_sources[0]}" "${language_sources[1]}")" == "$census" ]] \
     || fail "language folder order changed resolution"
 
 (cd "$REPO_ROOT" && "$compiler" --tree Language/Types/Int.range) > "$work_root/int-tree"
@@ -44,9 +43,9 @@ mkdir -p "$directory/nested" "$work_root/empty"
 cp -R "$REPO_ROOT/Testing/Compiler/Directory/." "$directory/"
 ln -s .. "$directory/nested/cycle"
 ln -s nested/Value.range "$directory/alias.range"
-directory_census="$("$compiler" "$directory")"
-grep -q 'sources=2 ' <<<"$directory_census" || fail "directory sources were skipped or duplicated"
-[[ "$("$compiler" "$directory/nested/Value.range" "$directory" "$directory/Start.range")" == "$directory_census" ]] \
+directory_census="$("$compiler" --emit-graph "$work_root/directory-census" "$directory")"
+[[ "$(grep -c '^graph=' <<<"$directory_census")" == 2 ]] || fail "directory sources were skipped or duplicated"
+[[ "$("$compiler" --emit-graph "$work_root/directory-census" "$directory/nested/Value.range" "$directory" "$directory/Start.range")" == "$directory_census" ]] \
     || fail "overlapping inputs changed the graph"
 "$compiler" --emit-graph "$work_root/directory-graph" "$directory" > "$work_root/graph-output"
 grep -Fq 'name: start' "$work_root/directory-graph/Start.txt" || fail "cross-file function missing"
@@ -61,4 +60,4 @@ result=0
 [[ "$result" == 65 ]] || fail "malformed nested source exited $result, expected 65"
 grep -Eq 'Broken.range:[0-9]+:[0-9]+:' "$work_root/error" || fail "nested diagnostic lacks source location"
 
-echo "compiler parser: $census int-structure=pass malformed=pass directory=pass"
+echo "compiler parser: sources=$(grep -c '^graph=' <<<"$census") int-structure=pass malformed=pass directory=pass"

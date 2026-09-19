@@ -58,12 +58,15 @@ for mode in ordinary sanitized; do
             grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
         fi
     done
-    # Normal compilation must resolve too, without asking for text output.
-    "$compiler" Testing/Compiler/Graph/Resolution > "$work_root/log"
-    grep -Fq 'resolved-sources=' "$work_root/log" || fail "$mode normal path did not resolve"
+    # Inspection can succeed while compilation reports missing language support.
+    status=0
+    "$compiler" Testing/Compiler/Graph/Resolution > "$work_root/log" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 && ! -s "$work_root/log" ]] || fail "$mode incomplete compilation claimed success"
+    grep -Fq 'hard-coded in C' "$work_root/error" || fail "$mode normal path concealed bootstrap behavior"
     status=0
     "$compiler" Testing/Compiler/Graph/ResolutionFail/Unknown.range > "$work_root/log" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode normal path skipped graph errors"
+    grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode normal path did not resolve"
     status=0
     "$compiler" --run start Testing/Compiler/Graph/Functions > "$work_root/log" 2> "$work_root/error" || status=$?
     [[ "$status" == 64 ]] || fail "$mode retired interpreter command was accepted"

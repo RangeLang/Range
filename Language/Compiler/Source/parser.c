@@ -374,7 +374,7 @@ static RangeNode *parsePrimary(RangeParser *parser)
         errno = 0;
         node->integer = strtoll(buffer, NULL, 10);
         if (errno == ERANGE || token.length >= sizeof(buffer)) {
-            parserFail(parser, &token, "integer literal exceeds signed 64-bit range");
+            parserFail(parser, &token, "numeric literal exceeds the C parser's signed 64-bit storage; Range literal materialization is not implemented");
         }
         parserAdvance(parser);
         return node;

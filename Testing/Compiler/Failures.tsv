@@ -7,7 +7,7 @@ DoubleDestroy	use of destroyed aggregate
 Immutable	immutable local 'value' may only be initialized once
 IntegerOverflow	integer overflow
 InvalidSlice	invalid collection slice
-LiteralOverflow	integer literal exceeds signed 64-bit range
+LiteralOverflow	numeric literal exceeds the C parser's signed 64-bit storage
 OutOfBounds	collection index out of bounds
 TemplateExecution	annotation execution is not implemented
 TrailingInterpolation	trailing tokens in interpolation

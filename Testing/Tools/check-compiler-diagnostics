@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Compilation exposes missing language definitions and remaining C implementations.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$REPO_ROOT"
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/range-compiler-diagnostics.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT
+for mode in ordinary sanitized; do
+    options=()
+    link_options=()
+    if [[ "$mode" == sanitized ]]; then
+        options=(--sanitize)
+        link_options=(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    fi
+    compiler="$work_root/$mode"
+    Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
+        Testing/Compiler/Graph/Diagnostics.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        -o "$work_root/$mode-diagnostics"
+    "$work_root/$mode-diagnostics"
+    python3 - "$compiler" "$work_root" <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+
+compiler, folder = sys.argv[1], Path(sys.argv[2])
+
+def compile_sources(*paths):
+    result = subprocess.run([compiler, *map(str, paths)], capture_output=True, text=True)
+    assert result.returncode == 65 and not result.stdout, result.stdout + result.stderr
+    assert 'native code emission is not implemented' in result.stderr, result.stderr
+    assert 'compilation failed:' in result.stderr, result.stderr
+    return result.stderr
+
+active = compile_sources('Language/Grammar', 'Language/Macros', 'Language/Types')
+for missing in ('Bool', 'String', 'Array', 'Generic', 'Parameter', 'Any'):
+    assert f"no declaration for '{missing}'" in active, active
+assert "'Macro' has a C graph shape but no Range declaration" in active, active
+for shortcut in ('filter(named:)', '.first', '.isTarget'):
+    assert f"'{shortcut}' is hard-coded in C" in active, active
+assert 'uses in this source' in active, active
+
+first, second = folder/'First.range', folder/'Second.range'
+first.write_text('@absent construct Broken {}\n')
+second.write_text('construct Independent { let member: NotDefined }\n')
+errors = compile_sources(first, second)
+assert "macro 'absent'" in errors and "'NotDefined'" in errors, errors
+first.write_text('construct Broken { let missing: }\n')
+errors = compile_sources(first, second)
+assert 'First.range:' in errors and "'NotDefined'" in errors, errors
+first.write_text('construct TooLarge { let value: 9223372036854775808 }\n')
+assert "C parser's signed 64-bit storage" in compile_sources(first, second)
+
+# Defining a previously missing type removes that error without inventing support.
+first.write_text('construct Holder { let item: NotDefined }\n')
+second.write_text('construct NotDefined {}\n')
+errors = compile_sources(first, second)
+assert "no declaration for 'NotDefined'" not in errors, errors
+assert 'value materialization' in errors, errors
+
+# Normal compilation invokes the evaluator and reports independent macro failures.
+first.write_text('''construct Construct {}
+construct Text {}
+@builtin("diagnostic") macro complain(let message: Text)
+macro first(): Construct { @complain("first application failed") }
+macro second(): Construct { @complain("second application failed") }
+@first construct First {}
+@second construct Second {}
+''')
+errors = compile_sources(first)
+assert 'first application failed' in errors and 'second application failed' in errors, errors
+assert 'error[undeclared]' not in errors, errors
+assert 'error[macro-validation]' in errors, errors
+
+# The graph viewer remains useful for sources that are not compilable yet.
+view = subprocess.run([compiler, '--emit-graph', str(folder/'graphs'),
+    'Language/Grammar', 'Language/Macros', 'Language/Types'], capture_output=True, text=True)
+assert view.returncode == 0, view.stderr
+assert (folder/'graphs'/'Integer.txt').is_file()
+PY
+    echo "compiler diagnostics: $mode missing-declarations=pass C-ownership=pass normal-validation=pass no-false-success=pass"
+done

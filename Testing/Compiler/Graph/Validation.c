@@ -46,8 +46,36 @@ static void validate(const char *source, const char *expected, size_t count)
     "while remaining > 0 { remaining: remaining - 1 consumed: consumed + 1 } " \
     "return consumed <= limit } "
 
+static void validateInteger(const char *source, int accepted)
+{
+    RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
+    const char *paths[] = {"Language/Macros/Integer.range", "Language/Macros/Literal.range",
+        "Language/Macros/Diagnostic.range", "Language/Types/Int.range"};
+    RangeNode *units[5]; char error[512];
+    for (size_t i = 0; i < 4; ++i) {
+        size_t length; char *text = readFile(paths[i],&length);
+        assert(text);
+        units[i] = rangeParseUnit(&arena,paths[i],text,length,error,sizeof(error));
+        free(text); assert(units[i]);
+    }
+    units[4] = rangeParseUnit(&arena,"Project.range",source,strlen(source),error,sizeof(error));
+    assert(units[4]);
+    assert(resolveGraphApplications(&arena,units,5,error,sizeof(error)));
+    size_t checked;
+    int ok = validateMacroApplications(&arena,units,5,&checked,error,sizeof(error));
+    assert(ok == accepted);
+    if (accepted) assert(checked == 2);
+    else assert(strstr(error,"Integer value does not fit the declared bits and signedness"));
+    rangeArenaDestroy(&arena);
+}
+
 int main(void)
 {
+    // Exercise the actual Range rule independently of unfinished compilation.
+    validateInteger("@integer construct Wide<let bits: 128, let signed: true> { let value: 0 }",1);
+    validateInteger("@integer construct Narrow<let bits: 8, let signed: true> { let value: 128 }",0);
+    validateInteger("@integer construct Negative<let bits: 8, let signed: true> { let value: -128 }",1);
+    validateInteger("@integer construct Unsigned<let bits: 8, let signed: false> { let value: -1 }",0);
     validate(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 7 }",NULL,1);
     validate(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 8 }","source policy rejected",0);
     validate(POLICY "@assess construct Parcel<let ceiling: 8> { let payload: 8 }",NULL,1);

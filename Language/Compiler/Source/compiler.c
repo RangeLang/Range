@@ -767,28 +767,38 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
     }
 }
 
+static int compilerAttribute(RangeNode *target, RangeNode *attribute)
+{
+    return same(attribute->name,"builtin")
+        || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))
+        || macroBuiltin(attribute->resolvedDeclaration,"literal");
+}
+
+static void validateMacroApplication(MetaEval *eval, RangeNode *attribute)
+{
+    RangeMacroApplication *app = attribute->macroApplication;
+    if (!app) fail(eval->vm,attribute,"macro application was not resolved");
+    if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
+        if (same(app->declaration->c->items[j]->name,"builtin"))
+            fail(eval->vm,attribute,"builtin target effects are not supported by compile-time validation");
+    MetaScope scope = {.application=app};
+    RangeGraphValue returned = {0};
+    (void)metaStatement(eval,&scope,app->declaration->a,&returned);
+}
+
 static void validateMacroTarget(MetaEval *eval, RangeNode *target, size_t *checked)
 {
     if (!target->graphType) return;
     if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
-        RangeMacroApplication *app = target->c->items[i]->macroApplication;
-        if (same(target->c->items[i]->name,"builtin")
-            || (target->kind == RangeNodeFunction && same(target->c->items[i]->name,"extern"))
-            || macroBuiltin(target->c->items[i]->resolvedDeclaration,"literal")) continue;
-        if (!app) fail(eval->vm,target->c->items[i],"macro application was not resolved");
-        if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
-            if (same(app->declaration->c->items[j]->name,"builtin"))
-                fail(eval->vm,target->c->items[i],"builtin target effects are not supported by compile-time validation");
-        MetaScope scope = {.application=app};
-        RangeGraphValue returned = {0};
-        (void)metaStatement(eval,&scope,app->declaration->a,&returned);
+        if (compilerAttribute(target,target->c->items[i])) continue;
+        validateMacroApplication(eval,target->c->items[i]);
         ++*checked;
     }
     if (target->kind == RangeNodeConstruct)
         for (size_t i = 0; i < target->itemCount; ++i) validateMacroTarget(eval,target->items[i],checked);
 }
 
-static int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
+int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
     size_t *checked, char *error, size_t errorSize)
 {
     *checked = 0;
@@ -807,7 +817,249 @@ static int validateMacroApplications(RangeArena *arena, RangeNode **units, size_
     return ok;
 }
 
-/* Compiler driver: load source directories, parse their graph, and inspect it. */
+/* Compilation reports independent source gaps before attempting dependent work.
+ * These references come from the parsed graph, never a required-type name list. */
+typedef struct SourceDiagnostic {
+    RangeNode *at;
+    const char *category;
+    const char *message;
+    size_t uses;
+    int warning;
+    struct SourceDiagnostic *next;
+} SourceDiagnostic;
+
+typedef struct {
+    RangeArena *arena;
+    RangeNode **units;
+    size_t count;
+    SourceDiagnostic *first, *last;
+    size_t errors, warnings;
+} SourceReport;
+
+typedef struct SourceScope {
+    RangeNode *owner;
+    struct SourceScope *parent;
+} SourceScope;
+
+static void sourceDiagnostic(SourceReport *report, RangeNode *at, int warning,
+                             const char *category, const char *format, ...)
+{
+    char text[768]; va_list args; va_start(args,format);
+    vsnprintf(text,sizeof(text),format,args); va_end(args);
+    /* Keep every distinct issue and its first location in each source file. */
+    for (SourceDiagnostic *d = report->first; d; d = d->next)
+        if (d->warning == warning && same(d->category,category) && same(d->message,text)
+            && ((!at && !d->at) || (at && d->at && same(at->path,d->at->path)))) {
+            ++d->uses;
+            return;
+        }
+    SourceDiagnostic *d = rangeArenaAllocate(report->arena,sizeof(*d));
+    *d = (SourceDiagnostic){.at=at,.category=category,.warning=warning,.uses=1,
+        .message=rangeArenaIntern(report->arena,text,strlen(text))};
+    if (report->last) report->last->next = d;
+    else report->first = d;
+    report->last = d;
+    if (warning) ++report->warnings;
+    else ++report->errors;
+}
+
+static int sourceDeclaration(RangeNode *node)
+{
+    return node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum
+        || node->kind == RangeNodeFunction || node->kind == RangeNodeMacro
+        || node->kind == RangeNodeMember || node->kind == RangeNodeParameter || node->kind == RangeNodeLocal;
+}
+
+static int sourceMatches(RangeNode *node, const char *name, int kind)
+{
+    if (!sourceDeclaration(node) || !same(node->name,name)) return 0;
+    if (kind == 1) return node->kind == RangeNodeMacro;
+    if (kind == 2) return node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum;
+    return node->kind != RangeNodeMacro;
+}
+
+static RangeNode *sourceLookup(SourceReport *report, SourceScope *scope,
+                               const char *name, int kind)
+{
+    for (; scope; scope = scope->parent) {
+        RangeNode *owner = scope->owner;
+        if (kind != 1 && owner->generics && same(owner->generics->name,"genericMembers"))
+            for (size_t i = 0; i < owner->generics->itemCount; ++i)
+                if (same(owner->generics->items[i]->name,name)) return owner->generics->items[i];
+        for (size_t i = 0; i < owner->itemCount; ++i) {
+            RangeNode *node = owner->items[i];
+            if (sourceMatches(node,name,kind)) return node;
+        }
+    }
+    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
+        RangeNode *node = report->units[u]->items[i];
+        if (sourceMatches(node,name,kind)) return node;
+    }
+    return NULL;
+}
+
+static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
+                                  RangeNode *at, const char *name, int kind)
+{
+    if (!name || !*name) return NULL;
+    const char *separator = strchr(name,'|');
+    if (separator) {
+        const char *left = rangeArenaIntern(report->arena,name,(size_t)(separator-name));
+        (void)sourceReference(report,scope,at,left,kind);
+        (void)sourceReference(report,scope,at,separator+1,kind);
+        sourceDiagnostic(report,at,0,"not-implemented","union type resolution is not implemented");
+        return NULL;
+    }
+    RangeNode *declaration = sourceLookup(report,scope,name,kind);
+    if (!declaration) {
+        if (kind != 1 && rangeGraphType(report->arena,name))
+            sourceDiagnostic(report,at,0,"undeclared","'%s' has a C graph shape but no Range declaration",name);
+        else sourceDiagnostic(report,at,0,"undeclared","no declaration for %s'%s' in the loaded sources",kind == 1 ? "macro " : "",name);
+    }
+    return declaration;
+}
+
+static void diagnoseSourceNode(SourceReport *, SourceScope *, RangeNode *, int);
+
+static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *node)
+{
+    if (!node) return;
+    (void)sourceReference(report,scope,node,node->name,2);
+    diagnoseSourceNode(report,scope,node->generics,0);
+    diagnoseType(report,scope,node->a); /* an explicit macro result type */
+}
+
+static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *node, int metadata)
+{
+    if (!node) return;
+    switch (node->kind) {
+    case RangeNodeUnit: case RangeNodeBlock: {
+        SourceScope block = {.owner=node,.parent=scope};
+        for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,&block,node->items[i],metadata);
+        return;
+    }
+    case RangeNodeConstruct: case RangeNodeEnum: case RangeNodeFunction: case RangeNodeMacro: {
+        SourceScope declaration = {.owner=node,.parent=scope};
+        if (node->kind == RangeNodeFunction)
+            (void)sourceReference(report,scope,node,node->typeName,2);
+        if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
+        diagnoseSourceNode(report,&declaration,node->generics,0);
+        diagnoseSourceNode(report,scope,node->c,0);
+        for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,&declaration,node->items[i],0);
+        diagnoseSourceNode(report,&declaration,node->a,0);
+        return;
+    }
+    case RangeNodeParameter:
+        diagnoseType(report,scope,node->b);
+        break;
+    case RangeNodeMember: case RangeNodeLocal: {
+        RangeNode *declaration = sourceReference(report,scope,node,node->typeName,
+            node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
+        if (declaration && (node->flags & RangeFlagApplication)
+            && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
+            sourceDiagnostic(report,node,0,"not-implemented","value construction for '%s' is not implemented",node->typeName);
+        break;
+    }
+    case RangeNodeName:
+        (void)sourceReference(report,scope,node,node->name,0);
+        break;
+    case RangeNodeMemberAccess:
+        if (same(node->name,"first") || same(node->name,"isTarget"))
+            sourceDiagnostic(report,node,1,"C-implementation","'.%s' is hard-coded in C; Range member dispatch is not implemented",node->name);
+        break;
+    case RangeNodeCall:
+        if (node->a && node->a->kind == RangeNodeMemberAccess) {
+            if (same(node->a->name,"filter") && node->itemCount == 1 && same(node->items[0]->name,"named"))
+                sourceDiagnostic(report,node,1,"C-implementation","'filter(named:)' is hard-coded in C; Range method dispatch is not implemented");
+            else sourceDiagnostic(report,node,0,"not-implemented","method call resolution for '%s' is not implemented",node->a->name);
+        } else if (node->a && node->a->kind == RangeNodeName) {
+            RangeNode *declaration = sourceLookup(report,scope,node->a->name,0);
+            if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
+                sourceDiagnostic(report,node,0,"not-implemented","value construction for '%s' is not implemented",node->a->name);
+        }
+        break;
+    case RangeNodeAttribute: {
+        if (same(node->name,"builtin") || same(node->name,"extern")) {
+            metadata = 1; /* compiler metadata still contains source expressions */
+            break;
+        }
+        if (node->name) {
+            RangeNode *macro = sourceReference(report,scope,node,node->name,1);
+            if (node->resolvedDeclaration) macro = node->resolvedDeclaration;
+            metadata = macroBuiltin(macro,"literal") || macroBuiltin(macro,"diagnostic");
+        }
+        break;
+    }
+    case RangeNodeInteger:
+        if (!metadata) sourceDiagnostic(report,node,1,"C-implementation",
+            "numeric literal values use C signed 64-bit storage; Range literal materialization is not implemented");
+        break;
+    case RangeNodeBool:
+        if (!metadata) sourceDiagnostic(report,node,1,"C-implementation",
+            "boolean literal recognition and values are hard-coded in C; Range literal materialization is not implemented");
+        break;
+    case RangeNodeString:
+        if (!metadata) sourceDiagnostic(report,node,1,"C-implementation",
+            "string literal values are supplied by C; Range literal materialization is not implemented");
+        break;
+    case RangeNodeUnary: case RangeNodeBinary:
+        sourceDiagnostic(report,node,1,"C-implementation",
+            "operator '%s' uses the C scalar evaluator; Range operator dispatch is not implemented",node->name);
+        break;
+    case RangeNodeEmission:
+        sourceDiagnostic(report,node,0,"not-implemented","macro code emission is not implemented");
+        break;
+    case RangeNodeClosure: case RangeNodeSwitch: case RangeNodeExtension: case RangeNodeSyntaxTemplate:
+        sourceDiagnostic(report,node,0,"not-implemented","execution of '%s' is not implemented",rangeNodeKindName(node->kind));
+        break;
+    default: break;
+    }
+    diagnoseSourceNode(report,scope,node->a,metadata);
+    if (node->kind != RangeNodeParameter) diagnoseSourceNode(report,scope,node->b,metadata);
+    diagnoseSourceNode(report,scope,node->c,metadata);
+    diagnoseSourceNode(report,scope,node->generics,0);
+    diagnoseSourceNode(report,scope,node->annotations,0);
+    for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,scope,node->items[i],metadata);
+    /* rhsReference aliases the already checked member/local type-position name. */
+}
+
+static void writeSourceDiagnostics(SourceReport *report, FILE *output)
+{
+    for (SourceDiagnostic *d = report->first; d; d = d->next) {
+        if (d->at) fprintf(output,"%s:%d:%d: ",d->at->path,d->at->line,d->at->column);
+        else fputs("compiler: ",output);
+        fprintf(output,"%s[%s]: %s",d->warning ? "warning" : "error",d->category,d->message);
+        if (d->uses > 1) fprintf(output," (%zu uses in this source)",d->uses);
+        fputc('\n',output);
+    }
+}
+
+static void diagnoseMacroTarget(SourceReport *report, Resolver *vm, RangeNode *target)
+{
+    if (!target->graphType) return;
+    if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
+        RangeNode *attribute = target->c->items[i];
+        if (compilerAttribute(target,attribute)) continue;
+        if (setjmp(vm->failure) == 0) {
+            MetaEval eval = {.vm=vm};
+            validateMacroApplication(&eval,attribute);
+        } else sourceDiagnostic(report,NULL,0,"macro-validation","%s",vm->error);
+    }
+    if (target->kind == RangeNodeConstruct)
+        for (size_t i = 0; i < target->itemCount; ++i) diagnoseMacroTarget(report,vm,target->items[i]);
+}
+
+static void diagnoseMacroApplications(SourceReport *report)
+{
+    Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
+    *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
+        .error=rangeArenaAllocate(report->arena,512),.errorSize=512};
+    for (size_t u = 0; u < report->count; ++u)
+        for (size_t i = 0; i < report->units[u]->itemCount; ++i)
+            diagnoseMacroTarget(report,vm,report->units[u]->items[i]);
+}
+
+/* Compiler driver: load source directories and compile, or inspect their graph. */
 #include "parser.h"
 #include "graph.h"
 #include <dirent.h>
@@ -957,7 +1209,7 @@ int main(int argc, char **argv)
 {
     RangeArena arena;
     rangeArenaInit(&arena);
-    int treeMode = 0, validationMode = 0;
+    int treeMode = 0;
     const char *literalMacro = NULL, *literalInput = NULL;
     const char *graphDirectory = NULL;
     int first = 1;
@@ -965,10 +1217,9 @@ int main(int argc, char **argv)
     if (argc > option + 2 && strcmp(argv[option],"--match-literal") == 0) {
         literalMacro=argv[option + 1]; literalInput=argv[option + 2]; first=option + 3;
     }
-    else if (argc > option && strcmp(argv[option], "--validate-macros") == 0) { validationMode = 1; first = option + 1; }
     else if (argc > option && strcmp(argv[option], "--tree") == 0) { treeMode = 1; first = option + 1; }
     else if (argc > option + 1 && strcmp(argv[option], "--emit-graph") == 0) { graphDirectory = argv[option + 1]; first = option + 2; }
-    if (first >= argc) { fprintf(stderr, "usage: compiler [--tree | --emit-graph directory | --match-literal macro text | --validate-macros] files-or-directories...\n"); return 64; }
+    if (first >= argc) { fprintf(stderr, "usage: compiler [--tree | --emit-graph directory | --match-literal macro text] files-or-directories...\n"); return 64; }
     Sources sources = {0};
     RangeNode **units = NULL;
     int status = 66;
@@ -988,8 +1239,6 @@ int main(int argc, char **argv)
     units = calloc(sources.count, sizeof(*units));
     if (!units) { status = 70; goto cleanup; }
     size_t unitCount = 0;
-    long counts[RangeNodeKindCount];
-    memset(counts, 0, sizeof(counts));
     int failures = 0;
     for (size_t index = 0; index < sources.count; ++index) {
         const char *path = sources.paths[index];
@@ -1003,11 +1252,22 @@ int main(int argc, char **argv)
         if (!unit) { fprintf(stderr, "%s\n", error); failures += 1; continue; }
         units[unitCount++] = unit;
         if (treeMode) { rangeGraphWriteTree(stdout, unit, 0); continue; }
-        for (size_t item = 0; item < unit->itemCount; ++item) {
-            counts[unit->items[item]->kind] += 1;
-        }
     }
-    if (!treeMode && !literalMacro && !failures) {
+    if (!treeMode && !graphDirectory && !literalMacro) {
+        SourceReport report = {.arena=&arena,.units=units,.count=unitCount};
+        char error[512];
+        int resolved = unitCount && resolveGraphApplications(&arena,units,unitCount,error,sizeof(error));
+        if (unitCount && !resolved) sourceDiagnostic(&report,NULL,0,"resolution","%s",error);
+        for (size_t u = 0; u < unitCount; ++u) diagnoseSourceNode(&report,NULL,units[u],0);
+        if (resolved && !failures && !report.errors) diagnoseMacroApplications(&report);
+        sourceDiagnostic(&report,NULL,0,"not-implemented","complete Range type checking and value materialization are not implemented");
+        sourceDiagnostic(&report,NULL,0,"not-implemented","native code emission is not implemented; no executable was produced");
+        writeSourceDiagnostics(&report,stderr);
+        fprintf(stderr,"compilation failed: %zu errors, %zu C implementation warnings\n",report.errors+(size_t)failures,report.warnings);
+        status = 65;
+        goto cleanup;
+    }
+    if (graphDirectory && !failures) {
         char error[512];
         if (!resolveGraphApplications(&arena, units, unitCount, error, sizeof(error))) {
             fprintf(stderr,"%s\n",error);
@@ -1024,18 +1284,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"%s\n",error); failures += 1;
         } else printf("match=%s\n",matched ? "true" : "false");
     }
-    if (validationMode && !failures) {
-        char error[512]; size_t checked;
-        if (!validateMacroApplications(&arena,units,unitCount,&checked,error,sizeof(error))) {
-            fprintf(stderr,"%s\n",error); failures += 1;
-        } else printf("validated-macro-applications=%zu\n",checked);
-    }
     status = failures ? 65 : 0;
-    if (treeMode || graphDirectory || literalMacro || validationMode) goto cleanup;
-    printf("resolved-sources=%zu nodes=%zu construct=%ld enum=%ld function=%ld macro=%ld main=%ld failures=%d\n",
-           sources.count, arena.nodeCount, counts[RangeNodeConstruct], counts[RangeNodeEnum],
-           counts[RangeNodeFunction], counts[RangeNodeMacro], counts[RangeNodeMain],
-           failures);
 cleanup:
     free(units);
     free(sources.paths);
