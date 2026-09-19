@@ -26,30 +26,12 @@ for mode in ordinary sanitized; do
         Testing/Compiler/Graph/MacroTargets.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
         -o "$work_root/$mode-macro-targets"
     "$work_root/$mode-macro-targets"
-    output="$work_root/$mode-graphs"
-    "$compiler" --emit-graph "$work_root/$mode-functions" Language/Grammar Language/Macros Language/Types Testing/Compiler/Graph/Functions > "$work_root/log"
-    cmp Testing/Compiler/Graph/Functions/Start.txt "$work_root/$mode-functions/Start.txt" || fail "$mode function return graph differs"
-    cmp Testing/Compiler/Graph/Functions/Returns.txt "$work_root/$mode-functions/Returns.txt" || fail "$mode call or bare return graph differs"
-    "$compiler" --emit-graph "$output" Testing/Compiler/Graph/Resolution > "$work_root/log"
-    for target in First Second; do
-        file="$output/$target.txt"
-        grep -Fq "targetName: $target" "$file" || fail "$mode target context leaked"
-        if grep -Fq 'Hidden control flow' "$file"; then fail "$mode body inspection leaked control flow"; fi
-        grep -Fq 'missing: none' "$file" || fail "$mode missing member was fabricated"
-    done
-    grep -Fq 'evaluated: 11' "$output/First.txt" || fail "$mode first payload differs"
-    grep -Fq 'evaluated: 22' "$output/Second.txt" || fail "$mode second payload differs"
-    grep -Fq 'width: 8' "$output/First.txt" || fail "$mode first generic differs"
-    grep -Fq 'width: 16' "$output/Second.txt" || fail "$mode second generic differs"
-    grep -Fq 'selected: Member { name: payload value: 11 }' "$output/First.txt" || fail "$mode reflection erased the member identity"
-    grep -Fq 'selected: #members.filter(named: "payload").first' "$output/Probe.txt" || fail "$mode member definition erased"
-    grep -Fq '@diagnostic("This block must remain deferred")' "$output/Probe.txt" || fail "$mode expansion body lost"
     for fixture in Unknown UnknownBody Cycle; do
         status=0
-        "$compiler" --emit-graph "$work_root/$mode-$fixture" "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?
+        "$compiler" "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?
         [[ "$status" == 65 ]] || fail "$mode $fixture exited $status"
         grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks source location"
-        [[ ! -e "$work_root/$mode-$fixture" ]] || fail "$mode $fixture emitted partial results"
+        [[ ! -s "$work_root/log" ]] || fail "$mode $fixture claimed success"
         if [[ "$fixture" == Cycle ]]; then
             grep -Fq 'cyclic graph member' "$work_root/error" || fail "$mode cycle failed for wrong reason"
         elif [[ "$fixture" == UnknownBody ]]; then
@@ -58,17 +40,14 @@ for mode in ordinary sanitized; do
             grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
         fi
     done
-    # Inspection can succeed while compilation reports missing language support.
+    # Normal compilation resolves the graph and reports missing language support.
     status=0
     "$compiler" Testing/Compiler/Graph/Resolution > "$work_root/log" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 && ! -s "$work_root/log" ]] || fail "$mode incomplete compilation claimed success"
     grep -Fq 'hard-coded in C' "$work_root/error" || fail "$mode normal path concealed bootstrap behavior"
+    if grep -Fq 'error[resolution]' "$work_root/error"; then fail "$mode graph resolution failed"; fi
     status=0
-    "$compiler" Testing/Compiler/Graph/ResolutionFail/Unknown.range > "$work_root/log" 2> "$work_root/error" || status=$?
-    [[ "$status" == 65 ]] || fail "$mode normal path skipped graph errors"
-    grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode normal path did not resolve"
-    status=0
-    "$compiler" --run start Testing/Compiler/Graph/Functions > "$work_root/log" 2> "$work_root/error" || status=$?
+    "$compiler" --run start Language/Types > "$work_root/log" 2> "$work_root/error" || status=$?
     [[ "$status" == 64 ]] || fail "$mode retired interpreter command was accepted"
-    echo "compiler graph: $mode contexts=2 reflection=pass deferred=pass normal-resolution=pass rejections=5"
+    echo "compiler graph: $mode contexts=2 reflection=pass deferred=pass normal-resolution=pass rejections=4"
 done

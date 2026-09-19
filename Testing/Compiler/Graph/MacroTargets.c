@@ -58,7 +58,9 @@ int main(void)
     RangeNode *macros = parse(&arena,"Macros.range",
         "macro inspect(): Construct { let name: \"local\" let members: 0 "
         "let targetName: #name let chosen: #members.filter(named: \"payload\").first "
-        "let config: #generics.first let attached: #macros.first } "
+        "let config: #generics.first let attached: #macros.first "
+        "let width: #generics.first.value let evaluated: #members.first.value "
+        "let missing: #members.filter(named: \"absent\").first } "
         "macro inspect(): Function { let targetName: #name let parameters: #parameters "
         "let output: #output let body: #body } "
         "macro inspect(): Enum { let targetName: #name let chosen: #cases.first } "
@@ -95,6 +97,16 @@ int main(void)
         assert(binding(a,"config").node == first->generics->items[0]);
         assert(binding(b,"config").node == second->generics->items[0]);
         assert(binding(a,"attached").node == first->c->items[0]);
+        assert(binding(a,"width").node == rangeNodeRHS(first->generics->items[0]));
+        assert(binding(b,"width").node == rangeNodeRHS(second->generics->items[0]));
+        assert(binding(a,"width").node->integer == 8);
+        assert(binding(b,"width").node->integer == 16);
+        assert(binding(a,"evaluated").node == rangeNodeRHS(first->items[0]));
+        assert(binding(b,"evaluated").node == rangeNodeRHS(second->items[0]));
+        assert(binding(a,"evaluated").node->integer == 11);
+        assert(binding(b,"evaluated").node->integer == 22);
+        assert(binding(a,"missing").kind == RangeGraphNone);
+        assert(binding(b,"missing").kind == RangeGraphNone);
         RangeMacroApplication *f = application(function,macros->items[1]);
         assert(binding(f,"parameters").nodes[0] == function->items[0]);
         assert(binding(f,"output").node == first);
@@ -108,15 +120,12 @@ int main(void)
         assert(binding(m,"body").node == recipe->a);
         assert(binding(m,"original").node == recipe->a->items[0]);
         assert(binding(m,"expansions").count == 1);
+        assert(recipe->a->items[1]->kind == RangeNodeExpressionStatement);
+        assert(binding(m,"expansions").nodes[0] == recipe->a->items[1]->a);
+        assert(binding(m,"body").node->source == targets->source);
+        assert(binding(m,"original").node->source == targets->source);
+        assert(binding(m,"expansions").nodes[0]->source == targets->source);
     }
-    // Rendering reflected bodies must use the target's source, across files.
-    FILE *out = tmpfile(); assert(out);
-    rangeGraphWrite(out,targets);
-    rewind(out);
-    char rendered[16384]; size_t bytes = fread(rendered,1,sizeof(rendered)-1,out);
-    rendered[bytes] = '\0'; fclose(out);
-    assert(strstr(rendered,"original: let original: #members.first"));
-    assert(strstr(rendered,"deferred target source"));
     RangeNode *reordered[] = {grammar,macros,targets};
     RangeNode *swap = macros->items[0]; macros->items[0] = macros->items[2]; macros->items[2] = swap;
     resolve(&arena,reordered,3);

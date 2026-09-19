@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves that the C compiler front end retains the current Core surface.
+# Checks source loading and the current C parser surface.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,24 +12,17 @@ compiler="$work_root/range-compiler"
 "$REPO_ROOT/Language/Compiler/Tools/build-range-compiler" "$compiler"
 
 language_sources=("$REPO_ROOT/Language/Grammar" "$REPO_ROOT/Language/Macros" "$REPO_ROOT/Language/Types")
-census="$("$compiler" --emit-graph "$work_root/census" "${language_sources[@]}")"
-[[ "$("$compiler" --emit-graph "$work_root/census" "${language_sources[2]}" "${language_sources[0]}" "${language_sources[1]}")" == "$census" ]] \
-    || fail "language folder order changed resolution"
+structure="$("$compiler" --tree "${language_sources[@]}")"
+[[ "$("$compiler" --tree "${language_sources[2]}" "${language_sources[0]}" "${language_sources[1]}")" == "$structure" ]] \
+    || fail "language folder order changed parsing"
 
 (cd "$REPO_ROOT" && "$compiler" --tree Language/Types/Int.range) > "$work_root/int-tree"
 grep -q 'construct name=Int ' "$work_root/int-tree" || fail "Int construct is missing"
 grep -q 'member name=value ' "$work_root/int-tree" || fail "Int payload member is missing"
 grep -q 'attribute name=integer' "$work_root/int-tree" || fail "Int integer macro application is missing"
 
-"$compiler" --emit-graph "$work_root/graphs/nested" "${language_sources[@]}" > "$work_root/graph-output"
-cmp "$REPO_ROOT/Testing/Compiler/Graph/Int.txt" "$work_root/graphs/nested/Int.txt" || fail "readable Int graph differs"
-integer_graph="$work_root/graphs/nested/Integer.txt"
-cmp "$REPO_ROOT/Testing/Compiler/Graph/Integer.txt" "$integer_graph" || fail "macro environment members differ"
-"$compiler" --emit-graph "$work_root/graphs/nested" "$REPO_ROOT/Testing/Compiler/Graph/Environment.range" > "$work_root/graph-output"
-cmp "$REPO_ROOT/Testing/Compiler/Graph/Environment.txt" "$work_root/graphs/nested/Environment.txt" || fail "environment block code differs"
-if grep -Eq 'rhs=|span=|flags=|application=|itemCount|resolvedDeclaration' "$work_root/graphs/nested/"*.txt; then
-    fail "readable graphs contain parser bookkeeping"
-fi
+"$compiler" --tree "$REPO_ROOT/Testing/Compiler/Graph/Environment.range" > "$work_root/environment-tree"
+grep -Eq '^[[:space:]]+emission($| )' "$work_root/environment-tree" || fail "environment block was skipped"
 
 probe="$work_root/malformed.range"
 printf 'construct Broken<let bits: > {}\n' > "$probe"
@@ -43,12 +36,11 @@ mkdir -p "$directory/nested" "$work_root/empty"
 cp -R "$REPO_ROOT/Testing/Compiler/Directory/." "$directory/"
 ln -s .. "$directory/nested/cycle"
 ln -s nested/Value.range "$directory/alias.range"
-directory_census="$("$compiler" --emit-graph "$work_root/directory-census" "$directory")"
-[[ "$(grep -c '^graph=' <<<"$directory_census")" == 2 ]] || fail "directory sources were skipped or duplicated"
-[[ "$("$compiler" --emit-graph "$work_root/directory-census" "$directory/nested/Value.range" "$directory" "$directory/Start.range")" == "$directory_census" ]] \
-    || fail "overlapping inputs changed the graph"
-"$compiler" --emit-graph "$work_root/directory-graph" "$directory" > "$work_root/graph-output"
-grep -Fq 'name: start' "$work_root/directory-graph/Start.txt" || fail "cross-file function missing"
+directory_tree="$("$compiler" --tree "$directory")"
+[[ "$(grep -c '^unit ' <<<"$directory_tree")" == 2 ]] || fail "directory sources were skipped or duplicated"
+[[ "$("$compiler" --tree "$directory/nested/Value.range" "$directory" "$directory/Start.range")" == "$directory_tree" ]] \
+    || fail "overlapping inputs changed parsing"
+grep -Eq 'function name=start($| )' <<<"$directory_tree" || fail "cross-file function missing"
 for invalid in "$work_root/empty" "$work_root/missing"; do
     result=0
     "$compiler" "$invalid" > /dev/null 2> "$work_root/error" || result=$?
@@ -60,4 +52,4 @@ result=0
 [[ "$result" == 65 ]] || fail "malformed nested source exited $result, expected 65"
 grep -Eq 'Broken.range:[0-9]+:[0-9]+:' "$work_root/error" || fail "nested diagnostic lacks source location"
 
-echo "compiler parser: sources=$(grep -c '^graph=' <<<"$census") int-structure=pass malformed=pass directory=pass"
+echo "compiler parser: sources=$(grep -c '^unit ' <<<"$structure") int-structure=pass malformed=pass directory=pass"

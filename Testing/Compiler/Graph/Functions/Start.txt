@@ -1,9 +1,0 @@
-Function {
-    name: start
-    output: Int
-    body: {
-        Return {
-            value: 42
-        }
-    }
-}

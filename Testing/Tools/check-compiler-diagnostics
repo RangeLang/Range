@@ -73,11 +73,13 @@ assert 'first application failed' in errors and 'second application failed' in e
 assert 'error[undeclared]' not in errors, errors
 assert 'error[macro-validation]' in errors, errors
 
-# The graph viewer remains useful for sources that are not compilable yet.
-view = subprocess.run([compiler, '--emit-graph', str(folder/'graphs'),
-    'Language/Grammar', 'Language/Macros', 'Language/Types'], capture_output=True, text=True)
-assert view.returncode == 0, view.stderr
-assert (folder/'graphs'/'Integer.txt').is_file()
+# The retired text export is rejected and creates no output directory.
+output = folder/'graphs'
+retired = subprocess.run([compiler, '--emit-graph', str(output),
+    'Language/Types'], capture_output=True, text=True)
+assert retired.returncode == 64 and not retired.stdout, retired.stdout + retired.stderr
+assert 'unsupported option: --emit-graph' in retired.stderr, retired.stderr
+assert not output.exists()
 PY
     echo "compiler diagnostics: $mode missing-declarations=pass C-ownership=pass normal-validation=pass no-false-success=pass"
 done

@@ -41,8 +41,6 @@ for mode in ordinary sanitized; do
     check choice no true
     check choice yesno false
     check emptyAllowed '' true
-    "$compiler" --emit-graph "$work_root/$mode-graph" "$core" "$fixtures/Rules.range" > "$work_root/out"
-    grep -Fq '[0-9]+' "$work_root/$mode-graph/Rules.txt" || fail "$mode pattern missing from graph"
     for fixture in Invalid Duplicate Argument Target; do
         case "$fixture" in
             Invalid) expected='invalid literal regex' ;;
@@ -57,8 +55,9 @@ for mode in ordinary sanitized; do
         grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks location"
     done
     status=0
-    "$compiler" --emit-graph "$work_root/$mode-invalid-graph" "$core" "$fixtures/Invalid.range" > "$work_root/out" 2> "$work_root/error" || status=$?
-    [[ "$status" == 65 && ! -e "$work_root/$mode-invalid-graph" ]] || fail "$mode invalid regex emitted graph"
+    "$compiler" "$core" "$fixtures/Invalid.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode invalid regex compilation claimed success"
+    grep -Fq 'invalid literal regex' "$work_root/error" || fail "$mode compilation skipped literal validation"
     status=0
     "$compiler" --match-literal decimal 64 "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing builtin was accepted"
@@ -67,5 +66,5 @@ for mode in ordinary sanitized; do
     "$compiler" --match-literal unregistered 64 "$core" "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing rule was accepted"
     grep -Fq "has no literal rule" "$work_root/error" || fail "$mode missing rule wrong error"
-    echo "compiler literal: $mode matches=15 rejections=7 graph=pass"
+    echo "compiler literal: $mode matches=15 rejections=7 normal-resolution=pass"
 done

@@ -1059,7 +1059,7 @@ static void diagnoseMacroApplications(SourceReport *report)
             diagnoseMacroTarget(report,vm,report->units[u]->items[i]);
 }
 
-/* Compiler driver: load source directories and compile, or inspect their graph. */
+/* Compiler driver: compile source directories, with parser and literal probes. */
 #include "parser.h"
 #include "graph.h"
 #include <dirent.h>
@@ -1158,68 +1158,19 @@ static char *readFile(const char *path, size_t *size)
     return buffer;
 }
 
-
-/* Flat per-source dumps; reject duplicate names before writing any files. */
-static const char *sourceName(const char *path)
-{
-    const char *slash = strrchr(path, '/');
-    return slash ? slash + 1 : path;
-}
-
-static int emitGraphs(RangeArena *arena, RangeNode **units, size_t count,
-                      const char *directory)
-{
-    if (!*directory) { fprintf(stderr, "graph output directory is empty\n"); return 0; }
-    for (size_t i = 0; i < count; ++i) {
-        for (size_t j = 0; j < i; ++j) {
-            if (!strcmp(sourceName(units[i]->path), sourceName(units[j]->path))) {
-                fprintf(stderr, "duplicate graph output name: %s\n", sourceName(units[i]->path));
-                return 0;
-            }
-        }
-    }
-    char *folder = (char *)rangeArenaIntern(arena, directory, strlen(directory));
-    for (char *p = folder + 1; ; ++p) {
-        if (*p && *p != '/') continue;
-        char saved = *p;
-        *p = '\0';
-        if (mkdir(folder, 0755) != 0 && errno != EEXIST) return sourceError(folder);
-        *p = saved;
-        if (!saved) break;
-    }
-    for (size_t i = 0; i < count; ++i) {
-        const char *name = sourceName(units[i]->path);
-        const char *extension = strrchr(name, '.');
-        size_t stem = extension ? (size_t)(extension - name) : strlen(name);
-        size_t length = strlen(directory) + stem + 6;
-        char *path = rangeArenaAllocate(arena, length);
-        snprintf(path, length, "%s/%.*s.txt", directory, (int)stem, name);
-        FILE *output = fopen(path, "w");
-        if (!output) return sourceError(path);
-        rangeGraphWrite(output, units[i]);
-        int failed = ferror(output);
-        if (fclose(output) != 0) failed = 1;
-        if (failed) return sourceError(path);
-        printf("graph=%s\n", path);
-    }
-    return 1;
-}
-
 int main(int argc, char **argv)
 {
     RangeArena arena;
     rangeArenaInit(&arena);
     int treeMode = 0;
     const char *literalMacro = NULL, *literalInput = NULL;
-    const char *graphDirectory = NULL;
     int first = 1;
     int option = first;
     if (argc > option + 2 && strcmp(argv[option],"--match-literal") == 0) {
         literalMacro=argv[option + 1]; literalInput=argv[option + 2]; first=option + 3;
     }
     else if (argc > option && strcmp(argv[option], "--tree") == 0) { treeMode = 1; first = option + 1; }
-    else if (argc > option + 1 && strcmp(argv[option], "--emit-graph") == 0) { graphDirectory = argv[option + 1]; first = option + 2; }
-    if (first >= argc) { fprintf(stderr, "usage: compiler [--tree | --emit-graph directory | --match-literal macro text] files-or-directories...\n"); return 64; }
+    if (first >= argc) { fprintf(stderr, "usage: compiler [--tree | --match-literal macro text] files-or-directories...\n"); return 64; }
     Sources sources = {0};
     RangeNode **units = NULL;
     int status = 66;
@@ -1253,7 +1204,7 @@ int main(int argc, char **argv)
         units[unitCount++] = unit;
         if (treeMode) { rangeGraphWriteTree(stdout, unit, 0); continue; }
     }
-    if (!treeMode && !graphDirectory && !literalMacro) {
+    if (!treeMode && !literalMacro) {
         SourceReport report = {.arena=&arena,.units=units,.count=unitCount};
         char error[512];
         int resolved = unitCount && resolveGraphApplications(&arena,units,unitCount,error,sizeof(error));
@@ -1265,17 +1216,6 @@ int main(int argc, char **argv)
         writeSourceDiagnostics(&report,stderr);
         fprintf(stderr,"compilation failed: %zu errors, %zu C implementation warnings\n",report.errors+(size_t)failures,report.warnings);
         status = 65;
-        goto cleanup;
-    }
-    if (graphDirectory && !failures) {
-        char error[512];
-        if (!resolveGraphApplications(&arena, units, unitCount, error, sizeof(error))) {
-            fprintf(stderr,"%s\n",error);
-            failures += 1;
-        }
-    }
-    if (graphDirectory && !failures && !emitGraphs(&arena, units, unitCount, graphDirectory)) {
-        status = 74;
         goto cleanup;
     }
     if (literalMacro && !failures) {

@@ -1,7 +1,0 @@
-function throughCall(): Int {
-    return start()
-}
-
-function finish() {
-    return
-}

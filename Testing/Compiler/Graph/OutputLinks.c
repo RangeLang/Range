@@ -11,7 +11,8 @@ int main(void)
     char error[512];
     rangeGraphInitTypes(&arena);
     const char *sources[] = {
-        "function start(): Whole { return 42 } function deferred(): Missing { return 0 }",
+        ("function start(): Whole { return 42 } function deferred(): Missing { return 0 } "
+         "function throughCall(): Whole { return start() } function finish() { return }"),
         "@integer construct Whole<let bits: 64, let signed: true> { let value: 0 }",
         "macro integer(): Construct { let bits: #generics.filter(named: \"bits\").first }"
     };
@@ -30,6 +31,11 @@ int main(void)
     assert(app->bindings[0].value.node == construct->generics->items[0]);
     assert(rangeNodeRHS(app->bindings[0].value.node)->integer == 64);
     assert(function->a->items[0]->a->integer == 42);
+    RangeNode *call = units[0]->items[2]->a->items[0]->a;
+    assert(units[0]->items[2]->b->resolvedDeclaration == construct);
+    assert(call->kind == RangeNodeCall && same(call->a->name,"start"));
+    assert(units[0]->items[3]->a->items[0]->kind == RangeNodeReturn);
+    assert(!units[0]->items[3]->a->items[0]->a);
     assert(rangeNodeRHS(construct->items[0])->integer == 0);
     rangeNodeAppend(&arena,units[1],rangeNodeCreate(&arena,RangeNodeConstruct,"duplicate.range",1,1));
     units[1]->items[1]->name = "Whole";
