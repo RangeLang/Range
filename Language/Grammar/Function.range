@@ -1,16 +1,6 @@
-@syntax {
-    function $name($parameters): $output {
-        $body
-    }
-}
-@syntax {
-    function $name($parameters) {
-        $body
-    }
-}
 construct Function {
     let name: String
-    let parameters: @many Parameter?
+    let parameters: Array<Parameter>
     let output: Construct?
-    let body: @many Return?
+    let body: Array<Return>
 }

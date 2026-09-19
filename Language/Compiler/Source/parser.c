@@ -159,35 +159,6 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
 
 /* ---- attributes ------------------------------------------------------ */
 
-/* Bootstrap parsing retains @syntax verbatim. Graph resolution validates its
- * C adapter and binds captures to the accompanying Core declaration. */
-static void parseTemplateSpan(RangeParser *parser, RangeNode *attribute)
-{
-    const char *open = NULL;
-    const char *close = NULL;
-    if (parserAt(parser, "(")) { open = "("; close = ")"; }
-    else if (parserAt(parser, "{")) { open = "{"; close = "}"; }
-    else return;
-    attribute->spanStart = parser->current.offset;
-    int depth = 0;
-    while (!parser->failed) {
-        if (parserAtKind(parser, RangeTokenEnd)) {
-            parserFail(parser, &parser->current, "unterminated @syntax template");
-            return;
-        }
-        if (parserAt(parser, open)) depth += 1;
-        else if (parserAt(parser, close)) {
-            depth -= 1;
-            if (depth == 0) {
-                attribute->spanEnd = parser->current.offset + parser->current.length;
-                parserAdvance(parser);
-                return;
-            }
-        }
-        parserAdvance(parser);
-    }
-}
-
 /* True when the current token opens a type position rather than an inferred
  * initialiser. `let x: Int(0)` is typed; `let m: #environment.filter(...)` and
  * `let author: "George"` place the initialising expression in that position. */
@@ -210,7 +181,8 @@ static RangeNode *parseAttributes(RangeParser *parser)
         parserAdvance(parser);
         attribute->name = parserExpectName(parser);
         if (strcmp(attribute->name, "syntax") == 0) {
-            parseTemplateSpan(parser, attribute);
+            parserFail(parser, &parser->current, "@syntax is deferred; structural syntax is defined in C");
+            return list;
         } else {
             if (parserAt(parser, "<")) attribute->generics = parseGenericArguments(parser, 0);
             if (parserAt(parser, "(")) parseArgumentList(parser, attribute);

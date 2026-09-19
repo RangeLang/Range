@@ -1,9 +1,3 @@
-@syntax {
-    return $value
-}
-@syntax {
-    return
-}
 construct Return {
     let value: Any?
 }

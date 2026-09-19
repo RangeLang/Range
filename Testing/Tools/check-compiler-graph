@@ -24,7 +24,6 @@ for mode in ordinary sanitized; do
     "$work_root/$mode-grammar-links"
     output="$work_root/$mode-graphs"
     "$compiler" --emit-graph "$work_root/$mode-functions" Language/Grammar Language/Macros Language/Types Testing/Compiler/Graph/Functions > "$work_root/log"
-    grep -Fq 'return $value' "$work_root/$mode-functions/Return.txt" || fail "$mode syntax template lost"
     cmp Testing/Compiler/Graph/Functions/Start.txt "$work_root/$mode-functions/Start.txt" || fail "$mode function return graph differs"
     cmp Testing/Compiler/Graph/Functions/Returns.txt "$work_root/$mode-functions/Returns.txt" || fail "$mode call or bare return graph differs"
     "$compiler" --emit-graph "$output" Testing/Compiler/Graph/Resolution > "$work_root/log"

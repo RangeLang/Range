@@ -1,6 +1,5 @@
 #define _XOPEN_SOURCE 700
 #include "model.h"
-#include "lexer.h"
 #include <regex.h>
 #include <setjmp.h>
 #include <stdarg.h>
@@ -302,89 +301,9 @@ static int isLanguageNode(const RangeNode *node)
     return 0;
 }
 
-/* The bootstrap parser owns these forms. Core gives them source identities and
- * field captures; unsupported templates must not silently look executable. */
-static int syntaxBuiltin(RangeNode *node)
-{
-    if (node->kind != RangeNodeMacro || !node->c) return 0;
-    for (size_t i = 0; i < node->c->itemCount; ++i) {
-        RangeNode *a = node->c->items[i];
-        if (!same(a->name,"builtin") || a->itemCount != 1) continue;
-        RangeNode *s = a->items[0]->a;
-        if (s && s->kind == RangeNodeString && s->itemCount == 1
-            && (s->items[0]->flags & RangeFlagLiteral) && same(s->items[0]->name,"syntax")) return 1;
-    }
-    return 0;
-}
-
-static int syntaxPattern(RangeNode *attribute, const char *pattern)
-{
-    RangeLexer actual, expected;
-    rangeLexerInit(&actual,attribute->path,attribute->source,
-        attribute->spanStart,attribute->spanEnd,attribute->line);
-    rangeLexerInit(&expected,"<syntax adapter>",pattern,0,strlen(pattern),1);
-    for (;;) {
-        RangeToken a, b;
-        if (!rangeLexerNext(&actual,&a) || !rangeLexerNext(&expected,&b)) return 0;
-        if (a.kind != b.kind || a.length != b.length || memcmp(a.text,b.text,a.length)) return 0;
-        if (a.kind == RangeTokenEnd) return 1;
-    }
-}
-
-static void bindSyntax(Resolver *vm, RangeNode *definition, RangeNode *attribute)
-{
-    static const struct { const char *name, *pattern; } adapters[] = {
-        {"Construct","{ construct $name { $members } }"},
-        {"Function","{ function $name ( $parameters ) : $output { $body } }"},
-        {"Function","{ function $name ( $parameters ) { $body } }"},
-        {"Member","{ let $name : $value }"},
-        {"Member","{ let $name }"},
-        {"Return","{ return $value }"},
-        {"Return","{ return }"}
-    };
-    if (!attribute->spanEnd) fail(vm,attribute,"syntax requires a template block");
-    RangeNode *shape = rangeGraphType(vm->arena,definition->name);
-    for (size_t i = 0; i < definition->itemCount; ++i) {
-        RangeNode *field = definition->items[i];
-        if (field->kind != RangeNodeMember || !rangeGraphField(shape,field->name))
-            fail(vm,field,"no C field adapter for %s.%s",definition->name,field->name ? field->name : "<unnamed>");
-        for (size_t j = 0; j < i; ++j)
-            if (same(definition->items[j]->name,field->name))
-                fail(vm,field,"duplicate Core grammar field '%s'",field->name);
-    }
-    RangeLexer lexer;
-    rangeLexerInit(&lexer,attribute->path,attribute->source,
-        attribute->spanStart,attribute->spanEnd,attribute->line);
-    attribute->syntaxCaptures = rangeNodeCreate(vm->arena,RangeNodeBlock,
-        attribute->path,attribute->line,attribute->column);
-    for (;;) {
-        RangeToken token;
-        if (!rangeLexerNext(&lexer,&token)) fail(vm,attribute,"invalid syntax template: %s",lexer.error);
-        if (token.kind == RangeTokenEnd) break;
-        if (!rangeTokenIs(&token,"$")) continue;
-        if (!rangeLexerNext(&lexer,&token) || token.kind != RangeTokenName)
-            fail(vm,attribute,"syntax capture requires a field name");
-        const char *name = rangeArenaIntern(vm->arena,token.text,token.length);
-        RangeNode *field = rangeGraphField(definition,name);
-        if (!field) fail(vm,attribute,"syntax capture '%s' is not a field of %s",name,definition->name);
-        if (rangeGraphField(attribute->syntaxCaptures,name))
-            fail(vm,attribute,"duplicate syntax capture '%s'",name);
-        RangeNode *capture = rangeNodeCreate(vm->arena,RangeNodeName,attribute->path,token.line,token.column);
-        capture->name = name;
-        capture->resolvedDeclaration = field;
-        rangeNodeAppend(vm->arena,attribute->syntaxCaptures,capture);
-    }
-    int supported = 0;
-    for (size_t i = 0; i < sizeof(adapters)/sizeof(*adapters); ++i)
-        if (same(definition->name,adapters[i].name) && syntaxPattern(attribute,adapters[i].pattern)) supported = 1;
-    if (!supported) fail(vm,attribute,"unsupported C syntax template for '%s'",definition->name);
-}
-
 static void linkGrammarNodes(Resolver *vm, RangeNode *node)
 {
     if (!node) return;
-    if (node->kind == RangeNodeAttribute && same(node->name,"syntax") && !node->syntaxCaptures)
-        fail(vm,node,"syntax requires a top-level Core grammar construct");
     node->grammarDefinition = node->graphType ? node->graphType->resolvedDeclaration : NULL;
     if (node->kind == RangeNodeMacro && node->b) {
         RangeNode *shape = rangeGraphType(vm->arena,node->b->name);
@@ -395,40 +314,27 @@ static void linkGrammarNodes(Resolver *vm, RangeNode *node)
     for (size_t i = 0; i < node->itemCount; ++i) linkGrammarNodes(vm,node->items[i]);
 }
 
-static void registerSyntax(Resolver *vm)
+/* C parses structure; ordinary language declarations supply node identities. */
+static void registerGrammarDefinitions(Resolver *vm)
 {
-    RangeNode *builtin = NULL;
-    for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
-        RangeNode *node = vm->units[u]->items[i];
-        if (!syntaxBuiltin(node)) continue;
-        if (builtin) fail(vm,node,"ambiguous syntax builtin");
-        if (!isLanguageNode(node) || !same(node->name,"syntax") || !node->b
-            || !same(node->b->name,"Construct") || node->b->flags || node->b->generics || node->b->a
-            || node->itemCount || node->a || node->generics)
-            fail(vm,node,"syntax builtin requires Core macro syntax(): Construct with no body");
-        builtin = node;
-    }
     for (size_t i = 0; i < vm->arena->graphTypes->itemCount; ++i)
         vm->arena->graphTypes->items[i]->resolvedDeclaration = NULL;
     for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
-        RangeNode *node = vm->units[u]->items[i];
-        if (!node->c) continue;
-        int bound = 0;
-        for (size_t j = 0; j < node->c->itemCount; ++j) {
-            RangeNode *attribute = node->c->items[j];
-            if (!same(attribute->name,"syntax")) continue;
-            if (!builtin) fail(vm,attribute,"syntax builtin declaration is not loaded");
-            if (node->kind != RangeNodeConstruct || !isLanguageNode(node))
-                fail(vm,attribute,"syntax currently requires a Core grammar construct");
-            RangeNode *shape = rangeGraphType(vm->arena,node->name);
-            if (!shape) fail(vm,attribute,"no C syntax adapter for '%s'",node->name);
-            if (!bound && shape->resolvedDeclaration)
-                fail(vm,node,"ambiguous Core grammar construct '%s'",node->name);
-            bindSyntax(vm,node,attribute);
-            attribute->resolvedDeclaration = builtin;
-            shape->resolvedDeclaration = node;
-            bound = 1;
+        RangeNode *definition = vm->units[u]->items[i];
+        if (definition->kind != RangeNodeConstruct || !isLanguageNode(definition)) continue;
+        RangeNode *shape = rangeGraphType(vm->arena,definition->name);
+        if (!shape) continue;
+        if (shape->resolvedDeclaration)
+            fail(vm,definition,"ambiguous language grammar construct '%s'",definition->name);
+        for (size_t j = 0; j < definition->itemCount; ++j) {
+            RangeNode *field = definition->items[j];
+            if (field->kind != RangeNodeMember || !rangeGraphField(shape,field->name))
+                fail(vm,field,"no C field adapter for %s.%s",definition->name,field->name ? field->name : "<unnamed>");
+            for (size_t k = 0; k < j; ++k)
+                if (same(definition->items[k]->name,field->name))
+                    fail(vm,field,"duplicate language grammar field '%s'",field->name);
         }
+        shape->resolvedDeclaration = definition;
     }
     for (size_t u = 0; u < vm->count; ++u) linkGrammarNodes(vm,vm->units[u]);
 }
@@ -535,7 +441,7 @@ static int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t
     int ok = 0;
     if (setjmp(vm->failure) == 0) {
         for (size_t u = 0; u < count; ++u) validateGraphShape(vm,units[u],units[u]->source);
-        registerSyntax(vm);
+        registerGrammarDefinitions(vm);
         registerLiteralRules(vm);
         for (size_t u = 0; u < count; ++u)
             for (size_t i = 0; i < units[u]->itemCount; ++i) resolveGraphTarget(vm,units[u]->items[i]);

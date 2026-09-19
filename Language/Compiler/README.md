@@ -35,8 +35,7 @@ existing executable on the next invocation. Sanitized checks are correctness
 tests, not required seed/bootstrap steps.
 
 `--emit-graph` runs the same resolution path as the normal command and writes
-one text file per source, including the loaded Core grammar definitions and their
-syntax templates. It does not emit the retired compiler schema files. Numeric
+one text file per source, including the loaded language grammar definitions. It does not emit the retired compiler schema files. Numeric
 and boolean literals display directly as `64` and `true`. These files are an
 inspection view, never compiler input. `--tree` deliberately shows the raw
 parser tree without requiring semantic resolution.
@@ -60,32 +59,35 @@ Macro validation statements, general macro execution, literal conversion,
 return-type compatibility checks, memory-management semantics, and native emission
 remain unfinished. The graph resolver is not a substitute for those stages.
 
-## Core grammar bindings
+## Structural syntax in C, language definitions in Range
 
-`Language/Grammar` declares `Construct`, `Function`, `Member`, and `Return` with
-co-located `@syntax` blocks. `Language/Macros/Syntax.range` declares the C-backed
-`macro syntax(): Construct`. During graph resolution, C checks each template
-against its supported bootstrap forms and links each `$field` capture to the
-actual member declaration. Parsed nodes and macro target references link to the
-corresponding Core construct identity. C still owns storage and reflective field
-access; these definitions do not load the retired schema engine.
+C directly parses constructs, functions, members, returns, and other structural
+syntax. `Language/Grammar` supplies ordinary `Construct`, `Function`, `Member`,
+and `Return` declarations. During resolution, C links its parsed nodes and macro
+target references to those declaration identities. Reflective field access
+continues to use C storage adapters. Duplicate grammar identities, duplicate
+fields, and fields without adapters are rejected.
 
-This is the fixed C adapter step: templates are checked and bound after parsing,
-not executed to parse the input. Changing a keyword or capture layout to an
-unsupported form fails explicitly. The templates describe the basic forms;
-existing C parsing of generics, annotations, receivers, and control flow remains
-available. `let name` is now supported for bare immutable members and locals,
-alongside `let name: value`. General template matching and macro execution are
-not implemented. `--tree` remains a raw bootstrap parse without these bindings.
+There is no active `@syntax` macro, template validator, or capture-binding table.
+The former templates are preserved in `Development/DeferredCompiler/SyntaxTemplates`
+as reference material; `@syntax` annotations are rejected by the active parser.
+Grammar definitions do not control parsing or require a general macro interpreter.
+
+`@literal` remains in Range: declarations supply recognition patterns and default
+construct relationships, while C supplies whole-string regex matching. The lexer
+still determines numeric/boolean literal candidates; regex patterns do not control
+tokenization. Literal conversion and validation remain unfinished.
+
+Bare immutable members and locals support `let name` alongside `let name: value`.
 Type positions accept positional arguments such as `Array<Member>` and nested
 `Array<Array<Member>>`; named generic arguments remain supported. This retains
 the type syntax without implementing generic specialization or array storage.
+`--tree` remains a raw C parse without grammar identity resolution.
 
-The `Function.body` draft (`@many Return?`) is not enforced as a restriction to
+The `Function.body` draft (`Array<Return>`) is not enforced as a restriction to
 return statements: C still stores a block containing all parsed statements.
-The Core representation of that block needs a design decision before the grammar
-field types can govern materialization. The bindings do not claim to validate
-those field types or make native execution available.
+Its Range representation remains a separate design question. Grammar field type
+validation and native emission are not implemented by these identity bindings.
 
 ## Literal recognition probe
 

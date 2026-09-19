@@ -96,7 +96,7 @@ struct RangeNode {
     const char *typeName;  /* interned, NUL terminated */
     int flags;
     long long integer;
-    size_t spanStart;   /* raw source span for @syntax templates */
+    size_t spanStart;   /* raw source span for retained code */
     size_t spanEnd;
     RangeNode *a;
     RangeNode *b;
@@ -106,8 +106,7 @@ struct RangeNode {
     RangeNode *resolvedType; /* resolved literal representation */
     RangeMacroApplication *macroApplication; /* application-specific bindings */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
-    RangeNode *grammarDefinition; /* loaded Core identity for a C-backed node */
-    RangeNode *syntaxCaptures; /* template captures linked to Core fields */
+    RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */
     const char *literalPattern; /* validated literal rule, owned by the arena */
     RangeNode *literalDefault; /* unique Core construct for a literal macro */
     RangeNode *annotations;

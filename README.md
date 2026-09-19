@@ -89,7 +89,8 @@ program transformations to speak about the same graph as ordinary Range code.
 
 Range's language model lives in `Language/Grammar`, `Language/Macros`, and
 `Language/Types` as Range constructs and macros.
-The compiler is implemented in C under `Language/Compiler`. It parses Core,
+Structural syntax is defined directly in C; grammar constructs and `@literal`
+patterns remain in Range. The compiler is implemented in C under `Language/Compiler`. It parses Core,
 builds the queryable program graph, resolves supported Core macro queries, and will encode target
 artifacts directly as bytes. LLVM and the former generated bootstrap chain are
 not part of the current architecture.
