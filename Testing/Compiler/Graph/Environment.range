@@ -1,7 +1,7 @@
 macro example(): Construct {
-    let target: #target
+    let member: #members.first
     let ignored: "#environment is only text here"
-    if target.isTarget {
+    if member.isTarget {
         #environment {
             // Keep the emitted recipe, including nested code.
             let message: "hello"

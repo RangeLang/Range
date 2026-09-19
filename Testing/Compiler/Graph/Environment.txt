@@ -3,7 +3,7 @@ Macro {
     target: Construct
     body: {
         members: {
-            target: #target
+            member: #members.first
         }
         environment: {
             // Keep the emitted recipe, including nested code.

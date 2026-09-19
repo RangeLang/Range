@@ -131,21 +131,23 @@ static void graphValue(FILE *out, RangeGraphValue value, const RangeMacroApplica
     }
     const RangeNode *node = value.node;
     if (node->kind == RangeNodeBlock && node->graphType) {
-        writeMacroBody(out,node,app->unit->source,depth);
+        writeMacroBody(out,node,node->source,depth);
         return;
     }
     if (node->kind == RangeNodeEmission && node->b) {
         fprintf(out,"#%s {\n",node->a->name);
-        sourceLines(out,app->unit->source,node->b->spanStart,node->b->spanEnd,depth + 1);
+        sourceLines(out,node->source,node->b->spanStart,node->b->spanEnd,depth + 1);
         indent(out,depth); fputc('}',out);
     } else if (node->kind == RangeNodeLocal) {
         fprintf(out,"%s %s: ",node->flags & RangeFlagMutable ? "state" : "let",node->name);
-        fwrite(app->unit->source + node->rhsStart,1,node->rhsEnd - node->rhsStart,out);
+        fwrite(node->source + node->rhsStart,1,node->rhsEnd - node->rhsStart,out);
     } else if (node->kind == RangeNodeMember && memberValue(node) != node) {
         fputs("Member { name: ",out); graphName(out,node->name);
         fputs(" value: ",out); writeNode(out,memberValue(node),depth); fputs(" }",out);
-    } else if (node->kind == RangeNodeMacro || node->kind == RangeNodeConstruct) {
-        fprintf(out,"%s { name: ",node->kind == RangeNodeMacro ? "Macro" : "Construct");
+    } else if (node->kind == RangeNodeMacro || node->kind == RangeNodeConstruct
+        || node->kind == RangeNodeFunction || node->kind == RangeNodeEnum || node->kind == RangeNodeAttribute) {
+        /* References may point back to the application being displayed. */
+        fprintf(out,"%s { name: ",node->graphType ? node->graphType->name : rangeNodeKindName(node->kind));
         graphName(out,node->name); fputs(" }",out);
     } else writeNode(out,node,depth);
 }

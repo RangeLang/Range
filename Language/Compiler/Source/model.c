@@ -166,7 +166,8 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
     if (!strcmp(name,"name")) return node->name
         ? (RangeGraphValue){.kind=RangeGraphText,.text=node->name} : none;
     if (!strcmp(name,"target") && node->kind == RangeNodeMacro)
-        return node->b ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->b} : none;
+        return node->b ? (RangeGraphValue){.kind=RangeGraphNode,
+            .node=node->b->resolvedDeclaration ? node->b->resolvedDeclaration : node->b} : none;
     if (!strcmp(name,"value") && (node->kind == RangeNodeLocal || node->kind == RangeNodeMember)) {
         RangeNode *rhs = rangeNodeRHS(node);
         if (!rhs && node->source && node->rhsEnd > node->rhsStart)
@@ -177,9 +178,11 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
     RangeNode *list = NULL;
     if (!strcmp(name,"generics") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro || node->kind == RangeNodeFunction))
         list = node->generics;
-    else if (!strcmp(name,"macros") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro || node->kind == RangeNodeFunction))
+    else if (!strcmp(name,"macros") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro
+        || node->kind == RangeNodeFunction || node->kind == RangeNodeEnum))
         list = node->c;
     else if (!strcmp(name,"members") && node->kind == RangeNodeConstruct) list = node;
+    else if (!strcmp(name,"cases") && node->kind == RangeNodeEnum) list = node;
     else if (!strcmp(name,"members") && node->kind == RangeNodeBlock) {
         RangeNode result = {0};
         for (size_t i = 0; i < node->itemCount; ++i)
@@ -201,6 +204,10 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Construct","macros",RangeFlagMany|RangeFlagOptional},
         {"Construct","generics",RangeFlagMany|RangeFlagOptional},
         {"Construct","members",RangeFlagMany|RangeFlagOptional},
+        {"Enum","name",0},
+        {"Enum","macros",RangeFlagMany|RangeFlagOptional},
+        {"Enum","cases",RangeFlagMany|RangeFlagOptional},
+        {"EnumCase","name",0},
         {"Function","name",0},
         {"Function","macros",RangeFlagMany|RangeFlagOptional},
         {"Function","receiver",RangeFlagOptional},
@@ -210,6 +217,7 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Function","body",RangeFlagOptional},
         {"Macro","name",0},
         {"Macro","macros",RangeFlagMany|RangeFlagOptional},
+        {"Macro","generics",RangeFlagMany|RangeFlagOptional},
         {"Macro","target",RangeFlagOptional},
         {"Macro","parameters",RangeFlagMany|RangeFlagOptional},
         {"Macro","body",RangeFlagOptional},

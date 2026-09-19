@@ -1,5 +1,5 @@
-macro unknown(): Construct {
+macro unknown(): Macro {
     let value: #body.unknown
 }
 @unknown
-construct Example {}
+macro example(): Construct {}

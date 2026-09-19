@@ -48,7 +48,7 @@ for mode in ordinary sanitized; do
             Invalid) expected='invalid literal regex' ;;
             Duplicate) expected='duplicate literal rule' ;;
             Argument) expected='literal pattern requires a non-interpolated string' ;;
-            Target) expected='literal rule must target a Macro' ;;
+            Target) expected="no macro 'literal' targets Construct" ;;
         esac
         status=0
         "$compiler" --match-literal invalid 64 "$core" "$fixtures/$fixture.range" > "$work_root/out" 2> "$work_root/error" || status=$?
@@ -62,7 +62,7 @@ for mode in ordinary sanitized; do
     status=0
     "$compiler" --match-literal decimal 64 "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing builtin was accepted"
-    grep -Fq 'literal builtin declaration is not loaded' "$work_root/error" || fail "$mode missing builtin wrong error"
+    grep -Fq "unresolved graph macro 'literal'" "$work_root/error" || fail "$mode missing builtin wrong error"
     status=0
     "$compiler" --match-literal unregistered 64 "$core" "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing rule was accepted"

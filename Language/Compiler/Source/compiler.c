@@ -59,7 +59,6 @@ static RangeGraphValue graphProperty(Resolver *vm, RangeMacroApplication *app,
     RangeNode *field = rangeGraphField(node->graphType,name);
     if (!field) fail(vm,at,"field '%s' is not declared by @type %s",name,
         node->graphType ? node->graphType->name : rangeNodeKindName(node->kind));
-    if (same(name,"target") && node == app->declaration) return graphNode(app->target);
     if (same(name,"value") && (node->kind == RangeNodeMember || node->kind == RangeNodeLocal)) {
         if (node->kind == RangeNodeLocal) {
             for (size_t i = 0; i < app->count; ++i)
@@ -86,7 +85,7 @@ static RangeGraphValue graphEval(Resolver *vm, RangeMacroApplication *app, Range
 {
     switch (node->kind) {
     case RangeNodeEnvironment:
-        return graphProperty(vm,app,graphNode(app->declaration),node->name,node);
+        return graphProperty(vm,app,graphNode(app->target),node->name,node);
     case RangeNodeMemberAccess:
         return graphProperty(vm,app,graphEval(vm,app,node->a),node->name,node);
     case RangeNodeName:
@@ -115,21 +114,49 @@ static RangeGraphValue graphEval(Resolver *vm, RangeMacroApplication *app, Range
     return (RangeGraphValue){0};
 }
 
+static RangeNode *graphTypeIdentity(RangeNode *node)
+{
+    return node->grammarDefinition ? node->grammarDefinition : node->graphType;
+}
+
+/* Names select candidates; the declared target identity selects an application. */
+static RangeNode *resolveMacroDeclaration(Resolver *vm, RangeNode *attribute,
+                                          RangeNode *target, RangeNode **owner)
+{
+    RangeNode *macro = NULL;
+    RangeNode *type = graphTypeIdentity(target);
+    int named = 0;
+    for (size_t u = 0; u < vm->count; ++u) for (size_t m = 0; m < vm->units[u]->itemCount; ++m) {
+        RangeNode *candidate = vm->units[u]->items[m];
+        if (candidate->kind != RangeNodeMacro || !same(candidate->name,attribute->name)) continue;
+        named = 1;
+        if (!candidate->b || !type || candidate->b->resolvedDeclaration != type) continue;
+        if (macro) fail(vm,attribute,"ambiguous graph macro '%s' for target %s",attribute->name,type->name);
+        macro = candidate;
+        if (owner) *owner = vm->units[u];
+    }
+    if (!macro) {
+        if (named) fail(vm,attribute,"no macro '%s' targets %s",attribute->name,
+            type ? type->name : rangeNodeKindName(target->kind));
+        fail(vm,attribute,"unresolved graph macro '%s'",attribute->name);
+    }
+    attribute->resolvedDeclaration = macro;
+    return macro;
+}
+
+static int macroBuiltin(RangeNode *, const char *);
+
 static void resolveGraphTarget(Resolver *vm, RangeNode *target)
 {
-    if (target->kind != RangeNodeConstruct) return;
+    if (!target->graphType) return;
     RangeNode *attributes = target->c;
     if (attributes) for (size_t a = 0; a < attributes->itemCount; ++a) {
-        RangeNode *attribute = attributes->items[a], *macro = NULL, *unit = NULL;
-        for (size_t u = 0; u < vm->count; ++u) for (size_t m = 0; m < vm->units[u]->itemCount; ++m) {
-            RangeNode *candidate = vm->units[u]->items[m];
-            if (candidate->kind != RangeNodeMacro || !same(candidate->name,attribute->name)) continue;
-            if (macro) fail(vm,attribute,"ambiguous graph macro '%s'",attribute->name);
-            macro = candidate; unit = vm->units[u];
-        }
-        if (!macro) fail(vm,attribute,"unresolved graph macro '%s'",attribute->name);
-        if (macro->b && !same(macro->b->name,"Construct"))
-            fail(vm,attribute,"macro '%s' does not target Construct",macro->name);
+        RangeNode *attribute = attributes->items[a], *unit = NULL;
+        attribute->macroApplication = NULL;
+        if (same(attribute->name,"builtin")
+            || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))) continue;
+        RangeNode *macro = resolveMacroDeclaration(vm,attribute,target,&unit);
+        if (macroBuiltin(macro,"literal")) continue; /* registered compiler primitive */
         if (attribute->itemCount || macro->itemCount)
             fail(vm,attribute,"parameterized macro graph resolution is not implemented");
         RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
@@ -151,7 +178,8 @@ static void resolveGraphTarget(Resolver *vm, RangeNode *target)
             if (rangeNodeHasContextReference(app->bindings[i].definition))
                 (void)graphBinding(vm,app,&app->bindings[i]);
     }
-    for (size_t i = 0; i < target->itemCount; ++i) resolveGraphTarget(vm,target->items[i]);
+    if (target->kind == RangeNodeConstruct)
+        for (size_t i = 0; i < target->itemCount; ++i) resolveGraphTarget(vm,target->items[i]);
 }
 
 static size_t graphValueCount(RangeGraphValue value)
@@ -166,6 +194,8 @@ static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source
     else node->source = source;
     const char *type = node->kind == RangeNodeMacro ? "Macro"
         : node->kind == RangeNodeConstruct ? "Construct"
+        : node->kind == RangeNodeEnum ? "Enum"
+        : node->kind == RangeNodeEnumCase ? "EnumCase"
         : node->kind == RangeNodeFunction ? "Function"
         : node->kind == RangeNodeReturn ? "Return"
         : (node->kind == RangeNodeLocal || node->kind == RangeNodeMember) ? "Member" : NULL;
@@ -177,7 +207,7 @@ static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source
         type = node->graphType->name;
         /* These are physical storage adapters, not a list of permitted fields. */
         static const char *const storage[] = {"name","target","members","environment","macros","generics","value",
-            "receiver","parameters","output","body"};
+            "receiver","parameters","output","body","cases"};
         for (size_t i = 0; i < sizeof(storage)/sizeof(*storage); ++i) {
             RangeGraphValue value = rangeGraphStoredField(vm->arena,node,storage[i]);
             if (graphValueCount(value) && !rangeGraphField(node->graphType,storage[i]))
@@ -237,7 +267,7 @@ static int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const 
 
 static int macroBuiltin(RangeNode *node, const char *tag)
 {
-    if (node->kind != RangeNodeMacro || !node->c) return 0;
+    if (!node || node->kind != RangeNodeMacro || !node->c) return 0;
     for (size_t i = 0; i < node->c->itemCount; ++i) {
         RangeNode *a = node->c->items[i];
         if (!same(a->name,"builtin") || a->itemCount != 1) continue;
@@ -266,13 +296,8 @@ static void registerLiteralRules(Resolver *vm)
         if (!node->c) continue;
         for (size_t j = 0; j < node->c->itemCount; ++j) {
             RangeNode *a = node->c->items[j];
-            if (!same(a->name,builtin ? builtin->name : "literal")) continue;
-            if (!builtin) fail(vm,a,"literal builtin declaration is not loaded");
-            for (size_t v = 0; v < vm->count; ++v) for (size_t k = 0; k < vm->units[v]->itemCount; ++k) {
-                RangeNode *candidate = vm->units[v]->items[k];
-                if (candidate != builtin && candidate->kind == RangeNodeMacro && same(candidate->name,builtin->name))
-                    fail(vm,a,"ambiguous literal macro declaration '%s'",builtin->name);
-            }
+            if (!builtin || !same(a->name,builtin->name)) continue;
+            if (resolveMacroDeclaration(vm,a,node,NULL) != builtin) continue;
             if (node->kind != RangeNodeMacro) fail(vm,a,"literal rule must target a Macro");
             if (node->literalPattern) fail(vm,a,"duplicate literal rule");
             if (a->itemCount != 1 || (a->items[0]->name && !same(a->items[0]->name,builtin->items[0]->name)))
@@ -302,13 +327,33 @@ static int isLanguageNode(const RangeNode *node)
     return 0;
 }
 
+static void validateTargetReferences(Resolver *vm, RangeNode *node, RangeNode *type)
+{
+    if (!node || node->kind == RangeNodeEmission) return; /* deferred code */
+    if (node->kind == RangeNodeEnvironment) {
+        if (!type) fail(vm,node,"#%s requires a declared macro target",node->name);
+        if (!rangeGraphField(type,node->name))
+            fail(vm,node,"field '%s' is not declared by @type %s",node->name,type->name);
+    }
+    validateTargetReferences(vm,node->a,type); validateTargetReferences(vm,node->b,type);
+    validateTargetReferences(vm,node->c,type); validateTargetReferences(vm,node->generics,type);
+    for (size_t i = 0; i < node->itemCount; ++i) validateTargetReferences(vm,node->items[i],type);
+}
+
 static void linkGrammarNodes(Resolver *vm, RangeNode *node)
 {
     if (!node) return;
     node->grammarDefinition = node->graphType ? node->graphType->resolvedDeclaration : NULL;
-    if (node->kind == RangeNodeMacro && node->b) {
-        RangeNode *shape = rangeGraphType(vm->arena,node->b->name);
-        if (shape) node->b->resolvedDeclaration = shape->resolvedDeclaration;
+    if (node->kind == RangeNodeMacro) {
+        RangeNode *shape = NULL;
+        if (node->b) {
+            if (node->b->flags || node->b->generics)
+                fail(vm,node->b,"macro target requires one declaration type");
+            shape = rangeGraphType(vm->arena,node->b->name);
+            if (!shape) fail(vm,node->b,"unknown macro target type '%s'",node->b->name);
+            node->b->resolvedDeclaration = shape->resolvedDeclaration ? shape->resolvedDeclaration : shape;
+        }
+        validateTargetReferences(vm,node->a,shape);
     }
     linkGrammarNodes(vm,node->a); linkGrammarNodes(vm,node->b); linkGrammarNodes(vm,node->c);
     linkGrammarNodes(vm,node->generics); linkGrammarNodes(vm,node->annotations);
@@ -385,19 +430,21 @@ static void resolveLiteralDefaults(Resolver *vm, RangeNode *node)
     for (size_t i = 0; i < node->itemCount; ++i) resolveLiteralDefaults(vm,node->items[i]);
 }
 
+static int resolveGraphApplications(RangeArena *, RangeNode **, size_t, char *, size_t);
+
 static int matchLiteralRule(RangeArena *arena, RangeNode **units, size_t count,
     const char *name, const char *input, int *matched, char *error, size_t errorSize)
 {
+    if (!resolveGraphApplications(arena,units,count,error,errorSize)) return 0;
     Resolver *vm = calloc(1,sizeof(*vm));
     if (!vm) { snprintf(error,errorSize,"cannot allocate literal matcher"); return 0; }
     vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
     int ok = 0;
     if (setjmp(vm->failure) == 0) {
-        registerLiteralRules(vm);
         RangeNode *macro = NULL;
         for (size_t u = 0; u < count; ++u) for (size_t i = 0; i < units[u]->itemCount; ++i) {
             RangeNode *node = units[u]->items[i];
-            if (node->kind != RangeNodeMacro || !same(node->name,name)) continue;
+            if (node->kind != RangeNodeMacro || !same(node->name,name) || !node->literalPattern) continue;
             if (macro) fail(vm,node,"ambiguous literal macro '%s'",name);
             macro = node;
         }
@@ -444,9 +491,9 @@ static int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t
         for (size_t u = 0; u < count; ++u) validateGraphShape(vm,units[u],units[u]->source);
         registerGrammarDefinitions(vm);
         registerLiteralRules(vm);
+        resolveGraphOutputs(vm);
         for (size_t u = 0; u < count; ++u)
             for (size_t i = 0; i < units[u]->itemCount; ++i) resolveGraphTarget(vm,units[u]->items[i]);
-        resolveGraphOutputs(vm);
         registerLiteralDefaults(vm);
         for (size_t u = 0; u < count; ++u) resolveLiteralDefaults(vm,units[u]);
         ok = 1;
@@ -523,6 +570,7 @@ static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind k
     for (size_t u = 0; u < eval->vm->count; ++u) for (size_t i = 0; i < eval->vm->units[u]->itemCount; ++i) {
         RangeNode *node = eval->vm->units[u]->items[i];
         if (node->kind != kind || !same(node->name,name)) continue;
+        if (kind == RangeNodeMacro && node->b) continue; /* standalone effect invocation */
         if (found) fail(eval->vm,at,"ambiguous compile-time declaration '%s'",name);
         found = node;
     }
@@ -721,19 +769,23 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
 
 static void validateMacroTarget(MetaEval *eval, RangeNode *target, size_t *checked)
 {
-    if (target->kind != RangeNodeConstruct) return;
+    if (!target->graphType) return;
     if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
         RangeMacroApplication *app = target->c->items[i]->macroApplication;
+        if (same(target->c->items[i]->name,"builtin")
+            || (target->kind == RangeNodeFunction && same(target->c->items[i]->name,"extern"))
+            || macroBuiltin(target->c->items[i]->resolvedDeclaration,"literal")) continue;
         if (!app) fail(eval->vm,target->c->items[i],"macro application was not resolved");
         if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
             if (same(app->declaration->c->items[j]->name,"builtin"))
-                fail(eval->vm,target->c->items[i],"builtin construct effects are not supported by compile-time validation");
+                fail(eval->vm,target->c->items[i],"builtin target effects are not supported by compile-time validation");
         MetaScope scope = {.application=app};
         RangeGraphValue returned = {0};
         (void)metaStatement(eval,&scope,app->declaration->a,&returned);
         ++*checked;
     }
-    for (size_t i = 0; i < target->itemCount; ++i) validateMacroTarget(eval,target->items[i],checked);
+    if (target->kind == RangeNodeConstruct)
+        for (size_t i = 0; i < target->itemCount; ++i) validateMacroTarget(eval,target->items[i],checked);
 }
 
 static int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,

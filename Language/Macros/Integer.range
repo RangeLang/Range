@@ -1,8 +1,8 @@
 @literal("[0-9]+")
 macro integer(): Construct {
-  let value: #target.members.filter(named: "value").first
-  let bits: #target.generics.filter(named: "bits").first
-  let signed: #target.generics.filter(named: "signed").first
+  let value: #members.filter(named: "value").first
+  let bits: #generics.filter(named: "bits").first
+  let signed: #generics.filter(named: "signed").first
 
   if !value.isTarget {
     @diagnostic("Construct must specify value")

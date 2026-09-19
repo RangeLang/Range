@@ -13,9 +13,9 @@ Macro {
     target: Construct
     body: {
         members: {
-            value: #target.members.filter(named: "value").first
-            bits: #target.generics.filter(named: "bits").first
-            signed: #target.generics.filter(named: "signed").first
+            value: #members.filter(named: "value").first
+            bits: #generics.filter(named: "bits").first
+            signed: #generics.filter(named: "signed").first
         }
     }
 }

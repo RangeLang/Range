@@ -22,6 +22,10 @@ for mode in ordinary sanitized; do
         Testing/Compiler/Graph/GrammarLinks.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
         -o "$work_root/$mode-grammar-links"
     "$work_root/$mode-grammar-links"
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
+        Testing/Compiler/Graph/MacroTargets.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        -o "$work_root/$mode-macro-targets"
+    "$work_root/$mode-macro-targets"
     output="$work_root/$mode-graphs"
     "$compiler" --emit-graph "$work_root/$mode-functions" Language/Grammar Language/Macros Language/Types Testing/Compiler/Graph/Functions > "$work_root/log"
     cmp Testing/Compiler/Graph/Functions/Start.txt "$work_root/$mode-functions/Start.txt" || fail "$mode function return graph differs"
@@ -29,20 +33,16 @@ for mode in ordinary sanitized; do
     "$compiler" --emit-graph "$output" Testing/Compiler/Graph/Resolution > "$work_root/log"
     for target in First Second; do
         file="$output/$target.txt"
-        grep -Fq 'macroName: probe' "$file" || fail "$mode macro identity lost"
         grep -Fq "targetName: $target" "$file" || fail "$mode target context leaked"
-        grep -Fq 'expansions: {' "$file" || fail "$mode environment field did not resolve to blocks"
-        grep -Fq 'bodyView: {' "$file" || fail "$mode nested body did not resolve"
         if grep -Fq 'Hidden control flow' "$file"; then fail "$mode body inspection leaked control flow"; fi
-        grep -Fq '#environment {' "$file" || fail "$mode expansion code missing"
-        grep -Fq 'let selected: #target.members.filter(named: "payload").first' "$file" || fail "$mode member definition erased"
         grep -Fq 'missing: none' "$file" || fail "$mode missing member was fabricated"
     done
     grep -Fq 'evaluated: 11' "$output/First.txt" || fail "$mode first payload differs"
     grep -Fq 'evaluated: 22' "$output/Second.txt" || fail "$mode second payload differs"
     grep -Fq 'width: 8' "$output/First.txt" || fail "$mode first generic differs"
     grep -Fq 'width: 16' "$output/Second.txt" || fail "$mode second generic differs"
-    grep -Fq 'original: let selected:' "$output/First.txt" || fail "$mode reflection returned the evaluated value instead of the member"
+    grep -Fq 'selected: Member { name: payload value: 11 }' "$output/First.txt" || fail "$mode reflection erased the member identity"
+    grep -Fq 'selected: #members.filter(named: "payload").first' "$output/Probe.txt" || fail "$mode member definition erased"
     grep -Fq '@diagnostic("This block must remain deferred")' "$output/Probe.txt" || fail "$mode expansion body lost"
     for fixture in Unknown UnknownBody Cycle; do
         status=0
@@ -55,7 +55,7 @@ for mode in ordinary sanitized; do
         elif [[ "$fixture" == UnknownBody ]]; then
             grep -Fq "field 'unknown' is not declared by @type Macro.body" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
         else
-            grep -Fq "field 'unknown' is not declared by @type Macro" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
+            grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
         fi
     done
     # Normal compilation must resolve too, without asking for text output.

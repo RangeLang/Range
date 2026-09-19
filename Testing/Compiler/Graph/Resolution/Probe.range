@@ -1,14 +1,9 @@
 macro probe(): Construct {
-    let macroName: #name
-    let targetName: #target.name
-    let selected: #target.members.filter(named: "payload").first
-    let width: #target.generics.filter(named: "width").first.value
-    let ownMembers: #body.members
-    let original: #body.members.filter(named: "selected").first
-    let evaluated: #body.members.filter(named: "selected").first.value.value
-    let missing: #target.members.filter(named: "absent").first
-    let expansions: #body.environment
-    let bodyView: #body
+    let targetName: #name
+    let selected: #members.filter(named: "payload").first
+    let width: #generics.filter(named: "width").first.value
+    let evaluated: #members.filter(named: "payload").first.value
+    let missing: #members.filter(named: "absent").first
     if false {
         @diagnostic("Hidden control flow must remain parsed but not displayed")
     }

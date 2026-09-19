@@ -35,8 +35,8 @@ static void validate(const char *source, const char *expected, size_t count)
 #define POLICY \
     EFFECT \
     "macro assess(): Construct { " \
-    "let chosen: #target.members.filter(named: \"payload\").first " \
-    "let rule: #target.generics.filter(named: \"ceiling\").first " \
+    "let chosen: #members.filter(named: \"payload\").first " \
+    "let rule: #generics.filter(named: \"ceiling\").first " \
     "if !chosen.isTarget { @complain(\"missing payload\") } " \
     "if !rule.isTarget { @complain(\"missing ceiling\") } " \
     "if chosen.isTarget && rule.isTarget { " \
@@ -58,16 +58,21 @@ int main(void)
                     "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,2);
     validate(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
                     "@assess construct Second<let ceiling: 2> { let payload: 3 }","source policy rejected",0);
+    validate(EFFECT "macro assess(): Construct { if #members.first.value < 0 { @complain(\"negative\") } } "
+                    "macro assess(): Function { if !#parameters.first.isTarget { @complain(\"missing input\") } } "
+                    "@assess construct Parcel { let payload: 8 } @assess function start(let input: Any) {}",NULL,2);
+    validate(EFFECT "macro complain(): Construct {} macro assess(): Function { @complain(\"selected effect\") } "
+                    "@assess function start() {}","selected effect",0);
     // Whole rule bodies are executed. Reversing the source condition changes validity.
-    validate(EFFECT "macro assess(): Construct { if #target.members.first.value < 10 { @complain(\"too small\") } } "
+    validate(EFFECT "macro assess(): Construct { if #members.first.value < 10 { @complain(\"too small\") } } "
                     "@assess construct Parcel { let payload: 8 }","too small",0);
-    validate(EFFECT "macro assess(): Construct { if #target.members.first.value > 10 { @complain(\"too large\") } } "
+    validate(EFFECT "macro assess(): Construct { if #members.first.value > 10 { @complain(\"too large\") } } "
                     "@assess construct Parcel { let payload: 8 }",NULL,1);
     // No concrete type, macro, helper, or parameter spelling is an intrinsic.
     validate("@builtin(\"diagnostic\") macro report(let text: RenamedText) "
              "@builtin(\"literal\") macro spelling(let pattern: RenamedText): Macro "
              "@spelling(\"[0-9]+\") macro decimalRule(): Construct { "
-             "let stored: #target.members.first "
+             "let stored: #members.first "
              "if !small(number: stored.value) { @report(\"too big\") } } "
              "function small(let number: RenamedNumber): RenamedTruth { return number < 4 } "
              "@decimalRule construct Quantity { let storage: 3 }",NULL,1);
@@ -84,8 +89,8 @@ int main(void)
     validate("function f(let a: Any, let b: Any): Any { return a } "
              "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","duplicate compile-time local",0);
     validate("macro assess(): Construct { if 1 {} } @assess construct Parcel {}","boolean graph value",0);
-    validate("@builtin(\"unknown\") macro assess(): Construct @assess construct Parcel {}","builtin construct effects",0);
-    validate("macro assess(): Construct { let leaked: 7 let selected: #target.members.first "
+    validate("@builtin(\"unknown\") macro assess(): Construct @assess construct Parcel {}","builtin target effects",0);
+    validate("macro assess(): Construct { let leaked: 7 let selected: #members.first "
              "if selected.value == 7 {} } @assess construct Parcel { let payload: leaked }",
              "unresolved compile-time local 'leaked'",0);
     puts("macro validation: source policies, renamed declarations, diagnostics, scopes, control flow, limits=pass");

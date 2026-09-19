@@ -13,7 +13,7 @@ int main(void)
     const char *sources[] = {
         "function start(): Whole { return 42 } function deferred(): Missing { return 0 }",
         "@integer construct Whole<let bits: 64, let signed: true> { let value: 0 }",
-        "macro integer(): Construct { let bits: #target.generics.filter(named: \"bits\").first }"
+        "macro integer(): Construct { let bits: #generics.filter(named: \"bits\").first }"
     };
     RangeNode *units[3];
     for (size_t i = 0; i < 3; ++i) {
