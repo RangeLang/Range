@@ -1,4 +1,4 @@
 // Bootstrap primitive: compile a POSIX extended regex and match a whole literal.
 // Recognition only; conversion and automatic token dispatch are deferred.
-@builtin("literal")
+@builtin
 macro literal(let pattern: String): Macro

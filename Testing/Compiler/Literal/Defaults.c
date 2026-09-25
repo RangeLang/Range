@@ -9,7 +9,7 @@ int main(void)
     char error[512];
     rangeGraphInitTypes(&arena);
     const char *core =
-        "@builtin(\"literal\") macro literal(let pattern: String): Macro "
+        "@builtin macro literal(let pattern: String): Macro "
         "@literal(\"[0-9]+\") macro number(): Construct {} "
         "@number construct Whole<let bits: 64> { let value: 0 } "
         "@literal(\"true|false\") macro truth(): Construct {} "

@@ -64,9 +64,9 @@ assert 'value materialization' in errors, errors
 # Normal compilation invokes the evaluator and reports independent macro failures.
 first.write_text('''construct Construct {}
 construct Text {}
-@builtin("diagnostic") macro complain(let message: Text)
-macro first(): Construct { @complain("first application failed") }
-macro second(): Construct { @complain("second application failed") }
+@builtin macro diagnostic(let message: Text)
+macro first(): Construct { @diagnostic("first application failed") }
+macro second(): Construct { @diagnostic("second application failed") }
 @first construct First {}
 @second construct Second {}
 ''')

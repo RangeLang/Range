@@ -1,6 +1,6 @@
 // Pseudocode: an explicit compiler primitive for repeated member storage.
 // This storage contract is not implemented yet.
-@builtin("many")
+@builtin
 macro many(): Member
 
 // The annotated member holds a variable number of element slots, stored out

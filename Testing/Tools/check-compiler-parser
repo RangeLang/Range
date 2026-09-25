@@ -42,6 +42,11 @@ if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
     fail "value generic without let was accepted"
 fi
 grep -q 'value generics require explicit let' "$work_root/error" || fail "missing let diagnostic changed"
+printf '@builtin("literal") macro spelling(let pattern: String): Macro\n' > "$probe"
+if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
+    fail "builtin selector argument was accepted"
+fi
+grep -q '@builtin takes no arguments' "$work_root/error" || fail "builtin argument diagnostic changed"
 printf 'construct Broken<let bits: > {}\n' > "$probe"
 
 directory="$work_root/source directory"

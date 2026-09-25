@@ -265,16 +265,12 @@ static int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const 
     return matched;
 }
 
-static int macroBuiltin(RangeNode *node, const char *tag)
+/* A builtin macro is `@builtin macro name`; its name selects the C primitive. */
+static int macroBuiltin(RangeNode *node, const char *name)
 {
-    if (!node || node->kind != RangeNodeMacro || !node->c) return 0;
-    for (size_t i = 0; i < node->c->itemCount; ++i) {
-        RangeNode *a = node->c->items[i];
-        if (!same(a->name,"builtin") || a->itemCount != 1) continue;
-        RangeNode *s = a->items[0]->a;
-        if (s && s->kind == RangeNodeString && s->itemCount == 1
-            && (s->items[0]->flags & RangeFlagLiteral) && same(s->items[0]->name,tag)) return 1;
-    }
+    if (!node || node->kind != RangeNodeMacro || !node->c || !same(node->name,name)) return 0;
+    for (size_t i = 0; i < node->c->itemCount; ++i)
+        if (same(node->c->items[i]->name,"builtin")) return 1;
     return 0;
 }
 
@@ -943,6 +939,10 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         if (node->kind == RangeNodeFunction)
             (void)sourceReference(report,scope,node,node->typeName,2);
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
+        if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
+            for (size_t i = 0; i < node->c->itemCount; ++i)
+                if (same(node->c->items[i]->name,"builtin"))
+                    sourceDiagnostic(report,node,0,"not-implemented","no C primitive is implemented for builtin macro '%s'",node->name);
         diagnoseSourceNode(report,&declaration,node->generics,0);
         diagnoseSourceNode(report,scope,node->c,0);
         for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,&declaration,node->items[i],0);

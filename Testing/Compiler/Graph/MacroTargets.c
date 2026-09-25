@@ -147,12 +147,12 @@ int main(void)
     // Primitive annotation spelling is overloadable by target too.
     rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
     RangeNode *literal = parse(&arena,"LiteralTargets.range",
-        "@builtin(\"literal\") macro spelling(let pattern: Text): Macro "
-        "macro spelling(): Construct { let targetName: #name } "
-        "@spelling(\"[0-9]+\") macro digits(): Construct {} "
+        "@builtin macro literal(let pattern: Text): Macro "
+        "macro literal(): Construct { let targetName: #name } "
+        "@literal(\"[0-9]+\") macro digits(): Construct {} "
         "macro digits(): Function {} "
         "@digits construct Quantity {} @digits function start() {} "
-        "@spelling construct Tagged {}");
+        "@literal construct Tagged {}");
     resolve(&arena,&literal,1);
     application(literal->items[4],literal->items[2]);
     application(literal->items[5],literal->items[3]);

@@ -80,14 +80,14 @@ int main(void)
     assert(!report.errors && report.warnings == 1);
     assert(!diagnostic(&report,"C-implementation","hard-coded"));
     rangeArenaDestroy(&arena);
-    report = collect(&arena,"@builtin(\"diagnostic\") macro say(let message: Text) "
-        "@builtin(\"literal\") macro pattern(let regex: Text): Macro "
-        "@pattern(\"[0-9]+\") macro inspect(): Construct { @say(\"a diagnostic\") }",
+    report = collect(&arena,"@builtin macro diagnostic(let message: Text) "
+        "@builtin macro literal(let regex: Text): Macro "
+        "@literal(\"[0-9]+\") macro inspect(): Construct { @diagnostic(\"a diagnostic\") }",
         "construct Text {} construct Macro {} construct Construct {}");
     assert(!report.errors && !report.warnings); /* explicit primitive metadata */
     rangeArenaDestroy(&arena);
-    report = collect(&arena,"@builtin(missingTag) macro example()",NULL);
-    assert(diagnostic(&report,"undeclared","'missingTag'"));
+    report = collect(&arena,"@builtin macro example()",NULL);
+    assert(diagnostic(&report,"not-implemented","no C primitive is implemented for builtin macro 'example'"));
     rangeArenaDestroy(&arena);
 
     report = collect(&arena,"construct Packet {} function make() { let packet: Packet() }",NULL);

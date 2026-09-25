@@ -184,6 +184,11 @@ static RangeNode *parseAttributes(RangeParser *parser)
         if (strcmp(attribute->name, "syntax") == 0) {
             parserFail(parser, &parser->current, "@syntax is deferred; structural syntax is defined in C");
             return list;
+        } else if (strcmp(attribute->name, "builtin") == 0
+                   && (parserAt(parser, "<") || parserAt(parser, "("))) {
+            /* The declaration's own name selects the compiler primitive. */
+            parserFail(parser, &parser->current, "@builtin takes no arguments; the declaration name selects the primitive");
+            return list;
         } else {
             if (parserAt(parser, "<")) attribute->generics = parseGenericArguments(parser, 0);
             if (parserAt(parser, "(")) parseArgumentList(parser, attribute);
