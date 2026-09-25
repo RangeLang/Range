@@ -1,0 +1,20 @@
+// Pseudocode: an explicit compiler primitive for repeated member storage.
+// This storage contract is not implemented yet.
+@builtin("many")
+macro many(): Member
+
+// The annotated member holds a variable number of element slots, stored out
+// of line. Its declared type supplies the element type; C uses only that
+// type's layout, never its name. Macros such as @collection apply @many;
+// user declarations do not.
+//
+// Primitive operations on the member, used only through its owner:
+// - resize(to: n): make exactly n slots available, keeping existing ones.
+// - read(at: i): the element in slot i.
+// - write(at: i, value: v): store v in slot i.
+//
+// @many does not track count, capacity, or growth policy; the owning macro
+// declares those as ordinary members. The member is not a standalone value.
+//
+// Open: behavior for out-of-range slots; layout computation for Element;
+// the allocator behind resize.

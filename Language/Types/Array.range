@@ -1,0 +1,10 @@
+// Pseudocode. <Element> denotes a type parameter; its declaration syntax and
+// constraint are still open. @collection supplies Array's storage members and
+// operations; support is pending.
+
+@collection
+construct Array<Element> {}
+
+// Proposed Array behavior: elements are ordered, and filtering preserves that
+// order. The resulting collection is another Array<Element>.
+// Array has no written members: its value is the members @collection emits.

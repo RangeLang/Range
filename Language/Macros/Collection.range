@@ -1,0 +1,51 @@
+// Pseudocode. Emission, type-parameter validation, and the @many primitive
+// are still to be implemented.
+macro collection(): Construct {
+    let element: #generics.filter(named: "Element").first
+
+    if !element.isTarget {
+        @diagnostic("Collection must declare generic Element")
+    }
+
+    // Require element to be a type parameter, not only a generic spelled
+    // Element.
+
+    // Open: the spelling that names this application's target construct.
+    // The construct itself holds the header; count and capacity are ordinary
+    // members, and only the element slots use the @many primitive.
+    extension #target {
+        state count: 0
+        state capacity: 0
+        @many
+        state elements: Element
+
+        function isEmpty(): Bool {
+            return count == 0
+        }
+
+        function append(let value: Element) {
+            if count == capacity {
+                if capacity == 0 {
+                    capacity: 1
+                } else {
+                    capacity: capacity * 2
+                }
+                elements.resize(to: capacity)
+            }
+            elements.write(at: count, value: value)
+            count: count + 1
+        }
+
+        // Proposed, not written yet:
+        // - first: elements.read(at: 0), or absence when count is 0.
+        // - filter(predicate): build the same collection specialization from
+        //   matching elements in order, retaining any graph-node identities.
+    }
+
+    // capacity is the source of truth for slot count; elements is resized
+    // only to capacity. count never exceeds capacity.
+
+    // Open: restricting writes to count, capacity, and elements to these
+    // operations (a later macro); copy semantics when an Array value is
+    // assigned; element lifetime for elements that own storage.
+}
