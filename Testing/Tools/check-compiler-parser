@@ -31,6 +31,19 @@ if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
 fi
 grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "diagnostic lacks a source location"
 
+# Type parameters are bare names; value generics keep explicit let.
+printf 'construct Pair<First, let size: 2, Second> { let first: First }\n' > "$probe"
+"$compiler" --tree "$probe" > "$work_root/generic-tree"
+grep -Eq '^ +member name=First$' "$work_root/generic-tree" || fail "type parameter is missing"
+grep -Eq '^ +member name=size rhs=' "$work_root/generic-tree" || fail "value generic beside type parameter is missing"
+grep -Eq '^ +member name=Second$' "$work_root/generic-tree" || fail "trailing type parameter is missing"
+printf 'construct Broken<T: Int> {}\n' > "$probe"
+if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
+    fail "value generic without let was accepted"
+fi
+grep -q 'value generics require explicit let' "$work_root/error" || fail "missing let diagnostic changed"
+printf 'construct Broken<let bits: > {}\n' > "$probe"
+
 directory="$work_root/source directory"
 mkdir -p "$directory/nested" "$work_root/empty"
 cp -R "$REPO_ROOT/Testing/Compiler/Directory/." "$directory/"

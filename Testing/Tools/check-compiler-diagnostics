@@ -34,8 +34,10 @@ def compile_sources(*paths):
     return result.stderr
 
 active = compile_sources('Language/Grammar', 'Language/Macros', 'Language/Types')
-for missing in ('Bool', 'String', 'Array', 'Generic', 'Parameter', 'Any'):
+for missing in ('Bool', 'String', 'Generic', 'Parameter', 'Any'):
     assert f"no declaration for '{missing}'" in active, active
+# Array<Element> declares a type parameter, so Array<Member> resolves.
+assert "no declaration for 'Array'" not in active, active
 assert "'Macro' has a C graph shape but no Range declaration" in active, active
 for shortcut in ('filter(named:)', '.first', '.isTarget'):
     assert f"'{shortcut}' is hard-coded in C" in active, active

@@ -759,8 +759,10 @@ static RangeNode *parseBlock(RangeParser *parser)
     return node;
 }
 
-/* Generic declarations reuse immutable member nodes. Their RHS is a parsed
- * expression: a type requirement, default literal, or ordinary application. */
+/* Generic declarations reuse immutable member nodes. A value generic is
+ * `let name: rhs`, whose RHS is a parsed expression: a type requirement,
+ * default literal, or ordinary application. A type parameter is a bare name
+ * and has no RHS. */
 static RangeNode *parseGenericMembers(RangeParser *parser)
 {
     RangeNode *list = parserNode(parser, RangeNodeBlock);
@@ -770,14 +772,18 @@ static RangeNode *parseGenericMembers(RangeParser *parser)
     if (parserAt(parser, ">")) parserFail(parser, &parser->current, "generic members cannot be empty");
     while (!parser->failed && !parserAt(parser, ">")) {
         RangeNode *member = parserNode(parser, RangeNodeMember);
-        if (!parserAt(parser, "let")) {
-            parserFail(parser, &parser->current, "generic members require explicit let");
-            break;
-        }
-        parserAdvance(parser);
+        int value = parserAt(parser, "let");
+        if (value) parserAdvance(parser);
         member->name = parserExpectName(parser);
         if (strcmp(member->name, "_") == 0)
             parserFail(parser, &parser->current, "generic members require a single named identity");
+        if (!value) {
+            if (parserAt(parser, ":"))
+                parserFail(parser, &parser->current, "value generics require explicit let");
+            rangeNodeAppend(parser->arena, list, member);
+            if (!parserAt(parser, ">")) parserExpect(parser, ",");
+            continue;
+        }
         parserExpect(parser, ":");
         member->rhsStart = parser->current.offset;
         parser->genericDepth += 1;
