@@ -110,6 +110,8 @@ static RangeNode *parseStatement(RangeParser *parser);
 static void parseArgumentList(RangeParser *parser, RangeNode *owner);
 static RangeNode *parseGenericArguments(RangeParser *parser, int typePosition);
 static RangeNode *parseGenericMembers(RangeParser *parser);
+static int parseDeclaration(RangeParser *parser, RangeNode *owner);
+static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes);
 
 /* ---- types ---------------------------------------------------------- */
 
@@ -160,7 +162,7 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
 /* ---- attributes ------------------------------------------------------ */
 
 /* True when the current token opens a type position rather than an inferred
- * initialiser. `let x: Int(0)` is typed; `let m: #environment.filter(...)` and
+ * initialiser. `let x: Int(0)` is typed; `let m: #members.filter(...)` and
  * `let author: "George"` place the initialising expression in that position. */
 static int atTypePosition(RangeParser *parser)
 {
@@ -402,9 +404,23 @@ static RangeNode *parsePrimary(RangeParser *parser)
         parserAdvance(parser);
         node->name = parserExpectName(parser);
         if (parser->conditionDepth == 0 && parserAt(parser, "{")) {
+            /* #graph quotes ordinary top-level declarations; inside it, #name
+             * splices a macro-time value and a bare name resolves where the
+             * code lands. */
+            if (strcmp(node->name, "graph") != 0) {
+                parserFail(parser, &parser->current, "only #graph opens emitted code");
+                return node;
+            }
             RangeNode *emission = parserNode(parser, RangeNodeEmission);
             emission->a = node;
-            emission->b = parseBlock(parser);
+            emission->b = parserNode(parser, RangeNodeBlock);
+            emission->b->name = "graph";
+            parserExpect(parser, "{");
+            while (!parser->failed && !parserAt(parser, "}")
+                   && !parserAtKind(parser, RangeTokenEnd)) {
+                if (!parseDeclaration(parser, emission->b)) break;
+            }
+            parserExpect(parser, "}");
             return emission;
         }
         return node;
@@ -705,14 +721,8 @@ static RangeNode *parseStatement(RangeParser *parser)
         return node;
     }
     if (parserAt(parser, "extension")) {
-        /* Declaration emitted into another declaration's surface. */
-        RangeNode *node = parserNode(parser, RangeNodeExtension);
-        parserAdvance(parser);
-        parser->conditionDepth += 1;
-        node->a = parseExpression(parser, 0);
-        parser->conditionDepth -= 1;
-        node->b = parseBlock(parser);
-        return node;
+        parserFail(parser, &parser->current, "extension is a top-level declaration");
+        return NULL;
     }
     if (parserAt(parser, "while")) {
         RangeNode *node = parserNode(parser, RangeNodeWhile);
@@ -867,20 +877,17 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
     return node;
 }
 
-static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
+/* Members, functions, and nested constructs; extensions share this body.
+ * receiver names the owner of member functions, when known while parsing. */
+static void parseConstructBody(RangeParser *parser, RangeNode *node, const char *receiver)
 {
-    RangeNode *node = parserNode(parser, RangeNodeConstruct);
-    parserExpect(parser, "construct");
-    node->name = parserExpectName(parser);
-    if (parserAt(parser, "<")) node->generics = parseGenericMembers(parser);
-    node->c = attributes;
-    if (!parserAt(parser, "{")) return node;
+    const char *owner = receiver ? receiver : "extension";
     parserExpect(parser, "{");
     while (!parser->failed && !parserAt(parser, "}")) {
         RangeNode *memberAttributes = parseAttributes(parser);
         if (parserAt(parser, "function")) {
             rangeNodeAppend(parser->arena, node,
-                            parseFunction(parser, memberAttributes, node->name));
+                            parseFunction(parser, memberAttributes, receiver));
             continue;
         }
         if (parserAt(parser, "construct")) {
@@ -897,7 +904,7 @@ static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
         else if (!parserAt(parser, "let")) {
             parserFail(parser, &parser->current,
                        "expected a member declaration in construct %s, found '%.*s'",
-                       node->name, (int)parser->current.length, parser->current.text);
+                       owner, (int)parser->current.length, parser->current.text);
             break;
         }
         parserAdvance(parser);
@@ -943,6 +950,36 @@ static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
         rangeNodeAppend(parser->arena, node, member);
     }
     parserExpect(parser, "}");
+}
+
+static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
+{
+    RangeNode *node = parserNode(parser, RangeNodeConstruct);
+    parserExpect(parser, "construct");
+    node->name = parserExpectName(parser);
+    if (parserAt(parser, "<")) node->generics = parseGenericMembers(parser);
+    node->c = attributes;
+    if (parserAt(parser, "{")) parseConstructBody(parser, node, node->name);
+    return node;
+}
+
+/* `extension Name { … }` adds construct members to the declaration it names.
+ * Inside #graph, the subject may be a splice such as `#name`. */
+static RangeNode *parseExtension(RangeParser *parser, RangeNode *attributes)
+{
+    RangeNode *node = parserNode(parser, RangeNodeExtension);
+    if (attributes->itemCount)
+        parserFail(parser, &parser->current, "extensions do not take macro applications");
+    parserExpect(parser, "extension");
+    parser->conditionDepth += 1;
+    node->a = parseExpression(parser, 0);
+    parser->conditionDepth -= 1;
+    RangeNode *root = node->a;
+    while (root && (root->kind == RangeNodeMemberAccess || root->kind == RangeNodeCall)) root = root->a;
+    if (node->a && node->a->kind == RangeNodeName && !node->a->generics) node->name = node->a->name;
+    else if (!root || root->kind != RangeNodeEnvironment)
+        parserFail(parser, &parser->current, "extension requires a declaration name");
+    parseConstructBody(parser, node, node->name);
     return node;
 }
 
@@ -968,8 +1005,9 @@ static RangeNode *parseEnum(RangeParser *parser, RangeNode *attributes)
 
 /* Macro declarations are parsed in full: parameters with defaults, the target
  * and result type positions, and the body as a real block. Macro bodies are
- * compile-time programs, so they may reference #environment and $ templates and
- * may end in a bare implicit result. Nothing here is retained as a raw span. */
+ * compile-time programs: they may read #fields, emit #graph blocks, use $
+ * templates, and end in a bare implicit result. Nothing here is retained as a
+ * raw span. */
 static RangeNode *parseMacro(RangeParser *parser, RangeNode *attributes)
 {
     RangeNode *node = parserNode(parser, RangeNodeMacro);
@@ -1046,6 +1084,37 @@ static RangeNode *parseMacro(RangeParser *parser, RangeNode *attributes)
     return node;
 }
 
+/* One top-level declaration. #graph blocks use the same loop, so emitted code
+ * is ordinary file-scope Range code. Returns 0 when parsing stops. */
+static int parseDeclaration(RangeParser *parser, RangeNode *owner)
+{
+    RangeNode *attributes = parseAttributes(parser);
+    if (parserAt(parser, "construct")) {
+        rangeNodeAppend(parser->arena, owner, parseConstruct(parser, attributes));
+    } else if (parserAt(parser, "enum")) {
+        rangeNodeAppend(parser->arena, owner, parseEnum(parser, attributes));
+    } else if (parserAt(parser, "function")) {
+        rangeNodeAppend(parser->arena, owner, parseFunction(parser, attributes, NULL));
+    } else if (parserAt(parser, "macro")) {
+        rangeNodeAppend(parser->arena, owner, parseMacro(parser, attributes));
+    } else if (parserAt(parser, "extension")) {
+        rangeNodeAppend(parser->arena, owner, parseExtension(parser, attributes));
+    } else if (parserAt(parser, "{")) {
+        RangeNode *emitted = parserNode(parser, RangeNodeMain);
+        emitted->a = parseBlock(parser);
+        emitted->b = attributes;
+        rangeNodeAppend(parser->arena, owner, emitted);
+    } else if (parserAtKind(parser, RangeTokenEnd)) {
+        return 0;
+    } else {
+        parserFail(parser, &parser->current,
+                   "unexpected '%.*s' at top level",
+                   (int)parser->current.length, parser->current.text);
+        return 0;
+    }
+    return !parser->failed;
+}
+
 RangeNode *rangeParseUnit(RangeArena *arena, const char *path,
                           const char *source, size_t length,
                           char *error, size_t errorSize)
@@ -1060,29 +1129,7 @@ RangeNode *rangeParseUnit(RangeArena *arena, const char *path,
 
     RangeNode *unit = rangeNodeCreate(arena, RangeNodeUnit, path, 1, 1);
     while (!parser.failed && !parserAtKind(&parser, RangeTokenEnd)) {
-        RangeNode *attributes = parseAttributes(&parser);
-        if (parserAt(&parser, "construct")) {
-            rangeNodeAppend(arena, unit, parseConstruct(&parser, attributes));
-        } else if (parserAt(&parser, "enum")) {
-            rangeNodeAppend(arena, unit, parseEnum(&parser, attributes));
-        } else if (parserAt(&parser, "function")) {
-            rangeNodeAppend(arena, unit, parseFunction(&parser, attributes, NULL));
-        } else if (parserAt(&parser, "macro")) {
-            rangeNodeAppend(arena, unit, parseMacro(&parser, attributes));
-        } else if (parserAt(&parser, "{")) {
-            RangeNode *emitted = rangeNodeCreate(arena, RangeNodeMain, path,
-                                                 parser.current.line,
-                                                 parser.current.column);
-            emitted->a = parseBlock(&parser);
-            emitted->b = attributes;
-            rangeNodeAppend(arena, unit, emitted);
-        } else if (parserAtKind(&parser, RangeTokenEnd)) {
-            break;
-        } else {
-            parserFail(&parser, &parser.current,
-                       "unexpected '%.*s' at top level",
-                       (int)parser.current.length, parser.current.text);
-        }
+        if (!parseDeclaration(&parser, unit)) break;
     }
     if (parser.failed) {
         snprintf(error, errorSize, "%s", parser.error);

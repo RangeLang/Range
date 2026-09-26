@@ -82,6 +82,8 @@ struct RangeMacroApplication {
     RangeNode *declaration;
     RangeNode *target;
     RangeNode *unit;
+    RangeNode *attribute; /* the application site on the target */
+    int applied;          /* each application runs once */
     RangeGraphBinding *bindings;
     size_t count;
 };
@@ -112,6 +114,7 @@ struct RangeNode {
     RangeNode *annotations;
     RangeNode *generics; /* declaration Let members or supplied type arguments */
     RangeNode *rhsReference; /* bare RHS identity, resolved like any name */
+    RangeNode *emittedBy; /* macro application whose #graph block produced this node */
     /* Complete declaration RHS source range, independent of legacy type slots. */
     size_t rhsStart;
     size_t rhsEnd;

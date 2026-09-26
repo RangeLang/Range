@@ -21,8 +21,8 @@ grep -q 'construct name=Int ' "$work_root/int-tree" || fail "Int construct is mi
 grep -q 'member name=value ' "$work_root/int-tree" || fail "Int payload member is missing"
 grep -q 'attribute name=integer' "$work_root/int-tree" || fail "Int integer macro application is missing"
 
-"$compiler" --tree "$REPO_ROOT/Testing/Compiler/Graph/Environment.range" > "$work_root/environment-tree"
-grep -Eq '^[[:space:]]+emission($| )' "$work_root/environment-tree" || fail "environment block was skipped"
+"$compiler" --tree "$REPO_ROOT/Testing/Compiler/Graph/Graph.range" > "$work_root/graph-tree"
+grep -Eq '^[[:space:]]+emission($| )' "$work_root/graph-tree" || fail "#graph block was skipped"
 
 probe="$work_root/malformed.range"
 printf 'construct Broken<let bits: > {}\n' > "$probe"
@@ -47,6 +47,12 @@ if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
     fail "builtin selector argument was accepted"
 fi
 grep -q '@builtin takes no arguments' "$work_root/error" || fail "builtin argument diagnostic changed"
+printf 'macro m(): Construct { #environment {} }\n' > "$probe"
+"$compiler" "$probe" > /dev/null 2> "$work_root/error" && fail "non-graph emission block was accepted"
+grep -q 'only #graph opens emitted code' "$work_root/error" || fail "emission block diagnostic changed"
+printf 'function f() { extension Box {} }\n' > "$probe"
+"$compiler" "$probe" > /dev/null 2> "$work_root/error" && fail "statement extension was accepted"
+grep -q 'extension is a top-level declaration' "$work_root/error" || fail "extension placement diagnostic changed"
 printf 'construct Broken<let bits: > {}\n' > "$probe"
 
 directory="$work_root/source directory"

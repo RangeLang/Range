@@ -26,6 +26,10 @@ for mode in ordinary sanitized; do
         Testing/Compiler/Graph/MacroTargets.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
         -o "$work_root/$mode-macro-targets"
     "$work_root/$mode-macro-targets"
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
+        Testing/Compiler/Graph/Emission.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        -o "$work_root/$mode-emission"
+    "$work_root/$mode-emission"
     for fixture in Unknown UnknownBody Cycle; do
         status=0
         "$compiler" "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?

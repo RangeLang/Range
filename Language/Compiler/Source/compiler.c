@@ -16,6 +16,8 @@ typedef struct {
     char *error;
     size_t errorSize;
     jmp_buf failure;
+    RangeNode *emitted; /* declarations emitted by the running application */
+    RangeNode *unit;    /* unit holding the running application's target */
 } Resolver;
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
@@ -160,7 +162,7 @@ static void resolveGraphTarget(Resolver *vm, RangeNode *target)
         if (attribute->itemCount || macro->itemCount)
             fail(vm,attribute,"parameterized macro graph resolution is not implemented");
         RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
-        *app = (RangeMacroApplication){.declaration=macro,.target=target,.unit=unit};
+        *app = (RangeMacroApplication){.declaration=macro,.target=target,.unit=unit,.attribute=attribute};
         if (macro->a) {
             app->bindings = rangeArenaAllocate(vm->arena,macro->a->itemCount * sizeof(*app->bindings));
             for (size_t i = 0; i < macro->a->itemCount; ++i) {
@@ -206,7 +208,7 @@ static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source
     if (node->graphType) {
         type = node->graphType->name;
         /* These are physical storage adapters, not a list of permitted fields. */
-        static const char *const storage[] = {"name","target","members","environment","macros","generics","value",
+        static const char *const storage[] = {"name","target","members","graph","macros","generics","value",
             "receiver","parameters","output","body","cases"};
         for (size_t i = 0; i < sizeof(storage)/sizeof(*storage); ++i) {
             RangeGraphValue value = rangeGraphStoredField(vm->arena,node,storage[i]);
@@ -515,6 +517,7 @@ typedef struct {
     Resolver *vm;
     unsigned steps;
     unsigned depth;
+    int splicing; /* evaluating a #name splice inside #graph */
 } MetaEval;
 
 static void metaStep(MetaEval *eval, RangeNode *at)
@@ -578,6 +581,83 @@ static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind k
 static RangeGraphValue metaExpression(MetaEval *, MetaScope *, RangeNode *);
 static int metaStatement(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue *);
 
+/* A splice is a #name chain such as #element or #element.name; the whole
+ * chain runs at macro time. */
+static int spliceChain(const RangeNode *node)
+{
+    while (node && (node->kind == RangeNodeMemberAccess || node->kind == RangeNodeCall)) node = node->a;
+    return node && node->kind == RangeNodeEnvironment;
+}
+
+/* A spliced value becomes the source a person would have written there. */
+static RangeNode *spliceNode(MetaEval *eval, RangeNode *at, RangeGraphValue value)
+{
+    RangeArena *arena = eval->vm->arena;
+    if (value.kind == RangeGraphNodes)
+        fail(eval->vm,at,"cannot splice a list of %zu declarations",value.count);
+    if (value.kind == RangeGraphNone) fail(eval->vm,at,"splice has no value");
+    RangeNode *node = value.kind == RangeGraphNode ? value.node : NULL;
+    if (node && (node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString)) {
+        RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
+        *copy = *node;
+        copy->path = at->path; copy->line = at->line; copy->column = at->column;
+        return copy;
+    }
+    const char *name = value.kind == RangeGraphText ? value.text : node->name;
+    if (!name) fail(eval->vm,at,"cannot splice an unnamed %s",rangeNodeKindName(node->kind));
+    RangeNode *reference = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
+    reference->name = name;
+    reference->resolvedDeclaration = node;
+    return reference;
+}
+
+/* `let x: #element` becomes `let x: Element`: a spliced name in a
+ * declaration RHS takes the type position, as the parser would place it. */
+static void spliceDeclarationType(RangeNode *copy, const RangeNode *original)
+{
+    if ((copy->kind != RangeNodeMember && copy->kind != RangeNodeLocal) || copy->typeName
+        || copy->itemCount != 1 || copy->items[0]->kind != RangeNodeArgument
+        || !spliceChain(original->items[0]->a) || copy->items[0]->a->kind != RangeNodeName) return;
+    RangeNode *reference = copy->items[0]->a;
+    copy->typeName = reference->name;
+    copy->itemCount = 0;
+    if (!(copy->flags & ~RangeFlagMutable)) copy->rhsReference = reference;
+}
+
+/* Copy one quoted declaration for this application, filling its splices.
+ * Nested macro declarations keep their own splices for their own runs. */
+static RangeNode *emitNode(MetaEval *eval, MetaScope *scope, RangeNode *node, int splice)
+{
+    if (!node) return NULL;
+    RangeNode *attribute = scope->application->attribute;
+    if (splice && spliceChain(node)) {
+        int outer = eval->splicing;
+        eval->splicing = 1;
+        RangeGraphValue value = metaExpression(eval,scope,node);
+        eval->splicing = outer;
+        RangeNode *spliced = spliceNode(eval,node,value);
+        spliced->emittedBy = attribute;
+        return spliced;
+    }
+    if (node->kind == RangeNodeMacro) splice = 0;
+    RangeNode *copy = rangeArenaAllocate(eval->vm->arena,sizeof(*copy));
+    *copy = *node;
+    copy->emittedBy = attribute;
+    copy->resolvedDeclaration = NULL;
+    copy->macroApplication = NULL;
+    copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
+    copy->a = emitNode(eval,scope,node->a,splice);
+    copy->b = emitNode(eval,scope,node->b,splice);
+    copy->c = emitNode(eval,scope,node->c,splice);
+    copy->generics = emitNode(eval,scope,node->generics,splice);
+    copy->annotations = emitNode(eval,scope,node->annotations,splice);
+    copy->rhsReference = emitNode(eval,scope,node->rhsReference,splice);
+    for (size_t i = 0; i < node->itemCount; ++i)
+        rangeNodeAppend(eval->vm->arena,copy,emitNode(eval,scope,node->items[i],splice));
+    if (splice) spliceDeclarationType(copy,node);
+    return copy;
+}
+
 static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *call)
 {
     if (!call->a || call->a->kind != RangeNodeName || call->a->generics)
@@ -617,9 +697,23 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         if (!local) fail(eval->vm,node,"unresolved compile-time local '%s'",node->name);
         return local->value;
     }
-    case RangeNodeEnvironment:
+    case RangeNodeEnvironment: {
         if (!scope->application) fail(eval->vm,node,"graph context is unavailable in this function");
+        if (!eval->splicing) return graphEval(eval->vm,scope->application,node);
+        // Inside #graph, #name is a macro local or a target field, never both.
+        MetaLocal *local = metaLocal(scope,node->name);
+        RangeNode *field = rangeGraphField(scope->application->target->graphType,node->name);
+        if (local && field) fail(eval->vm,node,"#%s names both a macro local and a target field",node->name);
+        if (local) return local->value;
+        if (!field) fail(eval->vm,node,"#%s is neither a macro local nor a target field",node->name);
         return graphEval(eval->vm,scope->application,node);
+    }
+    case RangeNodeEmission:
+        if (!scope->application || !eval->vm->emitted)
+            fail(eval->vm,node,"#graph requires a macro application");
+        for (size_t i = 0; i < node->b->itemCount; ++i)
+            rangeNodeAppend(eval->vm->arena,eval->vm->emitted,emitNode(eval,scope,node->b->items[i],1));
+        return (RangeGraphValue){0};
     case RangeNodeMemberAccess: {
         RangeGraphValue receiver = metaExpression(eval,scope,node->a);
         if (same(node->name,"isTarget")) {
@@ -770,47 +864,73 @@ static int compilerAttribute(RangeNode *target, RangeNode *attribute)
         || macroBuiltin(attribute->resolvedDeclaration,"literal");
 }
 
-static void validateMacroApplication(MetaEval *eval, RangeNode *attribute)
+/* Run one application. Its #graph output is collected and returned only when
+ * the whole body succeeds, so a failed application emits nothing. */
+static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
 {
     RangeMacroApplication *app = attribute->macroApplication;
-    if (!app) fail(eval->vm,attribute,"macro application was not resolved");
+    if (!app) fail(vm,attribute,"macro application was not resolved");
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
-        if (same(app->declaration->c->items[j]->name,"builtin"))
-            fail(eval->vm,attribute,"builtin target effects are not supported by compile-time validation");
+        if (same(app->declaration->c->items[j]->name,"builtin")) {
+            if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
+                fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
+            fail(vm,attribute,"builtin target effects are not supported by compile-time validation");
+        }
+    RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
+    vm->emitted = emitted;
+    MetaEval eval = {.vm=vm};
     MetaScope scope = {.application=app};
     RangeGraphValue returned = {0};
-    (void)metaStatement(eval,&scope,app->declaration->a,&returned);
+    (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
+    vm->emitted = NULL;
+    return emitted;
 }
 
-static void validateMacroTarget(MetaEval *eval, RangeNode *target, size_t *checked)
+/* Emitted and written declarations join the graph through the same path as
+ * parsed source: shape, grammar identity, macro targets, literal defaults. */
+static void resolveMergedNode(Resolver *vm, RangeNode *node)
 {
-    if (!target->graphType) return;
-    if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
-        if (compilerAttribute(target,target->c->items[i])) continue;
-        validateMacroApplication(eval,target->c->items[i]);
-        ++*checked;
-    }
-    if (target->kind == RangeNodeConstruct)
-        for (size_t i = 0; i < target->itemCount; ++i) validateMacroTarget(eval,target->items[i],checked);
+    validateGraphShape(vm,node,node->source);
+    linkGrammarNodes(vm,node);
+    resolveGraphTarget(vm,node);
+    resolveLiteralDefaults(vm,node);
 }
 
-int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
-    size_t *checked, char *error, size_t errorSize)
+/* An extension names its declaration; its members move there and resolve in
+ * that declaration's scope, so an emitted `Element` finds Array<Element>. */
+static void mergeExtension(Resolver *vm, RangeNode *extension)
 {
-    *checked = 0;
-    Resolver *vm = calloc(1,sizeof(*vm));
-    if (!vm) { snprintf(error,errorSize,"cannot allocate macro validator"); return 0; }
-    vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
-    int ok = 0;
-    if (setjmp(vm->failure) == 0) {
-        MetaEval eval = {.vm=vm};
-        for (size_t u = 0; u < count; ++u) for (size_t i = 0; i < units[u]->itemCount; ++i)
-            validateMacroTarget(&eval,units[u]->items[i],checked);
-        ok = 1;
+    RangeNode *subject = extension->a, *declaration = NULL;
+    if (!subject || subject->kind != RangeNodeName)
+        fail(vm,extension,"#name splices are only valid inside #graph");
+    for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
+        RangeNode *candidate = vm->units[u]->items[i];
+        if (!same(candidate->name,subject->name)) continue;
+        if (candidate->kind == RangeNodeEnum)
+            fail(vm,subject,"extending enum '%s' is not implemented",subject->name);
+        if (candidate->kind != RangeNodeConstruct) continue;
+        if (declaration) fail(vm,subject,"ambiguous extension of '%s'",subject->name);
+        declaration = candidate;
     }
-    if (!ok) *checked = 0;
-    free(vm);
-    return ok;
+    if (!declaration) fail(vm,subject,"extension of undeclared '%s'",subject->name);
+    for (size_t i = 0; i < extension->itemCount; ++i) {
+        RangeNode *item = extension->items[i];
+        if (item->kind == RangeNodeFunction) item->typeName = declaration->name;
+        rangeNodeAppend(vm->arena,declaration,item);
+        resolveMergedNode(vm,item);
+    }
+    extension->itemCount = 0;
+    extension->resolvedDeclaration = declaration;
+}
+
+static void mergeEmitted(Resolver *vm, RangeNode *emitted)
+{
+    for (size_t i = 0; i < emitted->itemCount; ++i) {
+        RangeNode *node = emitted->items[i];
+        if (node->kind == RangeNodeExtension) { mergeExtension(vm,node); continue; }
+        rangeNodeAppend(vm->arena,vm->unit,node);
+        resolveMergedNode(vm,node);
+    }
 }
 
 /* Compilation reports independent source gaps before attempting dependent work.
@@ -1006,10 +1126,9 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         sourceDiagnostic(report,node,1,"C-implementation",
             "operator '%s' uses the C scalar evaluator; Range operator dispatch is not implemented",node->name);
         break;
-    case RangeNodeEmission:
-        sourceDiagnostic(report,node,0,"not-implemented","macro code emission is not implemented");
-        break;
-    case RangeNodeClosure: case RangeNodeSwitch: case RangeNodeExtension: case RangeNodeSyntaxTemplate:
+    case RangeNodeEmission: case RangeNodeExtension:
+        return; /* quoted and extension code is checked where it lands */
+    case RangeNodeClosure: case RangeNodeSwitch: case RangeNodeSyntaxTemplate:
         sourceDiagnostic(report,node,0,"not-implemented","execution of '%s' is not implemented",rangeNodeKindName(node->kind));
         break;
     default: break;
@@ -1034,19 +1153,88 @@ static void writeSourceDiagnostics(SourceReport *report, FILE *output)
     }
 }
 
-static void diagnoseMacroTarget(SourceReport *report, Resolver *vm, RangeNode *target)
+/* Macro application: written extensions merge first, then every application
+ * runs once and its #graph output merges before the next round. Applications
+ * introduced by emitted code run in a later round. This discovery order is a
+ * bootstrap stand-in: the accepted design is a Datalog scheduler that orders
+ * applications by what they read and write, reruns only reads a write changes,
+ * and rejects cycles through absence or whole-list reads. */
+enum { RangeMacroRounds = 16 };
+
+/* Without a report, the first failure stops application (tests). With one,
+ * each failure is recorded and the remaining applications still run. */
+static void guarded(Resolver *vm, SourceReport *report, const char *category,
+                    void (*step)(Resolver *, RangeNode *), RangeNode *node)
 {
-    if (!target->graphType) return;
+    if (!report) { step(vm,node); return; }
+    jmp_buf outer;
+    memcpy(outer,vm->failure,sizeof(outer));
+    if (setjmp(vm->failure) == 0) step(vm,node);
+    else sourceDiagnostic(report,NULL,0,category,"%s",vm->error);
+    memcpy(vm->failure,outer,sizeof(outer));
+}
+
+static void applyAndMerge(Resolver *vm, RangeNode *attribute)
+{
+    mergeEmitted(vm,runMacroApplication(vm,attribute));
+}
+
+static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
+                       RangeNode *target, size_t *checked)
+{
+    if (!target->graphType) return 0;
+    int ran = 0;
     if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
         RangeNode *attribute = target->c->items[i];
         if (compilerAttribute(target,attribute)) continue;
-        if (setjmp(vm->failure) == 0) {
-            MetaEval eval = {.vm=vm};
-            validateMacroApplication(&eval,attribute);
-        } else sourceDiagnostic(report,NULL,0,"macro-validation","%s",vm->error);
+        // An unresolved application here comes from a merge that already failed.
+        RangeMacroApplication *app = attribute->macroApplication;
+        if (!app || app->applied) continue;
+        app->applied = 1;
+        ran = 1;
+        ++*checked;
+        vm->unit = unit;
+        guarded(vm,report,"macro-validation",applyAndMerge,attribute);
     }
+    // Members merged during this round wait for the next one.
     if (target->kind == RangeNodeConstruct)
-        for (size_t i = 0; i < target->itemCount; ++i) diagnoseMacroTarget(report,vm,target->items[i]);
+        for (size_t i = 0, n = target->itemCount; i < n; ++i)
+            ran |= applyTarget(vm,report,unit,target->items[i],checked);
+    return ran;
+}
+
+static void applyMacros(Resolver *vm, SourceReport *report, size_t *checked)
+{
+    for (size_t u = 0; u < vm->count; ++u)
+        for (size_t i = 0; i < vm->units[u]->itemCount; ++i)
+            if (vm->units[u]->items[i]->kind == RangeNodeExtension)
+                guarded(vm,report,"resolution",mergeExtension,vm->units[u]->items[i]);
+    for (int round = 0; round < RangeMacroRounds; ++round) {
+        int ran = 0;
+        for (size_t u = 0; u < vm->count; ++u)
+            for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
+                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],checked);
+        if (!ran) return;
+    }
+    if (!report) fail(vm,NULL,"macro emission did not settle after %d rounds",RangeMacroRounds);
+    sourceDiagnostic(report,NULL,0,"macro-validation","macro emission did not settle after %d rounds",RangeMacroRounds);
+}
+
+int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
+    size_t *checked, char *error, size_t errorSize)
+{
+    *checked = 0;
+    Resolver *vm = calloc(1,sizeof(*vm));
+    if (!vm) { snprintf(error,errorSize,"cannot allocate macro validator"); return 0; }
+    vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
+    int ok = 0;
+    if (setjmp(vm->failure) == 0) {
+        applyMacros(vm,NULL,checked);
+        ok = 1;
+    }
+    if (!ok) *checked = 0;
+    free(vm);
+    return ok;
 }
 
 static void diagnoseMacroApplications(SourceReport *report)
@@ -1054,9 +1242,63 @@ static void diagnoseMacroApplications(SourceReport *report)
     Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
     *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
         .error=rangeArenaAllocate(report->arena,512),.errorSize=512};
-    for (size_t u = 0; u < report->count; ++u)
-        for (size_t i = 0; i < report->units[u]->itemCount; ++i)
-            diagnoseMacroTarget(report,vm,report->units[u]->items[i]);
+    size_t checked = 0;
+    if (setjmp(vm->failure) == 0) applyMacros(vm,report,&checked);
+    else sourceDiagnostic(report,NULL,0,"macro-validation","%s",vm->error);
+}
+
+/* The ordinary rule: one declaration per name in a scope, however it arrived.
+ * Functions and macros are exempt because they overload. */
+static void diagnoseDuplicate(SourceReport *report, RangeNode *first, RangeNode *second, const char *scope)
+{
+    // Emitted declarations are reported at the application that produced them.
+    char origin[512];
+    RangeNode *source = first->emittedBy;
+    if (source) snprintf(origin,sizeof(origin),"first emitted by @%s at %s:%d",source->name,source->path,source->line);
+    else snprintf(origin,sizeof(origin),"first declared at %s:%d",first->path,first->line);
+    source = second->emittedBy;
+    if (source) sourceDiagnostic(report,source,0,"duplicate",
+        "@%s emits '%s', which is declared more than once in %s; %s",
+        source->name,second->name,scope,origin);
+    else sourceDiagnostic(report,second,0,"duplicate",
+        "'%s' is declared more than once in %s; %s",second->name,scope,origin);
+}
+
+static int scopeDeclaration(const RangeNode *node)
+{
+    return node->kind == RangeNodeMember || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum;
+}
+
+static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
+{
+    for (size_t i = 0; i < construct->itemCount; ++i) {
+        RangeNode *item = construct->items[i];
+        if (!scopeDeclaration(item) || !item->name) continue;
+        for (size_t j = 0; j < i; ++j)
+            if (scopeDeclaration(construct->items[j]) && same(construct->items[j]->name,item->name)) {
+                diagnoseDuplicate(report,construct->items[j],item,construct->name);
+                break;
+            }
+        if (item->kind == RangeNodeConstruct) diagnoseDuplicateMembers(report,item);
+    }
+}
+
+static void diagnoseDuplicates(SourceReport *report)
+{
+    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
+        RangeNode *item = report->units[u]->items[i];
+        if (item->kind == RangeNodeConstruct) diagnoseDuplicateMembers(report,item);
+        if (item->kind != RangeNodeConstruct && item->kind != RangeNodeEnum) continue;
+        int found = 0;
+        for (size_t v = 0; v <= u && !found; ++v)
+            for (size_t j = 0; j < (v == u ? i : report->units[v]->itemCount) && !found; ++j) {
+                RangeNode *earlier = report->units[v]->items[j];
+                if ((earlier->kind == RangeNodeConstruct || earlier->kind == RangeNodeEnum) && same(earlier->name,item->name)) {
+                    diagnoseDuplicate(report,earlier,item,"the program");
+                    found = 1;
+                }
+            }
+    }
 }
 
 /* Compiler driver: compile source directories, with parser and literal probes. */
@@ -1209,8 +1451,10 @@ int main(int argc, char **argv)
         char error[512];
         int resolved = unitCount && resolveGraphApplications(&arena,units,unitCount,error,sizeof(error));
         if (unitCount && !resolved) sourceDiagnostic(&report,NULL,0,"resolution","%s",error);
+        // Build the graph, apply macros and merge their output, then resolve names.
+        if (resolved && !failures) diagnoseMacroApplications(&report);
         for (size_t u = 0; u < unitCount; ++u) diagnoseSourceNode(&report,NULL,units[u],0);
-        if (resolved && !failures && !report.errors) diagnoseMacroApplications(&report);
+        diagnoseDuplicates(&report);
         sourceDiagnostic(&report,NULL,0,"not-implemented","complete Range type checking and value materialization are not implemented");
         sourceDiagnostic(&report,NULL,0,"not-implemented","native code emission is not implemented; no executable was produced");
         writeSourceDiagnostics(&report,stderr);

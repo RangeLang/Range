@@ -65,7 +65,7 @@ int main(void)
         "let output: #output let body: #body } "
         "macro inspect(): Enum { let targetName: #name let chosen: #cases.first } "
         "macro inspect(): Macro { let targetName: #name let targetType: #target "
-        "let body: #body let original: #body.members.first let expansions: #body.environment }");
+        "let body: #body let original: #body.members.first let expansions: #body.graph }");
     RangeNode *targets = parse(&arena,"Targets.range",
         "@inspect construct First<let width: 8> { let payload: 11 "
         "@inspect function nested() {} } "
@@ -73,7 +73,7 @@ int main(void)
         "@inspect function start(let input: Any): First { return 0 } "
         "@inspect enum Choice { case alpha case beta } "
         "@inspect macro recipe(): Construct { let original: #members.first "
-        "#environment { @diagnostic(\"deferred target source\") } }");
+        "#graph { construct Deferred {} } }");
     RangeNode *grammar = parse(&arena,RANGE_LANGUAGE_DIR "/Grammar/Nodes.range",
         "construct Construct { let name: String let members: Array<Member> "
         "let generics: Array<Generic> let macros: Array<Macro> } "

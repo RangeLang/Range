@@ -1,0 +1,22 @@
+macro example(): Construct {
+    let member: #members.first
+    let ignored: "#graph is only text here"
+    if member.isTarget {
+        #graph {
+            // Keep the emitted declarations, including nested code.
+            construct Message {
+                let text: "hello"
+                function show() {
+                    if true {
+                        @diagnostic(text)
+                    }
+                }
+            }
+        }
+    }
+    #graph {}
+}
+
+macro plain(): Construct {
+    let ignored: 5
+}

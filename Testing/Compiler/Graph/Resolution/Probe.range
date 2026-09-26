@@ -7,7 +7,9 @@ macro probe(): Construct {
     if false {
         @diagnostic("Hidden control flow must remain parsed but not displayed")
     }
-    #environment {
-        @diagnostic("This block must remain deferred")
+    #graph {
+        extension #name {
+            let probed: #width
+        }
     }
 }

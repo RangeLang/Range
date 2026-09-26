@@ -24,9 +24,9 @@ static void validate(const char *source, const char *expected, size_t count)
     } else {
         if (!ok) fprintf(stderr,"%s\n",error);
         assert(ok && checked == count);
-        // Validation must not mutate declarations or leak locals between applications.
+        // Each application runs once; a second pass finds nothing new to apply.
         assert(validateMacroApplications(&arena,&unit,1,&checked,error,sizeof(error)));
-        assert(checked == count);
+        assert(checked == 0);
     }
     rangeArenaDestroy(&arena);
 }
@@ -113,12 +113,13 @@ int main(void)
     validate("macro assess(): Construct { while true {} } @assess construct Parcel {}","step limit",0);
     validate("function recurse(): Any { return recurse() } "
              "macro assess(): Construct { let result: recurse() } @assess construct Parcel {}","call depth",0);
-    validate("macro assess(): Construct { #environment {} } @assess construct Parcel {}","unsupported compile-time expression",0);
+    validate("function helper(): Any { #graph {} return 0 } "
+             "macro assess(): Construct { let value: helper() } @assess construct Parcel {}","#graph requires a macro application",0);
     validate("macro assess(): Construct { @unknown(\"bad\") } @assess construct Parcel {}","unresolved compile-time declaration",0);
     validate("function f(let a: Any, let b: Any): Any { return a } "
              "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","duplicate compile-time local",0);
     validate("macro assess(): Construct { if 1 {} } @assess construct Parcel {}","boolean graph value",0);
-    validate("@builtin macro assess(): Construct @assess construct Parcel {}","builtin target effects",0);
+    validate("@builtin macro assess(): Construct @assess construct Parcel {}","no C primitive is implemented for builtin macro 'assess'",0);
     validate("macro assess(): Construct { let leaked: 7 let selected: #members.first "
              "if selected.value == 7 {} } @assess construct Parcel { let payload: leaked }",
              "unresolved compile-time local 'leaked'",0);

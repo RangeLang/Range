@@ -128,18 +128,18 @@ RangeNode *rangeNodeRHS(RangeNode *node)
     return NULL;
 }
 
-static void appendEnvironments(RangeArena *arena, RangeNode *list, RangeNode *node)
+static void appendGraphBlocks(RangeArena *arena, RangeNode *list, RangeNode *node)
 {
     if (!node || node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) return;
     if (node->kind == RangeNodeEmission && node->a && node->a->name
-        && !strcmp(node->a->name,"environment")) {
+        && !strcmp(node->a->name,"graph")) {
         rangeNodeAppend(arena,list,node);
         return;
     }
-    appendEnvironments(arena,list,node->a);
-    appendEnvironments(arena,list,node->b);
-    appendEnvironments(arena,list,node->c);
-    for (size_t i = 0; i < node->itemCount; ++i) appendEnvironments(arena,list,node->items[i]);
+    appendGraphBlocks(arena,list,node->a);
+    appendGraphBlocks(arena,list,node->b);
+    appendGraphBlocks(arena,list,node->c);
+    for (size_t i = 0; i < node->itemCount; ++i) appendGraphBlocks(arena,list,node->items[i]);
 }
 
 /* Storage adapters expose existing relationships; @type decides which are legal. */
@@ -188,9 +188,9 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
         for (size_t i = 0; i < node->itemCount; ++i)
             if (node->items[i]->kind == RangeNodeLocal) rangeNodeAppend(arena,&result,node->items[i]);
         return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
-    } else if (!strcmp(name,"environment") && node->kind == RangeNodeBlock) {
+    } else if (!strcmp(name,"graph") && node->kind == RangeNodeBlock) {
         RangeNode result = {0};
-        appendEnvironments(arena,&result,node);
+        appendGraphBlocks(arena,&result,node);
         return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
     } else return none;
     return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=list ? list->items : NULL,.count=list ? list->itemCount : 0};
@@ -224,7 +224,7 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Member","name",0}, {"Member","value",RangeFlagOptional},
         {"Return","value",RangeFlagOptional},
         {"Macro.body","members",RangeFlagMany|RangeFlagOptional},
-        {"Macro.body","environment",RangeFlagMany|RangeFlagOptional}
+        {"Macro.body","graph",RangeFlagMany|RangeFlagOptional}
     };
     arena->graphTypes = rangeNodeCreate(arena,RangeNodeUnit,"<compiler>",1,1);
     for (size_t i = 0; i < sizeof(fields)/sizeof(*fields); ++i) {
