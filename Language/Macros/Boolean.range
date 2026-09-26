@@ -1,0 +1,8 @@
+@literal("true|false")
+macro boolean(): Construct {
+  let value: #members.filter(named: "value").first
+
+  if !value.isTarget {
+    @diagnostic("Construct must specify value")
+  }
+}

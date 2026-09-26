@@ -1,0 +1,4 @@
+@boolean
+construct Bool {
+    let value: false
+}
