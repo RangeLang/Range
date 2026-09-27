@@ -116,7 +116,8 @@ static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes);
 /* ---- types ---------------------------------------------------------- */
 
 /* Reads a type position, returning the interned name and setting *many when
- * the position is a collection. An empty name means an untyped @many. */
+ * the position is a collection. An empty name means an untyped @many. Any other
+ * @name is a macro type: declarations that applied that macro. */
 static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **generics)
 {
     *flags = 0;
@@ -127,14 +128,10 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
             parserAdvance(parser);
             *flags |= RangeFlagMany;
             if (parser->current.kind != RangeTokenName) return "";
-        } else if (rangeTokenIs(ahead, "syntax") || rangeTokenIs(ahead, "type")
-                   || rangeTokenIs(ahead, "encoding") || rangeTokenIs(ahead, "one")
-                   || rangeTokenIs(ahead, "any") || rangeTokenIs(ahead, "member")) {
+        } else if (ahead->kind == RangeTokenName) {
             parserAdvance(parser);
-            const char *name = rangeArenaIntern(parser->arena,
-                                                parser->current.text,
-                                                parser->current.length);
-            parserAdvance(parser);
+            const char *name = parserExpectName(parser);
+            *flags |= RangeFlagMacroType;
             if (parserAt(parser, "?")) { parserAdvance(parser); *flags |= RangeFlagOptional; }
             return name;
         }
@@ -169,11 +166,7 @@ static int atTypePosition(RangeParser *parser)
     if (parser->current.kind == RangeTokenName)
         return !parserAt(parser,"true") && !parserAt(parser,"false");
     if (!parserAt(parser, "@")) return 0;
-    const RangeToken *ahead = parserPeek(parser);
-    return rangeTokenIs(ahead, "many") || rangeTokenIs(ahead, "syntax")
-        || rangeTokenIs(ahead, "type") || rangeTokenIs(ahead, "encoding")
-        || rangeTokenIs(ahead, "one") || rangeTokenIs(ahead, "any")
-        || rangeTokenIs(ahead, "member");
+    return parserPeek(parser)->kind == RangeTokenName;
 }
 
 static RangeNode *parseAttributes(RangeParser *parser)
@@ -333,9 +326,9 @@ static RangeNode *parseGenericArguments(RangeParser *parser, int typePosition)
     if (parserAt(parser, ">")) parserFail(parser, &parser->current, "generic arguments cannot be empty");
     while (!parser->failed && !parserAt(parser, ">")) {
         RangeNode *argument = parserNode(parser, RangeNodeArgument);
-        if (typePosition && parser->current.kind == RangeTokenName
-            && !rangeTokenIs(parserPeek(parser), ":")) {
-            // Positional type arguments, including nested Array<Array<Member>>.
+        if (typePosition && (parserAt(parser, "@") || (parser->current.kind == RangeTokenName
+            && !rangeTokenIs(parserPeek(parser), ":")))) {
+            // Positional type arguments, including Array<Array<@member>>.
             argument->a = parserNode(parser, RangeNodeName);
             argument->a->name = parseTypeName(parser, &argument->a->flags, &argument->a->generics);
         } else {

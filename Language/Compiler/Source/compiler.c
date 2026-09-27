@@ -121,6 +121,8 @@ static RangeNode *graphTypeIdentity(RangeNode *node)
     return node->grammarDefinition ? node->grammarDefinition : node->graphType;
 }
 
+static int appliesMacro(const RangeNode *, const RangeNode *);
+
 /* Names select candidates; the declared target identity selects an application. */
 static RangeNode *resolveMacroDeclaration(Resolver *vm, RangeNode *attribute,
                                           RangeNode *target, RangeNode **owner)
@@ -132,7 +134,9 @@ static RangeNode *resolveMacroDeclaration(Resolver *vm, RangeNode *attribute,
         RangeNode *candidate = vm->units[u]->items[m];
         if (candidate->kind != RangeNodeMacro || !same(candidate->name,attribute->name)) continue;
         named = 1;
-        if (!candidate->b || !type || candidate->b->resolvedDeclaration != type) continue;
+        if (!candidate->b || !type) continue;
+        RangeNode *wanted = candidate->b->resolvedDeclaration;
+        if (wanted != type && !((candidate->b->flags & RangeFlagMacroType) && appliesMacro(type,wanted))) continue;
         if (macro) fail(vm,attribute,"ambiguous graph macro '%s' for target %s",attribute->name,type->name);
         macro = candidate;
         if (owner) *owner = vm->units[u];
@@ -189,6 +193,15 @@ static size_t graphValueCount(RangeGraphValue value)
     return value.kind == RangeGraphNone ? 0 : value.kind == RangeGraphNodes ? value.count : 1;
 }
 
+/* Member kinds are distinct shapes; the parser records which keyword declared it. */
+static const char *memberKind(const RangeNode *node)
+{
+    if (node->flags & RangeFlagMutable) return "State";
+    if (node->flags & RangeFlagDerived) return "Derived";
+    if (node->flags & RangeFlagBinding) return "Binding";
+    return "Let";
+}
+
 static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source)
 {
     if (!node) return;
@@ -200,7 +213,7 @@ static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source
         : node->kind == RangeNodeEnumCase ? "EnumCase"
         : node->kind == RangeNodeFunction ? "Function"
         : node->kind == RangeNodeReturn ? "Return"
-        : (node->kind == RangeNodeLocal || node->kind == RangeNodeMember) ? "Member" : NULL;
+        : (node->kind == RangeNodeLocal || node->kind == RangeNodeMember) ? memberKind(node) : NULL;
     if (type) {
         node->graphType = rangeGraphType(vm->arena,type);
         if (!node->graphType) fail(vm,node,"missing @type %s",type);
@@ -325,17 +338,54 @@ static int isLanguageNode(const RangeNode *node)
     return 0;
 }
 
-static void validateTargetReferences(Resolver *vm, RangeNode *node, RangeNode *type)
+/* A macro type @name admits declarations that applied that macro. */
+static int appliesMacro(const RangeNode *declaration, const RangeNode *macro)
+{
+    if (!declaration || !declaration->c || !macro) return 0;
+    for (size_t i = 0; i < declaration->c->itemCount; ++i) {
+        const RangeNode *attribute = declaration->c->items[i];
+        if (same(attribute->name,macro->name)
+            && (!attribute->resolvedDeclaration || attribute->resolvedDeclaration == macro)) return 1;
+    }
+    return 0;
+}
+
+static RangeNode *macroType(Resolver *vm, RangeNode *at, const char *name)
+{
+    RangeNode *found = NULL;
+    for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
+        RangeNode *candidate = vm->units[u]->items[i];
+        if (candidate->kind != RangeNodeMacro || !same(candidate->name,name)) continue;
+        if (found) fail(vm,at,"ambiguous macro type '@%s'",name);
+        found = candidate;
+    }
+    if (!found) fail(vm,at,"unknown macro type '@%s'",name);
+    return found;
+}
+
+/* #field must exist on the target type, or on every kind a macro type admits. */
+static void validateTargetReferences(Resolver *vm, RangeNode *node, RangeNode *type, RangeNode *nominal)
 {
     if (!node || node->kind == RangeNodeEmission) return; /* deferred code */
-    if (node->kind == RangeNodeEnvironment) {
+    if (node->kind == RangeNodeEnvironment && nominal) {
+        size_t kinds = 0;
+        RangeNode *shapes = vm->arena->graphTypes;
+        for (size_t i = 0; i < shapes->itemCount; ++i) {
+            RangeNode *shape = shapes->items[i];
+            if (!appliesMacro(shape->resolvedDeclaration,nominal)) continue;
+            ++kinds;
+            if (!rangeGraphField(shape,node->name))
+                fail(vm,node,"field '%s' is not declared by %s, which applies @%s",node->name,shape->name,nominal->name);
+        }
+        if (!kinds) fail(vm,node,"no declaration kind applies @%s",nominal->name);
+    } else if (node->kind == RangeNodeEnvironment) {
         if (!type) fail(vm,node,"#%s requires a declared macro target",node->name);
         if (!rangeGraphField(type,node->name))
             fail(vm,node,"field '%s' is not declared by @type %s",node->name,type->name);
     }
-    validateTargetReferences(vm,node->a,type); validateTargetReferences(vm,node->b,type);
-    validateTargetReferences(vm,node->c,type); validateTargetReferences(vm,node->generics,type);
-    for (size_t i = 0; i < node->itemCount; ++i) validateTargetReferences(vm,node->items[i],type);
+    validateTargetReferences(vm,node->a,type,nominal); validateTargetReferences(vm,node->b,type,nominal);
+    validateTargetReferences(vm,node->c,type,nominal); validateTargetReferences(vm,node->generics,type,nominal);
+    for (size_t i = 0; i < node->itemCount; ++i) validateTargetReferences(vm,node->items[i],type,nominal);
 }
 
 static void linkGrammarNodes(Resolver *vm, RangeNode *node)
@@ -343,15 +393,20 @@ static void linkGrammarNodes(Resolver *vm, RangeNode *node)
     if (!node) return;
     node->grammarDefinition = node->graphType ? node->graphType->resolvedDeclaration : NULL;
     if (node->kind == RangeNodeMacro) {
-        RangeNode *shape = NULL;
+        RangeNode *shape = NULL, *nominal = NULL;
         if (node->b) {
-            if (node->b->flags || node->b->generics)
+            if ((node->b->flags & ~RangeFlagMacroType) || node->b->generics)
                 fail(vm,node->b,"macro target requires one declaration type");
-            shape = rangeGraphType(vm->arena,node->b->name);
-            if (!shape) fail(vm,node->b,"unknown macro target type '%s'",node->b->name);
-            node->b->resolvedDeclaration = shape->resolvedDeclaration ? shape->resolvedDeclaration : shape;
+            if (node->b->flags & RangeFlagMacroType) {
+                nominal = macroType(vm,node->b,node->b->name);
+                node->b->resolvedDeclaration = nominal;
+            } else {
+                shape = rangeGraphType(vm->arena,node->b->name);
+                if (!shape) fail(vm,node->b,"unknown macro target type '%s'",node->b->name);
+                node->b->resolvedDeclaration = shape->resolvedDeclaration ? shape->resolvedDeclaration : shape;
+            }
         }
-        validateTargetReferences(vm,node->a,shape);
+        validateTargetReferences(vm,node->a,shape,nominal);
     }
     linkGrammarNodes(vm,node->a); linkGrammarNodes(vm,node->b); linkGrammarNodes(vm,node->c);
     linkGrammarNodes(vm,node->generics); linkGrammarNodes(vm,node->annotations);
@@ -1040,7 +1095,7 @@ static void diagnoseSourceNode(SourceReport *, SourceScope *, RangeNode *, int);
 static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *node)
 {
     if (!node) return;
-    (void)sourceReference(report,scope,node,node->name,2);
+    (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 2);
     diagnoseSourceNode(report,scope,node->generics,0);
     diagnoseType(report,scope,node->a); /* an explicit macro result type */
 }
@@ -1074,14 +1129,14 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         break;
     case RangeNodeMember: case RangeNodeLocal: {
         RangeNode *declaration = sourceReference(report,scope,node,node->typeName,
-            node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
+            node->flags & RangeFlagMacroType ? 1 : node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
         if (declaration && (node->flags & RangeFlagApplication)
             && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
             sourceDiagnostic(report,node,0,"not-implemented","value construction for '%s' is not implemented",node->typeName);
         break;
     }
     case RangeNodeName:
-        (void)sourceReference(report,scope,node,node->name,0);
+        (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 0);
         break;
     case RangeNodeMemberAccess:
         if (same(node->name,"first") || same(node->name,"isTarget"))

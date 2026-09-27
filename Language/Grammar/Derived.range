@@ -1,4 +1,5 @@
-construct Member {
+@member
+construct Derived {
     let name: String
     let value: Any?
 }

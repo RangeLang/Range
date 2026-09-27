@@ -221,7 +221,10 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Macro","target",RangeFlagOptional},
         {"Macro","parameters",RangeFlagMany|RangeFlagOptional},
         {"Macro","body",RangeFlagOptional},
-        {"Member","name",0}, {"Member","value",RangeFlagOptional},
+        {"Let","name",0}, {"Let","value",RangeFlagOptional},
+        {"State","name",0}, {"State","value",RangeFlagOptional},
+        {"Derived","name",0}, {"Derived","value",RangeFlagOptional},
+        {"Binding","name",0}, {"Binding","value",RangeFlagOptional},
         {"Return","value",RangeFlagOptional},
         {"Macro.body","members",RangeFlagMany|RangeFlagOptional},
         {"Macro.body","graph",RangeFlagMany|RangeFlagOptional}

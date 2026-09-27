@@ -51,7 +51,7 @@ int main(void)
     const char *core =
         "construct Construct { let name: String let members: Array<Member> let generics: Array<Generic> let macros: Array<Macro> } "
         "construct Function { let name: String let parameters: Array<Parameter> let output: Construct? let body: Array<Return> } "
-        "construct Member { let name: String let value: Any? } "
+        "construct Let { let name: String let value: Any? } "
         "construct Return { let value: Any? } "
         "macro probe(): Construct { let chosen: #members.first }";
     RangeNode *units[] = {
@@ -66,7 +66,7 @@ int main(void)
     if (!ok) fprintf(stderr,"%s\n",error);
     assert(ok);
     RangeNode *construct = units[0]->items[0], *function = units[0]->items[1];
-    RangeNode *member = units[0]->items[2], *returns = units[0]->items[3];
+    RangeNode *let = units[0]->items[2], *returns = units[0]->items[3];
     RangeNode *box = units[1]->items[0], *start = units[1]->items[2];
     assert(construct->grammarDefinition == construct);
     RangeNode *members = construct->items[1];
@@ -77,9 +77,9 @@ int main(void)
     assert(same(members->generics->items[0]->a->name,"Member"));
     assert(box->grammarDefinition == construct);
     assert(start->grammarDefinition == function);
-    assert(box->items[0]->grammarDefinition == member);
+    assert(box->items[0]->grammarDefinition == let);
     assert(!rangeNodeRHS(box->items[0]));
-    assert(start->a->items[0]->grammarDefinition == member);
+    assert(start->a->items[0]->grammarDefinition == let);
     assert(start->a->items[1]->grammarDefinition == returns);
     assert(start->a->items[1]->a->integer == 42);
     assert(units[1]->items[3]->a->items[0]->grammarDefinition == returns);

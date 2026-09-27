@@ -1,0 +1,5 @@
+@member
+construct Binding {
+    let name: String
+    let value: Any?
+}

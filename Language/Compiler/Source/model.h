@@ -57,7 +57,8 @@ enum {
     RangeFlagBuiltin  = 1 << 5,
     RangeFlagOptional = 1 << 6,
     RangeFlagLiteral  = 1 << 7,  /* string part is literal text */
-    RangeFlagApplication = 1 << 8 /* explicit parentheses, including () */
+    RangeFlagApplication = 1 << 8, /* explicit parentheses, including () */
+    RangeFlagMacroType = 1 << 9    /* @name type: declarations that applied the macro */
 };
 
 typedef struct RangeNode RangeNode;

@@ -1,10 +1,11 @@
 // Pseudocode: an explicit compiler primitive for repeated member storage.
 // This storage contract is not implemented yet.
 @builtin
-macro many(): Member
+macro many(): State
 
 // The annotated member holds a variable number of element slots, stored out
-// of line. Its declared type supplies the element type; C uses only that
+// of line. It targets State because its slots change; @many on a let is
+// rejected. Its declared type supplies the element type; C uses only that
 // type's layout, never its name. Macros such as @collection apply @many;
 // user declarations do not.
 //
