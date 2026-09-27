@@ -1,0 +1,4 @@
+// A parameter's declared type is C-backed but has no field adapter yet.
+construct Parameter {
+    let name: String
+}

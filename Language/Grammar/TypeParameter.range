@@ -1,0 +1,4 @@
+@generic
+construct TypeParameter {
+    let name: String
+}

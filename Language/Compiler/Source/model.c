@@ -84,7 +84,7 @@ void rangeNodeAppend(RangeArena *arena, RangeNode *node, RangeNode *item)
 
 static const char *const RANGE_NODE_NAMES[RangeNodeKindCount] = {
     "unit", "construct", "enum", "enumCase", "function", "macro", "main",
-    "let", "state", "derived", "binding", "parameter", "attribute", "block", "assign", "if",
+    "let", "state", "derived", "binding", "typeParameter", "parameter", "attribute", "block", "assign", "if",
     "while", "return", "expressionStatement", "call", "argument",
     "memberAccess", "name", "integer", "bool", "string", "stringPart",
     "case", "unary", "binary", "manyLiteral", "environment", "syntaxTemplate",
@@ -232,6 +232,8 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"State","name",0}, {"State","value",RangeFlagOptional},
         {"Derived","name",0}, {"Derived","value",RangeFlagOptional},
         {"Binding","name",0}, {"Binding","value",RangeFlagOptional},
+        {"TypeParameter","name",0},
+        {"Parameter","name",0},
         {"Return","value",RangeFlagOptional},
         {"Macro.body","members",RangeFlagMany|RangeFlagOptional},
         {"Macro.body","graph",RangeFlagMany|RangeFlagOptional}

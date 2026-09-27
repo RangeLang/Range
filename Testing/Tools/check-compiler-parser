@@ -34,9 +34,9 @@ grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "diagnostic lacks a source
 # Type parameters are bare names; value generics keep explicit let.
 printf 'construct Pair<First, let size: 2, Second> { let first: First }\n' > "$probe"
 "$compiler" --tree "$probe" > "$work_root/generic-tree"
-grep -Eq '^ +let name=First$' "$work_root/generic-tree" || fail "type parameter is missing"
+grep -Eq '^ +typeParameter name=First$' "$work_root/generic-tree" || fail "type parameter is missing"
 grep -Eq '^ +let name=size rhs=' "$work_root/generic-tree" || fail "value generic beside type parameter is missing"
-grep -Eq '^ +let name=Second$' "$work_root/generic-tree" || fail "trailing type parameter is missing"
+grep -Eq '^ +typeParameter name=Second$' "$work_root/generic-tree" || fail "trailing type parameter is missing"
 printf 'construct Broken<T: Int> {}\n' > "$probe"
 if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
     fail "value generic without let was accepted"

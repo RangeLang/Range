@@ -1,0 +1,9 @@
+// target and body are C-backed but not declared here: a target is a
+// declaration type or a macro type, and a body is a block; neither has a
+// Range type yet.
+construct Macro {
+    let name: String
+    let parameters: Array<Parameter>
+    let generics: Array<@generic>
+    let macros: Array<Macro>
+}

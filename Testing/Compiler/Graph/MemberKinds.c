@@ -60,6 +60,17 @@ int main(void)
     // A let or state inside a function is the same kind as one in a construct.
     assert(start->a->items[0]->kind == RangeNodeLet && same(start->a->items[0]->graphType->name,"Let"));
     assert(start->a->items[1]->kind == RangeNodeState && same(start->a->items[1]->graphType->name,"State"));
+    rangeArenaDestroy(&arena);
+
+    // Generics are a Let or a TypeParameter; parameters have their own shape.
+    ok = resolve(&arena,units,"construct Pair<First, let size: 2> {} function take(let item: Any) {}",error);
+    if (!ok) fprintf(stderr,"%s\n",error);
+    assert(ok);
+    RangeNode *pair = units[1]->items[0], *take = units[1]->items[1];
+    assert(pair->generics->items[0]->kind == RangeNodeTypeParameter);
+    assert(same(pair->generics->items[0]->graphType->name,"TypeParameter"));
+    assert(pair->generics->items[1]->kind == RangeNodeLet);
+    assert(same(take->items[0]->graphType->name,"Parameter"));
     RangeNode *members = units[0]->items[5]->items[1];
     assert(members->generics->items[0]->a->flags & RangeFlagMacroType);
     assert(same(members->generics->items[0]->a->name,"member"));

@@ -1,4 +1,4 @@
-@member
+@member @generic
 construct Let {
     let name: String
     let value: Any?

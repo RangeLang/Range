@@ -203,7 +203,9 @@ static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source
         : node->kind == RangeNodeFunction ? "Function"
         : node->kind == RangeNodeReturn ? "Return"
         : node->kind == RangeNodeLet ? "Let" : node->kind == RangeNodeState ? "State"
-        : node->kind == RangeNodeDerived ? "Derived" : node->kind == RangeNodeBinding ? "Binding" : NULL;
+        : node->kind == RangeNodeDerived ? "Derived" : node->kind == RangeNodeBinding ? "Binding"
+        : node->kind == RangeNodeTypeParameter ? "TypeParameter"
+        : node->kind == RangeNodeParameter ? "Parameter" : NULL;
     if (type) {
         node->graphType = rangeGraphType(vm->arena,type);
         if (!node->graphType) fail(vm,node,"missing @type %s",type);

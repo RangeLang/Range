@@ -20,6 +20,7 @@ typedef enum {
     RangeNodeState,
     RangeNodeDerived,
     RangeNodeBinding,
+    RangeNodeTypeParameter, /* <Element>: a generic that names a type */
     RangeNodeParameter,
     RangeNodeAttribute,
     RangeNodeBlock,

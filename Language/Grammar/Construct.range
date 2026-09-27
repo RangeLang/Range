@@ -1,6 +1,6 @@
 construct Construct {
     let name: String
     let members: Array<@member>
-    let generics: Array<Generic>
+    let generics: Array<@generic>
     let macros: Array<Macro>
 }

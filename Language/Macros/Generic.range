@@ -1,0 +1,9 @@
+// Generic kinds apply @generic, so @generic names any of them: a value
+// generic such as <let bits: 64> is a Let; <Element> is a TypeParameter.
+macro generic(): Construct {
+  let name: #members.filter(named: "name").first
+
+  if !name.isTarget {
+    @diagnostic("Generic kind must declare name")
+  }
+}
