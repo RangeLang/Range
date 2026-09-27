@@ -25,6 +25,7 @@ static void compile(Compiled *compiled, const char *source)
     diagnoseMacroApplications(&compiled->report);
     diagnoseSourceNode(&compiled->report,NULL,compiled->unit,0);
     diagnoseDuplicates(&compiled->report);
+    diagnoseBuiltinFunctions(&compiled->report,compiled->unit);
 }
 
 static int reported(Compiled *compiled, const char *category, const char *text)
@@ -128,6 +129,21 @@ int main(void)
     assert(reported(&c,"macro-validation","macro emission did not settle after 16 rounds"));
     rangeArenaDestroy(&c.arena);
 
-    puts("macro emission: extensions, splices, landing scope, duplicates, rounds, failures=pass");
+    // Slot primitives act on the construct's single @many member.
+#define MANY "@builtin macro many(): State construct State {} construct Int {} "
+    compile(&c,CORE MANY
+        "construct Store { @many state slots: Int @builtin function read(let at: Int): Int } "
+        "construct Twice { @many state a: Int @many state b: Int @builtin function write(let at: Int, let value: Int) } "
+        "construct Plain { @builtin function resize(let to: Int) } "
+        "@builtin function helper()");
+    assert(!reported(&c,"macro-validation",""));
+    assert(reported(&c,"not-implemented","builtin macro 'many' has no runtime storage implementation"));
+    assert(reported(&c,"not-implemented","builtin function 'read' has no runtime implementation for @many storage"));
+    assert(reported(&c,"builtin","builtin function 'write' requires exactly one @many member in Twice; found 2"));
+    assert(reported(&c,"builtin","builtin function 'resize' requires exactly one @many member in Plain; found 0"));
+    assert(reported(&c,"not-implemented","no C primitive is implemented for builtin function 'helper'"));
+    rangeArenaDestroy(&c.arena);
+
+    puts("macro emission: extensions, splices, landing scope, duplicates, rounds, failures, slot builtins=pass");
     return 0;
 }

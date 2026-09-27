@@ -934,13 +934,15 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
 {
     RangeMacroApplication *app = attribute->macroApplication;
     if (!app) fail(vm,attribute,"macro application was not resolved");
+    RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
+    // @many marks layout only; applying it has no compile-time effect.
+    if (macroBuiltin(app->declaration,"many")) return emitted;
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
         if (same(app->declaration->c->items[j]->name,"builtin")) {
             if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
                 fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
             fail(vm,attribute,"builtin target effects are not supported by compile-time validation");
         }
-    RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
     vm->emitted = emitted;
     MetaEval eval = {.vm=vm};
     MetaScope scope = {.application=app};
@@ -1123,7 +1125,9 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         if (node->kind == RangeNodeFunction)
             (void)sourceReference(report,scope,node,node->typeName,2);
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
-        if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
+        if (macroBuiltin(node,"many"))
+            sourceDiagnostic(report,node,0,"not-implemented","builtin macro 'many' has no runtime storage implementation");
+        else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
             for (size_t i = 0; i < node->c->itemCount; ++i)
                 if (same(node->c->items[i]->name,"builtin"))
                     sourceDiagnostic(report,node,0,"not-implemented","no C primitive is implemented for builtin macro '%s'",node->name);
@@ -1347,6 +1351,39 @@ static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
     }
 }
 
+/* Builtin functions are C primitives selected by name. resize, read, and write
+ * act on their construct's @many member, so that construct needs exactly one. */
+static int slotPrimitive(const RangeNode *function)
+{
+    return same(function->name,"resize") || same(function->name,"read") || same(function->name,"write");
+}
+
+static int appliesBuiltin(const RangeNode *node, const char *name)
+{
+    if (node->c) for (size_t i = 0; i < node->c->itemCount; ++i)
+        if (macroBuiltin(node->c->items[i]->resolvedDeclaration,name)) return 1;
+    return 0;
+}
+
+static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
+{
+    size_t slots = 0;
+    if (owner->kind == RangeNodeConstruct)
+        for (size_t i = 0; i < owner->itemCount; ++i)
+            if (rangeNodeDeclaresValue(owner->items[i]->kind) && appliesBuiltin(owner->items[i],"many")) ++slots;
+    for (size_t i = 0; i < owner->itemCount; ++i) {
+        RangeNode *item = owner->items[i];
+        if (item->kind == RangeNodeConstruct) diagnoseBuiltinFunctions(report,item);
+        if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
+        if (!slotPrimitive(item) || owner->kind != RangeNodeConstruct)
+            sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin function '%s'",item->name);
+        else if (slots != 1)
+            sourceDiagnostic(report,item,0,"builtin","builtin function '%s' requires exactly one @many member in %s; found %zu",
+                item->name,owner->name,slots);
+        else sourceDiagnostic(report,item,0,"not-implemented","builtin function '%s' has no runtime implementation for @many storage",item->name);
+    }
+}
+
 static void diagnoseDuplicates(SourceReport *report)
 {
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
@@ -1519,6 +1556,7 @@ int main(int argc, char **argv)
         if (resolved && !failures) diagnoseMacroApplications(&report);
         for (size_t u = 0; u < unitCount; ++u) diagnoseSourceNode(&report,NULL,units[u],0);
         diagnoseDuplicates(&report);
+        for (size_t u = 0; u < unitCount; ++u) diagnoseBuiltinFunctions(&report,units[u]);
         sourceDiagnostic(&report,NULL,0,"not-implemented","complete Range type checking and value materialization are not implemented");
         sourceDiagnostic(&report,NULL,0,"not-implemented","native code emission is not implemented; no executable was produced");
         writeSourceDiagnostics(&report,stderr);
