@@ -1,5 +1,6 @@
+// value is C-backed but not declared here: it holds the right-hand-side
+// expression, which has no Range type until expression kinds are declared.
 @member
 construct Binding {
     let name: String
-    let value: Any?
 }

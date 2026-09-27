@@ -1,3 +1,3 @@
-construct Return {
-    let value: Any?
-}
+// value is C-backed but not declared here: it holds the returned
+// expression, which has no Range type until expression kinds are declared.
+construct Return {}

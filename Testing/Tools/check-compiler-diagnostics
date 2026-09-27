@@ -34,11 +34,11 @@ def compile_sources(*paths):
     return result.stderr
 
 active = compile_sources('Language/Grammar', 'Language/Macros', 'Language/Types')
-assert "no declaration for 'Any'" in active, active
 # Array<Element> declares a type parameter, so Array<Member> resolves;
 # @boolean and @string declare Bool and String the way @integer declares Int;
 # generics are @generic kinds, and every C graph shape has a grammar declaration.
-for declared in ('Array', 'Bool', 'String', 'Generic', 'Parameter'):
+# value fields are left undeclared until expressions have a Range type.
+for declared in ('Array', 'Bool', 'String', 'Generic', 'Parameter', 'Any'):
     assert f"no declaration for '{declared}'" not in active, active
 assert "has a C graph shape but no Range declaration" not in active, active
 for shortcut in ('filter(named:)', '.first', '.isTarget'):
