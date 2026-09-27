@@ -1,4 +1,4 @@
-/* Member kinds are distinct shapes; @member names any kind that applied it. */
+/* Each member keyword is its own node kind; @member names any kind that applied it. */
 #define main rangeCompilerMain
 #include "../../../Language/Compiler/Source/compiler.c"
 #undef main
@@ -51,12 +51,15 @@ int main(void)
     assert(ok);
     RangeNode *box = units[1]->items[0], *start = units[1]->items[1];
     const char *kinds[] = {"Let","State","Derived","Binding"};
+    const RangeNodeKind nodes[] = {RangeNodeLet,RangeNodeState,RangeNodeDerived,RangeNodeBinding};
     for (size_t i = 0; i < 4; ++i) {
+        assert(box->items[i]->kind == nodes[i] && !box->items[i]->flags);
         assert(same(box->items[i]->graphType->name,kinds[i]));
         assert(box->items[i]->grammarDefinition == units[0]->items[i + 1]);
     }
-    assert(same(start->a->items[0]->graphType->name,"Let"));
-    assert(same(start->a->items[1]->graphType->name,"State"));
+    // A let or state inside a function is the same kind as one in a construct.
+    assert(start->a->items[0]->kind == RangeNodeLet && same(start->a->items[0]->graphType->name,"Let"));
+    assert(start->a->items[1]->kind == RangeNodeState && same(start->a->items[1]->graphType->name,"State"));
     RangeNode *members = units[0]->items[5]->items[1];
     assert(members->generics->items[0]->a->flags & RangeFlagMacroType);
     assert(same(members->generics->items[0]->a->name,"member"));

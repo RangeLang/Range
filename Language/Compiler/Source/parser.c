@@ -205,6 +205,17 @@ static int attributesContain(const RangeNode *attributes, const char *name)
 
 /* ---- expressions ----------------------------------------------------- */
 
+/* The declaring keyword is the node kind: let, state, derived, or binding. */
+static int valueDeclarationKind(RangeParser *parser, RangeNodeKind *kind)
+{
+    if (parserAt(parser, "let")) *kind = RangeNodeLet;
+    else if (parserAt(parser, "state")) *kind = RangeNodeState;
+    else if (parserAt(parser, "derived")) *kind = RangeNodeDerived;
+    else if (parserAt(parser, "binding")) *kind = RangeNodeBinding;
+    else return 0;
+    return 1;
+}
+
 static RangeNode *parseString(RangeParser *parser)
 {
     RangeNode *node = parserNode(parser, RangeNodeString);
@@ -629,18 +640,17 @@ static RangeNode *parseStatement(RangeParser *parser)
         RangeNode *statement = parseStatement(parser);
         if (statement) {
             statement->annotations = attributes;
-            if (statement->kind == RangeNodeLocal && attributesContain(attributes, "many")) {
+            if (rangeNodeDeclaresValue(statement->kind) && attributesContain(attributes, "many")) {
                 statement->flags |= RangeFlagMany;
             }
         }
         return statement;
     }
     if (parserAt(parser, "let") || parserAt(parser, "state")) {
-        RangeNode *node = parserNode(parser, RangeNodeLocal);
-        if (parserAt(parser, "state")) node->flags |= RangeFlagMutable;
+        RangeNode *node = parserNode(parser, parserAt(parser, "state") ? RangeNodeState : RangeNodeLet);
         parserAdvance(parser);
         node->name = parserExpectName(parser);
-        if (!parserAt(parser, ":") && !(node->flags & RangeFlagMutable)) return node;
+        if (!parserAt(parser, ":") && node->kind == RangeNodeLet) return node;
         parserExpect(parser, ":");
         node->rhsStart = parser->current.offset;
         RangeToken rhsToken = parser->current;
@@ -660,11 +670,6 @@ static RangeNode *parseStatement(RangeParser *parser)
         }
         node->rhsEnd = parser->previousEnd;
         if (node->typeName && node->flags == 0 && node->itemCount == 0) {
-            node->rhsReference = rangeNodeCreate(parser->arena, RangeNodeName,
-                parser->path, rhsToken.line, rhsToken.column);
-            node->rhsReference->name = node->typeName;
-            node->rhsReference->generics = node->generics;
-        } else if (node->typeName && node->flags == RangeFlagMutable && node->itemCount == 0) {
             node->rhsReference = rangeNodeCreate(parser->arena, RangeNodeName,
                 parser->path, rhsToken.line, rhsToken.column);
             node->rhsReference->name = node->typeName;
@@ -779,7 +784,7 @@ static RangeNode *parseGenericMembers(RangeParser *parser)
     parserExpect(parser, "<");
     if (parserAt(parser, ">")) parserFail(parser, &parser->current, "generic members cannot be empty");
     while (!parser->failed && !parserAt(parser, ">")) {
-        RangeNode *member = parserNode(parser, RangeNodeMember);
+        RangeNode *member = parserNode(parser, RangeNodeLet);
         int value = parserAt(parser, "let");
         if (value) parserAdvance(parser);
         member->name = parserExpectName(parser);
@@ -888,21 +893,19 @@ static void parseConstructBody(RangeParser *parser, RangeNode *node, const char 
                             parseConstruct(parser, memberAttributes));
             continue;
         }
-        RangeNode *member = parserNode(parser, RangeNodeMember);
-        member->c = memberAttributes;
-        if (attributesContain(memberAttributes, "many")) member->flags |= RangeFlagMany;
-        if (parserAt(parser, "state")) member->flags |= RangeFlagMutable;
-        else if (parserAt(parser, "derived")) member->flags |= RangeFlagDerived;
-        else if (parserAt(parser, "binding")) member->flags |= RangeFlagBinding;
-        else if (!parserAt(parser, "let")) {
+        RangeNodeKind kind;
+        if (!valueDeclarationKind(parser, &kind)) {
             parserFail(parser, &parser->current,
                        "expected a member declaration in construct %s, found '%.*s'",
                        owner, (int)parser->current.length, parser->current.text);
             break;
         }
+        RangeNode *member = parserNode(parser, kind);
+        member->c = memberAttributes;
+        if (attributesContain(memberAttributes, "many")) member->flags |= RangeFlagMany;
         parserAdvance(parser);
         member->name = parserExpectName(parser);
-        if (!parserAt(parser, ":") && !(member->flags & (RangeFlagMutable|RangeFlagDerived|RangeFlagBinding))) {
+        if (!parserAt(parser, ":") && kind == RangeNodeLet) {
             rangeNodeAppend(parser->arena, node, member);
             continue;
         }
@@ -924,17 +927,14 @@ static void parseConstructBody(RangeParser *parser, RangeNode *node, const char 
             rangeNodeAppend(parser->arena, node, member);
             continue;
         }
-        if ((member->flags & RangeFlagDerived) && parserAt(parser, "{")) {
-            member->a = parseBlock(parser);
-        } else if (parserAt(parser, "{")) {
+        if (parserAt(parser, "{")) {
             member->a = parseBlock(parser);
         } else if (parserAt(parser, "(")) {
             member->flags |= RangeFlagApplication;
             parseArgumentList(parser, member);
         }
         member->rhsEnd = parser->previousEnd;
-        if (member->typeName && !member->a && !member->itemCount
-            && !(member->flags & ~RangeFlagMutable)) {
+        if (member->typeName && !member->a && !member->itemCount && !member->flags) {
             member->rhsReference = rangeNodeCreate(parser->arena, RangeNodeName,
                 parser->path, rhsToken.line, rhsToken.column);
             member->rhsReference->name = member->typeName;

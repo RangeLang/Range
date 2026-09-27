@@ -18,7 +18,7 @@ structure="$("$compiler" --tree "${language_sources[@]}")"
 
 (cd "$REPO_ROOT" && "$compiler" --tree Language/Types/Int.range) > "$work_root/int-tree"
 grep -q 'construct name=Int ' "$work_root/int-tree" || fail "Int construct is missing"
-grep -q 'member name=value ' "$work_root/int-tree" || fail "Int payload member is missing"
+grep -q 'let name=value ' "$work_root/int-tree" || fail "Int payload member is missing"
 grep -q 'attribute name=integer' "$work_root/int-tree" || fail "Int integer macro application is missing"
 
 "$compiler" --tree "$REPO_ROOT/Testing/Compiler/Graph/Graph.range" > "$work_root/graph-tree"
@@ -34,9 +34,9 @@ grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "diagnostic lacks a source
 # Type parameters are bare names; value generics keep explicit let.
 printf 'construct Pair<First, let size: 2, Second> { let first: First }\n' > "$probe"
 "$compiler" --tree "$probe" > "$work_root/generic-tree"
-grep -Eq '^ +member name=First$' "$work_root/generic-tree" || fail "type parameter is missing"
-grep -Eq '^ +member name=size rhs=' "$work_root/generic-tree" || fail "value generic beside type parameter is missing"
-grep -Eq '^ +member name=Second$' "$work_root/generic-tree" || fail "trailing type parameter is missing"
+grep -Eq '^ +let name=First$' "$work_root/generic-tree" || fail "type parameter is missing"
+grep -Eq '^ +let name=size rhs=' "$work_root/generic-tree" || fail "value generic beside type parameter is missing"
+grep -Eq '^ +let name=Second$' "$work_root/generic-tree" || fail "trailing type parameter is missing"
 printf 'construct Broken<T: Int> {}\n' > "$probe"
 if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
     fail "value generic without let was accepted"

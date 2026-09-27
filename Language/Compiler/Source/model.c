@@ -84,12 +84,19 @@ void rangeNodeAppend(RangeArena *arena, RangeNode *node, RangeNode *item)
 
 static const char *const RANGE_NODE_NAMES[RangeNodeKindCount] = {
     "unit", "construct", "enum", "enumCase", "function", "macro", "main",
-    "member", "parameter", "attribute", "block", "local", "assign", "if",
+    "let", "state", "derived", "binding", "parameter", "attribute", "block", "assign", "if",
     "while", "return", "expressionStatement", "call", "argument",
     "memberAccess", "name", "integer", "bool", "string", "stringPart",
     "case", "unary", "binary", "manyLiteral", "environment", "syntaxTemplate",
     "closure", "emission", "switch", "switchCase", "extension", "type"
 };
+
+/* let, state, derived, and binding: each names a value in its scope. */
+int rangeNodeDeclaresValue(RangeNodeKind kind)
+{
+    return kind == RangeNodeLet || kind == RangeNodeState
+        || kind == RangeNodeDerived || kind == RangeNodeBinding;
+}
 
 const char *rangeNodeKindName(RangeNodeKind kind)
 {
@@ -168,7 +175,7 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
     if (!strcmp(name,"target") && node->kind == RangeNodeMacro)
         return node->b ? (RangeGraphValue){.kind=RangeGraphNode,
             .node=node->b->resolvedDeclaration ? node->b->resolvedDeclaration : node->b} : none;
-    if (!strcmp(name,"value") && (node->kind == RangeNodeLocal || node->kind == RangeNodeMember)) {
+    if (!strcmp(name,"value") && rangeNodeDeclaresValue(node->kind)) {
         RangeNode *rhs = rangeNodeRHS(node);
         if (!rhs && node->source && node->rhsEnd > node->rhsStart)
             return (RangeGraphValue){.kind=RangeGraphText,
@@ -186,7 +193,7 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
     else if (!strcmp(name,"members") && node->kind == RangeNodeBlock) {
         RangeNode result = {0};
         for (size_t i = 0; i < node->itemCount; ++i)
-            if (node->items[i]->kind == RangeNodeLocal) rangeNodeAppend(arena,&result,node->items[i]);
+            if (rangeNodeDeclaresValue(node->items[i]->kind)) rangeNodeAppend(arena,&result,node->items[i]);
         return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
     } else if (!strcmp(name,"graph") && node->kind == RangeNodeBlock) {
         RangeNode result = {0};
@@ -237,7 +244,7 @@ void rangeGraphInitTypes(RangeArena *arena)
             type->name=fields[i].type;
             rangeNodeAppend(arena,arena->graphTypes,type);
         }
-        RangeNode *field=rangeNodeCreate(arena,RangeNodeMember,"<compiler>",1,1);
+        RangeNode *field=rangeNodeCreate(arena,RangeNodeLet,"<compiler>",1,1);
         field->name=fields[i].field; field->flags=fields[i].flags;
         rangeNodeAppend(arena,type,field);
     }

@@ -15,11 +15,14 @@ typedef enum {
     RangeNodeFunction,
     RangeNodeMacro,
     RangeNodeMain,
-    RangeNodeMember,
+    /* One node kind per grammar member kind, in constructs and in blocks. */
+    RangeNodeLet,
+    RangeNodeState,
+    RangeNodeDerived,
+    RangeNodeBinding,
     RangeNodeParameter,
     RangeNodeAttribute,
     RangeNodeBlock,
-    RangeNodeLocal,
     RangeNodeAssign,
     RangeNodeIf,
     RangeNodeWhile,
@@ -50,9 +53,7 @@ typedef enum {
 
 enum {
     RangeFlagMany     = 1 << 0,
-    RangeFlagMutable  = 1 << 1,  /* state */
-    RangeFlagDerived  = 1 << 2,
-    RangeFlagBinding  = 1 << 3,
+    RangeFlagBinding  = 1 << 3,  /* binding input parameter */
     RangeFlagExtern   = 1 << 4,
     RangeFlagBuiltin  = 1 << 5,
     RangeFlagOptional = 1 << 6,
@@ -140,6 +141,7 @@ RangeNode *rangeNodeCreate(RangeArena *arena, RangeNodeKind kind,
                            const char *path, int line, int column);
 void rangeNodeAppend(RangeArena *arena, RangeNode *node, RangeNode *item);
 const char *rangeNodeKindName(RangeNodeKind kind);
+int rangeNodeDeclaresValue(RangeNodeKind kind);
 int rangeNodeHasContextReference(const RangeNode *node);
 RangeNode *rangeGraphType(const RangeArena *arena, const char *name);
 void rangeGraphInitTypes(RangeArena *arena);

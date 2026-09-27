@@ -61,12 +61,10 @@ static RangeGraphValue graphProperty(Resolver *vm, RangeMacroApplication *app,
     RangeNode *field = rangeGraphField(node->graphType,name);
     if (!field) fail(vm,at,"field '%s' is not declared by @type %s",name,
         node->graphType ? node->graphType->name : rangeNodeKindName(node->kind));
-    if (same(name,"value") && (node->kind == RangeNodeMember || node->kind == RangeNodeLocal)) {
-        if (node->kind == RangeNodeLocal) {
-            for (size_t i = 0; i < app->count; ++i)
-                if (app->bindings[i].definition == node) return graphBinding(vm,app,&app->bindings[i]);
-        }
-    }
+    // A macro's own locals read their bound value; other declarations their RHS.
+    if (same(name,"value") && rangeNodeDeclaresValue(node->kind))
+        for (size_t i = 0; i < app->count; ++i)
+            if (app->bindings[i].definition == node) return graphBinding(vm,app,&app->bindings[i]);
     RangeGraphValue value = rangeGraphStoredField(vm->arena,node,name);
     if (!(field->flags & RangeFlagMany) && value.kind == RangeGraphNodes)
         return graphNode(value.count ? value.nodes[0] : NULL);
@@ -171,7 +169,7 @@ static void resolveGraphTarget(Resolver *vm, RangeNode *target)
             app->bindings = rangeArenaAllocate(vm->arena,macro->a->itemCount * sizeof(*app->bindings));
             for (size_t i = 0; i < macro->a->itemCount; ++i) {
                 RangeNode *member = macro->a->items[i];
-                if (member->kind != RangeNodeLocal) continue;
+                if (!rangeNodeDeclaresValue(member->kind)) continue;
                 for (size_t j = 0; j < app->count; ++j)
                     if (same(app->bindings[j].definition->name,member->name))
                         fail(vm,member,"duplicate graph member '%s'",member->name);
@@ -193,15 +191,6 @@ static size_t graphValueCount(RangeGraphValue value)
     return value.kind == RangeGraphNone ? 0 : value.kind == RangeGraphNodes ? value.count : 1;
 }
 
-/* Member kinds are distinct shapes; the parser records which keyword declared it. */
-static const char *memberKind(const RangeNode *node)
-{
-    if (node->flags & RangeFlagMutable) return "State";
-    if (node->flags & RangeFlagDerived) return "Derived";
-    if (node->flags & RangeFlagBinding) return "Binding";
-    return "Let";
-}
-
 static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source)
 {
     if (!node) return;
@@ -213,7 +202,8 @@ static void validateGraphShape(Resolver *vm, RangeNode *node, const char *source
         : node->kind == RangeNodeEnumCase ? "EnumCase"
         : node->kind == RangeNodeFunction ? "Function"
         : node->kind == RangeNodeReturn ? "Return"
-        : (node->kind == RangeNodeLocal || node->kind == RangeNodeMember) ? memberKind(node) : NULL;
+        : node->kind == RangeNodeLet ? "Let" : node->kind == RangeNodeState ? "State"
+        : node->kind == RangeNodeDerived ? "Derived" : node->kind == RangeNodeBinding ? "Binding" : NULL;
     if (type) {
         node->graphType = rangeGraphType(vm->arena,type);
         if (!node->graphType) fail(vm,node,"missing @type %s",type);
@@ -427,7 +417,7 @@ static void registerGrammarDefinitions(Resolver *vm)
             fail(vm,definition,"ambiguous language grammar construct '%s'",definition->name);
         for (size_t j = 0; j < definition->itemCount; ++j) {
             RangeNode *field = definition->items[j];
-            if (field->kind != RangeNodeMember || !rangeGraphField(shape,field->name))
+            if (!rangeNodeDeclaresValue(field->kind) || !rangeGraphField(shape,field->name))
                 fail(vm,field,"no C field adapter for %s.%s",definition->name,field->name ? field->name : "<unnamed>");
             for (size_t k = 0; k < j; ++k)
                 if (same(definition->items[k]->name,field->name))
@@ -614,7 +604,7 @@ static void metaBind(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeGra
     for (MetaLocal *local = scope->locals; local; local = local->next)
         if (same(local->name,node->name)) fail(eval->vm,node,"duplicate compile-time local '%s'",node->name);
     MetaLocal *local = rangeArenaAllocate(eval->vm->arena,sizeof(*local));
-    *local = (MetaLocal){.name=node->name,.value=value,.mutable=(node->flags & RangeFlagMutable)!=0,.next=scope->locals};
+    *local = (MetaLocal){.name=node->name,.value=value,.mutable=node->kind == RangeNodeState,.next=scope->locals};
     scope->locals = local;
 }
 
@@ -635,6 +625,14 @@ static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind k
 
 static RangeGraphValue metaExpression(MetaEval *, MetaScope *, RangeNode *);
 static int metaStatement(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue *);
+
+/* A macro's own top-level declarations are bound once per application. */
+static int macroLocal(const RangeMacroApplication *app, const RangeNode *node)
+{
+    for (size_t i = 0; app && i < app->count; ++i)
+        if (app->bindings[i].definition == node) return 1;
+    return 0;
+}
 
 /* A splice is a #name chain such as #element or #element.name; the whole
  * chain runs at macro time. */
@@ -670,13 +668,13 @@ static RangeNode *spliceNode(MetaEval *eval, RangeNode *at, RangeGraphValue valu
  * declaration RHS takes the type position, as the parser would place it. */
 static void spliceDeclarationType(RangeNode *copy, const RangeNode *original)
 {
-    if ((copy->kind != RangeNodeMember && copy->kind != RangeNodeLocal) || copy->typeName
+    if (!rangeNodeDeclaresValue(copy->kind) || copy->typeName
         || copy->itemCount != 1 || copy->items[0]->kind != RangeNodeArgument
         || !spliceChain(original->items[0]->a) || copy->items[0]->a->kind != RangeNodeName) return;
     RangeNode *reference = copy->items[0]->a;
     copy->typeName = reference->name;
     copy->itemCount = 0;
-    if (!(copy->flags & ~RangeFlagMutable)) copy->rhsReference = reference;
+    if (!copy->flags) copy->rhsReference = reference;
 }
 
 /* Copy one quoted declaration for this application, filling its splices.
@@ -779,7 +777,8 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         if (!scope->application) fail(eval->vm,node,"graph reflection requires a macro context");
         RangeGraphValue value = graphProperty(eval->vm,scope->application,receiver,node->name,node);
         if (same(node->name,"value") && receiver.kind == RangeGraphNode
-            && receiver.node->kind == RangeNodeMember && value.kind == RangeGraphNode) {
+            && rangeNodeDeclaresValue(receiver.node->kind) && value.kind == RangeGraphNode
+            && !macroLocal(scope->application,receiver.node)) {
             // A declaration initializer is evaluated outside the inspecting
             // macro's locals. Unsupported declaration-name lookup fails there.
             MetaScope initializer = {0};
@@ -871,8 +870,8 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
             if (metaStatement(eval,&block,node->items[i],returned)) return 1;
         return 0;
     }
-    case RangeNodeLocal: {
-        if (node->flags & ~(RangeFlagMutable|RangeFlagApplication))
+    case RangeNodeLet: case RangeNodeState: {
+        if (node->flags & ~RangeFlagApplication)
             fail(eval->vm,node,"unsupported compile-time local declaration");
         if ((node->flags & RangeFlagApplication) && node->typeName && !node->a) {
             // Declaration RHS applications use the parser's type-position storage.
@@ -1038,7 +1037,7 @@ static int sourceDeclaration(RangeNode *node)
 {
     return node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum
         || node->kind == RangeNodeFunction || node->kind == RangeNodeMacro
-        || node->kind == RangeNodeMember || node->kind == RangeNodeParameter || node->kind == RangeNodeLocal;
+        || rangeNodeDeclaresValue(node->kind) || node->kind == RangeNodeParameter;
 }
 
 static int sourceMatches(RangeNode *node, const char *name, int kind)
@@ -1127,7 +1126,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     case RangeNodeParameter:
         diagnoseType(report,scope,node->b);
         break;
-    case RangeNodeMember: case RangeNodeLocal: {
+    case RangeNodeLet: case RangeNodeState: case RangeNodeDerived: case RangeNodeBinding: {
         RangeNode *declaration = sourceReference(report,scope,node,node->typeName,
             node->flags & RangeFlagMacroType ? 1 : node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
         if (declaration && (node->flags & RangeFlagApplication)
@@ -1321,7 +1320,7 @@ static void diagnoseDuplicate(SourceReport *report, RangeNode *first, RangeNode 
 
 static int scopeDeclaration(const RangeNode *node)
 {
-    return node->kind == RangeNodeMember || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum;
+    return rangeNodeDeclaresValue(node->kind) || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum;
 }
 
 static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
