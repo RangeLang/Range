@@ -451,11 +451,19 @@ static void registerLiteralDefaults(Resolver *vm)
     }
 }
 
+/* A string literal's spelling is its quoted source text, interpolation included. */
+static const char *stringSpelling(Resolver *vm, const RangeNode *node)
+{
+    if (!node->source || node->spanEnd <= node->spanStart) return NULL;
+    return rangeArenaIntern(vm->arena,node->source + node->spanStart,node->spanEnd - node->spanStart);
+}
+
 static void resolveLiteralDefaults(Resolver *vm, RangeNode *node)
 {
     if (!node) return;
-    if (node->kind == RangeNodeInteger || node->kind == RangeNodeBool) {
-        const char *spelling = node->kind == RangeNodeBool ? (node->integer ? "true" : "false") : node->name;
+    if (node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString) {
+        const char *spelling = node->kind == RangeNodeBool ? (node->integer ? "true" : "false")
+            : node->kind == RangeNodeString ? stringSpelling(vm,node) : node->name;
         RangeNode *selected = NULL;
         for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
             RangeNode *macro = vm->units[u]->items[i];

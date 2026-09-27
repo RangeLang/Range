@@ -221,6 +221,9 @@ static RangeNode *parseString(RangeParser *parser)
     RangeNode *node = parserNode(parser, RangeNodeString);
     RangeToken token = parser->current;
     parserAdvance(parser);
+    /* The quoted source spelling selects the literal's Core construct. */
+    node->spanStart = token.offset;
+    node->spanEnd = token.offset + token.length;
 
     const char *source = parser->source;
     size_t cursor = token.bodyStart;

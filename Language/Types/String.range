@@ -1,0 +1,4 @@
+@string
+construct String {
+    let value: ""
+}
