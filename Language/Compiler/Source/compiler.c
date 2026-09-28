@@ -1131,7 +1131,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             (void)sourceReference(report,scope,node,node->typeName,2);
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
         if (macroBuiltin(node,"many"))
-            sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of copy-on-write slots, allocated through libSystem; blocks are never released or freed");
+            sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of copy-on-write slots, allocated through libSystem and freed when its last reference ends");
         else if (macroBuiltin(node,"optional"))
             sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the construct applying @optional in C");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
@@ -2391,6 +2391,13 @@ typedef struct { size_t at; RangeNode *function; RangeNode *self; } NativeCall;
 typedef struct { size_t at; uint32_t branch; const char *message; } NativeTrap;
 typedef struct { RangeNode *function, *self; size_t offset; int compiled; } NativeInstance;
 typedef struct { size_t at; const char *bytes; size_t length; } NativeText;
+/* A temporary that owns references until it is moved into place or its
+ * statement ends. */
+typedef struct { int32_t offset; RangeNode *type; int consumed; } NativeTemp;
+/* A release subroutine: for a value of `type` (x0 = its address), or for a
+ * block of `type` elements (x0 = the block, or zero). */
+typedef struct { RangeNode *type; int block; size_t offset; int compiled; } NativeHelper;
+typedef struct { size_t at; size_t helper; } NativeHelperCall;
 
 typedef struct {
     SourceReport *report;
@@ -2407,6 +2414,10 @@ typedef struct {
     NativeTrap *traps; size_t trapCount, trapCapacity;
     NativeInstance *instances; size_t instanceCount, instanceCapacity;
     NativeText *texts; size_t textCount, textCapacity;
+    NativeTemp *temps; size_t tempCount, tempCapacity;
+    long resultTemp; /* the temporary the last expression produced, or -1 */
+    NativeHelper *helpers; size_t helperCount, helperCapacity;
+    NativeHelperCall *helperCalls; size_t helperCallCount, helperCallCapacity;
 } Native;
 
 #define NATIVE_PUSH(array,count,capacity,value) do { \
@@ -2613,8 +2624,9 @@ static void nativeZero(Native *native, int base, size_t size)
 static RangeNode *nativeExpression(Native *, RangeNode *);
 static RangeNode *nativeAddress(Native *, RangeNode *, int *);
 static void nativeCopyValue(Native *, int, int, RangeNode *, int);
-static int nativePlace(const RangeNode *);
 static void nativeBranchHere(Native *, size_t, uint32_t);
+static void nativeTrackTemp(Native *, int32_t, RangeNode *);
+static int nativeTakeTemp(Native *);
 
 /* x0 holds a result of `type`; trap unless it fits the declared width. */
 static void nativeFits(Native *native, RangeNode *type, RangeNode *at, const char *operation)
@@ -2679,6 +2691,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
     RangeNode *declaration = type->resolvedDeclaration;
     if (kind == NativeScalar) {
         // A scalar's single input is the value itself.
+        native->resultTemp = -1;
         if (count) return nativeExpression(native,arguments[0]->a), type;
         for (size_t i = 0; i < declaration->itemCount; ++i)
             if (constructionInput(declaration->items[i]) && memberDefault(declaration->items[i])) {
@@ -2688,7 +2701,8 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         nativeEmit(native,armMovz(0,0,0));
         return type;
     }
-    if (!destination) destination = nativeReserve(native,type->size ? type->size : 1,type->alignment);
+    int temporary = !destination;
+    if (temporary) destination = nativeReserve(native,type->size ? type->size : 1,type->alignment);
     nativeFrameAddress(native,0,destination);
     nativeZero(native,0,type->size);
     for (size_t i = 0; i < declaration->itemCount; ++i) {
@@ -2707,12 +2721,85 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         if (!value) value = memberDefault(member);
         if (!value) continue; /* required inputs are enforced by the type checker */
         nativeExpression(native,value);
+        int moved = nativeTakeTemp(native);
         nativeFrameAddress(native,1,destination);
         if (memberKind == NativeScalar) nativeStoreScalar(native,0,1,offset,memberType);
-        else { nativeAddOffset(native,1,1,offset); nativeCopyValue(native,1,0,memberType,nativePlace(value)); }
+        else { nativeAddOffset(native,1,1,offset); nativeCopyValue(native,1,0,memberType,!moved); }
     }
+    if (temporary) nativeTrackTemp(native,destination,type);
+    else native->resultTemp = -1;
     nativeFrameAddress(native,0,destination);
     return type;
+}
+
+/* ---- ownership ----
+ * Values holding @many storage own references to their blocks. A local or
+ * parameter ends at the end of its block (a return ends every value in
+ * scope); a temporary ends with its statement unless it is moved into place;
+ * an overwritten value ends when its place is assigned. Ending releases each
+ * block through a subroutine per type; a block whose references reach zero
+ * releases its elements and is freed. */
+
+static int nativeSharesSlots(const RangeNode *);
+
+static size_t nativeHelper(Native *native, RangeNode *type, int block)
+{
+    for (size_t i = 0; i < native->helperCount; ++i)
+        if (native->helpers[i].type == type && native->helpers[i].block == block) return i;
+    NativeHelper helper = {.type=type,.block=block};
+    NATIVE_PUSH(native->helpers,native->helperCount,native->helperCapacity,helper);
+    return native->helperCount - 1;
+}
+
+static void nativeCallHelper(Native *native, RangeNode *type, int block)
+{
+    NativeHelperCall call = {.at=nativeEmit(native,armBl(0)),.helper=nativeHelper(native,type,block)};
+    NATIVE_PUSH(native->helperCalls,native->helperCallCount,native->helperCallCapacity,call);
+}
+
+/* Release the value of `type` at the address in x0. Clobbers caller-saved registers. */
+static void nativeRelease(Native *native, RangeNode *type)
+{
+    if (nativeSharesSlots(type)) nativeCallHelper(native,type,0);
+}
+
+static void nativeTrackTemp(Native *native, int32_t offset, RangeNode *type)
+{
+    native->resultTemp = -1;
+    if (!nativeSharesSlots(type)) return;
+    NativeTemp temp = {.offset=offset,.type=type};
+    NATIVE_PUSH(native->temps,native->tempCount,native->tempCapacity,temp);
+    native->resultTemp = (long)native->tempCount - 1;
+}
+
+/* The last expression's temporary moves into place: it no longer ends. */
+static int nativeTakeTemp(Native *native)
+{
+    if (native->resultTemp < 0) return 0;
+    native->temps[native->resultTemp].consumed = 1;
+    native->resultTemp = -1;
+    return 1;
+}
+
+static void nativeReleaseTemps(Native *native, size_t from)
+{
+    for (size_t i = native->tempCount; i-- > from;) {
+        if (native->temps[i].consumed) continue;
+        nativeFrameAddress(native,0,native->temps[i].offset);
+        nativeRelease(native,native->temps[i].type);
+    }
+    native->tempCount = from;
+    native->resultTemp = -1;
+}
+
+static void nativeReleaseSlots(Native *native, size_t from)
+{
+    for (size_t i = native->slotCount; i-- > from;) {
+        RangeNode *type = native->slots[i].type;
+        if (!type || type->scalarBits || !nativeSharesSlots(type)) continue;
+        nativeFrameAddress(native,0,native->slots[i].offset);
+        nativeRelease(native,type);
+    }
 }
 
 /* ---- @many storage ----
@@ -2806,12 +2893,6 @@ static void nativeCopyValue(Native *native, int destination, int source, RangeNo
     if (retain && nativeSharesSlots(type)) nativeRetain(native,destination,0,type);
 }
 
-/* An expression naming a place outlives the copy made from it. */
-static int nativePlace(const RangeNode *expr)
-{
-    return expr && (expr->kind == RangeNodeName || expr->kind == RangeNodeMemberAccess);
-}
-
 /* x1 = the block of the receiver at [sp + depth]; x2 = its slot count. */
 static void nativeLoadBlock(Native *native, NativeSlots *slots, uint32_t depth)
 {
@@ -2889,11 +2970,12 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
         nativeLoadBlock(native,&slots,0);
         nativeSlotAddress(native,&slots,call);
         nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
-        if (element->scalarBits) { nativeLoadScalar(native,0,0,0,element); return element; }
+        if (element->scalarBits) { nativeLoadScalar(native,0,0,0,element); native->resultTemp = -1; return element; }
         // The element stays in the block, so the copy holds its own references.
         int32_t copy = nativeReserve(native,size ? size : 1,element->alignment);
         nativeFrameAddress(native,1,copy);
         nativeCopyValue(native,1,0,element,1);
+        nativeTrackTemp(native,copy,element);
         nativeFrameAddress(native,0,copy);
         return element;
     }
@@ -2905,6 +2987,7 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
         }
         // Evaluate first: a copy made while evaluating must not see the write.
         if (!at || !value || !nativeExpression(native,value)) return NULL;
+        int moved = nativeTakeTemp(native);
         nativeEmit(native,armPush(0));
         if (!nativeExpression(native,at)) return NULL;
         nativeEmit(native,armPush(0));
@@ -2914,8 +2997,18 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
         nativeSlotAddress(native,&slots,call);
         nativeEmit(native,armPop(1));           /* the value */
         nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
-        if (element->scalarBits) nativeStoreScalar(native,1,0,0,element);
-        else nativeCopyValue(native,0,1,element,nativePlace(value));
+        native->resultTemp = -1;
+        if (element->scalarBits) { nativeStoreScalar(native,1,0,0,element); return NULL; }
+        if (!nativeSharesSlots(element)) { nativeCopy(native,0,1,size); return NULL; }
+        // Retain the new element first, then release the one it replaces.
+        nativeEmit(native,armPush(0));          /* slot: [sp + 16] */
+        nativeEmit(native,armPush(1));          /* value: [sp] */
+        if (!moved) { nativeEmit(native,armLdr(1,31,0)); nativeRetain(native,1,0,element); }
+        nativeEmit(native,armLdr(0,31,16));
+        nativeRelease(native,element);
+        nativeEmit(native,armPop(1));
+        nativeEmit(native,armPop(0));
+        nativeCopy(native,0,1,size);
         return NULL;
     }
     // resize(to: n): count checks, a block of its own, then realloc(block, 16 + n * size).
@@ -2927,6 +3020,27 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
     nativeTrap(native,armCbnz(5,0),call,"resize exceeds addressable memory");
     nativeEmit(native,armPush(0));           /* n */
     nativeUnique(native,&slots,16,call);
+    if (nativeSharesSlots(element)) {
+        // Elements past the new count end: release slots n ..< old count.
+        nativeEmit(native,armLdr(0,31,0));
+        nativeEmit(native,armPush(0));       /* index, from n: [sp]; n: [sp + 16] */
+        size_t top = native->machine.size;
+        nativeEmit(native,armLdr(3,31,0));
+        nativeLoadBlock(native,&slots,32);   /* receiver below index and n */
+        nativeEmit(native,armCmp(3,2));
+        size_t done = nativeEmit(native,armBcond(RangeHS,0));
+        nativeConstant(native,4,size);
+        nativeEmit(native,armMul(4,3,4));
+        nativeEmit(native,armAddImm(0,1,16));
+        nativeEmit(native,armAdd(0,0,4));
+        nativeRelease(native,element);
+        nativeEmit(native,armLdr(3,31,0));
+        nativeEmit(native,armAddImm(3,3,1));
+        nativeEmit(native,armStr(3,31,0));
+        nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
+        nativeBranchHere(native,done,armBcond(RangeHS,0));
+        nativeEmit(native,armAddImm(31,31,16));
+    }
     nativeEmit(native,armPop(0));
     nativeConstant(native,4,size);
     nativeEmit(native,armMul(5,0,4));        /* x5 = n * size */
@@ -2960,7 +3074,83 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
     rangeCallImport(&native->machine,"_memset");
     rangePatch(&native->machine,skip,armBcond(RangeLS,(int32_t)((native->machine.size - skip) / 4)));
     nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
+    native->resultTemp = -1;
     return NULL;
+}
+
+static RangeNode *nativeElementOf(Native *native, RangeNode *type, RangeNode *member)
+{
+    SourceScope scope = {.owner=type->resolvedDeclaration};
+    return resolveTypeReference(native->typer,&scope,member->typeName,member->generics,member->flags & ~RangeFlagMany,type,member);
+}
+
+/* Emit one release subroutine. */
+static void nativeHelperBody(Native *native, size_t index)
+{
+    NativeHelper helper = native->helpers[index];
+    native->helpers[index].offset = native->machine.size;
+    native->helpers[index].compiled = 1;
+    RangeNode *type = helper.type;
+    nativeEmit(native,armPushFrame());
+    nativeEmit(native,armAddImm(29,31,0));
+    if (!helper.block) {
+        // A value: release each block it holds, directly or in members.
+        nativeEmit(native,armPush(0));
+        RangeNode *declaration = type->resolvedDeclaration;
+        for (size_t i = 0; i < declaration->itemCount; ++i) {
+            if (!type->memberOffsets || type->memberOffsets[i] == SIZE_MAX) continue;
+            RangeNode *member = declaration->items[i];
+            if (member->flags & RangeFlagMany) {
+                RangeNode *element = nativeElementOf(native,type,member);
+                if (!element || nativeKind(native,element,member) == NativeNone) continue;
+                nativeEmit(native,armLdr(0,31,0));
+                nativeAddOffset(native,0,0,type->memberOffsets[i]);
+                nativeEmit(native,armLdr(0,0,0));
+                nativeCallHelper(native,element,1);
+            } else if (nativeSharesSlots(type->memberTypes[i])) {
+                nativeEmit(native,armLdr(0,31,0));
+                nativeAddOffset(native,0,0,type->memberOffsets[i]);
+                nativeCallHelper(native,type->memberTypes[i],0);
+            }
+        }
+    } else {
+        // A block: drop one reference; at zero release its elements and free it.
+        size_t empty = nativeEmit(native,armCbz(0,0));
+        nativeEmit(native,armLdr(1,0,0));
+        nativeEmit(native,armSubImm(1,1,1));
+        nativeEmit(native,armStr(1,0,0));
+        size_t shared = nativeEmit(native,armCbnz(1,0));
+        if (nativeSharesSlots(type)) {
+            nativeEmit(native,armPush(0));            /* block: [sp + 32] */
+            nativeEmit(native,armLdr(1,0,8));
+            nativeEmit(native,armPush(1));            /* count: [sp + 16] */
+            nativeEmit(native,armMovz(1,0,0));
+            nativeEmit(native,armPush(1));            /* index: [sp] */
+            size_t top = native->machine.size;
+            nativeEmit(native,armLdr(1,31,0));
+            nativeEmit(native,armLdr(2,31,16));
+            nativeEmit(native,armCmp(1,2));
+            size_t done = nativeEmit(native,armBcond(RangeHS,0));
+            nativeEmit(native,armLdr(0,31,32));
+            nativeConstant(native,3,type->size);
+            nativeEmit(native,armMul(1,1,3));
+            nativeEmit(native,armAdd(0,0,1));
+            nativeEmit(native,armAddImm(0,0,16));
+            nativeCallHelper(native,type,0);
+            nativeEmit(native,armLdr(1,31,0));
+            nativeEmit(native,armAddImm(1,1,1));
+            nativeEmit(native,armStr(1,31,0));
+            nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
+            nativeBranchHere(native,done,armBcond(RangeHS,0));
+            nativeEmit(native,armLdr(0,31,32));
+        }
+        rangeCallImport(&native->machine,"_free");
+        nativeBranchHere(native,empty,armCbz(0,0));
+        nativeBranchHere(native,shared,armCbnz(1,0));
+    }
+    nativeEmit(native,armAddImm(31,29,0));
+    nativeEmit(native,armPopFrame());
+    nativeEmit(native,armRet());
 }
 
 static NativeInstance *nativeInstance(Native *native, RangeNode *function, RangeNode *self)
@@ -3016,7 +3206,8 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     NativeCall site = {.at=nativeEmit(native,armBl(0)),.function=target,.self=self};
     NATIVE_PUSH(native->calls,native->callCount,native->callCapacity,site);
     nativeInstance(native,target,self);
-    if (result) nativeFrameAddress(native,0,result);
+    native->resultTemp = -1;
+    if (result) { nativeTrackTemp(native,result,output); nativeFrameAddress(native,0,result); }
     return output;
 }
 
@@ -3079,7 +3270,18 @@ static RangeNode *nativeLoadPlace(Native *native, RangeNode *type, int frameSlot
     return kind == NativeNone ? NULL : type;
 }
 
+static RangeNode *nativeExpressionValue(Native *, RangeNode *);
+
+/* Only a call, construction, or slot read produces a temporary; any other
+ * expression reports none, whatever its operands left behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
+{
+    RangeNode *type = nativeExpressionValue(native,expr);
+    if (!expr || expr->kind != RangeNodeCall) native->resultTemp = -1;
+    return type;
+}
+
+static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
 {
     if (!expr) return NULL;
     RangeNode *type = nativeType(native,expr->type);
@@ -3171,9 +3373,15 @@ static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 
 static void nativeStatement(Native *, RangeNode *);
 
+static void nativeReleaseSlots(Native *, size_t);
+
+/* A block's locals end with it. */
 static void nativeBlock(Native *native, RangeNode *block)
 {
+    size_t scope = native->slotCount;
     for (size_t i = 0; block && i < block->itemCount; ++i) nativeStatement(native,block->items[i]);
+    nativeReleaseSlots(native,scope);
+    native->slotCount = scope;
 }
 
 static void nativeBranchHere(Native *native, size_t at, uint32_t base)
@@ -3193,7 +3401,28 @@ static void nativeStorePlace(Native *native, RangeNode *type, int frameSlot, int
     } else nativeCopyValue(native,1,0,type,retain);
 }
 
+static void nativeStatementBody(Native *, RangeNode *);
+
+/* Temporaries a statement creates end with it, unless moved into place. */
 static void nativeStatement(Native *native, RangeNode *node)
+{
+    size_t temps = native->tempCount;
+    nativeStatementBody(native,node);
+    nativeReleaseTemps(native,temps);
+}
+
+/* A condition's temporaries end before its branch; x0 keeps the result. */
+static void nativeCondition(Native *native, RangeNode *condition)
+{
+    size_t temps = native->tempCount;
+    nativeExpression(native,condition);
+    if (native->tempCount == temps) return;
+    nativeEmit(native,armPush(0));
+    nativeReleaseTemps(native,temps);
+    nativeEmit(native,armPop(0));
+}
+
+static void nativeStatementBody(Native *native, RangeNode *node)
 {
     if (!node) return;
     switch (node->kind) {
@@ -3225,8 +3454,9 @@ static void nativeStatement(Native *native, RangeNode *node)
         int32_t offset = nativeNewSlot(native,node,type,kind);
         if (value) {
             if (!nativeExpression(native,value)) break;
+            int moved = nativeTakeTemp(native);
             nativeFrameAddress(native,1,offset);
-            nativeCopyValue(native,1,0,type,nativePlace(value));
+            nativeCopyValue(native,1,0,type,!moved);
         } else {
             nativeFrameAddress(native,0,offset);
             nativeZero(native,0,type->size);
@@ -3236,16 +3466,29 @@ static void nativeStatement(Native *native, RangeNode *node)
     case RangeNodeAssign: {
         RangeNode *type = nativeExpression(native,node->b);
         if (!type) break;
+        int moved = nativeTakeTemp(native);
         nativeEmit(native,armPush(0));
         int frameSlot = 0;
         RangeNode *placed = nativeAddress(native,node->a,&frameSlot);
+        if (!placed || nativeKind(native,placed,node) == NativeNone) { nativeEmit(native,armAddImm(31,31,16)); break; }
+        if (!placed->scalarBits && nativeSharesSlots(placed)) {
+            // Retain the new value first, then release the one it replaces.
+            nativeEmit(native,armPush(0));          /* place: [sp]; value: [sp + 16] */
+            if (!moved) { nativeEmit(native,armLdr(1,31,16)); nativeRetain(native,1,0,placed); }
+            nativeEmit(native,armLdr(0,31,0));
+            nativeRelease(native,placed);
+            nativeEmit(native,armPop(1));
+            nativeEmit(native,armPop(0));
+            nativeCopy(native,1,0,placed->size);
+            break;
+        }
         nativeEmit(native,armMov(1,0));
         nativeEmit(native,armPop(0));
-        if (placed && nativeKind(native,placed,node) != NativeNone) nativeStorePlace(native,placed,frameSlot,nativePlace(node->b));
+        nativeStorePlace(native,placed,frameSlot,!moved);
         break;
     }
     case RangeNodeIf: {
-        nativeExpression(native,node->a);
+        nativeCondition(native,node->a);
         size_t otherwise = nativeEmit(native,armCbz(0,0));
         nativeStatement(native,node->b);
         if (node->c) {
@@ -3258,7 +3501,7 @@ static void nativeStatement(Native *native, RangeNode *node)
     }
     case RangeNodeWhile: {
         size_t top = native->machine.size;
-        nativeExpression(native,node->a);
+        nativeCondition(native,node->a);
         size_t exit = nativeEmit(native,armCbz(0,0));
         nativeStatement(native,node->b);
         nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
@@ -3266,18 +3509,19 @@ static void nativeStatement(Native *native, RangeNode *node)
         break;
     }
     case RangeNodeReturn: {
+        // The result moves or is retained into place; then every value in scope ends.
         if (node->a) {
             RangeNode *type = nativeExpression(native,node->a);
             if (type && !type->scalarBits && native->resultSlot) {
-                // A returned local or parameter ends here and moves out; a
-                // member of the receiver stays, so the result holds its own references.
-                RangeNode *root = node->a;
-                while (root->kind == RangeNodeMemberAccess) root = root->a;
-                int retain = root->kind == RangeNodeName && !nativeSlotOf(native,root->resolvedDeclaration);
+                int moved = nativeTakeTemp(native);
                 nativeLoad(native,1,native->resultSlot);
-                nativeCopyValue(native,1,0,type,retain && nativePlace(node->a));
+                nativeCopyValue(native,1,0,type,!moved);
             }
         }
+        nativeEmit(native,armPush(0));
+        nativeReleaseTemps(native,0);
+        nativeReleaseSlots(native,0);
+        nativeEmit(native,armPop(0));
         size_t at = nativeEmit(native,armB(0));
         NATIVE_PUSH(native->returns,native->returnCount,native->returnCapacity,at);
         break;
@@ -3306,6 +3550,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     native->self = instance->self;
     native->owner = instance->self ? instance->self->resolvedDeclaration : NULL;
     native->slotCount = 0; native->returnCount = 0; native->frame = 0;
+    native->tempCount = 0; native->resultTemp = -1;
     native->selfSlot = 0; native->resultSlot = 0;
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0)); /* mov x29, sp */
@@ -3330,6 +3575,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
         }
     }
     nativeBlock(native,body);
+    nativeReleaseSlots(native,0); /* parameters */
     nativeEmit(native,armMovz(0,0,0));
     for (size_t i = 0; i < native->returnCount; ++i) nativeBranchHere(native,native->returns[i],armB(0));
     nativeEmit(native,armAddImm(31,29,0)); /* mov sp, x29 */
@@ -3426,6 +3672,12 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     // Compiling may reach new instances; the entry block stays first.
     for (size_t i = 0; i < native.instanceCount; ++i)
         if (!native.instances[i].compiled) nativeFunction(&native,&native.instances[i]);
+    // Release subroutines, which may reach further subroutines.
+    for (size_t i = 0; i < native.helperCount; ++i) nativeHelperBody(&native,i);
+    for (size_t i = 0; i < native.helperCallCount; ++i) {
+        NativeHelper *helper = &native.helpers[native.helperCalls[i].helper];
+        rangePatch(&native.machine,native.helperCalls[i].at,armBl((int32_t)(((int64_t)helper->offset - (int64_t)native.helperCalls[i].at) / 4)));
+    }
     for (size_t i = 0; i < native.callCount; ++i) {
         NativeInstance *instance = nativeInstance(&native,native.calls[i].function,native.calls[i].self);
         if (!instance->compiled) continue; /* reported where it was compiled */
@@ -3440,6 +3692,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     }
     rangeMachineFree(&native.machine);
     free(native.slots); free(native.returns); free(native.calls); free(native.traps); free(native.instances); free(native.texts);
+    free(native.temps); free(native.helpers); free(native.helperCalls);
     return written;
 }
 

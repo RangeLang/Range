@@ -1,0 +1,50 @@
+function filled(let n: Int): Array<Int> {
+    state xs: Array<Int>()
+    state i: 0
+    while i < n {
+        xs.append(value: i)
+        i: i + 1
+    }
+    return xs
+}
+
+function sum(let xs: Array<Int>): Int {
+    state total: 0
+    state i: 0
+    while i < xs.count {
+        total: total + xs.read(at: i)
+        i: i + 1
+    }
+    return total
+}
+
+function grid(let rows: Int): Array<Array<Int>> {
+    state g: Array<Array<Int>>()
+    state r: 0
+    while r < rows {
+        g.append(value: filled(n: r))
+        r: r + 1
+    }
+    return g
+}
+
+{
+    state round: 0
+    state checksum: 0
+    while round < 200 {
+        state a: filled(n: 50)
+        state b: a
+        b.append(value: 1)
+        a: b
+        state g: grid(rows: 6)
+        state h: g
+        state row: h.read(at: 5)
+        row.write(at: 0, value: 9)
+        h.write(at: 5, value: row)
+        g.resize(to: 2)          // storage shrinks; Array's own count does not
+        checksum: checksum + sum(xs: a) + sum(xs: filled(n: 3)) + g.count + grid(rows: 3).count
+        round: round + 1
+    }
+    if checksum != 200 * (1226 + 3 + 6 + 3) { return 1 }
+    return 42
+}
