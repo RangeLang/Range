@@ -86,6 +86,22 @@ static inline uint32_t armPop(int rt) { return 0xF84107E0u | (uint32_t)rt; }
 /* stur/ldur rt, [rn, #offset] for offsets in -256..255. */
 static inline uint32_t armStur(int rt, int rn, int32_t offset) { return 0xF8000000u | ((uint32_t)offset & 0x1FFu) << 12 | (uint32_t)rn << 5 | (uint32_t)rt; }
 static inline uint32_t armLdur(int rt, int rn, int32_t offset) { return 0xF8400000u | ((uint32_t)offset & 0x1FFu) << 12 | (uint32_t)rn << 5 | (uint32_t)rt; }
+/* Immediate offsets and frame math beyond 12 bits: add/sub rd, rn, #imm, lsl #12. */
+static inline uint32_t armAddImmHigh(int rd, int rn, uint32_t imm) { return 0x91400000u | imm << 10 | (uint32_t)rn << 5 | (uint32_t)rd; }
+static inline uint32_t armSubImmHigh(int rd, int rn, uint32_t imm) { return 0xD1400000u | imm << 10 | (uint32_t)rn << 5 | (uint32_t)rd; }
+/* Loads and stores of 1, 2, 4, or 8 bytes at [rn, #offset], offset scaled by size.
+ * Loads sign- or zero-extend into the full 64-bit register. */
+static inline uint32_t armLoadSized(size_t size, int isSigned, int rt, int rn, uint32_t offset)
+{
+    uint32_t op = size == 8 ? 0xF9400000u : size == 4 ? (isSigned ? 0xB9800000u : 0xB9400000u)
+        : size == 2 ? (isSigned ? 0x79800000u : 0x79400000u) : (isSigned ? 0x39800000u : 0x39400000u);
+    return op | (offset / (uint32_t)size) << 10 | (uint32_t)rn << 5 | (uint32_t)rt;
+}
+static inline uint32_t armStoreSized(size_t size, int rt, int rn, uint32_t offset)
+{
+    uint32_t op = size == 8 ? 0xF9000000u : size == 4 ? 0xB9000000u : size == 2 ? 0x79000000u : 0x39000000u;
+    return op | (offset / (uint32_t)size) << 10 | (uint32_t)rn << 5 | (uint32_t)rt;
+}
 static inline uint32_t armStr(int rt, int rn, uint32_t offset) { return 0xF9000000u | (offset / 8) << 10 | (uint32_t)rn << 5 | (uint32_t)rt; }
 static inline uint32_t armLdr(int rt, int rn, uint32_t offset) { return 0xF9400000u | (offset / 8) << 10 | (uint32_t)rn << 5 | (uint32_t)rt; }
 

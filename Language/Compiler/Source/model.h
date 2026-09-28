@@ -62,7 +62,9 @@ enum {
     RangeFlagLiteral  = 1 << 7,  /* string part is literal text */
     RangeFlagApplication = 1 << 8, /* explicit parentheses, including () */
     RangeFlagMacroType = 1 << 9,   /* @name type: declarations that applied the macro */
-    RangeFlagChecked = 1 << 10     /* specialization: its laws have run */
+    RangeFlagChecked = 1 << 10,    /* specialization: its laws have run */
+    RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
+    RangeFlagMutationKnown = 1 << 12
 };
 
 typedef struct RangeNode RangeNode;
@@ -115,6 +117,8 @@ struct RangeNode {
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
     int scalarBits, scalarSigned; /* from the builtin storage and signed members; 0 bits if not a scalar */
+    size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */
+    struct RangeNode **memberTypes; /* specialization: type per declaration item; NULL for @many storage */
     RangeMacroApplication *macroApplication; /* application-specific bindings */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */

@@ -29,6 +29,7 @@ run() {
 case_file() { printf '%s\n' "$2" > "$work_root/$1.range"; echo "$work_root/$1.range"; }
 
 run arithmetic 42 "" Testing/Compiler/Native/Arithmetic.range
+run aggregates 42 "" Testing/Compiler/Native/Aggregates.range
 run narrow-overflow 134 "result of '+' does not fit Int<bits: 8, signed: true>" "$(case_file narrow-overflow \
     'function step(let x: Int<bits: 8>): Int<bits: 8> { return x + 100 }
 { let r: step(x: 100) return 0 }')"
@@ -59,4 +60,4 @@ status=0
 [[ "$status" == 65 && ! -e "$work_root/literal-law" ]] || fail "literal law violation compiled"
 grep -q "does not satisfy @integer" "$work_root/log" || fail "literal law reported wrongly"
 
-echo "compiler native: programs=9 signatures=pass traps=pass literal-law=pass"
+echo "compiler native: programs=10 signatures=pass traps=pass literal-law=pass aggregates=pass"

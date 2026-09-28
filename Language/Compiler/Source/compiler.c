@@ -1150,9 +1150,8 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     case RangeNodeLet: case RangeNodeState: case RangeNodeDerived: case RangeNodeBinding: {
         RangeNode *declaration = sourceReference(report,scope,node,node->typeName,
             node->flags & RangeFlagMacroType ? 1 : node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
-        if (declaration && (node->flags & RangeFlagApplication)
-            && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
-            sourceDiagnostic(report,node,0,"not-implemented","value construction for '%s' is not implemented",node->typeName);
+        if (declaration && (node->flags & RangeFlagApplication) && declaration->kind == RangeNodeEnum)
+            sourceDiagnostic(report,node,0,"not-implemented","enum construction for '%s' is not implemented",node->typeName);
         break;
     }
     case RangeNodeName:
@@ -1170,8 +1169,8 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             else sourceDiagnostic(report,node,0,"not-implemented","compile-time method call resolution for '%s' is not implemented",node->a->name);
         } else if (node->a && node->a->kind == RangeNodeName) {
             RangeNode *declaration = sourceLookup(report,scope,node->a->name,0);
-            if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
-                sourceDiagnostic(report,node,0,"not-implemented","value construction for '%s' is not implemented",node->a->name);
+            if (declaration && declaration->kind == RangeNodeEnum)
+                sourceDiagnostic(report,node,0,"not-implemented","enum construction for '%s' is not implemented",node->a->name);
         }
         break;
     case RangeNodeAttribute: {
@@ -1727,6 +1726,7 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
         return node->b ? resolveTypeReference(typer,scope,node->b->name,node->b->generics,node->flags,context,node->b) : NULL;
     if (node->flags & RangeFlagMany) return NULL; /* @many storage is not a standalone value */
     if (node->a && node->a->kind == RangeNodeCall && node->typeName) return node->a->type; /* `let r: step(x: 1)` */
+    if (node->typeName && (node->flags & RangeFlagApplication) && node->type) return node->type; /* construction */
     // A bare name's resolved declaration decides its meaning: a value is
     // copied, a construct is a requirement.
     if (node->typeName && node->rhsReference && !node->generics) {
@@ -1737,8 +1737,10 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
         }
     }
     if (node->typeName) return resolveTypeReference(typer,scope,node->typeName,node->generics,node->flags,context,node);
+    // A literal member of the construct its literal selects (Int's `value: 0`)
+    // has that construct's own specialization.
     RangeNode *rhs = rangeNodeRHS(node);
-    return rhs ? typeOf(typer,scope,rhs,NULL,context) : NULL;
+    return rhs ? typeOf(typer,scope,rhs,context,context) : NULL;
 }
 
 static RangeNode *findMember(RangeNode *declaration, const char *name)
@@ -1803,6 +1805,66 @@ static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value
     return type;
 }
 
+/* Construction inputs: let and state members that are neither builtin nor
+ * @many storage, which starts empty. A member with a default is optional;
+ * one without is required. */
+static int constructionInput(const RangeNode *member)
+{
+    return (member->kind == RangeNodeLet || member->kind == RangeNodeState)
+        && !builtinMember(member) && !(member->flags & RangeFlagMany);
+}
+
+/* The member's default: an inferred RHS, or a construction RHS; a bare type
+ * reference is a requirement and supplies nothing. */
+static RangeNode *memberDefault(RangeNode *member)
+{
+    if (!member->typeName) return rangeNodeRHS(member);
+    if (member->flags & RangeFlagApplication) return member;
+    RangeNode *copied = member->rhsReference ? member->rhsReference->resolvedDeclaration : NULL;
+    return copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? member->rhsReference : NULL;
+}
+
+/* `Point(x: 1, y: 2)`: each argument names the member it populates, and is
+ * typed with that member's type in this specialization. */
+static RangeNode *typeConstruction(Typer *typer, SourceScope *scope, RangeNode *at, const char *name, RangeNode *generics,
+                                   int flags, RangeNode **arguments, size_t count, RangeNode *context)
+{
+    RangeNode *type = resolveTypeReference(typer,scope,name,generics,flags & ~RangeFlagApplication,context,at);
+    if (!type) return NULL;
+    if (type->kind == RangeNodeTypeParameter) { typeError(typer,at,"type parameter %s cannot be constructed",type->name); return NULL; }
+    RangeNode *declaration = type->resolvedDeclaration;
+    size_t inputs = 0;
+    RangeNode *only = NULL;
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (constructionInput(declaration->items[i])) { ++inputs; only = declaration->items[i]; }
+    SourceScope declarationScope = {.owner=declaration};
+    char typeName[160]; describeType(typeName,sizeof(typeName),type);
+    for (size_t i = 0; i < count; ++i) {
+        RangeNode *argument = arguments[i], *member = NULL;
+        if (!argument->name) {
+            if (inputs != 1 || count != 1) { typeError(typer,argument,"%s requires labeled arguments",typeName); continue; }
+            member = only;
+        } else for (size_t j = 0; j < declaration->itemCount; ++j)
+            if (constructionInput(declaration->items[j]) && same(declaration->items[j]->name,argument->name)) member = declaration->items[j];
+        if (!member) { typeError(typer,argument,"%s has no input '%s'",typeName,argument->name); continue; }
+        for (size_t j = 0; j < i; ++j)
+            if (arguments[j]->resolvedDeclaration == member) typeError(typer,argument,"'%s' is supplied twice",member->name);
+        argument->resolvedDeclaration = member;
+        RangeNode *expected = declaredType(typer,&declarationScope,member,type);
+        RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
+        char what[200]; snprintf(what,sizeof(what),"input '%s' of %s",member->name,typeName);
+        expectType(typer,argument->a,expected,actual,what);
+    }
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *member = declaration->items[i];
+        if (!constructionInput(member) || memberDefault(member)) continue;
+        int supplied = 0;
+        for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) supplied = 1;
+        if (!supplied) typeError(typer,at,"%s requires input '%s'",typeName,member->name);
+    }
+    return type;
+}
+
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *context)
 {
     RangeNode *callee = call->a, *function = NULL, *receiver = NULL;
@@ -1811,9 +1873,14 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         function = lookupFunction(typer->report,scope,callee->name);
         if (!function) {
             RangeNode *declaration = sourceLookup(typer->report,scope,callee->name,0);
-            if (declaration && declaration->kind != RangeNodeConstruct && declaration->kind != RangeNodeEnum)
+            if (!declaration) declaration = sourceLookup(typer->report,scope,callee->name,2);
+            if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeTypeParameter)) {
+                callee->resolvedDeclaration = declaration;
+                return typeConstruction(typer,scope,call,callee->name,callee->generics,callee->flags,call->items,call->itemCount,context);
+            }
+            if (declaration && declaration->kind != RangeNodeEnum)
                 typeError(typer,call,"'%s' is not a function",callee->name);
-            return NULL; /* construction and undeclared names are reported already */
+            return NULL; /* enum construction and undeclared names are reported already */
         }
         receiver = function->typeName ? context : NULL;
     } else if (callee->kind == RangeNodeMemberAccess) {
@@ -1942,7 +2009,10 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
     case RangeNodeLet: case RangeNodeState:
         if (node->typeName && (node->flags & RangeFlagApplication)) {
             // `let r: step(x: 1)` calls a function; a construct here is construction.
-            if (!lookupFunction(typer->report,scope,node->typeName)) break; /* construction is reported already */
+            if (!lookupFunction(typer->report,scope,node->typeName)) {
+                node->type = typeConstruction(typer,scope,node,node->typeName,node->generics,node->flags,node->items,node->itemCount,context);
+                break;
+            }
             RangeNode *callee = rangeNodeCreate(typer->report->arena,RangeNodeName,node->path,node->line,node->column);
             callee->name = node->typeName;
             RangeNode *call = rangeNodeCreate(typer->report->arena,RangeNodeCall,node->path,node->line,node->column);
@@ -1956,7 +2026,25 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         break;
     case RangeNodeAssign: {
         RangeNode *target = node->a;
-        if (!target || target->kind != RangeNodeName) { sourceDiagnostic(typer->report,node,0,"not-implemented","assignment to a member path is not implemented"); break; }
+        if (target && target->kind == RangeNodeMemberAccess) {
+            // `p.x: 5` changes a state member of a state value.
+            RangeNode *expected = typeOf(typer,scope,target,NULL,context);
+            RangeNode *member = target->resolvedDeclaration, *root = target;
+            while (root->kind == RangeNodeMemberAccess) {
+                if (root->resolvedDeclaration && root->resolvedDeclaration->kind != RangeNodeState)
+                    typeError(typer,node,"cannot assign through %s '%s'",rangeNodeKindName(root->resolvedDeclaration->kind),root->name);
+                root = root->a;
+            }
+            if (root->kind == RangeNodeName && root->resolvedDeclaration && root->resolvedDeclaration->kind != RangeNodeState)
+                typeError(typer,node,"cannot assign through %s '%s'",rangeNodeKindName(root->resolvedDeclaration->kind),root->name);
+            if (member) {
+                RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
+                char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",member->name);
+                expectType(typer,node->b,expected,actual,what);
+            }
+            break;
+        }
+        if (!target || target->kind != RangeNodeName) { sourceDiagnostic(typer->report,node,0,"not-implemented","assignment to this target is not implemented"); break; }
         RangeNode *declaration = sourceLookup(typer->report,scope,target->name,0);
         target->resolvedDeclaration = declaration;
         if (!declaration) break;
@@ -2014,7 +2102,14 @@ static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declarat
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
         if (rangeNodeDeclaresValue(item->kind)) {
-            if (item->typeName && (item->flags & RangeFlagApplication)) continue;
+            if (item->typeName && (item->flags & RangeFlagApplication)) {
+                // A member initialized by construction, e.g. `state from: Point(x: 0)`.
+                if (!lookupFunction(typer->report,&scope,item->typeName))
+                    item->type = typeConstruction(typer,&scope,item,item->typeName,item->generics,item->flags,
+                                                  item->items,item->itemCount,context);
+                else typeError(typer,item,"member '%s' cannot be initialized by calling '%s'",item->name,item->typeName);
+                continue;
+            }
             item->type = declaredType(typer,&scope,item,context);
         } else if (item->kind == RangeNodeFunction) typeFunction(typer,&scope,item,context);
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
@@ -2114,13 +2209,22 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
         if (declaration->generics) for (size_t i = 0; i < declaration->generics->itemCount; ++i)
             if (declaration->generics->items[i]->kind == RangeNodeTypeParameter) parametric = 1;
         SourceScope scope = {.owner=declaration};
+        RangeArena *arena = typer->report->arena;
+        size_t items = declaration->itemCount ? declaration->itemCount : 1;
+        specialization->memberOffsets = rangeArenaAllocate(arena,items * sizeof(size_t));
+        specialization->memberTypes = rangeArenaAllocate(arena,items * sizeof(RangeNode *));
+        for (size_t i = 0; i < declaration->itemCount; ++i) {
+            specialization->memberOffsets[i] = SIZE_MAX;
+            specialization->memberTypes[i] = NULL;
+        }
         for (size_t i = 0; i < declaration->itemCount; ++i) {
             RangeNode *member = declaration->items[i];
             if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
             size_t memberSize, memberAlignment;
+            RangeNode *type = NULL;
             if (member->flags & RangeFlagMany) { memberSize = 8; memberAlignment = 8; }
             else {
-                RangeNode *type = parametric ? declaredType(typer,&scope,member,specialization) : member->type;
+                type = parametric ? declaredType(typer,&scope,member,specialization) : member->type;
                 if (!type || type->kind != RangeNodeSpecialization || !layoutOf(typer,type,member)) {
                     known = 0;
                     specialization->integer = 1; /* the cause lies in a member's type, reported there */
@@ -2128,7 +2232,10 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
                 }
                 memberSize = type->size; memberAlignment = type->alignment;
             }
-            size = (size + memberAlignment - 1) / memberAlignment * memberAlignment + memberSize;
+            size = (size + memberAlignment - 1) / memberAlignment * memberAlignment;
+            specialization->memberOffsets[i] = size;
+            specialization->memberTypes[i] = type;
+            size += memberSize;
             if (memberAlignment > alignment) alignment = memberAlignment;
         }
         size = (size + alignment - 1) / alignment * alignment;
@@ -2138,6 +2245,71 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
     specialization->size = size;
     specialization->alignment = alignment;
     return 1;
+}
+
+/* ---- mutation -------------------------------------------------------------
+ * A method changes its receiver when it assigns one of its construct's members,
+ * calls a sibling that does, or calls the slot builtins resize and write. Such a
+ * method may only be called on a state value: `state` is what permits change. */
+
+static RangeNode *ownerOf(Typer *typer, const RangeNode *function)
+{
+    if (!function->typeName) return NULL;
+    RangeNode *owner = sourceLookup(typer->report,NULL,function->typeName,2);
+    return owner && owner->kind == RangeNodeConstruct ? owner : NULL;
+}
+
+static int memberOf(const RangeNode *owner, const RangeNode *node)
+{
+    for (size_t i = 0; owner && node && i < owner->itemCount; ++i) if (owner->items[i] == node) return 1;
+    return 0;
+}
+
+static int mutates(Typer *, RangeNode *);
+
+static int mutatesIn(Typer *typer, RangeNode *owner, RangeNode *node)
+{
+    if (!node) return 0;
+    if (node->kind == RangeNodeFunction || node->kind == RangeNodeConstruct) return 0;
+    if (node->kind == RangeNodeAssign) {
+        RangeNode *root = node->a;
+        while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+        if (root && root->kind == RangeNodeName && memberOf(owner,root->resolvedDeclaration)) return 1;
+    }
+    if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeName) {
+        RangeNode *callee = node->a->resolvedDeclaration;
+        if (callee && callee->kind == RangeNodeFunction && memberOf(owner,callee) && mutates(typer,callee)) return 1;
+    }
+    if (mutatesIn(typer,owner,node->a) || mutatesIn(typer,owner,node->b) || mutatesIn(typer,owner,node->c)) return 1;
+    for (size_t i = 0; i < node->itemCount; ++i) if (mutatesIn(typer,owner,node->items[i])) return 1;
+    return 0;
+}
+
+static int mutates(Typer *typer, RangeNode *function)
+{
+    if (function->flags & RangeFlagMutationKnown) return (function->flags & RangeFlagMutating) != 0;
+    function->flags |= RangeFlagMutationKnown; /* recursion assumes no change until shown */
+    int result = (function->flags & RangeFlagBuiltin) ? same(function->name,"resize") || same(function->name,"write")
+        : mutatesIn(typer,ownerOf(typer,function),function->a);
+    if (result) function->flags |= RangeFlagMutating;
+    return result;
+}
+
+static void checkMutations(Typer *typer, RangeNode *node)
+{
+    if (!node) return;
+    if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeMemberAccess) {
+        RangeNode *function = node->a->resolvedDeclaration;
+        if (function && function->kind == RangeNodeFunction && mutates(typer,function)) {
+            RangeNode *root = node->a->a;
+            while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+            RangeNode *declaration = root && root->kind == RangeNodeName ? root->resolvedDeclaration : NULL;
+            if (!declaration || declaration->kind != RangeNodeState)
+                typeError(typer,node,"'%s' changes its receiver, which must be declared with state",function->name);
+        }
+    }
+    checkMutations(typer,node->a); checkMutations(typer,node->b); checkMutations(typer,node->c);
+    for (size_t i = 0; i < node->itemCount; ++i) checkMutations(typer,node->items[i]);
 }
 
 /* The integer and boolean literal rules select the constructs operators
@@ -2152,67 +2324,86 @@ static RangeNode *literalFamily(Typer *typer, const char *spelling)
     return NULL;
 }
 
-static void typeCheck(SourceReport *report)
+/* Returns the typer, kept for code generation: generic methods are lowered per
+ * concrete specialization, which substitutes and lays out new types. */
+static Typer *typeCheck(SourceReport *report)
 {
     Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
     *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
         .error=rangeArenaAllocate(report->arena,512),.errorSize=512};
-    Typer typer = {.report=report,.vm=vm};
-    typer.specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
-    if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return; }
-    typer.integer = literalFamily(&typer,"0");
-    typer.boolean = literalFamily(&typer,"true");
-    if (typer.boolean) typer.booleanType = specialize(&typer,NULL,typer.boolean,NULL,NULL,typer.boolean);
+    Typer *typer = rangeArenaAllocate(report->arena,sizeof(*typer));
+    *typer = (Typer){.report=report,.vm=vm};
+    typer->specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
+    if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return typer; }
+    typer->integer = literalFamily(typer,"0");
+    typer->boolean = literalFamily(typer,"true");
+    if (typer->boolean) typer->booleanType = specialize(typer,NULL,typer->boolean,NULL,NULL,typer->boolean);
     // The entry block returns the default integer: the process exit status.
-    RangeNode *status = typer.integer ? specialize(&typer,NULL,typer.integer,NULL,NULL,typer.integer) : NULL;
+    RangeNode *status = typer->integer ? specialize(typer,NULL,typer->integer,NULL,NULL,typer->integer) : NULL;
     for (size_t u = 0; u < report->count; ++u) {
         SourceScope unit = {.owner=report->units[u]};
         for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
             RangeNode *item = report->units[u]->items[i];
-            if (item->kind == RangeNodeConstruct) typeConstruct(&typer,&unit,item);
-            else if (item->kind == RangeNodeFunction) typeFunction(&typer,&unit,item,NULL);
-            else if (item->kind == RangeNodeMain) { item->type = status; typeBlock(&typer,&unit,item->a,NULL,status); }
+            if (item->kind == RangeNodeConstruct) typeConstruct(typer,&unit,item);
+            else if (item->kind == RangeNodeFunction) typeFunction(typer,&unit,item,NULL);
+            else if (item->kind == RangeNodeMain) { item->type = status; typeBlock(typer,&unit,item->a,NULL,status); }
         }
     }
+    for (size_t u = 0; u < report->count; ++u) checkMutations(typer,report->units[u]);
     // Every type the program mentions gets a layout, or a reason it has none.
-    for (size_t i = 0; i < typer.specializations->itemCount; ++i) {
-        RangeNode *specialization = typer.specializations->items[i];
-        if (specialization->layout == 2 || layoutOf(&typer,specialization,specialization->resolvedDeclaration)
+    for (size_t i = 0; i < typer->specializations->itemCount; ++i) {
+        RangeNode *specialization = typer->specializations->items[i];
+        if (specialization->layout == 2 || layoutOf(typer,specialization,specialization->resolvedDeclaration)
             || specialization->integer) continue;
         char name[160]; describeType(name,sizeof(name),specialization);
         sourceDiagnostic(report,specialization->resolvedDeclaration,0,"layout","%s has no layout",name);
     }
+    return typer;
 }
 
 /* ---- native code -----------------------------------------------------------
- * Lowers typed Range to ARM64. Values of scalar types live in 64-bit registers,
- * sign- or zero-extended by the width their storage primitive declares; each
- * local and parameter has an 8-byte frame slot. Operators are C builtins: each
- * enforces its operand type's range (the @integer law) at runtime where the
- * compiler cannot prove it, writing a located message and exiting 134. Every
- * function is compiled, reached or not, so each missing mechanism is reported.
- * Forms not lowered yet are reported as not implemented. */
+ * Lowers typed Range to ARM64. A scalar (a type with a storage primitive) lives
+ * in a 64-bit register, sign- or zero-extended by the width its storage and
+ * signed primitives declare. Any other value lives in memory and expressions
+ * carry its address. Calling convention, internal to Range: a method receives
+ * its receiver's address in x0 and parameters after it; scalars pass by value,
+ * aggregates by address (the callee copies); an aggregate result is written to
+ * the address the caller passes in x8. Generic constructs' methods are compiled
+ * once per concrete specialization, with type parameters substituted.
+ *
+ * Operators are C builtins: each enforces its operand type's range (the
+ * @integer law) at runtime where the compiler cannot prove it, writing a
+ * located message and exiting 134. Every function is compiled, reached or not,
+ * so each missing mechanism is reported; forms not lowered yet are reported as
+ * not implemented. */
 
-typedef struct { RangeNode *declaration; int32_t offset; } NativeSlot;
-typedef struct { size_t at; RangeNode *function; } NativeCall;
+typedef struct { RangeNode *declaration; int32_t offset; RangeNode *type; } NativeSlot;
+typedef struct { size_t at; RangeNode *function; RangeNode *self; } NativeCall;
 typedef struct { size_t at; uint32_t branch; const char *message; } NativeTrap;
-typedef struct { size_t at; uint32_t branch; } NativeJump;
+typedef struct { RangeNode *function, *self; size_t offset; int compiled; } NativeInstance;
 
 typedef struct {
     SourceReport *report;
+    Typer *typer;
     RangeMachine machine;
     int failed;
+    /* The function being compiled. */
+    RangeNode *owner, *self, *output;
+    int32_t frame, selfSlot, resultSlot;
     NativeSlot *slots; size_t slotCount, slotCapacity;
-    NativeJump *returns; size_t returnCount, returnCapacity;
+    size_t *returns; size_t returnCount, returnCapacity;
+    /* The program. */
     NativeCall *calls; size_t callCount, callCapacity;
     NativeTrap *traps; size_t trapCount, trapCapacity;
-    RangeNode **functions; size_t *offsets; size_t functionCount, functionCapacity;
+    NativeInstance *instances; size_t instanceCount, instanceCapacity;
 } Native;
 
 #define NATIVE_PUSH(array,count,capacity,value) do { \
     if ((count) == (capacity)) { (capacity) = (capacity) ? (capacity) * 2 : 16; \
         (array) = realloc((array),(capacity) * sizeof(*(array))); if (!(array)) abort(); } \
     (array)[(count)++] = (value); } while (0)
+
+enum { NativeNone, NativeScalar, NativeAggregate };
 
 static void nativeMissing(Native *native, RangeNode *at, const char *format, ...)
 {
@@ -2231,7 +2422,7 @@ static void nativeConstant(Native *native, int rd, uint64_t value)
         if ((uint16_t)(value >> shift)) nativeEmit(native,armMovk(rd,(uint16_t)(value >> shift),shift));
 }
 
-/* Branch to a trap stub with a located message when the condition holds. */
+/* Branch to a trap stub with a located message when the branch is taken. */
 static void nativeTrap(Native *native, uint32_t branch, RangeNode *at, const char *format, ...)
 {
     char text[512]; va_list args; va_start(args,format);
@@ -2244,42 +2435,172 @@ static void nativeTrap(Native *native, uint32_t branch, RangeNode *at, const cha
     NATIVE_PUSH(native->traps,native->trapCount,native->trapCapacity,trap);
 }
 
-static int32_t nativeSlot(Native *native, RangeNode *declaration)
+/* ---- types in the function being compiled ---- */
+
+/* Substitute a construct's type parameters with `self`'s arguments. A
+ * specialization mentioning them becomes a new concrete specialization, whose
+ * laws run like any other. */
+static RangeNode *nativeSubstitute(Native *native, RangeNode *type, RangeNode *self)
 {
-    for (size_t i = 0; i < native->slotCount; ++i)
-        if (native->slots[i].declaration == declaration) return native->slots[i].offset;
-    return 0;
+    if (!type || !self || !self->resolvedDeclaration || !self->resolvedDeclaration->generics) return type;
+    RangeNode *declared = self->resolvedDeclaration->generics;
+    if (type->kind == RangeNodeTypeParameter) {
+        for (size_t i = 0; i < declared->itemCount && self->generics && i < self->generics->itemCount; ++i)
+            if (declared->items[i] == type) return self->generics->items[i]->resolvedType;
+        return type;
+    }
+    if (type->kind != RangeNodeSpecialization || !type->generics) return type;
+    RangeArena *arena = native->report->arena;
+    RangeNode *generics = rangeNodeCreate(arena,RangeNodeBlock,type->path,type->line,type->column);
+    generics->name = "genericMembers";
+    int changed = 0;
+    for (size_t i = 0; i < type->generics->itemCount; ++i) {
+        RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
+        *copy = *type->generics->items[i];
+        if (copy->kind == RangeNodeTypeParameter) {
+            copy->resolvedType = nativeSubstitute(native,copy->resolvedType,self);
+            changed |= copy->resolvedType != type->generics->items[i]->resolvedType;
+        }
+        rangeNodeAppend(arena,generics,copy);
+    }
+    if (!changed) return type;
+    int created = 0;
+    RangeNode *specialization = internSpecialization(native->typer,type->resolvedDeclaration,generics,&created);
+    if (created) checkLaws(native->typer,specialization,NULL,type->resolvedDeclaration);
+    return specialization;
 }
 
-static int32_t nativeNewSlot(Native *native, RangeNode *declaration)
+static RangeNode *nativeType(Native *native, RangeNode *type) { return nativeSubstitute(native,type,native->self); }
+
+static int nativeKind(Native *native, RangeNode *type, RangeNode *at)
 {
-    int32_t offset = -8 * (int32_t)(native->slotCount + 1);
-    NativeSlot slot = {.declaration=declaration,.offset=offset};
+    char name[160];
+    if (!type || type->kind != RangeNodeSpecialization) {
+        describeType(name,sizeof(name),type);
+        nativeMissing(native,at,"native values of %s are not implemented",name);
+        return NativeNone;
+    }
+    if (!layoutOf(native->typer,type,at)) {
+        describeType(name,sizeof(name),type);
+        nativeMissing(native,at,"native values of %s are not implemented: it has no runtime layout",name);
+        return NativeNone;
+    }
+    return type->scalarBits ? NativeScalar : NativeAggregate;
+}
+
+static size_t nativeMemberIndex(RangeNode *declaration, RangeNode *member)
+{
+    for (size_t i = 0; i < declaration->itemCount; ++i) if (declaration->items[i] == member) return i;
+    return SIZE_MAX;
+}
+
+/* ---- frame ---- */
+
+static int32_t nativeReserve(Native *native, size_t size, size_t alignment)
+{
+    if (alignment < 8) alignment = 8;
+    size_t frame = ((size_t)native->frame + size + alignment - 1) / alignment * alignment;
+    native->frame = (int32_t)frame;
+    return -(int32_t)frame;
+}
+
+static NativeSlot *nativeSlotOf(Native *native, RangeNode *declaration)
+{
+    for (size_t i = 0; declaration && i < native->slotCount; ++i)
+        if (native->slots[i].declaration == declaration) return &native->slots[i];
+    return NULL;
+}
+
+static int32_t nativeNewSlot(Native *native, RangeNode *declaration, RangeNode *type, int kind)
+{
+    int32_t offset = kind == NativeAggregate ? nativeReserve(native,type->size ? type->size : 1,type->alignment) : nativeReserve(native,8,8);
+    NativeSlot slot = {.declaration=declaration,.offset=offset,.type=type};
     NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     return offset;
 }
 
+/* rd = rn + offset (offset may exceed 12 bits). */
+static void nativeAddOffset(Native *native, int rd, int rn, size_t offset)
+{
+    if (offset >> 24) { nativeMissing(native,NULL,"offsets beyond 16 MB are not implemented"); return; }
+    if (!offset) { if (rd != rn) nativeEmit(native,armAddImm(rd,rn,0)); return; }
+    if (offset >> 12) nativeEmit(native,armAddImmHigh(rd,rn,(uint32_t)(offset >> 12)));
+    if (offset & 0xFFF) nativeEmit(native,armAddImm(rd,offset >> 12 ? rd : rn,(uint32_t)(offset & 0xFFF)));
+}
+
+/* rd = x29 + offset, offset negative. */
+static void nativeFrameAddress(Native *native, int rd, int32_t offset)
+{
+    uint32_t distance = (uint32_t)-offset;
+    if (distance >> 24) { nativeMissing(native,NULL,"frames beyond 16 MB are not implemented"); return; }
+    if (distance >> 12) nativeEmit(native,armSubImmHigh(rd,29,distance >> 12));
+    if ((distance & 0xFFF) || !(distance >> 12)) nativeEmit(native,armSubImm(rd,distance >> 12 ? rd : 29,distance & 0xFFF));
+}
+
+/* Scalar frame slots hold the full register. */
 static void nativeStore(Native *native, int rt, int32_t offset)
 {
     if (offset >= -256) { nativeEmit(native,armStur(rt,29,offset)); return; }
-    nativeEmit(native,armSubImm(9,29,(uint32_t)-offset));
+    nativeFrameAddress(native,9,offset);
     nativeEmit(native,armStr(rt,9,0));
 }
 
 static void nativeLoad(Native *native, int rt, int32_t offset)
 {
     if (offset >= -256) { nativeEmit(native,armLdur(rt,29,offset)); return; }
-    nativeEmit(native,armSubImm(9,29,(uint32_t)-offset));
+    nativeFrameAddress(native,9,offset);
     nativeEmit(native,armLdr(rt,9,0));
 }
 
-static int nativeScalar(Native *native, RangeNode *type, RangeNode *at)
+/* A scalar inside an aggregate occupies exactly its size. */
+static void nativeLoadScalar(Native *native, int rt, int rn, size_t offset, RangeNode *type)
 {
-    if (type && type->kind == RangeNodeSpecialization && type->scalarBits) return 1;
-    char name[160]; describeType(name,sizeof(name),type);
-    nativeMissing(native,at,"native values of %s are not implemented",name);
-    return 0;
+    size_t size = type->size;
+    if (offset % size || offset / size > 4095) { nativeAddOffset(native,10,rn,offset); rn = 10; offset = 0; }
+    nativeEmit(native,armLoadSized(size,type->scalarSigned,rt,rn,(uint32_t)offset));
 }
+
+static void nativeStoreScalar(Native *native, int rt, int rn, size_t offset, RangeNode *type)
+{
+    size_t size = type->size;
+    if (offset % size || offset / size > 4095) { nativeAddOffset(native,10,rn,offset); rn = 10; offset = 0; }
+    nativeEmit(native,armStoreSized(size,rt,rn,(uint32_t)offset));
+}
+
+/* Copy `size` bytes from [source] to [destination]; clobbers x10-x12. */
+static void nativeCopy(Native *native, int destination, int source, size_t size)
+{
+    nativeEmit(native,armAddImm(12,destination,0));
+    nativeEmit(native,armAddImm(10,source,0));
+    size_t offset = 0;
+    for (size_t chunk = 8; chunk; chunk /= 2)
+        while (size - offset >= chunk) {
+            if (offset / chunk > 4095) {
+                nativeAddOffset(native,12,12,offset); nativeAddOffset(native,10,10,offset);
+                size -= offset; offset = 0;
+            }
+            nativeEmit(native,armLoadSized(chunk,0,11,10,(uint32_t)offset));
+            nativeEmit(native,armStoreSized(chunk,11,12,(uint32_t)offset));
+            offset += chunk;
+        }
+}
+
+static void nativeZero(Native *native, int base, size_t size)
+{
+    nativeEmit(native,armAddImm(12,base,0));
+    size_t offset = 0;
+    for (size_t chunk = 8; chunk; chunk /= 2)
+        while (size - offset >= chunk) {
+            if (offset / chunk > 4095) { nativeAddOffset(native,12,12,offset); size -= offset; offset = 0; }
+            nativeEmit(native,armStoreSized(chunk,31,12,(uint32_t)offset));
+            offset += chunk;
+        }
+}
+
+/* ---- expressions: a scalar in x0, or an aggregate's address in x0 ---- */
+
+static RangeNode *nativeExpression(Native *, RangeNode *);
+static RangeNode *nativeAddress(Native *, RangeNode *, int *);
 
 /* x0 holds a result of `type`; trap unless it fits the declared width. */
 static void nativeFits(Native *native, RangeNode *type, RangeNode *at, const char *operation)
@@ -2290,8 +2611,6 @@ static void nativeFits(Native *native, RangeNode *type, RangeNode *at, const cha
     char name[160]; describeType(name,sizeof(name),type);
     nativeTrap(native,armBcond(RangeNE,0),at,"result of '%s' does not fit %s",operation,name);
 }
-
-static void nativeExpression(Native *, RangeNode *);
 
 static void nativeArithmetic(Native *native, RangeNode *expr, RangeNode *type)
 {
@@ -2335,90 +2654,235 @@ static void nativeArithmetic(Native *native, RangeNode *expr, RangeNode *type)
     } else nativeMissing(native,expr,"native operator '%s' is not implemented",op);
 }
 
-static void nativeCall(Native *native, RangeNode *call)
+/* Construct `type` at frame offset `destination` (an aggregate), or into x0 (a
+ * scalar). Arguments populate the members they name; the rest take their
+ * defaults; @many storage starts empty. */
+static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type, RangeNode **arguments,
+                                  size_t count, int32_t destination)
 {
-    RangeNode *function = call->a ? call->a->resolvedDeclaration : NULL;
-    if (!function || function->kind != RangeNodeFunction || call->a->kind != RangeNodeName) {
-        nativeMissing(native,call,"native method calls are not implemented");
-        return;
+    int kind = nativeKind(native,type,at);
+    if (kind == NativeNone) return NULL;
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (kind == NativeScalar) {
+        // A scalar's single input is the value itself.
+        if (count) return nativeExpression(native,arguments[0]->a), type;
+        for (size_t i = 0; i < declaration->itemCount; ++i)
+            if (constructionInput(declaration->items[i]) && memberDefault(declaration->items[i])) {
+                nativeExpression(native,memberDefault(declaration->items[i]));
+                return type;
+            }
+        nativeEmit(native,armMovz(0,0,0));
+        return type;
     }
-    if (function->typeName) { nativeMissing(native,call,"native calls to '%s.%s' are not implemented",function->typeName,function->name); return; }
-    if (function->flags & (RangeFlagBuiltin | RangeFlagExtern)) {
-        nativeMissing(native,call,"native calls to builtin function '%s' are not implemented",function->name);
-        return;
+    if (!destination) destination = nativeReserve(native,type->size ? type->size : 1,type->alignment);
+    nativeFrameAddress(native,0,destination);
+    nativeZero(native,0,type->size);
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *member = declaration->items[i];
+        size_t offset = type->memberOffsets ? type->memberOffsets[i] : SIZE_MAX;
+        if (offset == SIZE_MAX || (member->flags & RangeFlagMany)) continue;
+        RangeNode *memberType = type->memberTypes[i], *value = NULL;
+        for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
+        int memberKind = nativeKind(native,memberType,member);
+        if (memberKind == NativeNone) continue;
+        if (!value && member->typeName && (member->flags & RangeFlagApplication)) {
+            nativeConstruct(native,member,memberType,member->items,member->itemCount,destination + (int32_t)offset);
+            if (memberKind == NativeScalar) { nativeFrameAddress(native,1,destination); nativeStoreScalar(native,0,1,offset,memberType); }
+            continue;
+        }
+        if (!value) value = memberDefault(member);
+        if (!value) continue; /* required inputs are enforced by the type checker */
+        nativeExpression(native,value);
+        nativeFrameAddress(native,1,destination);
+        if (memberKind == NativeScalar) nativeStoreScalar(native,0,1,offset,memberType);
+        else { nativeAddOffset(native,1,1,offset); nativeCopy(native,1,0,memberType->size); }
     }
-    if (call->itemCount > 8) { nativeMissing(native,call,"calls with more than 8 arguments are not implemented"); return; }
-    for (size_t i = 0; i < call->itemCount; ++i) {
-        nativeExpression(native,call->items[i]->a);
-        nativeEmit(native,armPush(0));
-    }
-    for (size_t i = call->itemCount; i-- > 0;) nativeEmit(native,armPop((int)i));
-    NativeCall site = {.at=nativeEmit(native,armBl(0)),.function=function};
-    NATIVE_PUSH(native->calls,native->callCount,native->callCapacity,site);
+    nativeFrameAddress(native,0,destination);
+    return type;
 }
 
-static void nativeExpression(Native *native, RangeNode *expr)
+static NativeInstance *nativeInstance(Native *native, RangeNode *function, RangeNode *self)
 {
-    if (!expr) return;
+    for (size_t i = 0; i < native->instanceCount; ++i)
+        if (native->instances[i].function == function && native->instances[i].self == self) return &native->instances[i];
+    NativeInstance instance = {.function=function,.self=self};
+    NATIVE_PUSH(native->instances,native->instanceCount,native->instanceCapacity,instance);
+    return &native->instances[native->instanceCount - 1];
+}
+
+static RangeNode *nativeCall(Native *native, RangeNode *call)
+{
+    RangeNode *callee = call->a, *target = callee ? callee->resolvedDeclaration : NULL;
+    if (target && (target->kind == RangeNodeConstruct || target->kind == RangeNodeTypeParameter))
+        return nativeConstruct(native,call,nativeType(native,call->type),call->items,call->itemCount,0);
+    if (!target || target->kind != RangeNodeFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
+    RangeNode *self = NULL;
+    int hasSelf = 0;
+    if (callee->kind == RangeNodeMemberAccess) {
+        int frameSlot = 0;
+        self = nativeAddress(native,callee->a,&frameSlot);
+        if (!self) return NULL;
+        nativeEmit(native,armPush(0));
+        hasSelf = 1;
+    } else if (target->typeName) {
+        // A sibling call inside a method acts on the same receiver.
+        if (!native->owner) { nativeMissing(native,call,"method '%s' called without a receiver",target->name); return NULL; }
+        nativeLoad(native,0,native->selfSlot);
+        nativeEmit(native,armPush(0));
+        self = native->self;
+        hasSelf = 1;
+    }
+    if (target->flags & (RangeFlagBuiltin | RangeFlagExtern)) {
+        nativeMissing(native,call,"native calls to builtin function '%s' are not implemented",target->name);
+        return NULL;
+    }
+    size_t registers = call->itemCount + (size_t)hasSelf;
+    if (registers > 8) { nativeMissing(native,call,"calls with more than 8 arguments are not implemented"); return NULL; }
+    for (size_t i = 0; i < call->itemCount; ++i) {
+        if (!nativeExpression(native,call->items[i]->a)) return NULL;
+        nativeEmit(native,armPush(0));
+    }
+    RangeNode *output = nativeSubstitute(native,target->type,self);
+    int outputKind = output ? nativeKind(native,output,call) : NativeNone;
+    int32_t result = 0;
+    if (outputKind == NativeAggregate) result = nativeReserve(native,output->size ? output->size : 1,output->alignment);
+    for (size_t i = registers; i-- > 0;) nativeEmit(native,armPop((int)i));
+    if (result) nativeFrameAddress(native,8,result);
+    NativeCall site = {.at=nativeEmit(native,armBl(0)),.function=target,.self=self};
+    NATIVE_PUSH(native->calls,native->callCount,native->callCapacity,site);
+    nativeInstance(native,target,self);
+    if (result) nativeFrameAddress(native,0,result);
+    return output;
+}
+
+/* The address of an expression in x0, and its type. A scalar local's address is
+ * its frame slot (*frameSlot = 1: it holds a full register). Other values that
+ * are not places are materialized into a temporary. */
+static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
+{
+    *frameSlot = 0;
+    if (expr->kind == RangeNodeName) {
+        RangeNode *declaration = expr->resolvedDeclaration;
+        NativeSlot *slot = nativeSlotOf(native,declaration);
+        if (slot) {
+            nativeFrameAddress(native,0,slot->offset);
+            *frameSlot = slot->type && slot->type->scalarBits;
+            return slot->type;
+        }
+        size_t index = native->owner ? nativeMemberIndex(native->owner,declaration) : SIZE_MAX;
+        if (index != SIZE_MAX && native->self->memberOffsets && native->self->memberOffsets[index] != SIZE_MAX) {
+            nativeLoad(native,0,native->selfSlot);
+            nativeAddOffset(native,0,0,native->self->memberOffsets[index]);
+            return native->self->memberTypes[index];
+        }
+        if (declaration && (declaration->flags & RangeFlagMany)) {
+            nativeMissing(native,expr,"'%s' holds @many storage, not a value",expr->name);
+            return NULL;
+        }
+        nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name);
+        return NULL;
+    }
+    if (expr->kind == RangeNodeMemberAccess) {
+        int innerSlot = 0;
+        RangeNode *receiver = nativeAddress(native,expr->a,&innerSlot);
+        if (!receiver) return NULL;
+        size_t index = nativeMemberIndex(receiver->resolvedDeclaration,expr->resolvedDeclaration);
+        if (index == SIZE_MAX || !receiver->memberOffsets || receiver->memberOffsets[index] == SIZE_MAX) {
+            nativeMissing(native,expr,"native access to member '%s' is not implemented",expr->name);
+            return NULL;
+        }
+        nativeAddOffset(native,0,0,receiver->memberOffsets[index]);
+        return receiver->memberTypes[index];
+    }
+    RangeNode *type = nativeExpression(native,expr);
+    if (!type || nativeKind(native,type,expr) != NativeScalar) return type;
+    int32_t temporary = nativeReserve(native,8,8);
+    nativeStore(native,0,temporary);
+    nativeFrameAddress(native,0,temporary);
+    *frameSlot = 1;
+    return type;
+}
+
+/* Load the value at an address produced by nativeAddress: scalars into x0. */
+static RangeNode *nativeLoadPlace(Native *native, RangeNode *type, int frameSlot, RangeNode *at)
+{
+    int kind = nativeKind(native,type,at);
+    if (kind == NativeScalar) {
+        if (frameSlot) nativeEmit(native,armLdr(0,0,0));
+        else nativeLoadScalar(native,0,0,0,type);
+    }
+    return kind == NativeNone ? NULL : type;
+}
+
+static RangeNode *nativeExpression(Native *native, RangeNode *expr)
+{
+    if (!expr) return NULL;
+    RangeNode *type = nativeType(native,expr->type);
     switch (expr->kind) {
     case RangeNodeInteger:
-        if (nativeScalar(native,expr->type,expr)) nativeConstant(native,0,(uint64_t)expr->integer);
-        break;
+        if (nativeKind(native,type,expr) != NativeScalar) return NULL;
+        nativeConstant(native,0,(uint64_t)expr->integer);
+        return type;
     case RangeNodeBool:
         nativeConstant(native,0,expr->integer ? 1 : 0);
-        break;
-    case RangeNodeName: {
-        int32_t offset = nativeSlot(native,expr->resolvedDeclaration);
-        if (!offset) { nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name); break; }
-        nativeLoad(native,0,offset);
-        break;
+        return type;
+    case RangeNodeName: case RangeNodeMemberAccess: {
+        int frameSlot = 0;
+        RangeNode *placed = nativeAddress(native,expr,&frameSlot);
+        return placed ? nativeLoadPlace(native,placed,frameSlot,expr) : NULL;
     }
-    case RangeNodeUnary:
-        nativeExpression(native,expr->a);
-        if (same(expr->name,"!")) { nativeEmit(native,armCmpImm(0,0)); nativeEmit(native,armCset(0,RangeEQ)); break; }
-        if (!nativeScalar(native,expr->type,expr)) break;
-        if (expr->type->scalarBits == 64 && expr->type->scalarSigned) {
-            char name[160]; describeType(name,sizeof(name),expr->type);
+    case RangeNodeUnary: {
+        RangeNode *operand = nativeExpression(native,expr->a);
+        if (!operand) return NULL;
+        if (same(expr->name,"!")) { nativeEmit(native,armCmpImm(0,0)); nativeEmit(native,armCset(0,RangeEQ)); return type; }
+        if (nativeKind(native,type,expr) != NativeScalar) return NULL;
+        if (type->scalarBits == 64 && type->scalarSigned) {
+            char name[160]; describeType(name,sizeof(name),type);
             nativeEmit(native,armNegs(0,0));
             nativeTrap(native,armBcond(RangeVS,0),expr,"result of '-' does not fit %s",name);
         } else {
             nativeEmit(native,armNeg(0,0));
-            nativeFits(native,expr->type,expr,"-");
+            nativeFits(native,type,expr,"-");
         }
-        break;
+        return type;
+    }
     case RangeNodeBinary: {
         const char *op = expr->name;
         if (same(op,"&&") || same(op,"||")) {
             nativeExpression(native,expr->a);
-            size_t skip = nativeEmit(native,same(op,"&&") ? armCbz(0,0) : armCbnz(0,0));
-            nativeExpression(native,expr->b);
             uint32_t base = same(op,"&&") ? armCbz(0,0) : armCbnz(0,0);
+            size_t skip = nativeEmit(native,base);
+            nativeExpression(native,expr->b);
             rangePatch(&native->machine,skip,base | (uint32_t)(((native->machine.size - skip) / 4) & 0x7FFFF) << 5);
-            break;
+            return type;
         }
-        RangeNode *operand = expr->a->type;
-        nativeExpression(native,expr->a);
+        RangeNode *operand = nativeExpression(native,expr->a);
         nativeEmit(native,armPush(0));
         nativeExpression(native,expr->b);
         nativeEmit(native,armMov(1,0));
         nativeEmit(native,armPop(0));
-        if (!nativeScalar(native,operand,expr)) break;
+        if (!operand) return NULL;
+        if (nativeKind(native,operand,expr) != NativeScalar) {
+            nativeMissing(native,expr,"native operator '%s' on aggregate values is not implemented",op);
+            return NULL;
+        }
         int isSigned = operand->scalarSigned;
         int cond = same(op,"==") ? RangeEQ : same(op,"!=") ? RangeNE
             : same(op,"<") ? (isSigned ? RangeLT : RangeLO) : same(op,">") ? (isSigned ? RangeGT : RangeHI)
             : same(op,"<=") ? (isSigned ? RangeLE : RangeLS) : same(op,">=") ? (isSigned ? RangeGE : RangeHS) : -1;
         if (cond >= 0) { nativeEmit(native,armCmp(0,1)); nativeEmit(native,armCset(0,cond)); }
         else nativeArithmetic(native,expr,operand);
-        break;
+        return type;
     }
     case RangeNodeCall:
-        nativeCall(native,expr);
-        break;
+        return nativeCall(native,expr);
     default:
         nativeMissing(native,expr,"native %s expressions are not implemented",rangeNodeKindName(expr->kind));
-        break;
+        return NULL;
     }
 }
+
+/* ---- statements ---- */
 
 static void nativeStatement(Native *, RangeNode *);
 
@@ -2434,32 +2898,65 @@ static void nativeBranchHere(Native *native, size_t at, uint32_t base)
     rangePatch(&native->machine,at,patched);
 }
 
+/* x0 holds a value of `type`: a scalar, or an aggregate's address. Store it
+ * into the place at the address in x1. */
+static void nativeStorePlace(Native *native, RangeNode *type, int frameSlot)
+{
+    if (type->scalarBits) {
+        if (frameSlot) nativeEmit(native,armStr(0,1,0));
+        else nativeStoreScalar(native,0,1,0,type);
+    } else nativeCopy(native,1,0,type->size);
+}
+
 static void nativeStatement(Native *native, RangeNode *node)
 {
     if (!node) return;
     switch (node->kind) {
     case RangeNodeBlock: nativeBlock(native,node); break;
     case RangeNodeLet: case RangeNodeState: {
-        if (!nativeScalar(native,node->type,node)) break;
-        if (node->typeName && (node->flags & RangeFlagApplication) && !(node->a && node->a->kind == RangeNodeCall)) {
-            nativeMissing(native,node,"value construction for '%s' is not implemented",node->typeName);
-            break;
-        }
-        int32_t offset = nativeNewSlot(native,node);
+        RangeNode *type = nativeType(native,node->type);
+        int kind = nativeKind(native,type,node);
+        if (kind == NativeNone) break;
+        int construction = node->typeName && (node->flags & RangeFlagApplication) && !(node->a && node->a->kind == RangeNodeCall);
         // A bare name that resolved to a value is a copy; to a type, a requirement.
         RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
         RangeNode *value = !node->typeName || (node->a && node->a->kind == RangeNodeCall) ? rangeNodeRHS(node)
             : copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL;
-        if (value) nativeExpression(native,value);
-        else nativeEmit(native,armMovz(0,0,0)); /* a requirement without a value starts at zero */
-        nativeStore(native,0,offset);
+        if (kind == NativeScalar) {
+            if (construction) nativeConstruct(native,node,type,node->items,node->itemCount,0);
+            else if (value) nativeExpression(native,value);
+            else nativeEmit(native,armMovz(0,0,0)); /* a requirement without a value starts at zero */
+            nativeStore(native,0,nativeNewSlot(native,node,type,kind));
+            break;
+        }
+        if (construction) {
+            // Arguments are evaluated before the name exists, so construct in place.
+            int32_t offset = nativeReserve(native,type->size ? type->size : 1,type->alignment);
+            nativeConstruct(native,node,type,node->items,node->itemCount,offset);
+            NativeSlot slot = {.declaration=node,.offset=offset,.type=type};
+            NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
+            break;
+        }
+        int32_t offset = nativeNewSlot(native,node,type,kind);
+        if (value) {
+            if (!nativeExpression(native,value)) break;
+            nativeFrameAddress(native,1,offset);
+            nativeCopy(native,1,0,type->size);
+        } else {
+            nativeFrameAddress(native,0,offset);
+            nativeZero(native,0,type->size);
+        }
         break;
     }
     case RangeNodeAssign: {
-        int32_t offset = nativeSlot(native,node->a ? node->a->resolvedDeclaration : NULL);
-        if (!offset) { nativeMissing(native,node,"native assignment to this target is not implemented"); break; }
-        nativeExpression(native,node->b);
-        nativeStore(native,0,offset);
+        RangeNode *type = nativeExpression(native,node->b);
+        if (!type) break;
+        nativeEmit(native,armPush(0));
+        int frameSlot = 0;
+        RangeNode *placed = nativeAddress(native,node->a,&frameSlot);
+        nativeEmit(native,armMov(1,0));
+        nativeEmit(native,armPop(0));
+        if (placed && nativeKind(native,placed,node) != NativeNone) nativeStorePlace(native,placed,frameSlot);
         break;
     }
     case RangeNodeIf: {
@@ -2484,9 +2981,15 @@ static void nativeStatement(Native *native, RangeNode *node)
         break;
     }
     case RangeNodeReturn: {
-        if (node->a) nativeExpression(native,node->a);
-        NativeJump jump = {.at=nativeEmit(native,armB(0)),.branch=armB(0)};
-        NATIVE_PUSH(native->returns,native->returnCount,native->returnCapacity,jump);
+        if (node->a) {
+            RangeNode *type = nativeExpression(native,node->a);
+            if (type && !type->scalarBits && native->resultSlot) {
+                nativeLoad(native,1,native->resultSlot);
+                nativeCopy(native,1,0,type->size);
+            }
+        }
+        size_t at = nativeEmit(native,armB(0));
+        NATIVE_PUSH(native->returns,native->returnCount,native->returnCapacity,at);
         break;
     }
     case RangeNodeExpressionStatement:
@@ -2494,55 +2997,69 @@ static void nativeStatement(Native *native, RangeNode *node)
             nativeMissing(native,node,"runtime macro application '@%s' is not implemented",node->a->name);
         else nativeExpression(native,node->a);
         break;
+    case RangeNodeFunction: case RangeNodeConstruct:
+        nativeMissing(native,node,"nested %s declarations are not implemented natively",rangeNodeKindName(node->kind));
+        break;
     default:
         nativeMissing(native,node,"native %s statements are not implemented",rangeNodeKindName(node->kind));
         break;
     }
 }
 
-/* One function or the entry block: frame, parameters, body, epilogue. A body
- * that ends without returning returns zero. */
-static void nativeFunction(Native *native, RangeNode *function, RangeNode *body)
+/* One function instance or the entry block: frame, receiver, parameters,
+ * body, epilogue. A body that ends without returning returns zero. */
+static void nativeFunction(Native *native, NativeInstance *instance)
 {
-    NATIVE_PUSH(native->functions,native->functionCount,native->functionCapacity,function);
-    native->offsets = realloc(native->offsets,native->functionCapacity * sizeof(*native->offsets));
-    if (!native->offsets) abort();
-    native->offsets[native->functionCount - 1] = native->machine.size;
-    native->slotCount = 0; native->returnCount = 0;
+    RangeNode *function = instance->function;
+    instance->offset = native->machine.size;
+    instance->compiled = 1;
+    native->self = instance->self;
+    native->owner = instance->self ? instance->self->resolvedDeclaration : NULL;
+    native->slotCount = 0; native->returnCount = 0; native->frame = 0;
+    native->selfSlot = 0; native->resultSlot = 0;
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0)); /* mov x29, sp */
-    size_t frame = nativeEmit(native,armSubImm(31,31,0));
+    size_t frameHigh = nativeEmit(native,armSubImmHigh(31,31,0));
+    size_t frameLow = nativeEmit(native,armSubImm(31,31,0));
+    RangeNode *body = function->kind == RangeNodeMain ? function->a : function->a;
+    native->output = function->kind == RangeNodeMain ? function->type : nativeType(native,function->type);
+    int outputKind = native->output ? nativeKind(native,native->output,function) : NativeScalar;
+    if (outputKind == NativeAggregate) { native->resultSlot = nativeReserve(native,8,8); nativeStore(native,8,native->resultSlot); }
+    int base = 0;
+    if (native->owner) { native->selfSlot = nativeReserve(native,8,8); nativeStore(native,0,native->selfSlot); base = 1; }
     if (function->kind == RangeNodeFunction) {
-        if (function->itemCount > 8) nativeMissing(native,function,"functions with more than 8 parameters are not implemented");
-        for (size_t i = 0; i < function->itemCount && i < 8; ++i) {
-            RangeNode *parameter = function->items[i];
-            if (!nativeScalar(native,parameter->type,parameter)) continue;
-            nativeStore(native,(int)i,nativeNewSlot(native,parameter));
+        if (function->itemCount + (size_t)base > 8) nativeMissing(native,function,"functions with more than 8 parameters are not implemented");
+        for (size_t i = 0; i < function->itemCount && i + (size_t)base < 8; ++i) {
+            RangeNode *parameter = function->items[i], *type = nativeType(native,parameter->type);
+            int kind = nativeKind(native,type,parameter);
+            if (kind == NativeNone) continue;
+            int reg = (int)i + base;
+            int32_t offset = nativeNewSlot(native,parameter,type,kind);
+            if (kind == NativeScalar) nativeStore(native,reg,offset);
+            else { nativeEmit(native,armAddImm(0,reg,0)); nativeFrameAddress(native,1,offset); nativeCopy(native,1,0,type->size); }
         }
-        if (function->b && !nativeScalar(native,function->type,function->b)) return;
     }
     nativeBlock(native,body);
     nativeEmit(native,armMovz(0,0,0));
-    for (size_t i = 0; i < native->returnCount; ++i) nativeBranchHere(native,native->returns[i].at,armB(0));
+    for (size_t i = 0; i < native->returnCount; ++i) nativeBranchHere(native,native->returns[i],armB(0));
     nativeEmit(native,armAddImm(31,29,0)); /* mov sp, x29 */
     nativeEmit(native,armPopFrame());
     nativeEmit(native,armRet());
-    size_t bytes = (native->slotCount * 8 + 15) / 16 * 16;
-    if (bytes > 4095) nativeMissing(native,function,"frames larger than 4095 bytes are not implemented");
-    else rangePatch(&native->machine,frame,armSubImm(31,31,(uint32_t)bytes));
+    size_t bytes = ((size_t)native->frame + 15) / 16 * 16;
+    if (bytes >> 24) nativeMissing(native,function,"frames beyond 16 MB are not implemented");
+    rangePatch(&native->machine,frameHigh,bytes >> 12 ? armSubImmHigh(31,31,(uint32_t)(bytes >> 12)) : armAddImm(31,31,0));
+    rangePatch(&native->machine,frameLow,armSubImm(31,31,(uint32_t)(bytes & 0xFFF)));
 }
 
 /* Trap stubs: write the message to stderr, then exit with status 134, as an
  * abort would, without the delay of a crash report. */
 static void nativeTraps(Native *native)
 {
-    size_t *stubs = calloc(native->trapCount ? native->trapCount : 1,sizeof(*stubs));
     size_t *messages = calloc(native->trapCount ? native->trapCount : 1,sizeof(*messages));
-    if (!stubs || !messages) abort();
+    if (!messages) abort();
     for (size_t i = 0; i < native->trapCount; ++i) {
         NativeTrap *trap = &native->traps[i];
-        stubs[i] = native->machine.size;
-        int32_t words = (int32_t)((stubs[i] - trap->at) / 4);
+        int32_t words = (int32_t)((native->machine.size - trap->at) / 4);
         rangePatch(&native->machine,trap->at,trap->branch | ((uint32_t)words & 0x7FFFFu) << 5);
         messages[i] = nativeEmit(native,armAdr(1,0));
         nativeEmit(native,armMovz(0,2,0));
@@ -2555,35 +3072,59 @@ static void nativeTraps(Native *native)
         size_t text = rangeEmitBytes(&native->machine,native->traps[i].message,strlen(native->traps[i].message));
         rangePatch(&native->machine,messages[i],armAdr(1,(int32_t)(text - messages[i])));
     }
-    free(stubs); free(messages);
+    free(messages);
 }
 
-/* Compile every function and the entry block; write the executable when
- * nothing is missing. Returns 1 when an executable was written. */
-static int emitNative(SourceReport *report, const char *path)
+/* A specialization is concrete when no type argument is a type parameter. */
+static int nativeConcrete(const RangeNode *type)
 {
-    Native native = {.report=report};
+    if (!type || type->kind != RangeNodeSpecialization) return 0;
+    for (size_t i = 0; type->generics && i < type->generics->itemCount; ++i) {
+        RangeNode *generic = type->generics->items[i];
+        if (generic->kind == RangeNodeTypeParameter && !nativeConcrete(generic->resolvedType)) return 0;
+    }
+    return 1;
+}
+
+static void nativeMethods(Native *native, RangeNode *construct)
+{
+    for (size_t i = 0; i < native->typer->specializations->itemCount; ++i) {
+        RangeNode *self = native->typer->specializations->items[i];
+        if (self->resolvedDeclaration != construct || !nativeConcrete(self)) continue;
+        for (size_t j = 0; j < construct->itemCount; ++j) {
+            RangeNode *function = construct->items[j];
+            if (function->kind == RangeNodeFunction && !(function->flags & (RangeFlagBuiltin | RangeFlagExtern)))
+                nativeInstance(native,function,self);
+        }
+    }
+}
+
+/* Compile the entry block, every function, and every method of every concrete
+ * specialization; write the executable when nothing is missing. Returns 1
+ * when an executable was written. */
+static int emitNative(SourceReport *report, Typer *typer, const char *path)
+{
+    Native native = {.report=report,.typer=typer};
     RangeNode *entry = NULL;
     size_t entries = 0;
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
         if (report->units[u]->items[i]->kind == RangeNodeMain) { entry = report->units[u]->items[i]; ++entries; }
     if (entries > 1) { sourceDiagnostic(report,entry,0,"entry","the program has %zu entry blocks; it needs one",entries); return 0; }
-    if (entry) nativeFunction(&native,entry,entry->a);
+    if (entry) nativeInstance(&native,entry,NULL);
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
         RangeNode *item = report->units[u]->items[i];
         if (item->kind == RangeNodeFunction && !(item->flags & (RangeFlagBuiltin | RangeFlagExtern)))
-            nativeFunction(&native,item,item->a);
-        else if (item->kind == RangeNodeConstruct)
-            for (size_t j = 0; j < item->itemCount; ++j)
-                if (item->items[j]->kind == RangeNodeFunction && !(item->items[j]->flags & RangeFlagBuiltin))
-                    nativeMissing(&native,item->items[j],"native methods ('%s.%s') are not implemented",item->name,item->items[j]->name);
+            nativeInstance(&native,item,NULL);
     }
+    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
+        if (report->units[u]->items[i]->kind == RangeNodeConstruct) nativeMethods(&native,report->units[u]->items[i]);
+    // Compiling may reach new instances; the entry block stays first.
+    for (size_t i = 0; i < native.instanceCount; ++i)
+        if (!native.instances[i].compiled) nativeFunction(&native,&native.instances[i]);
     for (size_t i = 0; i < native.callCount; ++i) {
-        size_t target = SIZE_MAX;
-        for (size_t f = 0; f < native.functionCount; ++f)
-            if (native.functions[f] == native.calls[i].function) target = native.offsets[f];
-        if (target == SIZE_MAX) continue; /* reported where the function was compiled */
-        rangePatch(&native.machine,native.calls[i].at,armBl((int32_t)((int64_t)target - (int64_t)native.calls[i].at) / 4));
+        NativeInstance *instance = nativeInstance(&native,native.calls[i].function,native.calls[i].self);
+        if (!instance->compiled) continue; /* reported where it was compiled */
+        rangePatch(&native.machine,native.calls[i].at,armBl((int32_t)(((int64_t)instance->offset - (int64_t)native.calls[i].at) / 4)));
     }
     nativeTraps(&native);
     int written = 0;
@@ -2593,8 +3134,7 @@ static int emitNative(SourceReport *report, const char *path)
         else sourceDiagnostic(report,NULL,0,"output","%s",error);
     }
     rangeMachineFree(&native.machine);
-    free(native.slots); free(native.returns); free(native.calls); free(native.traps);
-    free(native.functions); free(native.offsets);
+    free(native.slots); free(native.returns); free(native.calls); free(native.traps); free(native.instances);
     return written;
 }
 
@@ -2755,9 +3295,9 @@ int main(int argc, char **argv)
         for (size_t u = 0; u < unitCount; ++u) diagnoseSourceNode(&report,NULL,units[u],0);
         diagnoseDuplicates(&report);
         for (size_t u = 0; u < unitCount; ++u) diagnoseBuiltinFunctions(&report,units[u]);
-        if (resolved && !failures) typeCheck(&report);
+        Typer *typer = resolved && !failures ? typeCheck(&report) : NULL;
         // Native code is generated from a complete, well-typed graph only.
-        int written = resolved && !failures && !report.errors && emitNative(&report,output);
+        int written = typer && !report.errors && emitNative(&report,typer,output);
         writeSourceDiagnostics(&report,stderr);
         if (report.errors || failures) {
             fprintf(stderr,"compilation failed: %zu errors, %zu C implementation warnings\n",report.errors+(size_t)failures,report.warnings);

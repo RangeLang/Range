@@ -1,0 +1,51 @@
+construct Point {
+    state x: Int
+    state y: Int
+    let label: 3
+
+    function sum(): Int {
+        return x + y + label
+    }
+
+    function shift(let by: Int) {
+        x: x + by
+        bump()
+    }
+
+    function bump() {
+        y: y + 1
+    }
+}
+
+construct Line {
+    state from: Point(x: 0, y: 0)
+    state to: Point
+    let narrow: Int(7)
+}
+
+function mirror(let p: Point): Point {
+    return Point(x: p.y, y: p.x)
+}
+
+function length(let line: Line): Int {
+    return (line.to.x - line.from.x) + (line.to.y - line.from.y) + line.narrow
+}
+
+{
+    state p: Point(x: 1, y: 2)
+    p.shift(by: 10)
+    if p.x != 11 { return 1 }
+    if p.y != 3 { return 2 }
+    p.y: 20
+    let m: mirror(p: p)
+    if m.x != 20 { return 3 }
+    if m.y != 11 { return 4 }
+    if m.sum() != 34 { return 5 }
+    state line: Line(to: Point(x: 4, y: 6))
+    line.from.x: 1
+    if length(line: line) != 16 { return 6 }
+    let copy: line
+    line.to.y: 100
+    if copy.to.y != 6 { return 7 }
+    return 42
+}

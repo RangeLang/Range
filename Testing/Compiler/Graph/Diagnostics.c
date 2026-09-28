@@ -91,7 +91,8 @@ int main(void)
     rangeArenaDestroy(&arena);
 
     report = collect(&arena,"construct Packet {} function make() { let packet: Packet() }",NULL);
-    assert(diagnostic(&report,"not-implemented","value construction for 'Packet'"));
+    // Construction is typed, not reported as missing.
+    assert(!diagnostic(&report,"not-implemented","construction"));
     rangeArenaDestroy(&arena);
     puts("source diagnostics: all references, scopes, late definitions, C shortcuts, metadata, construction=pass");
     return 0;
