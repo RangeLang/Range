@@ -48,6 +48,7 @@ typedef enum {
     RangeNodeSwitch,
     RangeNodeSwitchCase,
     RangeNodeExtension,
+    RangeNodeSpecialization, /* a construct plus one value per generic */
     RangeNodeType,
     RangeNodeKindCount
 } RangeNodeKind;
@@ -60,7 +61,8 @@ enum {
     RangeFlagOptional = 1 << 6,
     RangeFlagLiteral  = 1 << 7,  /* string part is literal text */
     RangeFlagApplication = 1 << 8, /* explicit parentheses, including () */
-    RangeFlagMacroType = 1 << 9    /* @name type: declarations that applied the macro */
+    RangeFlagMacroType = 1 << 9,   /* @name type: declarations that applied the macro */
+    RangeFlagChecked = 1 << 10     /* specialization: its laws have run */
 };
 
 typedef struct RangeNode RangeNode;
@@ -109,6 +111,7 @@ struct RangeNode {
     /* Resolution result: declaration identity, never a name-only dispatch. */
     RangeNode *resolvedDeclaration;
     RangeNode *resolvedType; /* resolved literal representation */
+    RangeNode *type; /* the specialization an expression or declaration has */
     RangeMacroApplication *macroApplication; /* application-specific bindings */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */

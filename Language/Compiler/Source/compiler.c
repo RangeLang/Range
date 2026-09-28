@@ -18,6 +18,7 @@ typedef struct {
     jmp_buf failure;
     RangeNode *emitted; /* declarations emitted by the running application */
     RangeNode *unit;    /* unit holding the running application's target */
+    int skipEmission;   /* law runs per specialization check; emission stays on the declaration */
 } Resolver;
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
@@ -772,6 +773,7 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         return graphEval(eval->vm,scope->application,node);
     }
     case RangeNodeEmission:
+        if (eval->vm->skipEmission) return (RangeGraphValue){0};
         if (!scope->application || !eval->vm->emitted)
             fail(eval->vm,node,"#graph requires a macro application");
         for (size_t i = 0; i < node->b->itemCount; ++i)
@@ -1021,6 +1023,7 @@ typedef struct {
 typedef struct SourceScope {
     RangeNode *owner;
     struct SourceScope *parent;
+    int meta; /* inside a macro body: compile-time code over graph values */
 } SourceScope;
 
 static void sourceDiagnostic(SourceReport *report, RangeNode *at, int warning,
@@ -1116,12 +1119,12 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     if (!node) return;
     switch (node->kind) {
     case RangeNodeUnit: case RangeNodeBlock: {
-        SourceScope block = {.owner=node,.parent=scope};
+        SourceScope block = {.owner=node,.parent=scope,.meta=scope && scope->meta};
         for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,&block,node->items[i],metadata);
         return;
     }
     case RangeNodeConstruct: case RangeNodeEnum: case RangeNodeFunction: case RangeNodeMacro: {
-        SourceScope declaration = {.owner=node,.parent=scope};
+        SourceScope declaration = {.owner=node,.parent=scope,.meta=(scope && scope->meta) || node->kind == RangeNodeMacro};
         if (node->kind == RangeNodeFunction)
             (void)sourceReference(report,scope,node,node->typeName,2);
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
@@ -1152,14 +1155,15 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 0);
         break;
     case RangeNodeMemberAccess:
-        if (same(node->name,"first") || same(node->name,"isTarget"))
+        /* Runtime member access is typed later; these are graph-value shortcuts. */
+        if (scope && scope->meta && (same(node->name,"first") || same(node->name,"isTarget")))
             sourceDiagnostic(report,node,1,"C-implementation","'.%s' is hard-coded in C; Range member dispatch is not implemented",node->name);
         break;
     case RangeNodeCall:
-        if (node->a && node->a->kind == RangeNodeMemberAccess) {
+        if (node->a && node->a->kind == RangeNodeMemberAccess && scope && scope->meta) {
             if (same(node->a->name,"filter") && node->itemCount == 1 && same(node->items[0]->name,"named"))
                 sourceDiagnostic(report,node,1,"C-implementation","'filter(named:)' is hard-coded in C; Range method dispatch is not implemented");
-            else sourceDiagnostic(report,node,0,"not-implemented","method call resolution for '%s' is not implemented",node->a->name);
+            else sourceDiagnostic(report,node,0,"not-implemented","compile-time method call resolution for '%s' is not implemented",node->a->name);
         } else if (node->a && node->a->kind == RangeNodeName) {
             RangeNode *declaration = sourceLookup(report,scope,node->a->name,0);
             if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
@@ -1402,6 +1406,595 @@ static void diagnoseDuplicates(SourceReport *report)
     }
 }
 
+/* ---- types -------------------------------------------------------------
+ * A type is a specialization: a construct plus one value per generic. Equal
+ * specializations are interned to one node, so type equality is identity.
+ * Inside a construct's own bodies its type parameters stand for themselves.
+ * Literals take the type their context requires; a construct's laws (its
+ * macro applications) run once per distinct specialization and once per
+ * supplied literal. Emission stays on the declaration, so those runs only
+ * check. Operators are C builtins for now, selected by the literal families
+ * the language declares. */
+
+typedef struct {
+    SourceReport *report;
+    Resolver *vm;                /* runs laws per specialization */
+    RangeNode *specializations;  /* interned RangeNodeSpecialization nodes */
+    RangeNode *integer, *boolean; /* constructs the integer and boolean literal rules select */
+    RangeNode *booleanType;
+} Typer;
+
+static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+static RangeNode *declaredType(Typer *, SourceScope *, RangeNode *, RangeNode *);
+static RangeNode *resolveTypeReference(Typer *, SourceScope *, const char *, RangeNode *, int, RangeNode *, RangeNode *);
+
+static void typeError(Typer *typer, RangeNode *at, const char *format, ...)
+{
+    char text[512]; va_list args; va_start(args,format);
+    vsnprintf(text,sizeof(text),format,args); va_end(args);
+    sourceDiagnostic(typer->report,at,0,"type","%s",text);
+}
+
+static void describeType(char *out, size_t size, const RangeNode *type)
+{
+    if (!type) { snprintf(out,size,"<unknown>"); return; }
+    if (type->kind == RangeNodeTypeParameter) { snprintf(out,size,"%s",type->name); return; }
+    size_t n = (size_t)snprintf(out,size,"%s",type->name);
+    RangeNode *generics = type->generics;
+    if (!generics || !generics->itemCount || n >= size) return;
+    n += (size_t)snprintf(out + n,size - n,"<");
+    for (size_t i = 0; i < generics->itemCount && n < size; ++i) {
+        RangeNode *generic = generics->items[i];
+        char inner[128];
+        if (generic->kind == RangeNodeTypeParameter) describeType(inner,sizeof(inner),generic->resolvedType);
+        else {
+            RangeNode *value = rangeNodeRHS(generic);
+            if (!value) snprintf(inner,sizeof(inner),"?");
+            else if (value->kind == RangeNodeInteger) snprintf(inner,sizeof(inner),"%lld",value->integer);
+            else if (value->kind == RangeNodeBool) snprintf(inner,sizeof(inner),"%s",value->integer ? "true" : "false");
+            else if (value->kind == RangeNodeString && value->itemCount == 1 && (value->items[0]->flags & RangeFlagLiteral))
+                snprintf(inner,sizeof(inner),"\"%s\"",value->items[0]->name);
+            else snprintf(inner,sizeof(inner),"%s",value->name ? value->name : "?");
+        }
+        n += (size_t)snprintf(out + n,size - n,"%s%s: %s",i ? ", " : "",generic->name,inner);
+    }
+    if (n < size) snprintf(out + n,size - n,">");
+}
+
+static int sameGenericValue(RangeNode *x, RangeNode *y)
+{
+    if (x->kind == RangeNodeTypeParameter) return y->kind == RangeNodeTypeParameter && x->resolvedType == y->resolvedType;
+    if (y->kind == RangeNodeTypeParameter) return 0;
+    RangeNode *a = rangeNodeRHS(x), *b = rangeNodeRHS(y);
+    if (!a || !b) return a == b;
+    if (a == b) return 1;
+    if (a->kind != b->kind) return 0;
+    if (a->kind == RangeNodeInteger || a->kind == RangeNodeBool) return a->integer == b->integer;
+    if (a->kind == RangeNodeString)
+        return a->itemCount == 1 && b->itemCount == 1 && (a->items[0]->flags & RangeFlagLiteral)
+            && (b->items[0]->flags & RangeFlagLiteral) && same(a->items[0]->name,b->items[0]->name);
+    return 0;
+}
+
+static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, RangeNode *generics, int *created)
+{
+    *created = 0;
+    for (size_t i = 0; i < typer->specializations->itemCount; ++i) {
+        RangeNode *candidate = typer->specializations->items[i];
+        if (candidate->resolvedDeclaration != declaration) continue;
+        size_t count = generics ? generics->itemCount : 0;
+        if ((candidate->generics ? candidate->generics->itemCount : 0) != count) continue;
+        size_t matched = 0;
+        for (size_t j = 0; j < count; ++j)
+            if (sameGenericValue(candidate->generics->items[j],generics->items[j])) ++matched;
+        if (matched == count) return candidate;
+    }
+    RangeArena *arena = typer->report->arena;
+    RangeNode *specialization = rangeNodeCreate(arena,RangeNodeSpecialization,declaration->path,declaration->line,declaration->column);
+    specialization->name = declaration->name;
+    specialization->resolvedDeclaration = declaration;
+    specialization->generics = generics;
+    rangeNodeAppend(arena,typer->specializations,specialization);
+    *created = 1;
+    return specialization;
+}
+
+static RangeNode *copyGeneric(RangeArena *arena, RangeNode *generic)
+{
+    RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
+    *copy = *generic;
+    copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
+    copy->rhsReference = NULL; copy->typeName = NULL; copy->type = NULL;
+    copy->a = generic->kind == RangeNodeTypeParameter ? NULL : rangeNodeRHS(generic);
+    return copy;
+}
+
+/* The literal populates the one member whose default the same literal rule
+ * matched; C never names that member. */
+static RangeNode *literalHolder(RangeNode *declaration, RangeNode *value, size_t *holders)
+{
+    RangeNode *holder = NULL;
+    *holders = 0;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *member = declaration->items[i];
+        if (!rangeNodeDeclaresValue(member->kind)) continue;
+        RangeNode *rhs = rangeNodeRHS(member);
+        if (!rhs || !rhs->resolvedDeclaration || rhs->resolvedDeclaration != value->resolvedDeclaration) continue;
+        holder = member;
+        ++*holders;
+    }
+    return holder;
+}
+
+/* Run the construct's macro applications against this specialization, with
+ * the supplied literal in place of the member it populates. */
+static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value, RangeNode *at)
+{
+    RangeNode *declaration = specialization->resolvedDeclaration;
+    if (!declaration->c || !declaration->c->itemCount) return;
+    if (!value) {
+        if (specialization->flags & RangeFlagChecked) return;
+        specialization->flags |= RangeFlagChecked;
+    }
+    RangeArena *arena = typer->report->arena;
+    Resolver *vm = typer->vm;
+    RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
+    *copy = *declaration;
+    copy->generics = specialization->generics;
+    if (value) {
+        size_t holders = 0;
+        RangeNode *holder = literalHolder(declaration,value,&holders);
+        if (holders != 1) {
+            sourceDiagnostic(typer->report,at,0,"not-implemented",
+                "literal materialization for '%s' is not implemented: %zu members hold a %s literal",
+                declaration->name,holders,value->resolvedDeclaration->name);
+            return;
+        }
+        copy->items = rangeArenaAllocate(arena,declaration->itemCount * sizeof(*copy->items));
+        copy->itemCapacity = declaration->itemCount;
+        memcpy(copy->items,declaration->items,declaration->itemCount * sizeof(*copy->items));
+        RangeNode *member = rangeArenaAllocate(arena,sizeof(*member));
+        *member = *holder;
+        member->rhsReference = NULL; member->typeName = NULL; member->a = NULL;
+        member->items = NULL; member->itemCount = 0; member->itemCapacity = 0;
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,value->path,value->line,value->column);
+        argument->a = value;
+        rangeNodeAppend(arena,member,argument);
+        for (size_t i = 0; i < copy->itemCount; ++i) if (copy->items[i] == holder) copy->items[i] = member;
+    }
+    for (size_t i = 0; i < declaration->c->itemCount; ++i) {
+        RangeNode *attribute = declaration->c->items[i];
+        RangeMacroApplication *declared = attribute->macroApplication;
+        if (!declared || compilerAttribute(declaration,attribute) || !declared->declaration->a) continue;
+        if (macroBuiltin(declared->declaration,"many")) continue;
+        RangeMacroApplication *app = rangeArenaAllocate(arena,sizeof(*app));
+        *app = (RangeMacroApplication){.declaration=declared->declaration,.target=copy,.unit=declared->unit,.attribute=attribute};
+        jmp_buf outer;
+        memcpy(outer,vm->failure,sizeof(outer));
+        vm->skipEmission = 1;
+        if (setjmp(vm->failure) == 0) {
+            MetaEval eval = {.vm=vm};
+            MetaScope scope = {.application=app};
+            RangeGraphValue returned = {0};
+            (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
+        } else {
+            char type[160];
+            describeType(type,sizeof(type),specialization);
+            sourceDiagnostic(typer->report,at,0,"law","%s does not satisfy @%s: %s",type,app->declaration->name,vm->error);
+        }
+        vm->skipEmission = 0;
+        memcpy(vm->failure,outer,sizeof(outer));
+    }
+}
+
+/* Build the specialization named by generic arguments, in the context whose
+ * type parameters the arguments may mention. */
+static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declaration,
+                             RangeNode *arguments, RangeNode *context, RangeNode *at)
+{
+    RangeArena *arena = typer->report->arena;
+    RangeNode *declared = declaration->generics, *generics = NULL;
+    int isDefault = 1;
+    size_t positional = 0;
+    if (declared) {
+        generics = rangeNodeCreate(arena,RangeNodeBlock,declaration->path,declaration->line,declaration->column);
+        generics->name = "genericMembers";
+        for (size_t i = 0; i < declared->itemCount; ++i) {
+            RangeNode *generic = declared->items[i], *argument = NULL;
+            size_t unnamed = 0;
+            if (arguments) for (size_t j = 0; j < arguments->itemCount; ++j) {
+                RangeNode *candidate = arguments->items[j];
+                if (candidate->name ? same(candidate->name,generic->name)
+                    : generic->kind == RangeNodeTypeParameter && unnamed++ == positional) { argument = candidate; break; }
+            }
+            RangeNode *copy = copyGeneric(arena,generic);
+            if (generic->kind == RangeNodeTypeParameter) {
+                ++positional;
+                if (!argument) { typeError(typer,at,"'%s' requires generic %s",declaration->name,generic->name); return NULL; }
+                RangeNode *reference = argument->a;
+                if (!reference || reference->kind != RangeNodeName) { typeError(typer,argument,"generic %s requires a type",generic->name); return NULL; }
+                RangeNode *type = resolveTypeReference(typer,scope,reference->name,reference->generics,reference->flags,context,reference);
+                if (!type) return NULL;
+                copy->resolvedType = type;
+                isDefault = 0;
+            } else if (argument) {
+                SourceScope declarationScope = {.owner=declaration};
+                RangeNode *expected = declaredType(typer,&declarationScope,generic,NULL);
+                RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
+                if (expected && actual && expected != actual) {
+                    char want[160], got[160];
+                    describeType(want,sizeof(want),expected); describeType(got,sizeof(got),actual);
+                    typeError(typer,argument->a,"generic %s requires %s; found %s",generic->name,want,got);
+                    return NULL;
+                }
+                copy->a = argument->a;
+                if (!sameGenericValue(copy,generic)) isDefault = 0;
+            }
+            rangeNodeAppend(arena,generics,copy);
+        }
+        size_t unnamed = 0;
+        if (arguments) for (size_t j = 0; j < arguments->itemCount; ++j) {
+            RangeNode *candidate = arguments->items[j];
+            int known = 0;
+            if (!candidate->name) known = unnamed++ < positional;
+            else for (size_t i = 0; i < declared->itemCount; ++i)
+                if (same(candidate->name,declared->items[i]->name)) known = 1;
+            if (!known && candidate->name) { typeError(typer,candidate,"'%s' has no generic named '%s'",declaration->name,candidate->name); return NULL; }
+            if (!known) { typeError(typer,candidate,"'%s' takes %zu type arguments; %zu supplied",declaration->name,positional,unnamed); return NULL; }
+        }
+    } else if (arguments && arguments->itemCount) {
+        typeError(typer,at,"'%s' takes no generic arguments",declaration->name);
+        return NULL;
+    }
+    int created = 0;
+    RangeNode *specialization = internSpecialization(typer,declaration,generics,&created);
+    if (created) {
+        // The declaration's own application already covered its defaults.
+        if (isDefault) specialization->flags |= RangeFlagChecked;
+        else checkLaws(typer,specialization,NULL,at);
+    }
+    return specialization;
+}
+
+/* Inside its own bodies, a construct is specialized by its own parameters. */
+static RangeNode *selfSpecialization(Typer *typer, RangeNode *declaration)
+{
+    RangeArena *arena = typer->report->arena;
+    RangeNode *generics = NULL;
+    if (declaration->generics) {
+        generics = rangeNodeCreate(arena,RangeNodeBlock,declaration->path,declaration->line,declaration->column);
+        generics->name = "genericMembers";
+        for (size_t i = 0; i < declaration->generics->itemCount; ++i) {
+            RangeNode *generic = declaration->generics->items[i], *copy = copyGeneric(arena,generic);
+            if (generic->kind == RangeNodeTypeParameter) copy->resolvedType = generic;
+            rangeNodeAppend(arena,generics,copy);
+        }
+    }
+    int created = 0;
+    RangeNode *specialization = internSpecialization(typer,declaration,generics,&created);
+    specialization->flags |= RangeFlagChecked;
+    return specialization;
+}
+
+static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const char *name,
+                                       RangeNode *generics, int flags, RangeNode *context, RangeNode *at)
+{
+    if (!name || !*name || strchr(name,'|')) return NULL; /* unions are reported already */
+    if (flags & RangeFlagMacroType) return NULL; /* macro types are not typed in this step */
+    if (flags & RangeFlagOptional) {
+        sourceDiagnostic(typer->report,at,0,"not-implemented","optional types are not implemented");
+        return NULL;
+    }
+    if (context && context->generics)
+        for (size_t i = 0; i < context->generics->itemCount; ++i) {
+            RangeNode *generic = context->generics->items[i];
+            if (generic->kind == RangeNodeTypeParameter && same(generic->name,name)) return generic->resolvedType;
+        }
+    RangeNode *declaration = sourceLookup(typer->report,scope,name,2);
+    if (!declaration || declaration->kind != RangeNodeConstruct) return NULL; /* undeclared is reported already */
+    return specialize(typer,scope,declaration,generics,context,at);
+}
+
+static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context)
+{
+    if (node->kind == RangeNodeParameter)
+        return node->b ? resolveTypeReference(typer,scope,node->b->name,node->b->generics,node->flags,context,node->b) : NULL;
+    if (node->flags & RangeFlagMany) return NULL; /* @many storage is not a standalone value */
+    if (node->typeName) return resolveTypeReference(typer,scope,node->typeName,node->generics,node->flags,context,node);
+    RangeNode *rhs = rangeNodeRHS(node);
+    return rhs ? typeOf(typer,scope,rhs,NULL,context) : NULL;
+}
+
+static RangeNode *findMember(RangeNode *declaration, const char *name)
+{
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (rangeNodeDeclaresValue(declaration->items[i]->kind) && same(declaration->items[i]->name,name))
+            return declaration->items[i];
+    return NULL;
+}
+
+static RangeNode *findFunction(RangeNode *owner, const char *name)
+{
+    for (size_t i = 0; i < owner->itemCount; ++i)
+        if (owner->items[i]->kind == RangeNodeFunction && same(owner->items[i]->name,name)) return owner->items[i];
+    return NULL;
+}
+
+static RangeNode *lookupFunction(SourceReport *report, SourceScope *scope, const char *name)
+{
+    for (; scope; scope = scope->parent) {
+        RangeNode *function = findFunction(scope->owner,name);
+        if (function) return function;
+    }
+    for (size_t u = 0; u < report->count; ++u) {
+        RangeNode *function = findFunction(report->units[u],name);
+        if (function) return function;
+    }
+    return NULL;
+}
+
+static int isLiteral(const RangeNode *node)
+{
+    return node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString;
+}
+
+static int isInteger(Typer *typer, const RangeNode *type)
+{
+    return type && type->kind == RangeNodeSpecialization && typer->integer && type->resolvedDeclaration == typer->integer;
+}
+
+static void expectType(Typer *typer, RangeNode *at, RangeNode *expected, RangeNode *actual, const char *what)
+{
+    if (!expected || !actual || expected == actual) return;
+    char want[160], got[160];
+    describeType(want,sizeof(want),expected); describeType(got,sizeof(got),actual);
+    typeError(typer,at,"%s requires %s; found %s",what,want,got);
+}
+
+static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *expected)
+{
+    RangeNode *rule = literal->resolvedDeclaration;
+    if (!rule || !rule->literalDefault) return NULL;
+    RangeNode *declaration = rule->literalDefault, *type;
+    if (expected && expected->kind == RangeNodeSpecialization && expected->resolvedDeclaration == declaration) type = expected;
+    else type = specialize(typer,NULL,declaration,NULL,NULL,literal);
+    if (type) checkLaws(typer,type,literal,literal);
+    return type;
+}
+
+static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *context)
+{
+    RangeNode *callee = call->a, *function = NULL, *receiver = NULL;
+    if (!callee) return NULL;
+    if (callee->kind == RangeNodeName) {
+        function = lookupFunction(typer->report,scope,callee->name);
+        if (!function) {
+            RangeNode *declaration = sourceLookup(typer->report,scope,callee->name,0);
+            if (declaration && declaration->kind != RangeNodeConstruct && declaration->kind != RangeNodeEnum)
+                typeError(typer,call,"'%s' is not a function",callee->name);
+            return NULL; /* construction and undeclared names are reported already */
+        }
+        receiver = function->typeName ? context : NULL;
+    } else if (callee->kind == RangeNodeMemberAccess) {
+        receiver = typeOf(typer,scope,callee->a,NULL,context);
+        if (!receiver) return NULL;
+        if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,callee,"type parameter %s has no functions",receiver->name); return NULL; }
+        function = findFunction(receiver->resolvedDeclaration,callee->name);
+        if (!function) {
+            char type[160]; describeType(type,sizeof(type),receiver);
+            typeError(typer,callee,"%s has no function '%s'",type,callee->name);
+            return NULL;
+        }
+    } else {
+        typeError(typer,call,"call target is not a function");
+        return NULL;
+    }
+    callee->resolvedDeclaration = function;
+    SourceScope functionScope = {.owner=function};
+    if (call->itemCount != function->itemCount)
+        typeError(typer,call,"'%s' takes %zu arguments; %zu supplied",function->name,function->itemCount,call->itemCount);
+    for (size_t i = 0; i < call->itemCount && i < function->itemCount; ++i) {
+        RangeNode *argument = call->items[i], *parameter = function->items[i];
+        if (!argument->name || !same(argument->name,parameter->name))
+            typeError(typer,argument,"argument %zu of '%s' requires label '%s'",i + 1,function->name,parameter->name);
+        RangeNode *expected = declaredType(typer,&functionScope,parameter,receiver);
+        RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
+        char what[160];
+        snprintf(what,sizeof(what),"argument '%s' of '%s'",parameter->name,function->name);
+        expectType(typer,argument->a,expected,actual,what);
+    }
+    RangeNode *output = function->b;
+    return output ? resolveTypeReference(typer,&functionScope,output->name,output->generics,output->flags,receiver,output) : NULL;
+}
+
+static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
+{
+    if (!expr) return NULL;
+    RangeNode *type = NULL;
+    switch (expr->kind) {
+    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString:
+        type = typeLiteral(typer,expr,expected);
+        break;
+    case RangeNodeName: {
+        RangeNode *declaration = sourceLookup(typer->report,scope,expr->name,0);
+        if (!declaration) break;
+        if (rangeNodeDeclaresValue(declaration->kind) || declaration->kind == RangeNodeParameter) {
+            if (declaration->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
+            else type = declaredType(typer,scope,declaration,context);
+        } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
+        else if (declaration->kind == RangeNodeTypeParameter || declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
+            typeError(typer,expr,"'%s' names a type, not a value",expr->name);
+        break;
+    }
+    case RangeNodeMemberAccess: {
+        RangeNode *receiver = typeOf(typer,scope,expr->a,NULL,context);
+        if (!receiver) break;
+        if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,expr,"type parameter %s has no members",receiver->name); break; }
+        RangeNode *declaration = receiver->resolvedDeclaration;
+        RangeNode *member = findMember(declaration,expr->name);
+        if (member) {
+            if (member->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
+            else { SourceScope declarationScope = {.owner=declaration}; type = declaredType(typer,&declarationScope,member,receiver); }
+        } else if (findFunction(declaration,expr->name)) typeError(typer,expr,"'%s.%s' is a function; call it",declaration->name,expr->name);
+        else { char t[160]; describeType(t,sizeof(t),receiver); typeError(typer,expr,"%s has no member '%s'",t,expr->name); }
+        break;
+    }
+    case RangeNodeCall:
+        type = typeCall(typer,scope,expr,context);
+        break;
+    case RangeNodeUnary: {
+        int logical = same(expr->name,"!");
+        RangeNode *operand = typeOf(typer,scope,expr->a,logical ? typer->booleanType : expected,context);
+        if (!operand) break;
+        if (logical) { expectType(typer,expr->a,typer->booleanType,operand,"operator '!'"); type = typer->booleanType; }
+        else if (!isInteger(typer,operand)) { char t[160]; describeType(t,sizeof(t),operand); typeError(typer,expr,"operator '-' requires an integer type; found %s",t); }
+        else type = operand;
+        break;
+    }
+    case RangeNodeBinary: {
+        const char *op = expr->name;
+        int logical = same(op,"&&") || same(op,"||");
+        int comparison = same(op,"<") || same(op,">") || same(op,"<=") || same(op,">=");
+        int equality = same(op,"==") || same(op,"!=");
+        RangeNode *want = logical ? typer->booleanType : (comparison || equality) ? NULL : expected;
+        RangeNode *left, *right;
+        // A literal takes the other operand's type when that side is not a literal.
+        if (isLiteral(expr->a) && !isLiteral(expr->b)) {
+            right = typeOf(typer,scope,expr->b,want,context);
+            left = typeOf(typer,scope,expr->a,right ? right : want,context);
+        } else {
+            left = typeOf(typer,scope,expr->a,want,context);
+            right = typeOf(typer,scope,expr->b,left ? left : want,context);
+        }
+        if (!left || !right) break;
+        if (left != right) {
+            char l[160], r[160]; describeType(l,sizeof(l),left); describeType(r,sizeof(r),right);
+            typeError(typer,expr,"operator '%s' requires matching types; found %s and %s",op,l,r);
+            break;
+        }
+        if (logical) { expectType(typer,expr,typer->booleanType,left,"operator"); type = typer->booleanType; }
+        else if (equality) type = typer->booleanType;
+        else if (!isInteger(typer,left)) { char t[160]; describeType(t,sizeof(t),left); typeError(typer,expr,"operator '%s' requires an integer type; found %s",op,t); }
+        else type = comparison ? typer->booleanType : left;
+        break;
+    }
+    default: break; /* unsupported forms are reported already */
+    }
+    expr->type = type;
+    return type;
+}
+
+static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+
+static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
+{
+    if (!node) return;
+    switch (node->kind) {
+    case RangeNodeBlock: typeBlock(typer,scope,node,context,output); break;
+    case RangeNodeLet: case RangeNodeState:
+        if (node->typeName && (node->flags & RangeFlagApplication)) break; /* construction is reported already */
+        node->type = declaredType(typer,scope,node,context);
+        break;
+    case RangeNodeAssign: {
+        RangeNode *target = node->a;
+        if (!target || target->kind != RangeNodeName) { sourceDiagnostic(typer->report,node,0,"not-implemented","assignment to a member path is not implemented"); break; }
+        RangeNode *declaration = sourceLookup(typer->report,scope,target->name,0);
+        if (!declaration) break;
+        if (declaration->kind != RangeNodeState) { typeError(typer,node,"cannot assign to %s '%s'",rangeNodeKindName(declaration->kind),target->name); break; }
+        RangeNode *expected = declaredType(typer,scope,declaration,context);
+        RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
+        char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",target->name);
+        expectType(typer,node->b,expected,actual,what);
+        break;
+    }
+    case RangeNodeIf: case RangeNodeWhile: {
+        RangeNode *condition = typeOf(typer,scope,node->a,typer->booleanType,context);
+        expectType(typer,node->a,typer->booleanType,condition,"condition");
+        typeStatement(typer,scope,node->b,context,output);
+        typeStatement(typer,scope,node->c,context,output);
+        break;
+    }
+    case RangeNodeReturn:
+        if (output) {
+            if (!node->a) { char t[160]; describeType(t,sizeof(t),output); typeError(typer,node,"return requires %s",t); break; }
+            expectType(typer,node->a,output,typeOf(typer,scope,node->a,output,context),"return");
+        } else if (node->a) {
+            (void)typeOf(typer,scope,node->a,NULL,context);
+            typeError(typer,node,"this function returns no value");
+        }
+        break;
+    case RangeNodeExpressionStatement:
+        if (node->a && node->a->kind != RangeNodeAttribute) (void)typeOf(typer,scope,node->a,NULL,context);
+        break;
+    default: break; /* declarations, and forms reported as not implemented */
+    }
+}
+
+static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, RangeNode *context, RangeNode *output)
+{
+    if (!block) return;
+    SourceScope scope = {.owner=block,.parent=parent};
+    for (size_t i = 0; i < block->itemCount; ++i) typeStatement(typer,&scope,block->items[i],context,output);
+}
+
+static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function, RangeNode *context)
+{
+    SourceScope scope = {.owner=function,.parent=parent};
+    for (size_t i = 0; i < function->itemCount; ++i) function->items[i]->type = declaredType(typer,&scope,function->items[i],context);
+    RangeNode *output = function->b
+        ? resolveTypeReference(typer,&scope,function->b->name,function->b->generics,function->b->flags,context,function->b) : NULL;
+    function->type = output;
+    if (function->a) typeBlock(typer,&scope,function->a,context,output);
+}
+
+static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declaration)
+{
+    RangeNode *context = selfSpecialization(typer,declaration);
+    SourceScope scope = {.owner=declaration,.parent=parent};
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *item = declaration->items[i];
+        if (rangeNodeDeclaresValue(item->kind)) {
+            if (item->typeName && (item->flags & RangeFlagApplication)) continue;
+            item->type = declaredType(typer,&scope,item,context);
+        } else if (item->kind == RangeNodeFunction) typeFunction(typer,&scope,item,context);
+        else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
+    }
+}
+
+/* The integer and boolean literal rules select the constructs operators
+ * apply to; C names neither. */
+static RangeNode *literalFamily(Typer *typer, const char *spelling)
+{
+    for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+        RangeNode *macro = typer->report->units[u]->items[i];
+        if (macro->kind != RangeNodeMacro || !macro->literalPattern || !macro->literalDefault) continue;
+        if (literalMatch(typer->vm,macro,macro->literalPattern,spelling)) return macro->literalDefault;
+    }
+    return NULL;
+}
+
+static void typeCheck(SourceReport *report)
+{
+    Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
+    *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
+        .error=rangeArenaAllocate(report->arena,512),.errorSize=512};
+    Typer typer = {.report=report,.vm=vm};
+    typer.specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
+    if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return; }
+    typer.integer = literalFamily(&typer,"0");
+    typer.boolean = literalFamily(&typer,"true");
+    if (typer.boolean) typer.booleanType = specialize(&typer,NULL,typer.boolean,NULL,NULL,typer.boolean);
+    for (size_t u = 0; u < report->count; ++u) {
+        SourceScope unit = {.owner=report->units[u]};
+        for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
+            RangeNode *item = report->units[u]->items[i];
+            if (item->kind == RangeNodeConstruct) typeConstruct(&typer,&unit,item);
+            else if (item->kind == RangeNodeFunction) typeFunction(&typer,&unit,item,NULL);
+            else if (item->kind == RangeNodeMain) typeBlock(&typer,&unit,item->a,NULL,NULL);
+        }
+    }
+}
+
 /* Compiler driver: compile source directories, with parser and literal probes. */
 #include "parser.h"
 #include "graph.h"
@@ -1557,7 +2150,8 @@ int main(int argc, char **argv)
         for (size_t u = 0; u < unitCount; ++u) diagnoseSourceNode(&report,NULL,units[u],0);
         diagnoseDuplicates(&report);
         for (size_t u = 0; u < unitCount; ++u) diagnoseBuiltinFunctions(&report,units[u]);
-        sourceDiagnostic(&report,NULL,0,"not-implemented","complete Range type checking and value materialization are not implemented");
+        if (resolved && !failures) typeCheck(&report);
+        sourceDiagnostic(&report,NULL,0,"not-implemented","value construction and value materialization are not implemented");
         sourceDiagnostic(&report,NULL,0,"not-implemented","native code emission is not implemented; no executable was produced");
         writeSourceDiagnostics(&report,stderr);
         fprintf(stderr,"compilation failed: %zu errors, %zu C implementation warnings\n",report.errors+(size_t)failures,report.warnings);

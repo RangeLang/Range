@@ -41,6 +41,9 @@ active = compile_sources('Language/Grammar', 'Language/Macros', 'Language/Types'
 for declared in ('Array', 'Bool', 'String', 'Generic', 'Parameter', 'Any'):
     assert f"no declaration for '{declared}'" not in active, active
 assert "has a C graph shape but no Range declaration" not in active, active
+# The language sources type-check; laws run per specialization without failing.
+assert 'error[type]' not in active and 'error[law]' not in active, active
+assert 'optional types are not implemented' in active, active
 for shortcut in ('filter(named:)', '.first', '.isTarget'):
     assert f"'{shortcut}' is hard-coded in C" in active, active
 assert 'uses in this source' in active, active
