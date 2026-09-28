@@ -17,7 +17,7 @@ for mode in ordinary sanitized; do
     compiler="$work_root/$mode"
     Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/Validation.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/Validation.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-validation"
     "$work_root/$mode-validation"
     for option in --validate-macros --check-return; do

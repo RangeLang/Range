@@ -16,7 +16,7 @@ for mode in ordinary sanitized; do
     compiler="$work_root/$mode"
     Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/Diagnostics.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/Diagnostics.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-diagnostics"
     "$work_root/$mode-diagnostics"
     python3 - "$compiler" "$work_root" <<'PY'
@@ -29,7 +29,6 @@ compiler, folder = sys.argv[1], Path(sys.argv[2])
 def compile_sources(*paths):
     result = subprocess.run([compiler, *map(str, paths)], capture_output=True, text=True)
     assert result.returncode == 65 and not result.stdout, result.stdout + result.stderr
-    assert 'native code emission is not implemented' in result.stderr, result.stderr
     assert 'compilation failed:' in result.stderr, result.stderr
     return result.stderr
 
@@ -63,9 +62,12 @@ assert "C parser's signed 64-bit storage" in compile_sources(first, second)
 # Defining a previously missing type removes that error without inventing support.
 first.write_text('construct Holder { let item: NotDefined }\n')
 second.write_text('construct NotDefined {}\n')
-errors = compile_sources(first, second)
-assert "no declaration for 'NotDefined'" not in errors, errors
-assert 'value materialization' in errors, errors
+# With nothing missing and no entry block, the sources check cleanly and no
+# executable is claimed.
+result = subprocess.run([compiler, str(first), str(second)], capture_output=True, text=True)
+assert result.returncode == 0 and not result.stdout, result.stdout + result.stderr
+assert "no declaration for 'NotDefined'" not in result.stderr, result.stderr
+assert 'no entry block, so no executable was written' in result.stderr, result.stderr
 
 # Normal compilation invokes the evaluator and reports independent macro failures.
 first.write_text('''construct Construct {}

@@ -32,11 +32,13 @@ macro integer(): Construct {
     }
   }
 
-  // Layout: the construct is a scalar exactly bits wide. C reads the storage
-  // primitive from the specialization; it never names Int or bits.
+  // Layout and arithmetic: the construct is a scalar exactly bits wide, signed
+  // or not. C reads these primitives from the specialization; it never names
+  // Int, bits, or signed.
   #graph {
     extension #name {
       @builtin let storage: bits
+      @builtin let signed: signed
     }
   }
 }

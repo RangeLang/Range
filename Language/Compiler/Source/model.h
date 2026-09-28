@@ -114,6 +114,7 @@ struct RangeNode {
     RangeNode *type; /* the specialization an expression or declaration has */
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
+    int scalarBits, scalarSigned; /* from the builtin storage and signed members; 0 bits if not a scalar */
     RangeMacroApplication *macroApplication; /* application-specific bindings */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */

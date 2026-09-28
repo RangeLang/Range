@@ -1,0 +1,5 @@
+// The declarations the native checks need beyond the integer and boolean
+// sources: macro target shapes and the diagnostic message type.
+construct Construct {}
+construct Macro {}
+construct String {}

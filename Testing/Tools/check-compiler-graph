@@ -15,27 +15,27 @@ for mode in ordinary sanitized; do
     link_options=()
     if [[ "$mode" == sanitized ]]; then link_options=(-fsanitize=address,undefined -fno-omit-frame-pointer -g); fi
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/OutputLinks.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/OutputLinks.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-output-links"
     "$work_root/$mode-output-links"
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/GrammarLinks.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/GrammarLinks.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-grammar-links"
     "$work_root/$mode-grammar-links"
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/MacroTargets.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/MacroTargets.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-macro-targets"
     "$work_root/$mode-macro-targets"
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/Emission.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/Emission.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-emission"
     "$work_root/$mode-emission"
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/MemberKinds.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/MemberKinds.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-member-kinds"
     "$work_root/$mode-member-kinds"
     clang -std=c17 -Wall -Wextra -Werror -O1 ${link_options[@]+"${link_options[@]}"} \
-        Testing/Compiler/Graph/Types.c Language/Compiler/Source/{lexer,parser,model,graph}.c \
+        Testing/Compiler/Graph/Types.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-types"
     "$work_root/$mode-types"
     for fixture in Unknown UnknownBody Cycle; do
