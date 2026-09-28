@@ -1355,6 +1355,8 @@ static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
     }
 }
 
+static int builtinMember(const RangeNode *);
+
 /* Builtin functions are C primitives selected by name. resize, read, and write
  * act on their construct's @many member, so that construct needs exactly one. */
 static int slotPrimitive(const RangeNode *function)
@@ -1378,6 +1380,8 @@ static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
     for (size_t i = 0; i < owner->itemCount; ++i) {
         RangeNode *item = owner->items[i];
         if (item->kind == RangeNodeConstruct) diagnoseBuiltinFunctions(report,item);
+        if (builtinMember(item) && (!same(item->name,"storage") || owner->kind != RangeNodeConstruct))
+            sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin member '%s'",item->name);
         if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
         if (!slotPrimitive(item) || owner->kind != RangeNodeConstruct)
             sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin function '%s'",item->name);
@@ -1961,6 +1965,94 @@ static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declarat
     }
 }
 
+static int builtinMember(const RangeNode *member)
+{
+    if (!rangeNodeDeclaresValue(member->kind) || !member->c) return 0;
+    for (size_t i = 0; i < member->c->itemCount; ++i)
+        if (same(member->c->items[i]->name,"builtin")) return 1;
+    return 0;
+}
+
+/* ---- layout --------------------------------------------------------------
+ * A construct with a builtin `storage` member is a scalar exactly that many
+ * bits wide; its other members are its meaning, not separate storage. Any
+ * other construct lays its members out in order with natural alignment. A
+ * @many member is an 8-byte address. C reads widths from the specialization
+ * it materialized; it never names a construct or a generic. */
+
+static long long storageBits(Typer *typer, RangeNode *specialization, RangeNode *storage)
+{
+    RangeNode *value = rangeNodeRHS(storage);
+    if (value && value->kind == RangeNodeName && specialization->generics)
+        for (size_t i = 0; i < specialization->generics->itemCount; ++i)
+            if (same(specialization->generics->items[i]->name,value->name)) { value = rangeNodeRHS(specialization->generics->items[i]); break; }
+    if (!value || value->kind != RangeNodeInteger) {
+        sourceDiagnostic(typer->report,storage,0,"layout","builtin 'storage' requires an integer bit width");
+        return 0;
+    }
+    return value->integer;
+}
+
+static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
+{
+    if (!specialization || specialization->kind != RangeNodeSpecialization) return 0;
+    if (specialization->layout == 2) return specialization->size || specialization->alignment;
+    RangeNode *declaration = specialization->resolvedDeclaration;
+    char name[160];
+    if (specialization->layout == 1) {
+        describeType(name,sizeof(name),specialization);
+        sourceDiagnostic(typer->report,at,0,"layout","%s has no layout: it contains itself",name);
+        return 0;
+    }
+    specialization->layout = 1;
+    size_t size = 0, alignment = 1;
+    int known = 1;
+    RangeNode *storage = NULL;
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"storage")) storage = declaration->items[i];
+    if (storage) {
+        long long bits = storageBits(typer,specialization,storage);
+        if (bits <= 0 || bits > 64) {
+            if (bits > 64) sourceDiagnostic(typer->report,storage,0,"layout","scalars wider than 64 bits are not implemented");
+            known = 0;
+        } else {
+            size = (size_t)((bits + 7) / 8);
+            alignment = size <= 1 ? 1 : size <= 2 ? 2 : size <= 4 ? 4 : 8;
+            size = alignment; /* a scalar occupies its aligned width */
+        }
+    } else {
+        // Member types computed for the declaration hold for every
+        // specialization unless a type parameter is involved.
+        int parametric = 0;
+        if (declaration->generics) for (size_t i = 0; i < declaration->generics->itemCount; ++i)
+            if (declaration->generics->items[i]->kind == RangeNodeTypeParameter) parametric = 1;
+        SourceScope scope = {.owner=declaration};
+        for (size_t i = 0; i < declaration->itemCount; ++i) {
+            RangeNode *member = declaration->items[i];
+            if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
+            size_t memberSize, memberAlignment;
+            if (member->flags & RangeFlagMany) { memberSize = 8; memberAlignment = 8; }
+            else {
+                RangeNode *type = parametric ? declaredType(typer,&scope,member,specialization) : member->type;
+                if (!type || type->kind != RangeNodeSpecialization || !layoutOf(typer,type,member)) {
+                    known = 0;
+                    specialization->integer = 1; /* the cause lies in a member's type, reported there */
+                    continue;
+                }
+                memberSize = type->size; memberAlignment = type->alignment;
+            }
+            size = (size + memberAlignment - 1) / memberAlignment * memberAlignment + memberSize;
+            if (memberAlignment > alignment) alignment = memberAlignment;
+        }
+        size = (size + alignment - 1) / alignment * alignment;
+    }
+    specialization->layout = 2;
+    if (!known) { specialization->size = 0; specialization->alignment = 0; return 0; }
+    specialization->size = size;
+    specialization->alignment = alignment;
+    return 1;
+}
+
 /* The integer and boolean literal rules select the constructs operators
  * apply to; C names neither. */
 static RangeNode *literalFamily(Typer *typer, const char *spelling)
@@ -1992,6 +2084,14 @@ static void typeCheck(SourceReport *report)
             else if (item->kind == RangeNodeFunction) typeFunction(&typer,&unit,item,NULL);
             else if (item->kind == RangeNodeMain) typeBlock(&typer,&unit,item->a,NULL,NULL);
         }
+    }
+    // Every type the program mentions gets a layout, or a reason it has none.
+    for (size_t i = 0; i < typer.specializations->itemCount; ++i) {
+        RangeNode *specialization = typer.specializations->items[i];
+        if (specialization->layout == 2 || layoutOf(&typer,specialization,specialization->resolvedDeclaration)
+            || specialization->integer) continue;
+        char name[160]; describeType(name,sizeof(name),specialization);
+        sourceDiagnostic(report,specialization->resolvedDeclaration,0,"layout","%s has no layout",name);
     }
 }
 

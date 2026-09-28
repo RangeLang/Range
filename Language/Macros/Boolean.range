@@ -5,4 +5,11 @@ macro boolean(): Construct {
   if !value.isTarget {
     @diagnostic("Construct must specify value")
   }
+
+  // Layout: one bit of storage, held in one byte.
+  #graph {
+    extension #name {
+      @builtin let storage: 1
+    }
+  }
 }

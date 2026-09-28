@@ -102,6 +102,7 @@ int main(void)
     compile(&c,"function nothing() {}");
     assert(!errorsIn(&c,"type") && !errorsIn(&c,"law"));
     assert(reported(&c,"not-implemented","optional types are not implemented"));
+    assert(reported(&c,"layout","String has no layout: it contains itself"));
     RangeNode *append = NULL;
     for (size_t u = 0; u < c.count && !append; ++u) {
         RangeNode *array = named(c.units[u],"Array");
@@ -155,6 +156,29 @@ int main(void)
     assert(reported(&c,"type","cannot assign to let 'a'"));
     rangeArenaDestroy(&c.arena);
 
-    puts("types: language sources, contextual literals, laws per specialization, substitution, refusals=pass");
+    // Layout: scalars from their storage width, constructs from members in order.
+    compile(&c,"construct Pair { let flag: Bool let count: Int } "
+        "construct Bytes { let a: Int<bits: 8> let b: Int<bits: 8> let c: Int<bits: 12> } "
+        "construct Loop { let again: Loop } "
+        "function layouts() { let a: 0 state b: Int<bits: 8> state w: Int<bits: 12> let t: true "
+        "state xs: Array<Int> let p: Pair let q: Bytes let s: \"\" }");
+    struct { const char *name; size_t size, alignment; } expected[] = {
+        {"a",8,8}, {"b",1,1}, {"w",2,2}, {"t",1,1}, {"xs",24,8}, {"p",16,8}, {"q",4,2}};
+    for (size_t i = 0; i < sizeof(expected)/sizeof(*expected); ++i) {
+        RangeNode *type = local(&c,"layouts",expected[i].name)->type;
+        assert(type && type->layout == 2);
+        if (type->size != expected[i].size || type->alignment != expected[i].alignment)
+            fprintf(stderr,"%s: size %zu alignment %zu\n",expected[i].name,type->size,type->alignment);
+        assert(type->size == expected[i].size && type->alignment == expected[i].alignment);
+    }
+    assert(!local(&c,"layouts","s")->type->size);
+    assert(reported(&c,"layout","String has no layout: it contains itself"));
+    assert(reported(&c,"layout","Loop has no layout: it contains itself"));
+    // Only root causes are reported; types that merely contain them stay quiet.
+    for (SourceDiagnostic *d = c.report.first; d; d = d->next)
+        assert(!same(d->category,"layout") || strstr(d->message,"contains itself"));
+    rangeArenaDestroy(&c.arena);
+
+    puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout=pass");
     return 0;
 }

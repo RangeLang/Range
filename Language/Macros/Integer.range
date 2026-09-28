@@ -20,9 +20,8 @@ macro integer(): Construct {
     )
   }
 
-  // Validation evaluates these statements and helper calls as Range code.
-  // The selected members currently expose declaration defaults; connecting a
-  // matched literal to a constructed payload is a separate, unfinished step.
+  // The law runs per specialization and per supplied literal, so value and
+  // bits are the specialized ones here.
   if value.isTarget && bits.isTarget && signed.isTarget {
     if bits.value <= 0 {
       @diagnostic("Integer bits must be positive")
@@ -30,6 +29,14 @@ macro integer(): Construct {
       if !integerValueFits(value: value.value, bits: bits.value, signed: signed.value) {
         @diagnostic("Integer value does not fit the declared bits and signedness")
       }
+    }
+  }
+
+  // Layout: the construct is a scalar exactly bits wide. C reads the storage
+  // primitive from the specialization; it never names Int or bits.
+  #graph {
+    extension #name {
+      @builtin let storage: bits
     }
   }
 }
