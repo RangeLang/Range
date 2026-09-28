@@ -102,7 +102,7 @@ int main(void)
     compile(&c,"function nothing() {}");
     assert(!errorsIn(&c,"type") && !errorsIn(&c,"law"));
     assert(!reported(&c,"not-implemented","optional"));
-    assert(reported(&c,"layout","String has no layout: it contains itself"));
+    assert(!reported(&c,"layout",""));
     RangeNode *append = NULL;
     for (size_t u = 0; u < c.count && !append; ++u) {
         RangeNode *array = named(c.units[u],"Array");
@@ -171,9 +171,9 @@ int main(void)
             fprintf(stderr,"%s: size %zu alignment %zu\n",expected[i].name,type->size,type->alignment);
         assert(type->size == expected[i].size && type->alignment == expected[i].alignment);
     }
-    assert(!local(&c,"layouts","s")->type->size);
+    // The bytes primitive: an address and a byte count.
+    assert(local(&c,"layouts","s")->type->size == 16 && local(&c,"layouts","s")->type->alignment == 8);
     expectDescription(local(&c,"layouts","maybe")->type,"Optional<Wrapped: Int<bits: 8, signed: true>>");
-    assert(reported(&c,"layout","String has no layout: it contains itself"));
     assert(reported(&c,"layout","Loop has no layout: it contains itself"));
     // Only root causes are reported; types that merely contain them stay quiet.
     for (SourceDiagnostic *d = c.report.first; d; d = d->next)

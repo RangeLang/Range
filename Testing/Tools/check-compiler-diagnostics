@@ -32,7 +32,17 @@ def compile_sources(*paths):
     assert 'compilation failed:' in result.stderr, result.stderr
     return result.stderr
 
-active = compile_sources('Language/Grammar', 'Language/Macros', 'Language/Types')
+# Every feature the language sources declare is provided by Range or by C:
+# they check with no errors, and each C-provided piece is a warning.
+language = subprocess.run([compiler, 'Language/Grammar', 'Language/Macros', 'Language/Types'],
+                          capture_output=True, text=True)
+active = language.stderr
+assert language.returncode == 0 and not language.stdout, language.stdout + active
+assert 'error[' not in active, active
+assert 'no entry block, so no executable was written' in active, active
+for provided in ('@many storage is a C heap block', "builtin function 'resize' is implemented in C",
+                 "builtin member 'storage' is a C layout primitive", "builtin member 'bytes' is a C layout primitive"):
+    assert provided in active, active
 # Array<Element> declares a type parameter, so Array<Member> resolves;
 # @boolean and @string declare Bool and String the way @integer declares Int;
 # generics are @generic kinds, and every C graph shape has a grammar declaration.
@@ -42,7 +52,6 @@ for declared in ('Array', 'Bool', 'String', 'Generic', 'Parameter', 'Any'):
 assert "has a C graph shape but no Range declaration" not in active, active
 # The language sources type-check; laws run per specialization without failing.
 assert 'error[type]' not in active and 'error[law]' not in active, active
-assert 'String has no layout: it contains itself' in active, active
 assert 'optional types are not implemented' not in active, active
 assert "'?' sugar resolves to the construct applying @optional in C" in active, active
 for shortcut in ('filter(named:)', '.first', '.isTarget'):

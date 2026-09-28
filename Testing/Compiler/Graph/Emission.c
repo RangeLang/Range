@@ -137,8 +137,13 @@ int main(void)
         "construct Plain { @builtin function resize(let to: Int) } "
         "@builtin function helper()");
     assert(!reported(&c,"macro-validation",""));
-    assert(reported(&c,"not-implemented","builtin macro 'many' has no runtime storage implementation"));
-    assert(reported(&c,"not-implemented","builtin function 'read' has no runtime implementation for @many storage"));
+    // C provides @many storage and its slot builtins; both are reported as C-implemented.
+    assert(!reported(&c,"not-implemented","'many'") && !reported(&c,"not-implemented","'read'"));
+    int warned = 0;
+    for (SourceDiagnostic *d = c.report.first; d; d = d->next)
+        if (d->warning && same(d->category,"C-implementation")
+            && (strstr(d->message,"@many storage is a C heap block") || strstr(d->message,"builtin function 'read' is implemented in C"))) ++warned;
+    assert(warned == 2);
     assert(reported(&c,"builtin","builtin function 'write' requires exactly one @many member in Twice; found 2"));
     assert(reported(&c,"builtin","builtin function 'resize' requires exactly one @many member in Plain; found 0"));
     assert(reported(&c,"not-implemented","no C primitive is implemented for builtin function 'helper'"));

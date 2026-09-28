@@ -7,4 +7,12 @@ macro string(): Construct {
   if !value.isTarget {
     @diagnostic("Construct must specify value")
   }
+
+  // Layout: UTF-8 bytes held by C, as an address and a byte count. C reads
+  // the bytes primitive; it never names String.
+  #graph {
+    extension #name {
+      @builtin let bytes
+    }
+  }
 }
