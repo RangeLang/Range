@@ -1,0 +1,59 @@
+construct Bag {
+    state items: Array<Int>()
+
+    function add(let value: Int) {
+        items.append(value: value)
+    }
+
+    function snapshot(): Array<Int> {
+        return items
+    }
+}
+
+function filled(let n: Int): Array<Int> {
+    state xs: Array<Int>()
+    state i: 0
+    while i < n {
+        xs.append(value: i)
+        i: i + 1
+    }
+    return xs
+}
+
+function mutateCopy(let xs: Array<Int>): Int {
+    state local: xs
+    local.append(value: 99)
+    return local.count
+}
+
+{
+    state a: filled(n: 3)
+    state b: a
+    b.append(value: 10)
+    if a.count != 3 { return 1 }
+    if b.count != 4 { return 2 }
+    a.write(at: 0, value: 50)
+    if b.read(at: 0) != 0 { return 3 }
+    if a.read(at: 0) != 50 { return 4 }
+    if mutateCopy(xs: a) != 4 { return 5 }
+    if a.count != 3 { return 6 }
+
+    state bag: Bag()
+    bag.add(value: 1)
+    state snap: bag.snapshot()
+    bag.add(value: 2)
+    if snap.count != 1 { return 7 }
+    snap.write(at: 0, value: 7)
+    if bag.items.read(at: 0) != 1 { return 8 }
+
+    state grid: Array<Array<Int>>()
+    grid.append(value: filled(n: 2))
+    state other: grid
+    state row: other.read(at: 0)
+    row.write(at: 1, value: 42)
+    if grid.read(at: 0).read(at: 1) != 1 { return 9 }
+    other.write(at: 0, value: row)
+    if grid.read(at: 0).read(at: 1) != 1 { return 10 }
+    if other.read(at: 0).read(at: 1) != 42 { return 11 }
+    return 42
+}

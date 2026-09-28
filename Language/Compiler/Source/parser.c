@@ -163,8 +163,15 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
  * `let author: "George"` place the initialising expression in that position. */
 static int atTypePosition(RangeParser *parser)
 {
-    if (parser->current.kind == RangeTokenName)
-        return !parserAt(parser,"true") && !parserAt(parser,"false");
+    if (parser->current.kind == RangeTokenName) {
+        if (parserAt(parser,"true") || parserAt(parser,"false")) return 0;
+        // `let s: bag.snapshot()` and `let n: a + 1` are expressions; a `<`
+        // after the name stays a generic list, as in `Array<Int>`.
+        static const char *const expression[] = {".", "+", "-", "*", "/", "%", "==", "!=", "<=", ">=", "&&", "||", ">", NULL};
+        const RangeToken *ahead = parserPeek(parser);
+        for (size_t i = 0; expression[i]; ++i) if (rangeTokenIs(ahead, expression[i])) return 0;
+        return 1;
+    }
     if (!parserAt(parser, "@")) return 0;
     return parserPeek(parser)->kind == RangeTokenName;
 }

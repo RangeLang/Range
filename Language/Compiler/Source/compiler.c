@@ -1131,7 +1131,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             (void)sourceReference(report,scope,node,node->typeName,2);
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
         if (macroBuiltin(node,"many"))
-            sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of slots, allocated with libSystem realloc and never freed");
+            sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of copy-on-write slots, allocated through libSystem; blocks are never released or freed");
         else if (macroBuiltin(node,"optional"))
             sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the construct applying @optional in C");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
@@ -2612,6 +2612,9 @@ static void nativeZero(Native *native, int base, size_t size)
 
 static RangeNode *nativeExpression(Native *, RangeNode *);
 static RangeNode *nativeAddress(Native *, RangeNode *, int *);
+static void nativeCopyValue(Native *, int, int, RangeNode *, int);
+static int nativePlace(const RangeNode *);
+static void nativeBranchHere(Native *, size_t, uint32_t);
 
 /* x0 holds a result of `type`; trap unless it fits the declared width. */
 static void nativeFits(Native *native, RangeNode *type, RangeNode *at, const char *operation)
@@ -2706,7 +2709,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         nativeExpression(native,value);
         nativeFrameAddress(native,1,destination);
         if (memberKind == NativeScalar) nativeStoreScalar(native,0,1,offset,memberType);
-        else { nativeAddOffset(native,1,1,offset); nativeCopy(native,1,0,memberType->size); }
+        else { nativeAddOffset(native,1,1,offset); nativeCopyValue(native,1,0,memberType,nativePlace(value)); }
     }
     nativeFrameAddress(native,0,destination);
     return type;
@@ -2714,10 +2717,15 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
 
 /* ---- @many storage ----
  * A @many member holds the address of a C heap block, or zero while empty:
- * [slot count: 8 bytes][slots]. resize reallocates it with libSystem realloc
- * and zero-fills new slots; read and write check the index against the count
- * C keeps. The block belongs to the construct's single @many member; its
- * element size comes from that member's declared type in this specialization. */
+ * [references: 8 bytes][slot count: 8 bytes][slots]. Storage is copy-on-write:
+ * copying a value retains each block it reaches, and resize or write on a
+ * shared block first give the writer its own block (cloned with libSystem
+ * malloc and memcpy, retaining its elements; the old block loses a reference).
+ * resize grows with realloc and zero-fills new slots; read and write check the
+ * index against the count C keeps. Blocks are never released when values end,
+ * and never freed. The block belongs to the construct's single @many member;
+ * its element size comes from that member's declared type in this
+ * specialization. */
 
 typedef struct { size_t offset; RangeNode *element; } NativeSlots;
 
@@ -2742,6 +2750,68 @@ static int nativeSlotsOf(Native *native, RangeNode *self, RangeNode *at, NativeS
     return 1;
 }
 
+/* A value of `type` holds @many storage, directly or in a member. */
+static int nativeSharesSlots(const RangeNode *type)
+{
+    if (!type || type->kind != RangeNodeSpecialization || type->scalarBits || !type->memberOffsets) return 0;
+    RangeNode *declaration = type->resolvedDeclaration;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        if (type->memberOffsets[i] == SIZE_MAX) continue;
+        if ((declaration->items[i]->flags & RangeFlagMany) || nativeSharesSlots(type->memberTypes[i])) return 1;
+    }
+    return 0;
+}
+
+/* Retain every block the value at [base + offset] holds. Uses x9, x11, x13. */
+static void nativeRetain(Native *native, int base, size_t offset, RangeNode *type)
+{
+    RangeNode *declaration = type->resolvedDeclaration;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        if (!type->memberOffsets || type->memberOffsets[i] == SIZE_MAX) continue;
+        size_t at = offset + type->memberOffsets[i];
+        if (declaration->items[i]->flags & RangeFlagMany) {
+            nativeAddOffset(native,13,base,at);
+            nativeEmit(native,armLdr(9,13,0));
+            nativeEmit(native,armCbz(9,4));
+            nativeEmit(native,armLdr(11,9,0));
+            nativeEmit(native,armAddImm(11,11,1));
+            nativeEmit(native,armStr(11,9,0));
+        } else if (nativeSharesSlots(type->memberTypes[i])) nativeRetain(native,base,at,type->memberTypes[i]);
+    }
+}
+
+/* Retain the elements of the block in x6, x7 slots long. Uses x14-x16. */
+static void nativeRetainElements(Native *native, RangeNode *element)
+{
+    if (!nativeSharesSlots(element)) return;
+    nativeEmit(native,armMovz(14,0,0));
+    size_t top = native->machine.size;
+    nativeEmit(native,armCmp(14,7));
+    size_t done = nativeEmit(native,armBcond(RangeHS,0));
+    nativeConstant(native,16,element->size);
+    nativeEmit(native,armMul(15,14,16));
+    nativeEmit(native,armAdd(15,15,6));
+    nativeEmit(native,armAddImm(15,15,16));
+    nativeRetain(native,15,0,element);
+    nativeEmit(native,armAddImm(14,14,1));
+    nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
+    rangePatch(&native->machine,done,armBcond(RangeHS,(int32_t)((native->machine.size - done) / 4)));
+}
+
+/* Copy a value; with `retain`, the copy also holds references to its blocks.
+ * A temporary moving into place is not retained. */
+static void nativeCopyValue(Native *native, int destination, int source, RangeNode *type, int retain)
+{
+    nativeCopy(native,destination,source,type->size);
+    if (retain && nativeSharesSlots(type)) nativeRetain(native,destination,0,type);
+}
+
+/* An expression naming a place outlives the copy made from it. */
+static int nativePlace(const RangeNode *expr)
+{
+    return expr && (expr->kind == RangeNodeName || expr->kind == RangeNodeMemberAccess);
+}
+
 /* x1 = the block of the receiver at [sp + depth]; x2 = its slot count. */
 static void nativeLoadBlock(Native *native, NativeSlots *slots, uint32_t depth)
 {
@@ -2750,7 +2820,7 @@ static void nativeLoadBlock(Native *native, NativeSlots *slots, uint32_t depth)
     nativeEmit(native,armLdr(1,1,0));
     nativeEmit(native,armMovz(2,0,0));
     nativeEmit(native,armCbz(1,2));
-    nativeEmit(native,armLdr(2,1,0));
+    nativeEmit(native,armLdr(2,1,8));
 }
 
 /* x0 = the address of slot x3 in the block in x1, after checking x3 < x2. */
@@ -2760,8 +2830,49 @@ static void nativeSlotAddress(Native *native, NativeSlots *slots, RangeNode *at)
     nativeTrap(native,armBcond(RangeHS,0),at,"slot index is outside the @many storage");
     nativeConstant(native,4,slots->element->size);
     nativeEmit(native,armMul(4,3,4));
-    nativeEmit(native,armAddImm(0,1,8));
+    nativeEmit(native,armAddImm(0,1,16));
     nativeEmit(native,armAdd(0,0,4));
+}
+
+/* Give the receiver at [sp + depth] a block no other value shares. */
+static void nativeUnique(Native *native, NativeSlots *slots, uint32_t depth, RangeNode *at)
+{
+    nativeEmit(native,armLdr(1,31,depth));
+    nativeAddOffset(native,1,1,slots->offset);
+    nativeEmit(native,armLdr(1,1,0));
+    size_t empty = nativeEmit(native,armCbz(1,0));
+    nativeEmit(native,armLdr(2,1,0));
+    nativeEmit(native,armCmpImm(2,1));
+    size_t owned = nativeEmit(native,armBcond(RangeLS,0));
+    nativeEmit(native,armLdr(3,1,8));
+    nativeConstant(native,4,slots->element->size);
+    nativeEmit(native,armMul(4,3,4));
+    nativeEmit(native,armAddImm(4,4,16));    /* bytes */
+    nativeEmit(native,armPush(1));            /* old block */
+    nativeEmit(native,armPush(4));            /* bytes */
+    nativeEmit(native,armMov(0,4));
+    rangeCallImport(&native->machine,"_malloc");
+    nativeTrap(native,armCbz(0,0),at,"could not allocate @many storage");
+    nativeEmit(native,armLdr(2,31,0));        /* bytes */
+    nativeEmit(native,armLdr(1,31,16));       /* old block */
+    nativeEmit(native,armPush(0));            /* new block */
+    rangeCallImport(&native->machine,"_memcpy");
+    nativeEmit(native,armLdr(6,31,0));
+    nativeEmit(native,armMovz(9,1,0));
+    nativeEmit(native,armStr(9,6,0));         /* the new block has one reference */
+    nativeEmit(native,armLdr(7,6,8));
+    nativeRetainElements(native,slots->element);
+    nativeEmit(native,armLdr(1,31,32));       /* old block loses a reference */
+    nativeEmit(native,armLdr(2,1,0));
+    nativeEmit(native,armSubImm(2,2,1));
+    nativeEmit(native,armStr(2,1,0));
+    nativeEmit(native,armLdr(6,31,0));
+    nativeEmit(native,armAddImm(31,31,48));
+    nativeEmit(native,armLdr(1,31,depth));
+    nativeAddOffset(native,1,1,slots->offset);
+    nativeEmit(native,armStr(6,1,0));         /* the receiver holds the new block */
+    nativeBranchHere(native,empty,armCbz(1,0));
+    nativeBranchHere(native,owned,armBcond(RangeLS,0));
 }
 
 static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *function, RangeNode *self)
@@ -2779,9 +2890,10 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
         nativeSlotAddress(native,&slots,call);
         nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
         if (element->scalarBits) { nativeLoadScalar(native,0,0,0,element); return element; }
+        // The element stays in the block, so the copy holds its own references.
         int32_t copy = nativeReserve(native,size ? size : 1,element->alignment);
         nativeFrameAddress(native,1,copy);
-        nativeCopy(native,1,0,size);
+        nativeCopyValue(native,1,0,element,1);
         nativeFrameAddress(native,0,copy);
         return element;
     }
@@ -2791,27 +2903,34 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
             if (same(call->items[i]->name,"at")) at = call->items[i]->a;
             if (same(call->items[i]->name,"value")) value = call->items[i]->a;
         }
+        // Evaluate first: a copy made while evaluating must not see the write.
         if (!at || !value || !nativeExpression(native,value)) return NULL;
         nativeEmit(native,armPush(0));
         if (!nativeExpression(native,at)) return NULL;
-        nativeEmit(native,armMov(3,0));
-        nativeLoadBlock(native,&slots,16);      /* the receiver is below the value */
+        nativeEmit(native,armPush(0));
+        nativeUnique(native,&slots,32,call);   /* receiver below value and index */
+        nativeEmit(native,armPop(3));           /* index */
+        nativeLoadBlock(native,&slots,16);
         nativeSlotAddress(native,&slots,call);
         nativeEmit(native,armPop(1));           /* the value */
         nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
         if (element->scalarBits) nativeStoreScalar(native,1,0,0,element);
-        else nativeCopy(native,0,1,size);
+        else nativeCopyValue(native,0,1,element,nativePlace(value));
         return NULL;
     }
-    // resize(to: n): count checks, then realloc(block, 8 + n * size).
+    // resize(to: n): count checks, a block of its own, then realloc(block, 16 + n * size).
     if (!nativeExpression(native,call->items[0]->a)) return NULL;
     nativeEmit(native,armCmpImm(0,0));
     nativeTrap(native,armBcond(RangeLT,0),call,"resize to a negative slot count");
     nativeConstant(native,4,size);
     nativeEmit(native,armUmulh(5,0,4));
     nativeTrap(native,armCbnz(5,0),call,"resize exceeds addressable memory");
+    nativeEmit(native,armPush(0));           /* n */
+    nativeUnique(native,&slots,16,call);
+    nativeEmit(native,armPop(0));
+    nativeConstant(native,4,size);
     nativeEmit(native,armMul(5,0,4));        /* x5 = n * size */
-    nativeEmit(native,armAddImm(5,5,8));     /* plus the count */
+    nativeEmit(native,armAddImm(5,5,16));    /* plus the header */
     nativeLoadBlock(native,&slots,0);        /* x1 = old block, x2 = old count */
     nativeEmit(native,armPush(0));           /* n */
     nativeEmit(native,armPush(2));           /* old count */
@@ -2821,18 +2940,20 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
     nativeTrap(native,armCbz(0,0),call,"resize could not allocate @many storage");
     nativeEmit(native,armPop(2));            /* old count */
     nativeEmit(native,armPop(3));            /* n */
-    nativeEmit(native,armStr(3,0,0));        /* the block records its count */
+    nativeEmit(native,armMovz(9,1,0));
+    nativeEmit(native,armStr(9,0,0));        /* a block of its own: one reference */
+    nativeEmit(native,armStr(3,0,8));        /* the block records its count */
     nativeEmit(native,armLdr(1,31,0));       /* receiver */
     nativeAddOffset(native,1,1,slots.offset);
     nativeEmit(native,armStr(0,1,0));        /* the member holds the block */
-    // Zero the slots beyond the old count: memset(block + 8 + old * size, 0, (n - old) * size).
+    // Zero the slots beyond the old count: memset(block + 16 + old * size, 0, (n - old) * size).
     nativeEmit(native,armCmp(3,2));
     size_t skip = nativeEmit(native,armBcond(RangeLS,0));
     nativeConstant(native,4,size);
     nativeEmit(native,armSub(5,3,2));
     nativeEmit(native,armMul(5,5,4));        /* bytes */
     nativeEmit(native,armMul(4,2,4));
-    nativeEmit(native,armAddImm(0,0,8));
+    nativeEmit(native,armAddImm(0,0,16));
     nativeEmit(native,armAdd(0,0,4));        /* first new slot */
     nativeEmit(native,armMovz(1,0,0));
     nativeEmit(native,armMov(2,5));
@@ -2840,28 +2961,6 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
     rangePatch(&native->machine,skip,armBcond(RangeLS,(int32_t)((native->machine.size - skip) / 4)));
     nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
     return NULL;
-}
-
-/* Copying a value copies its @many address, so both copies share one block.
- * Copy semantics are undecided; each such copy is reported. */
-static int nativeSharesSlots(const RangeNode *type)
-{
-    if (!type || type->kind != RangeNodeSpecialization || type->scalarBits || !type->memberOffsets) return 0;
-    RangeNode *declaration = type->resolvedDeclaration;
-    for (size_t i = 0; i < declaration->itemCount; ++i) {
-        if (type->memberOffsets[i] == SIZE_MAX) continue;
-        if ((declaration->items[i]->flags & RangeFlagMany) || nativeSharesSlots(type->memberTypes[i])) return 1;
-    }
-    return 0;
-}
-
-static void nativeCopyValue(Native *native, int destination, int source, RangeNode *type, RangeNode *at)
-{
-    if (nativeSharesSlots(type)) {
-        char name[160]; describeType(name,sizeof(name),type);
-        sourceDiagnostic(native->report,at,1,"copy","copying %s shares its @many storage; copy semantics are not decided",name);
-    }
-    nativeCopy(native,destination,source,type->size);
 }
 
 static NativeInstance *nativeInstance(Native *native, RangeNode *function, RangeNode *self)
@@ -3086,12 +3185,12 @@ static void nativeBranchHere(Native *native, size_t at, uint32_t base)
 
 /* x0 holds a value of `type`: a scalar, or an aggregate's address. Store it
  * into the place at the address in x1. */
-static void nativeStorePlace(Native *native, RangeNode *type, int frameSlot, RangeNode *at)
+static void nativeStorePlace(Native *native, RangeNode *type, int frameSlot, int retain)
 {
     if (type->scalarBits) {
         if (frameSlot) nativeEmit(native,armStr(0,1,0));
         else nativeStoreScalar(native,0,1,0,type);
-    } else nativeCopyValue(native,1,0,type,at);
+    } else nativeCopyValue(native,1,0,type,retain);
 }
 
 static void nativeStatement(Native *native, RangeNode *node)
@@ -3127,7 +3226,7 @@ static void nativeStatement(Native *native, RangeNode *node)
         if (value) {
             if (!nativeExpression(native,value)) break;
             nativeFrameAddress(native,1,offset);
-            nativeCopyValue(native,1,0,type,node);
+            nativeCopyValue(native,1,0,type,nativePlace(value));
         } else {
             nativeFrameAddress(native,0,offset);
             nativeZero(native,0,type->size);
@@ -3142,7 +3241,7 @@ static void nativeStatement(Native *native, RangeNode *node)
         RangeNode *placed = nativeAddress(native,node->a,&frameSlot);
         nativeEmit(native,armMov(1,0));
         nativeEmit(native,armPop(0));
-        if (placed && nativeKind(native,placed,node) != NativeNone) nativeStorePlace(native,placed,frameSlot,node);
+        if (placed && nativeKind(native,placed,node) != NativeNone) nativeStorePlace(native,placed,frameSlot,nativePlace(node->b));
         break;
     }
     case RangeNodeIf: {
@@ -3170,8 +3269,13 @@ static void nativeStatement(Native *native, RangeNode *node)
         if (node->a) {
             RangeNode *type = nativeExpression(native,node->a);
             if (type && !type->scalarBits && native->resultSlot) {
+                // A returned local or parameter ends here and moves out; a
+                // member of the receiver stays, so the result holds its own references.
+                RangeNode *root = node->a;
+                while (root->kind == RangeNodeMemberAccess) root = root->a;
+                int retain = root->kind == RangeNodeName && !nativeSlotOf(native,root->resolvedDeclaration);
                 nativeLoad(native,1,native->resultSlot);
-                nativeCopyValue(native,1,0,type,node);
+                nativeCopyValue(native,1,0,type,retain && nativePlace(node->a));
             }
         }
         size_t at = nativeEmit(native,armB(0));
@@ -3222,7 +3326,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
             int reg = (int)i + base;
             int32_t offset = nativeNewSlot(native,parameter,type,kind);
             if (kind == NativeScalar) nativeStore(native,reg,offset);
-            else { nativeEmit(native,armAddImm(0,reg,0)); nativeFrameAddress(native,1,offset); nativeCopyValue(native,1,0,type,parameter); }
+            else { nativeEmit(native,armAddImm(0,reg,0)); nativeFrameAddress(native,1,offset); nativeCopyValue(native,1,0,type,1); }
         }
     }
     nativeBlock(native,body);
