@@ -1,0 +1,6 @@
+// Effect: write the message and a newline. Inside a macro body it runs at
+// compile time and writes to the compiler's output; in a program it writes to
+// standard output. Interpolated parts are written in order: integers of any
+// width in decimal, booleans as true or false, strings as their bytes.
+@builtin
+macro print(let message: String)

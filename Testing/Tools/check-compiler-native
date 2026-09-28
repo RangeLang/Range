@@ -36,6 +36,10 @@ core=(Language/Grammar Language/Macros Language/Types)
 run arrays 42 "" Testing/Compiler/Native/Arrays.range
 run copy-on-write 42 "" Testing/Compiler/Native/CopyOnWrite.range
 run lifetimes 42 "" Testing/Compiler/Native/Lifetimes.range
+run output 134 "Output.range:22:9: count is 5, expected at most 3" Testing/Compiler/Native/Output.range
+printf '%s\n' "Hello from Range!" "hello, world" "count: 5, last: 25, empty: false, capacity: 8" \
+    "-128 4294967295 -9223372036854775808 0 true" "done" | cmp -s - "$work_root/stdout" \
+    || fail "@print wrote: $(cat "$work_root/stdout")"
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes; do
@@ -78,4 +82,4 @@ status=0
 [[ "$status" == 65 && ! -e "$work_root/literal-law" ]] || fail "literal law violation compiled"
 grep -q "does not satisfy @integer" "$work_root/log" || fail "literal law reported wrongly"
 
-echo "compiler native: programs=15 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass"
+echo "compiler native: programs=16 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass"

@@ -535,6 +535,46 @@ static void resolveGraphOutputs(Resolver *vm)
     }
 }
 
+/* An application of a macro without a target (an effect such as @print) is a
+ * statement of its own, even when it precedes a declaration it would
+ * otherwise appear to annotate. */
+static int effectMacro(Resolver *vm, const char *name)
+{
+    for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
+        RangeNode *node = vm->units[u]->items[i];
+        if (node->kind == RangeNodeMacro && !node->b && same(node->name,name)) return 1;
+    }
+    return 0;
+}
+
+static void separateEffects(Resolver *vm, RangeNode *node)
+{
+    if (!node) return;
+    if (node->kind == RangeNodeBlock) {
+        for (size_t i = 0; i < node->itemCount; ++i) {
+            RangeNode *statement = node->items[i], *annotations = statement->annotations;
+            if (!annotations) continue;
+            size_t kept = 0, moved = 0;
+            for (size_t j = 0; j < annotations->itemCount; ++j) {
+                RangeNode *attribute = annotations->items[j];
+                if (!effectMacro(vm,attribute->name)) { annotations->items[kept++] = attribute; continue; }
+                RangeNode *effect = rangeNodeCreate(vm->arena,RangeNodeExpressionStatement,attribute->path,attribute->line,attribute->column);
+                effect->a = attribute;
+                // Insert before the statement, keeping source order.
+                rangeNodeAppend(vm->arena,node,effect);
+                memmove(node->items + i + moved + 1,node->items + i + moved,(node->itemCount - 1 - i - moved) * sizeof(*node->items));
+                node->items[i + moved] = effect;
+                ++moved;
+            }
+            annotations->itemCount = kept;
+            if (!kept) statement->annotations = NULL;
+            i += moved;
+        }
+    }
+    separateEffects(vm,node->a); separateEffects(vm,node->b); separateEffects(vm,node->c);
+    for (size_t i = 0; i < node->itemCount; ++i) separateEffects(vm,node->items[i]);
+}
+
 static int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t count,
                                     char *error, size_t errorSize)
 {
@@ -543,6 +583,7 @@ static int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t
     vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
     int ok = 0;
     if (setjmp(vm->failure) == 0) {
+        for (size_t u = 0; u < count; ++u) separateEffects(vm,units[u]);
         for (size_t u = 0; u < count; ++u) validateGraphShape(vm,units[u],units[u]->source);
         registerGrammarDefinitions(vm);
         registerLiteralRules(vm);
@@ -860,12 +901,16 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
     }
     case RangeNodeAttribute: {
         RangeNode *macro = metaDeclaration(eval,node,RangeNodeMacro,node->name);
-        if (!macroBuiltin(macro,"diagnostic") || macro->a || macro->generics || macro->itemCount != 1)
+        int print = macroBuiltin(macro,"print");
+        if ((!macroBuiltin(macro,"diagnostic") && !print) || macro->a || macro->generics || macro->itemCount != 1)
             fail(eval->vm,node,"unsupported compile-time macro effect");
         if (node->itemCount != 1 || (node->items[0]->name && !same(node->items[0]->name,macro->items[0]->name)))
-            fail(eval->vm,node,"diagnostic builtin requires one message argument");
+            fail(eval->vm,node,"%s builtin requires one message argument",macro->name);
         const char *message = graphText(eval->vm,metaExpression(eval,scope,node->items[0]->a),node);
-        fail(eval->vm,node,"%s",message);
+        if (!print) fail(eval->vm,node,"%s",message);
+        // Compile-time output: the compiler's standard output, one line per effect.
+        printf("%s\n",message);
+        return (RangeGraphValue){0};
     }
     default: fail(eval->vm,node,"unsupported compile-time expression '%s'",rangeNodeKindName(node->kind));
     }
@@ -1134,7 +1179,10 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of copy-on-write slots, allocated through libSystem and freed when its last reference ends");
         else if (macroBuiltin(node,"optional"))
             sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the construct applying @optional in C");
-        else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
+        else if (macroBuiltin(node,"print"))
+            sourceDiagnostic(report,node,1,"C-implementation","@print writes through libSystem write in C, formatting integers in C");
+        else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic")
+                 && !macroBuiltin(node,"print"))
             for (size_t i = 0; i < node->c->itemCount; ++i)
                 if (same(node->c->items[i]->name,"builtin"))
                     sourceDiagnostic(report,node,0,"not-implemented","no C primitive is implemented for builtin macro '%s'",node->name);
@@ -2004,6 +2052,35 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
 
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 
+/* `@print(…)` and `@diagnostic(…)` in runtime code: one message, a String or
+ * an interpolated literal whose parts are integers, booleans, or strings. */
+static void typeEffect(Typer *typer, SourceScope *scope, RangeNode *attribute, RangeNode *context)
+{
+    RangeNode *macro = NULL;
+    for (size_t u = 0; u < typer->report->count && !macro; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+        RangeNode *candidate = typer->report->units[u]->items[i];
+        if (candidate->kind == RangeNodeMacro && !candidate->b && same(candidate->name,attribute->name)) { macro = candidate; break; }
+    }
+    if (!macro) return; /* undeclared macros are reported already */
+    attribute->resolvedDeclaration = macro;
+    if (!macroBuiltin(macro,"print") && !macroBuiltin(macro,"diagnostic")) return; /* reported by code generation */
+    if (attribute->itemCount != 1) { typeError(typer,attribute,"@%s requires one message",macro->name); return; }
+    RangeNode *message = attribute->items[0]->a;
+    if (message->kind != RangeNodeString) { (void)typeOf(typer,scope,message,NULL,context); return; }
+    (void)typeOf(typer,scope,message,NULL,context);
+    for (size_t i = 0; i < message->itemCount; ++i) {
+        RangeNode *part = message->items[i];
+        if (part->flags & RangeFlagLiteral) continue;
+        RangeNode *type = typeOf(typer,scope,part->a,NULL,context);
+        if (!type) continue;
+        if (type->kind == RangeNodeSpecialization && (type->resolvedDeclaration == typer->integer
+            || type->resolvedDeclaration == typer->boolean
+            || (message->type && type->resolvedDeclaration == message->type->resolvedDeclaration))) continue;
+        char name[160]; describeType(name,sizeof(name),type);
+        typeError(typer,part->a,"@%s cannot write %s",macro->name,name);
+    }
+}
+
 static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
 {
     if (!node) return;
@@ -2075,7 +2152,8 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         }
         break;
     case RangeNodeExpressionStatement:
-        if (node->a && node->a->kind != RangeNodeAttribute) (void)typeOf(typer,scope,node->a,NULL,context);
+        if (node->a && node->a->kind == RangeNodeAttribute) typeEffect(typer,scope,node->a,context);
+        else if (node->a) (void)typeOf(typer,scope,node->a,NULL,context);
         break;
     default: break; /* declarations, and forms reported as not implemented */
     }
@@ -2394,8 +2472,10 @@ typedef struct { size_t at; const char *bytes; size_t length; } NativeText;
 /* A temporary that owns references until it is moved into place or its
  * statement ends. */
 typedef struct { int32_t offset; RangeNode *type; int consumed; } NativeTemp;
-/* A release subroutine: for a value of `type` (x0 = its address), or for a
- * block of `type` elements (x0 = the block, or zero). */
+/* A subroutine emitted once: release a value of `type` (x0 = its address),
+ * release a block of `type` elements (x0 = the block, or zero), or write an
+ * integer in decimal (x0 = the value, x1 = the file descriptor). */
+enum { NativeReleaseValue, NativeReleaseBlock, NativeWriteSigned, NativeWriteUnsigned };
 typedef struct { RangeNode *type; int block; size_t offset; int compiled; } NativeHelper;
 typedef struct { size_t at; size_t helper; } NativeHelperCall;
 
@@ -3093,7 +3173,38 @@ static void nativeHelperBody(Native *native, size_t index)
     RangeNode *type = helper.type;
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0));
-    if (!helper.block) {
+    if (helper.block == NativeWriteSigned || helper.block == NativeWriteUnsigned) {
+        // Digits are written backwards into a 32-byte buffer on the stack.
+        nativeEmit(native,armSubImm(31,31,32));
+        nativeEmit(native,armMov(9,0));              /* the magnitude */
+        nativeEmit(native,armMov(10,1));             /* the file descriptor */
+        nativeEmit(native,armMovz(11,0,0));          /* negative */
+        if (helper.block == NativeWriteSigned) {
+            nativeEmit(native,armCmpImm(9,0));
+            nativeEmit(native,armBcond(RangeGE,3));
+            nativeEmit(native,armNeg(9,9));          /* the minimum stays as its unsigned magnitude */
+            nativeEmit(native,armMovz(11,1,0));
+        }
+        nativeEmit(native,armAddImm(3,31,32));       /* cursor, past the buffer */
+        nativeEmit(native,armMovz(13,10,0));
+        size_t digit = native->machine.size;
+        nativeEmit(native,armUdiv(12,9,13));
+        nativeEmit(native,armMsub(14,12,13,9));
+        nativeEmit(native,armAddImm(14,14,'0'));
+        nativeEmit(native,armSubImm(3,3,1));
+        nativeEmit(native,armStoreSized(1,14,3,0));
+        nativeEmit(native,armMov(9,12));
+        nativeEmit(native,armCbnz(9,-(int32_t)((native->machine.size - digit) / 4)));
+        nativeEmit(native,armCbz(11,4));
+        nativeEmit(native,armMovz(14,'-',0));
+        nativeEmit(native,armSubImm(3,3,1));
+        nativeEmit(native,armStoreSized(1,14,3,0));
+        nativeEmit(native,armAddImm(2,31,32));
+        nativeEmit(native,armSub(2,2,3));            /* length */
+        nativeEmit(native,armMov(1,3));
+        nativeEmit(native,armMov(0,10));
+        rangeCallImport(&native->machine,"_write");
+    } else if (!helper.block) {
         // A value: release each block it holds, directly or in members.
         nativeEmit(native,armPush(0));
         RangeNode *declaration = type->resolvedDeclaration;
@@ -3401,6 +3512,83 @@ static void nativeStorePlace(Native *native, RangeNode *type, int frameSlot, int
     } else nativeCopyValue(native,1,0,type,retain);
 }
 
+/* write(fd, text) for bytes placed in __text. */
+static void nativeWriteText(Native *native, int fd, const char *bytes, size_t length)
+{
+    if (!length) return;
+    nativeEmit(native,armMovz(0,(uint16_t)fd,0));
+    NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=bytes,.length=length};
+    NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
+    nativeConstant(native,2,length);
+    rangeCallImport(&native->machine,"_write");
+}
+
+/* Stream a message to fd: literal parts as bytes, interpolated integers in
+ * decimal, booleans as true or false, strings as their bytes. */
+static void nativeWriteMessage(Native *native, int fd, RangeNode *message)
+{
+    int literal = message->kind == RangeNodeString;
+    size_t parts = literal ? message->itemCount : 1;
+    for (size_t i = 0; i < parts; ++i) {
+        RangeNode *part = literal ? message->items[i] : NULL;
+        if (part && (part->flags & RangeFlagLiteral)) { nativeWriteText(native,fd,part->name,(size_t)part->integer); continue; }
+        RangeNode *value = part ? part->a : message;
+        RangeNode *type = nativeExpression(native,value);
+        if (!type) continue;
+        if (type->kind == RangeNodeSpecialization && type->resolvedDeclaration == native->typer->boolean) {
+            nativeEmit(native,armMov(9,0));
+            nativeEmit(native,armMovz(0,(uint16_t)fd,0));
+            size_t isFalse = nativeEmit(native,armCbz(9,0));
+            NativeText yes = {.at=nativeEmit(native,armAdr(1,0)),.bytes="true",.length=4};
+            NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,yes);
+            nativeEmit(native,armMovz(2,4,0));
+            size_t done = nativeEmit(native,armB(0));
+            nativeBranchHere(native,isFalse,armCbz(9,0));
+            NativeText no = {.at=nativeEmit(native,armAdr(1,0)),.bytes="false",.length=5};
+            NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,no);
+            nativeEmit(native,armMovz(2,5,0));
+            nativeBranchHere(native,done,armB(0));
+            rangeCallImport(&native->machine,"_write");
+        } else if (type->scalarBits) {
+            nativeEmit(native,armMovz(1,(uint16_t)fd,0));
+            nativeCallHelper(native,NULL,type->scalarSigned ? NativeWriteSigned : NativeWriteUnsigned);
+        } else if (type->size == 16 && type->resolvedDeclaration == (message->type ? message->type->resolvedDeclaration : NULL)) {
+            nativeEmit(native,armLdr(2,0,8));
+            nativeEmit(native,armLdr(1,0,0));
+            nativeEmit(native,armMovz(0,(uint16_t)fd,0));
+            rangeCallImport(&native->machine,"_write");
+        } else {
+            char name[160]; describeType(name,sizeof(name),type);
+            nativeMissing(native,value,"writing %s is not implemented",name);
+        }
+    }
+}
+
+/* @print writes to standard output; @diagnostic writes a located message to
+ * standard error and exits 134, as a law violation does. */
+static void nativeEffect(Native *native, RangeNode *node, RangeNode *attribute)
+{
+    RangeNode *macro = attribute->resolvedDeclaration;
+    int print = macroBuiltin(macro,"print");
+    if (!print && !macroBuiltin(macro,"diagnostic")) {
+        nativeMissing(native,node,"runtime macro application '@%s' is not implemented",attribute->name);
+        return;
+    }
+    if (attribute->itemCount != 1) return; /* reported by the type checker */
+    if (!print) {
+        char location[512];
+        snprintf(location,sizeof(location),"%s:%d:%d: ",attribute->path,attribute->line,attribute->column);
+        const char *prefix = rangeArenaIntern(native->report->arena,location,strlen(location));
+        nativeWriteText(native,2,prefix,strlen(prefix));
+    }
+    nativeWriteMessage(native,print ? 1 : 2,attribute->items[0]->a);
+    nativeWriteText(native,print ? 1 : 2,"\n",1);
+    if (!print) {
+        nativeEmit(native,armMovz(0,134,0));
+        rangeCallImport(&native->machine,"_exit");
+    }
+}
+
 static void nativeStatementBody(Native *, RangeNode *);
 
 /* Temporaries a statement creates end with it, unless moved into place. */
@@ -3527,8 +3715,7 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         break;
     }
     case RangeNodeExpressionStatement:
-        if (node->a && node->a->kind == RangeNodeAttribute)
-            nativeMissing(native,node,"runtime macro application '@%s' is not implemented",node->a->name);
+        if (node->a && node->a->kind == RangeNodeAttribute) nativeEffect(native,node,node->a);
         else nativeExpression(native,node->a);
         break;
     case RangeNodeFunction: case RangeNodeConstruct:

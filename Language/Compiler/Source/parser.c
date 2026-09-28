@@ -629,8 +629,12 @@ static RangeNode *parseStatement(RangeParser *parser)
             emitted->b = attributes;
             return emitted;
         }
-        if (parserAt(parser, "}") || parserAtKind(parser, RangeTokenEnd)) {
-            /* Attributes not modifying a declaration are macro applications.
+        RangeNodeKind declared;
+        if (parserAt(parser, "}") || parserAtKind(parser, RangeTokenEnd)
+            || !(valueDeclarationKind(parser, &declared) || parserAt(parser, "function")
+                 || parserAt(parser, "construct"))) {
+            /* Attributes annotate declarations; before anything else they are
+             * effects, like @print(…), and the next statement stands alone.
              * Each one is its own statement; a run of them becomes a block. */
             if (attributes->itemCount == 1) {
                 RangeNode *application =

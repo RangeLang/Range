@@ -1,3 +1,5 @@
-// Compiler effect: report the supplied message and fail validation.
+// Effect: report the message. Inside a macro body it fails validation at
+// compile time; in a program it writes the located message to standard error
+// and exits with status 134.
 @builtin
 macro diagnostic(let message: String)
