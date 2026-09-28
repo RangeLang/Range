@@ -1,0 +1,7 @@
+// `Wrapped?` is Optional<Wrapped>. Absence is a false `present`; its payload
+// is then meaningless. Spelling absence and presence at construction is open.
+@optional
+construct Optional<Wrapped> {
+    let present: Bool
+    let wrapped: Wrapped
+}

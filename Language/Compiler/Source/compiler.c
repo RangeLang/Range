@@ -938,8 +938,9 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     RangeMacroApplication *app = attribute->macroApplication;
     if (!app) fail(vm,attribute,"macro application was not resolved");
     RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
-    // @many marks layout only; applying it has no compile-time effect.
-    if (macroBuiltin(app->declaration,"many")) return emitted;
+    // @many marks layout and @optional marks the `?` sugar's construct; applying
+    // either has no compile-time effect.
+    if (macroBuiltin(app->declaration,"many") || macroBuiltin(app->declaration,"optional")) return emitted;
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
         if (same(app->declaration->c->items[j]->name,"builtin")) {
             if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
@@ -1131,6 +1132,8 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
         if (macroBuiltin(node,"many"))
             sourceDiagnostic(report,node,0,"not-implemented","builtin macro 'many' has no runtime storage implementation");
+        else if (macroBuiltin(node,"optional"))
+            sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the construct applying @optional in C");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic"))
             for (size_t i = 0; i < node->c->itemCount; ++i)
                 if (same(node->c->items[i]->name,"builtin"))
@@ -1687,8 +1690,26 @@ static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const c
     if (!name || !*name || strchr(name,'|')) return NULL; /* unions are reported already */
     if (flags & RangeFlagMacroType) return NULL; /* macro types are not typed in this step */
     if (flags & RangeFlagOptional) {
-        sourceDiagnostic(typer->report,at,0,"not-implemented","optional types are not implemented");
-        return NULL;
+        // `T?` is the construct applying @optional, specialized with T.
+        RangeNode *optional = NULL;
+        size_t found = 0;
+        for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+            RangeNode *candidate = typer->report->units[u]->items[i];
+            if (candidate->kind == RangeNodeConstruct && appliesBuiltin(candidate,"optional")) { optional = candidate; ++found; }
+        }
+        if (found != 1) {
+            sourceDiagnostic(typer->report,at,0,"undeclared","'%s?' needs exactly one construct applying @optional; found %zu",name,found);
+            return NULL;
+        }
+        RangeArena *arena = typer->report->arena;
+        RangeNode *wrapped = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
+        wrapped->name = name; wrapped->generics = generics; wrapped->flags = flags & ~RangeFlagOptional;
+        RangeNode *arguments = rangeNodeCreate(arena,RangeNodeBlock,at->path,at->line,at->column);
+        arguments->name = "genericArguments";
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,at->path,at->line,at->column);
+        argument->a = wrapped;
+        rangeNodeAppend(arena,arguments,argument);
+        return specialize(typer,scope,optional,arguments,context,at);
     }
     if (context && context->generics)
         for (size_t i = 0; i < context->generics->itemCount; ++i) {
@@ -2037,6 +2058,16 @@ static long long storageBits(Typer *typer, RangeNode *specialization, RangeNode 
     return value->integer;
 }
 
+/* Grammar constructs describe C's graph nodes: C provides their values at
+ * compile time, and they have no runtime layout. */
+static int graphConstruct(Typer *typer, const RangeNode *declaration)
+{
+    RangeNode *shapes = typer->report->arena->graphTypes;
+    for (size_t i = 0; shapes && i < shapes->itemCount; ++i)
+        if (shapes->items[i]->resolvedDeclaration == declaration) return 1;
+    return 0;
+}
+
 static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
 {
     if (!specialization || specialization->kind != RangeNodeSpecialization) return 0;
@@ -2046,6 +2077,11 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
     if (specialization->layout == 1) {
         describeType(name,sizeof(name),specialization);
         sourceDiagnostic(typer->report,at,0,"layout","%s has no layout: it contains itself",name);
+        return 0;
+    }
+    if (graphConstruct(typer,declaration)) {
+        specialization->layout = 2;
+        specialization->integer = 1; /* graph value: runtime uses report it */
         return 0;
     }
     specialization->layout = 1;

@@ -1,0 +1,4 @@
+// C primitive: `T?` in a type position is sugar for the construct that applies
+// @optional, specialized with T. C resolves the sugar; it never names the type.
+@builtin
+macro optional(): Construct

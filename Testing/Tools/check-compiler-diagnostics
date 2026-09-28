@@ -43,7 +43,8 @@ assert "has a C graph shape but no Range declaration" not in active, active
 # The language sources type-check; laws run per specialization without failing.
 assert 'error[type]' not in active and 'error[law]' not in active, active
 assert 'String has no layout: it contains itself' in active, active
-assert 'optional types are not implemented' in active, active
+assert 'optional types are not implemented' not in active, active
+assert "'?' sugar resolves to the construct applying @optional in C" in active, active
 for shortcut in ('filter(named:)', '.first', '.isTarget'):
     assert f"'{shortcut}' is hard-coded in C" in active, active
 assert 'uses in this source' in active, active

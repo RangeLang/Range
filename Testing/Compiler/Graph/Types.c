@@ -101,7 +101,7 @@ int main(void)
     // The language sources type-check; only runtime gaps and deferred forms remain.
     compile(&c,"function nothing() {}");
     assert(!errorsIn(&c,"type") && !errorsIn(&c,"law"));
-    assert(reported(&c,"not-implemented","optional types are not implemented"));
+    assert(!reported(&c,"not-implemented","optional"));
     assert(reported(&c,"layout","String has no layout: it contains itself"));
     RangeNode *append = NULL;
     for (size_t u = 0; u < c.count && !append; ++u) {
@@ -161,9 +161,9 @@ int main(void)
         "construct Bytes { let a: Int<bits: 8> let b: Int<bits: 8> let c: Int<bits: 12> } "
         "construct Loop { let again: Loop } "
         "function layouts() { let a: 0 state b: Int<bits: 8> state w: Int<bits: 12> let t: true "
-        "state xs: Array<Int> let p: Pair let q: Bytes let s: \"\" }");
+        "state xs: Array<Int> let p: Pair let q: Bytes let s: \"\" state maybe: Int<bits: 8>? }");
     struct { const char *name; size_t size, alignment; } expected[] = {
-        {"a",8,8}, {"b",1,1}, {"w",2,2}, {"t",1,1}, {"xs",24,8}, {"p",16,8}, {"q",4,2}};
+        {"a",8,8}, {"b",1,1}, {"w",2,2}, {"t",1,1}, {"xs",24,8}, {"p",16,8}, {"q",4,2}, {"maybe",2,1}};
     for (size_t i = 0; i < sizeof(expected)/sizeof(*expected); ++i) {
         RangeNode *type = local(&c,"layouts",expected[i].name)->type;
         assert(type && type->layout == 2);
@@ -172,6 +172,7 @@ int main(void)
         assert(type->size == expected[i].size && type->alignment == expected[i].alignment);
     }
     assert(!local(&c,"layouts","s")->type->size);
+    expectDescription(local(&c,"layouts","maybe")->type,"Optional<Wrapped: Int<bits: 8, signed: true>>");
     assert(reported(&c,"layout","String has no layout: it contains itself"));
     assert(reported(&c,"layout","Loop has no layout: it contains itself"));
     // Only root causes are reported; types that merely contain them stay quiet.
