@@ -252,26 +252,39 @@ static const char *literalString(Resolver *vm, RangeNode *node)
     return node->items[0]->name;
 }
 
-static int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const char *input)
+/* Each literal pattern is compiled once per process; every literal in the
+ * program is matched against the compiled form. */
+static regex_t *literalRegex(Resolver *vm, RangeNode *at, const char *pattern)
 {
+    static struct { char *pattern; regex_t regex; } cache[32];
+    static size_t cached;
+    for (size_t i = 0; i < cached; ++i) if (!strcmp(cache[i].pattern,pattern)) return &cache[i].regex;
     regex_t regex;
     int code = regcomp(&regex,pattern,REG_EXTENDED);
-    char detail[256];
     if (code) {
+        char detail[256];
         regerror(code,&regex,detail,sizeof(detail));
         fail(vm,at,"invalid literal regex: %s",detail);
     }
+    if (cached == sizeof(cache)/sizeof(*cache)) { regfree(&cache[0].regex); free(cache[0].pattern); cache[0] = cache[--cached]; }
+    char *copy = strdup(pattern);
+    if (!copy) abort();
+    cache[cached].pattern = copy;
+    cache[cached].regex = regex;
+    return &cache[cached++].regex;
+}
+
+static int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const char *input)
+{
+    regex_t *regex = literalRegex(vm,at,pattern);
     regmatch_t match;
-    code = input ? regexec(&regex,input,1,&match,0) : REG_NOMATCH;
+    int code = input ? regexec(regex,input,1,&match,0) : REG_NOMATCH;
     if (code && code != REG_NOMATCH) {
-        regerror(code,&regex,detail,sizeof(detail));
-        regfree(&regex);
+        char detail[256];
+        regerror(code,regex,detail,sizeof(detail));
         fail(vm,at,"literal regex matching failed: %s",detail);
     }
-    int matched = !code && match.rm_so == 0 && match.rm_eo >= 0
-        && (size_t)match.rm_eo == strlen(input);
-    regfree(&regex);
-    return matched;
+    return !code && match.rm_so == 0 && match.rm_eo >= 0 && (size_t)match.rm_eo == strlen(input);
 }
 
 /* A builtin macro is `@builtin macro name`; its name selects the C primitive. */
@@ -1474,12 +1487,24 @@ static void diagnoseDuplicates(SourceReport *report)
  * check. Operators are C builtins for now, selected by the literal families
  * the language declares. */
 
+/* A law run on a literal depends only on the specialization and the
+ * literal's value, so its outcome is kept under exactly those inputs. */
+typedef struct {
+    RangeNode *type;
+    RangeNodeKind kind;
+    long long integer;
+    const char *text;
+    const char **failures;
+    size_t failureCount;
+} LawResult;
+
 typedef struct {
     SourceReport *report;
     Resolver *vm;                /* runs laws per specialization */
     RangeNode *specializations;  /* interned RangeNodeSpecialization nodes */
     RangeNode *integer, *boolean; /* constructs the integer and boolean literal rules select */
     RangeNode *booleanType;
+    LawResult *laws; size_t lawCount, lawCapacity;
 } Typer;
 
 static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
@@ -1584,8 +1609,46 @@ static RangeNode *literalHolder(RangeNode *declaration, RangeNode *value, size_t
     return holder;
 }
 
+/* The inputs a literal gives a law: its kind and value, `-n` as one value. */
+static int lawInputs(const RangeNode *value, RangeNodeKind *kind, long long *integer, const char **text)
+{
+    *integer = 0; *text = NULL;
+    if (value->kind == RangeNodeUnary && same(value->name,"-") && value->a && value->a->kind == RangeNodeInteger) {
+        *kind = RangeNodeInteger;
+        *integer = -value->a->integer;
+        return value->a->integer != LLONG_MIN;
+    }
+    *kind = value->kind;
+    if (value->kind == RangeNodeInteger || value->kind == RangeNodeBool) { *integer = value->integer; return 1; }
+    if (value->kind == RangeNodeString && value->itemCount == 1 && (value->items[0]->flags & RangeFlagLiteral)) {
+        *text = value->items[0]->name;
+        return 1;
+    }
+    return 0;
+}
+
+static LawResult *lawResult(Typer *typer, RangeNode *type, RangeNode *value)
+{
+    RangeNodeKind kind; long long integer; const char *text;
+    if (!lawInputs(value,&kind,&integer,&text)) return NULL;
+    for (size_t i = 0; i < typer->lawCount; ++i) {
+        LawResult *result = &typer->laws[i];
+        if (result->type == type && result->kind == kind && result->integer == integer
+            && (result->text == text || (result->text && text && !strcmp(result->text,text)))) return result;
+    }
+    if (typer->lawCount == typer->lawCapacity) {
+        typer->lawCapacity = typer->lawCapacity ? typer->lawCapacity * 2 : 64;
+        LawResult *grown = rangeArenaAllocate(typer->report->arena,typer->lawCapacity * sizeof(*grown));
+        if (typer->lawCount) memcpy(grown,typer->laws,typer->lawCount * sizeof(*grown));
+        typer->laws = grown;
+    }
+    typer->laws[typer->lawCount] = (LawResult){.type=type,.kind=kind,.integer=integer,.text=text,.failureCount=SIZE_MAX};
+    return &typer->laws[typer->lawCount++];
+}
+
 /* Run the construct's macro applications against this specialization, with
- * the supplied literal in place of the member it populates. */
+ * the supplied literal in place of the member it populates. A literal's
+ * outcome is reused for every equal literal of the same type. */
 static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value, RangeNode *at)
 {
     RangeNode *declaration = specialization->resolvedDeclaration;
@@ -1594,6 +1657,13 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         if (specialization->flags & RangeFlagChecked) return;
         specialization->flags |= RangeFlagChecked;
     }
+    LawResult *known = value ? lawResult(typer,specialization,value) : NULL;
+    if (known && known->failureCount != SIZE_MAX) {
+        for (size_t i = 0; i < known->failureCount; ++i) sourceDiagnostic(typer->report,at,0,"law","%s",known->failures[i]);
+        return;
+    }
+    const char *failures[8];
+    size_t failureCount = 0;
     RangeArena *arena = typer->report->arena;
     Resolver *vm = typer->vm;
     RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
@@ -1636,12 +1706,20 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
             RangeGraphValue returned = {0};
             (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
         } else {
-            char type[160];
+            char type[160], text[768];
             describeType(type,sizeof(type),specialization);
-            sourceDiagnostic(typer->report,at,0,"law","%s does not satisfy @%s: %s",type,app->declaration->name,vm->error);
+            snprintf(text,sizeof(text),"%s does not satisfy @%s: %s",type,app->declaration->name,vm->error);
+            sourceDiagnostic(typer->report,at,0,"law","%s",text);
+            if (failureCount < sizeof(failures)/sizeof(*failures))
+                failures[failureCount++] = rangeArenaIntern(arena,text,strlen(text));
         }
         vm->skipEmission = 0;
         memcpy(vm->failure,outer,sizeof(outer));
+    }
+    if (known) {
+        known->failures = rangeArenaAllocate(arena,(failureCount ? failureCount : 1) * sizeof(*known->failures));
+        memcpy(known->failures,failures,failureCount * sizeof(*failures));
+        known->failureCount = failureCount;
     }
 }
 
@@ -1980,7 +2058,9 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         if (!declaration) break;
         if (rangeNodeDeclaresValue(declaration->kind) || declaration->kind == RangeNodeParameter) {
             if (declaration->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
-            else type = declaredType(typer,scope,declaration,context);
+            // The type was computed where the name was declared, in this same
+            // context; a use does not re-derive it (or rerun its laws).
+            else type = declaration->type ? declaration->type : declaredType(typer,scope,declaration,context);
         } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
         else if (declaration->kind == RangeNodeTypeParameter || declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
             typeError(typer,expr,"'%s' names a type, not a value",expr->name);
