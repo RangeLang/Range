@@ -1,0 +1,75 @@
+// Patterns: shared bindings, guards, nested cases, generic enums, and
+// payloads that hold @many storage, copied on write.
+enum Shape {
+    case circle(radius: Int)
+    case square(side: Int)
+    case group(Array<Int>)
+    case nothing
+}
+
+enum Either<Left, Right> {
+    case left(Left)
+    case right(Right)
+}
+
+enum Tree {
+    case leaf(value: Int)
+    case node(left: Tree, right: Tree)
+}
+
+function size(let s: Shape): Int {
+    switch s {
+    case .circle(let n), .square(let n):
+        return n
+    case .group(let xs) where xs.count > 2:
+        return 1000
+    case .group(let xs):
+        state copy: xs
+        copy.append(value: 1)
+        return copy.count
+    case .nothing:
+        return 0
+    }
+}
+
+function shallow(let t: Tree): Int {
+    switch t {
+    case .node(.leaf(let a), .leaf(let b)):
+        return a * b
+    case .node(.node(_, _), _), .node(_, .node(_, _)):
+        return -1
+    case .leaf(let v):
+        return v
+    }
+}
+
+function pick(let e: Either<Int, Bool>): Int {
+    switch e {
+    case .left(let n): return n
+    case .right(true): return 1
+    case .right(false): return 0
+    }
+}
+
+{
+    state round: 0
+    while round < 100 {
+        state xs: Array<Int>()
+        xs.append(value: 1)
+        let g: Shape(.group(xs))
+        if size(s: g) != 2 { return 1 }
+        if xs.count != 1 { return 2 }
+        xs.append(value: 2)
+        xs.append(value: 3)
+        if size(s: .group(xs)) != 1000 { return 3 }
+        if size(s: g) != 2 { return 4 }
+        round: round + 1
+    }
+    if size(s: .circle(radius: 4)) + size(s: .square(side: 5)) != 9 { return 5 }
+    if shallow(t: .node(left: .leaf(value: 6), right: .leaf(value: 7))) != 42 { return 6 }
+    if shallow(t: .node(left: .leaf(value: 6), right: .node(left: .leaf(value: 1), right: .leaf(value: 2)))) != -1 { return 7 }
+    if pick(e: .left(9)) + pick(e: .right(true)) != 10 { return 8 }
+    let either: Either<Int, Bool>(.right(false))
+    if pick(e: either) != 0 { return 9 }
+    return 42
+}

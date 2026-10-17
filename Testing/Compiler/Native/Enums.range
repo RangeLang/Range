@@ -1,0 +1,42 @@
+// Enums without payloads: a value is its tag. Cases are written Type.case,
+// or .case wherever the context names the enum.
+enum Direction {
+    case north
+    case east, south
+    case west
+}
+
+construct Heading {
+    state facing: Direction(.north)
+    let fallback: Direction
+}
+
+function turn(let d: Direction): Direction {
+    if d == .north { return .east }
+    if d == Direction.east { return .south }
+    if .south == d { return Direction.west }
+    return .north
+}
+
+{
+    let a: Direction(.north)
+    let b: turn(d: a)
+    if b != .east { return 1 }
+    if a == b { return 2 }
+    state h: Heading(fallback: .west)
+    h.facing: turn(d: h.facing)
+    if h.facing != Direction.east || h.fallback != .west { return 3 }
+    let copy: h
+    h.facing: .south
+    if copy.facing != .east { return 4 }
+    state xs: Array<Direction>()
+    xs.append(value: .south)
+    xs.append(value: turn(d: .south))
+    xs.append(value: turn(d: xs.read(at: 1)))
+    if xs.read(at: 1) != .west || xs.read(at: 2) != .north { return 5 }
+    state d: Direction.west
+    d: turn(d: d)
+    if d != .north { return 6 }
+    @print("\(a) \(b) \(xs.read(at: 1)) \(h.fallback)")
+    return 42
+}

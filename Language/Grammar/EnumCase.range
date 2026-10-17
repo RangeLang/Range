@@ -1,0 +1,5 @@
+// One alternative of an enum; its ordinal is its tag. Payload fields are
+// C-backed Let nodes and have no field adapter yet.
+construct EnumCase {
+    let name: String
+}

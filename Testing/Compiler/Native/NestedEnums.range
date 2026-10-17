@@ -1,0 +1,132 @@
+// Nested enums: declared in constructs and in other enums, named Outer.Inner,
+// and by their bare name inside Outer. Payloads hold other enums and
+// constructs, recursion through a construct included.
+construct Light {
+    enum Color {
+        case red, amber, green
+
+        enum Shade {
+            case dim, bright
+        }
+    }
+
+    state color: Color(.red)
+    let shade: Color.Shade
+
+    function next(): Color {
+        switch color {
+        case .red: return .green
+        case .green: return Color.amber
+        case .amber: return .red
+        }
+    }
+
+    function advance() {
+        color: next()
+    }
+}
+
+construct Holder {
+    let inner: Light.Color
+}
+
+function name(let c: Light.Color): Int {
+    switch c {
+    case Light.Color.red: return 1
+    case .amber: return 2
+    case .green: return 3
+    }
+}
+
+function bright(let s: Light.Color.Shade): Bool {
+    return s == .bright
+}
+
+function lights(): Int {
+    state light: Light(shade: .bright)
+    light.advance()
+    if name(c: light.color) != 3 { return 1 }
+    light.advance()
+    if light.color != Light.Color.amber { return 2 }
+    let h: Holder(inner: .green)
+    if name(c: h.inner) != 3 { return 3 }
+    if !bright(s: light.shade) { return 4 }
+    let c: Light.Color(.amber)
+    if name(c: c) != 2 { return 5 }
+    return 42
+}
+
+construct Pair {
+    let left: Expr
+    let right: Expr
+}
+
+enum Expr {
+    case number(Int)
+    case add(Pair)
+    case negate(Expr)
+    case scaled(by: Factor, of: Expr)
+
+    enum Factor {
+        case double, triple
+    }
+}
+
+enum Statement {
+    case print(Expr)
+    case block(Array<Statement>)
+}
+
+function evaluate(let e: Expr): Int {
+    switch e {
+    case .number(let n):
+        return n
+    case .add(let pair):
+        return evaluate(e: pair.left) + evaluate(e: pair.right)
+    case .negate(let inner):
+        return -evaluate(e: inner)
+    case .scaled(by: .double, let inner):
+        return 2 * evaluate(e: inner)
+    case .scaled(by: .triple, let inner):
+        return 3 * evaluate(e: inner)
+    }
+}
+
+function run(let s: Statement): Int {
+    switch s {
+    case .print(let e):
+        return evaluate(e: e)
+    case .block(let statements):
+        state total: 0
+        state i: 0
+        while i < statements.count {
+            total: total + run(s: statements.read(at: i))
+            i: i + 1
+        }
+        return total
+    }
+}
+
+function expressions(): Int {
+    let one: Expr(.number(1))
+    let sum: Expr.add(Pair(left: one, right: .negate(.number(5))))
+    if evaluate(e: sum) != -4 { return 1 }
+    let f: Expr.Factor(.triple)
+    let scaled: Expr(.scaled(by: f, of: sum))
+    if evaluate(e: scaled) != -12 { return 2 }
+    if evaluate(e: .scaled(by: Expr.Factor.double, of: .number(21))) != 42 { return 3 }
+    state body: Array<Statement>()
+    body.append(value: .print(scaled))
+    body.append(value: .print(.number(50)))
+    state inner: Array<Statement>()
+    inner.append(value: .print(one))
+    body.append(value: .block(inner))
+    if run(s: .block(body)) != 39 { return 4 }
+    return 42
+}
+
+{
+    if lights() != 42 { return 1 }
+    if expressions() != 42 { return 2 }
+    return 42
+}

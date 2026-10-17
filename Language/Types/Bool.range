@@ -1,4 +1,5 @@
 @boolean
-construct Bool {
-    let value: false
+enum Bool {
+    case false
+    case true
 }

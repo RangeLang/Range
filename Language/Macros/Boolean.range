@@ -1,15 +1,14 @@
 @literal("true|false")
-macro boolean(): Construct {
-  let value: #members.filter(named: "value").first
+macro boolean(): Enum {
+  let no: #cases.filter(named: "false").first
+  let yes: #cases.filter(named: "true").first
 
-  if !value.isTarget {
-    @diagnostic("Construct must specify value")
+  if !no.isTarget || !yes.isTarget {
+    @diagnostic("Enum must declare case false and case true")
   }
 
-  // Layout: one bit of storage, held in one byte.
-  #graph {
-    extension #name {
-      @builtin let storage: 1
-    }
-  }
+  // Layout: an enum without payloads is its tag, so the tag is the storage.
+  // A literal names the case spelled like it. Conditions branch on the tag
+  // and comparisons produce it, so C requires case false to be tag 0 and
+  // case true tag 1, and checks that where it finds the condition type.
 }

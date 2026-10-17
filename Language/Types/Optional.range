@@ -1,7 +1,7 @@
-// `Wrapped?` is Optional<Wrapped>. Absence is a false `present`; its payload
-// is then meaningless. Spelling absence and presence at construction is open.
+// `Wrapped?` is Optional<Wrapped>. `if let value: optional { }` binds the
+// payload of the present case.
 @optional
-construct Optional<Wrapped> {
-    let present: Bool
-    let wrapped: Wrapped
+enum Optional<Wrapped> {
+    case absent
+    case present(Wrapped)
 }

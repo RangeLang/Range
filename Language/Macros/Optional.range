@@ -1,4 +1,5 @@
-// C primitive: `T?` in a type position is sugar for the construct that applies
-// @optional, specialized with T. C resolves the sugar; it never names the type.
+// C primitive: `T?` in a type position is sugar for the enum that applies
+// @optional, specialized with T, and `if let` unwraps the payload of its one
+// payload case. C resolves both; it never names the type or its cases.
 @builtin
-macro optional(): Construct
+macro optional(): Enum

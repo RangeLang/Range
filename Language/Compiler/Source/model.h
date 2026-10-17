@@ -50,6 +50,7 @@ typedef enum {
     RangeNodeExtension,
     RangeNodeSpecialization, /* a construct plus one value per generic */
     RangeNodeType,
+    RangeNodePattern,        /* a switch or if-case pattern; integer is its RangePattern form */
     RangeNodeKindCount
 } RangeNodeKind;
 
@@ -64,7 +65,19 @@ enum {
     RangeFlagMacroType = 1 << 9,   /* @name type: declarations that applied the macro */
     RangeFlagChecked = 1 << 10,    /* specialization: its laws have run */
     RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
-    RangeFlagMutationKnown = 1 << 12
+    RangeFlagMutationKnown = 1 << 12,
+    RangeFlagConditional = 1 << 13 /* switch: written as `if case` or `if let`, with an else arm */
+};
+
+/* Pattern forms. A case pattern's items are arguments (label, sub-pattern); a
+ * top-level pattern's b is its `where` guard and c the block of its bindings. */
+enum {
+    RangePatternAny,      /* _ */
+    RangePatternBind,     /* let name: a is the Let it declares */
+    RangePatternCase,     /* .name(…) or Type.name(…): a is the type path, if written */
+    RangePatternValue,    /* an expression compared for equality: a */
+    RangePatternRelation, /* < 0: name is the operator, a the operand */
+    RangePatternPresent   /* if let: the payload of the @optional declaration's payload case */
 };
 
 typedef struct RangeNode RangeNode;
@@ -117,6 +130,8 @@ struct RangeNode {
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
     int scalarBits, scalarSigned; /* from the builtin storage and signed members; 0 bits if not a scalar */
+    int variantTag; /* union specialization: bytes of its leading tag; 0 for other layouts */
+    unsigned char *memberBoxed; /* union specialization: per payload field, stored out of line */
     size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */
     struct RangeNode **memberTypes; /* specialization: type per declaration item; NULL for @many storage */
     RangeMacroApplication *macroApplication; /* application-specific bindings */

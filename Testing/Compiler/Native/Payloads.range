@@ -1,0 +1,59 @@
+// Payload cases: a tag plus the largest payload, inline. Construction labels
+// the fields as declared; patterns bind them by position.
+enum Token {
+    case value(number: Int)
+    case pair(Int, Int)
+    case word(text: String, count: Int)
+    case end
+}
+
+construct Lexer {
+    state last: Token(.end)
+    state seen: Array<Token>()
+
+    function push(let token: Token) {
+        last: token
+        seen.append(value: token)
+    }
+}
+
+function weigh(let t: Token): Int {
+    switch t {
+    case .value(let number) where number > 100:
+        return 100
+    case .value(let number):
+        return number
+    case .pair(let a, let b):
+        return a + b
+    case .word(text: _, let count):
+        return count
+    case .end:
+        return 0
+    }
+}
+
+function make(let n: Int): Token {
+    if n == 0 { return .end }
+    if n < 0 { return Token.pair(n, 3) }
+    return .value(number: n)
+}
+
+{
+    let t: Token(.value(number: 7))
+    if weigh(t: t) != 7 { return 1 }
+    if weigh(t: .value(number: 700)) != 100 { return 2 }
+    if weigh(t: .pair(4, -2)) != 2 { return 3 }
+    if weigh(t: Token.word(text: "hi", count: 5)) != 5 { return 4 }
+    if weigh(t: make(n: 0)) != 0 { return 5 }
+    if weigh(t: make(n: -10)) != -7 { return 6 }
+    state lexer: Lexer()
+    lexer.push(token: make(n: 9))
+    lexer.push(token: .word(text: "x", count: 2))
+    if weigh(t: lexer.last) != 2 { return 7 }
+    if weigh(t: lexer.seen.read(at: 0)) != 9 { return 8 }
+    if case .value(let n): lexer.seen.read(at: 0) {
+        if n != 9 { return 9 }
+    } else { return 10 }
+    if case .end: t { return 11 } else if case .value(number: 7): t { } else { return 12 }
+    return 42
+}

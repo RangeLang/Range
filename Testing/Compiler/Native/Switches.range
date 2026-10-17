@@ -1,0 +1,77 @@
+// switch: exhaustive, several patterns per case, guards, no fallthrough.
+// Bool is an enum, so true and false cover it without a default.
+enum Direction {
+    case north, east, south, west
+}
+
+function horizontal(let d: Direction): Bool {
+    switch d {
+    case .east, .west:
+        return true
+    case .north, .south:
+        return false
+    }
+}
+
+function score(let d: Direction): Int {
+    state total: 0
+    switch d {
+    case .north:
+        total: 1
+    case .east:
+        total: 2
+    default:
+        total: 10
+    }
+    return total
+}
+
+function classify(let n: Int): Int {
+    switch n {
+    case 0:
+        return 100
+    case 1, 2, 3:
+        return 200
+    case < 0:
+        return 300
+    case let big where big > 1000:
+        return big
+    default:
+        return 400
+    }
+}
+
+function flip(let b: Bool): Int {
+    switch b {
+    case true:
+        return 1
+    case false:
+        return 0
+    }
+}
+
+function both(let a: Bool, let b: Bool): Int {
+    state result: 0
+    switch a && b {
+    case Bool.true:
+        result: 2
+    case .false:
+        result: 1
+    }
+    return result
+}
+
+{
+    if !horizontal(d: .east) { return 1 }
+    if horizontal(d: .south) { return 2 }
+    if score(d: .east) != 2 { return 3 }
+    if score(d: .west) != 10 { return 4 }
+    if classify(n: 0) != 100 { return 5 }
+    if classify(n: 2) != 200 { return 6 }
+    if classify(n: -5) != 300 { return 7 }
+    if classify(n: 5000) != 5000 { return 8 }
+    if classify(n: 50) != 400 { return 9 }
+    if flip(b: true) != 1 || flip(b: 1 > 2) != 0 { return 10 }
+    if both(a: true, b: !false) != 2 || both(a: true, b: false) != 1 { return 11 }
+    return 42
+}
