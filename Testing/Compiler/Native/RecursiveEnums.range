@@ -12,7 +12,7 @@ enum List {
 }
 
 function build(let depth: Int, let start: Int): Tree {
-    if depth == 0 { return .leaf(value: start) }
+    if depth = 0 { return .leaf(value: start) }
     return .node(left: build(depth: depth - 1, start: start), right: build(depth: depth - 1, start: start + 1))
 }
 

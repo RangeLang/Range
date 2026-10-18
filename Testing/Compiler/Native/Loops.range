@@ -26,7 +26,7 @@ function sum(let xs: Array<Int>): Int {
     let xs: make(n: 11)
     if sum(xs: xs) != 55 { return 1 }
     state evens: 0
-    for x in xs where x % 2 == 0 { evens: evens + x }
+    for x in xs where x % 2 = 0 { evens: evens + x }
     if evens != 30 { return 2 }
     state count: 0
     for _ in xs { count: count + 1 }
@@ -43,12 +43,12 @@ function sum(let xs: Array<Int>): Int {
     while round < 20 {
         for row in rows {
             let copy: row
-            if copy.count == 1 { continue }
+            if copy.count = 1 { continue }
             for x in row {
-                if x == 3 { break }
+                if x = 3 { break }
                 total: total + x
             }
-            if row.count == 5 { break }
+            if row.count = 5 { break }
         }
         state shapes: Array<Shape>()
         shapes.append(value: .group(make(n: 3)))
@@ -57,7 +57,7 @@ function sum(let xs: Array<Int>): Int {
         for s in shapes {
             switch s {
             case .group(let items):
-                if items.count == 3 { continue }
+                if items.count = 3 { continue }
                 total: total + items.count
             case .nothing:
                 break // ends the switch, not the loop
@@ -77,7 +77,7 @@ function sum(let xs: Array<Int>): Int {
     state found: 0
     for m in maybes {
         if let v: m {
-            if v == 9 { break } // an `if` is not a break target: this ends the loop
+            if v = 9 { break } // an `if` is not a break target: this ends the loop
             found: found + v
         } else { continue }
     }

@@ -1,12 +1,12 @@
 // A value of T where T? is expected is promoted to .present(value): returns,
-// construction, arguments, assignments, members, and either side of ==.
+// construction, arguments, assignments, members, and either side of =.
 enum Direction { case north, south }
 construct Person {
     let age: Int
     state manager: Int?(.absent)
 }
 function find(let xs: Array<Int>, let wanted: Int): Int? {
-    for x in xs { if x == wanted { return x } }
+    for x in xs { if x = wanted { return x } }
     return .absent
 }
 function small(let n: Int): Int<bits: 8>? {
@@ -28,7 +28,7 @@ function describe(let maybe: Int?): Int {
     if describe(maybe: find(xs: xs, wanted: 4)) != -1 { return 2 }
     if describe(maybe: 12) != 12 { return 3 }
     let x: Int?(5)
-    if x != 5 || x == 6 || x == .absent { return 4 }
+    if x != 5 || x = 6 || x = .absent { return 4 }
     state y: Int?(.absent)
     y: 7
     if describe(maybe: y) != 7 { return 5 }

@@ -54,6 +54,7 @@ run guards 42 "" Testing/Compiler/Native/Guards.range
 run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
+run equality-syntax 42 "" Testing/Compiler/Native/EqualitySyntax.range
 run promotion 42 "" Testing/Compiler/Native/Promotion.range
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
@@ -61,7 +62,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
-                   loops intervals guards enum-methods equality promotion strings-native; do
+                   loops intervals guards enum-methods equality equality-syntax promotion strings-native; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -97,7 +98,7 @@ run large-frame 39 "" "$(case_file large-frame "$locals")"
 
 # The law rejects a literal at compile time; nothing is written.
 source="$(case_file literal-law 'function id(let a: Int<bits: 8>): Int<bits: 8> { return a }
-{ if id(a: -129) == 0 { return 1 } return 0 }')"
+{ if id(a: -129) = 0 { return 1 } return 0 }')"
 status=0
 "$compiler" -o "$work_root/literal-law" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" || status=$?
 [[ "$status" == 65 && ! -e "$work_root/literal-law" ]] || fail "literal law violation compiled"
@@ -191,10 +192,16 @@ reject enum-extension-member "an extension of enum 'Direction' cannot add stored
     'enum Direction { case north, south }
 extension Direction { let speed: 1 }
 { return 0 }'
-reject payload-equality "payload field '0' of case 'at' is Point, which '==' does not compare" \
+reject payload-equality "payload field '0' of case 'at' is Point, which '=' does not compare" \
     'construct Point { let x: Int }
 enum Place { case at(Point), nowhere }
-{ let p: Place(.nowhere) if p == .nowhere { return 1 } return 0 }'
+{ let p: Place(.nowhere) if p = .nowhere { return 1 } return 0 }'
+# Equality is a single `=`; `==` is never an alternative spelling.
+reject double-equals "double-equals.range:1:17: use '=' for equality" \
+    '{ let a: 1 if a == 1 { return 1 } return 0 }'
+reject double-equals-pattern "double-equals-pattern.range:1:47: use '=' for equality" \
+    'function f(let n: Int): Int { switch n { case == 1: return 1 default: return 0 } }
+{ return f(n: 1) }'
 # Without a construct applying @interval, as in the minimal core, `..<` has no meaning.
 full=("${core[@]}")
 core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macros/Diagnostic.range
@@ -203,4 +210,4 @@ reject interval-undeclared "'..<' needs exactly one construct applying @interval
     '{ let r: 0..<3 return 0 }'
 core=("${full[@]}")
 
-echo "compiler native: programs=31 rejections=27 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass promotion=pass strings=pass"
+echo "compiler native: programs=32 rejections=29 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equality-syntax=pass promotion=pass strings=pass"

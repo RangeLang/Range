@@ -19,7 +19,7 @@ enum Direction {
 
 extension Direction {
     function vertical(): Bool {
-        return self == .north || self == .south
+        return self = .north || self = .south
     }
 }
 

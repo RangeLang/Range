@@ -121,7 +121,7 @@ int main(void)
     validate("macro assess(): Construct { if 1 {} } @assess construct Parcel {}","boolean graph value",0);
     validate("@builtin macro assess(): Construct @assess construct Parcel {}","no C primitive is implemented for builtin macro 'assess'",0);
     validate("macro assess(): Construct { let leaked: 7 let selected: #members.first "
-             "if selected.value == 7 {} } @assess construct Parcel { let payload: leaked }",
+             "if selected.value = 7 {} } @assess construct Parcel { let payload: leaked }",
              "unresolved compile-time local 'leaked'",0);
     puts("macro validation: source policies, renamed declarations, diagnostics, scopes, control flow, limits=pass");
     return 0;

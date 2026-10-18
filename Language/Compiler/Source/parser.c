@@ -12,7 +12,7 @@
 static const char *const RANGE_PRECEDENCE[][7] = {
     {"||", NULL},
     {"&&", NULL},
-    {"==", "!=", "<", ">", "<=", ">=", NULL},
+    {"=", "!=", "<", ">", "<=", ">=", NULL},
     {"..<", NULL},
     {"+", "-", NULL},
     {"*", "/", "%", NULL}
@@ -182,7 +182,7 @@ static int atTypePosition(RangeParser *parser)
         if (parserAt(parser,"true") || parserAt(parser,"false")) return 0;
         // `let s: bag.snapshot()` and `let n: a + 1` are expressions; a `<`
         // after the name stays a generic list, as in `Array<Int>`.
-        static const char *const expression[] = {".", "+", "-", "*", "/", "%", "==", "!=", "<=", ">=", "&&", "||", ">", NULL};
+        static const char *const expression[] = {".", "+", "-", "*", "/", "%", "=", "!=", "<=", ">=", "&&", "||", ">", NULL};
         const RangeToken *ahead = parserPeek(parser);
         for (size_t i = 0; expression[i]; ++i) if (rangeTokenIs(ahead, expression[i])) return 0;
         return 1;
@@ -623,7 +623,7 @@ static RangeNode *parseExpression(RangeParser *parser, int level)
 
 /* ---- patterns -------------------------------------------------------- */
 
-static const char *const RANGE_RELATIONS[] = {"<", ">", "<=", ">=", "==", "!=", NULL};
+static const char *const RANGE_RELATIONS[] = {"<", ">", "<=", ">=", "=", "!=", NULL};
 
 /* `_`, `let name`, `.case`, `.case(label: sub, …)`, `Type.case(…)`, a relation
  * such as `< 0`, or an expression compared for equality. Bindings are Let

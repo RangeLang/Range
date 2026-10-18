@@ -183,6 +183,12 @@ int rangeLexerNext(RangeLexer *lexer, RangeToken *token)
             token->kind = RangeTokenSymbol;
             for (size_t step = 0; step < width; ++step) advance(lexer);
             token->length = width;
+            /* Equality is a single `=`; `==` is lexed whole so the
+             * diagnostic points at it, and never accepted. */
+            if (rangeTokenIs(token, "==")) {
+                rangeLexerFail(lexer, token, "use '=' for equality");
+                return 0;
+            }
             return 1;
         }
     }

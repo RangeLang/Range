@@ -20,7 +20,7 @@ function fib(let n: Int): Int {
 }
 
 function check(let n: Int): Bool {
-    return n != 0 && 10 / n == 5
+    return n != 0 && 10 / n = 5
 }
 
 function step(let x: Int<bits: 8>): Int<bits: 8> {

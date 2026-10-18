@@ -33,7 +33,7 @@ function weigh(let t: Token): Int {
 }
 
 function make(let n: Int): Token {
-    if n == 0 { return .end }
+    if n = 0 { return .end }
     if n < 0 { return Token.pair(n, 3) }
     return .value(number: n)
 }

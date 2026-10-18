@@ -12,9 +12,9 @@ construct Heading {
 }
 
 function turn(let d: Direction): Direction {
-    if d == .north { return .east }
-    if d == Direction.east { return .south }
-    if .south == d { return Direction.west }
+    if d = .north { return .east }
+    if d = Direction.east { return .south }
+    if .south = d { return Direction.west }
     return .north
 }
 
@@ -22,7 +22,7 @@ function turn(let d: Direction): Direction {
     let a: Direction(.north)
     let b: turn(d: a)
     if b != .east { return 1 }
-    if a == b { return 2 }
+    if a = b { return 2 }
     state h: Heading(fallback: .west)
     h.facing: turn(d: h.facing)
     if h.facing != Direction.east || h.fallback != .west { return 3 }

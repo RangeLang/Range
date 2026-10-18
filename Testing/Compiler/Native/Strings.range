@@ -1,4 +1,4 @@
-// String in native code: count (bytes), byte(at:), ==, + into a new
+// String in native code: count (bytes), byte(at:), =, + into a new
 // reference-counted block, construction from a literal, and @print.
 enum Token { case word(String), end }
 construct Named { let name: String }
@@ -10,7 +10,7 @@ function vowels(let s: String): Int {
     state i: 0
     while i < s.count {
         let b: s.byte(at: i)
-        if b == 97 || b == 101 || b == 105 || b == 111 || b == 117 { found: found + 1 }
+        if b = 97 || b = 101 || b = 105 || b = 111 || b = 117 { found: found + 1 }
         i: i + 1
     }
     return found
@@ -27,7 +27,7 @@ function kind(let s: String): Int {
     @print("local: \(s)")
     let empty: String()
     if empty.count != 0 || empty != "" { return 1 }
-    if s.count != 2 || s != "hi" || s == "ho" { return 2 }
+    if s.count != 2 || s != "hi" || s = "ho" { return 2 }
     let g: greet(name: "world")
     @print(g)
     if g.count != 12 || g != "hello, world" { return 3 }
@@ -45,7 +45,7 @@ function kind(let s: String): Int {
     state total: 0
     for w in words { total: total + w.count }
     if total != 3 + 5 + 7 { return 7 }
-    if Token.word("a" + "b") != .word("ab") || Token.word("x") == .end { return 8 }
+    if Token.word("a" + "b") != .word("ab") || Token.word("x") = .end { return 8 }
     let n: Named(name: joined + "?")
     if n.name.count != 7 { return 9 }
     if kind(s: "yes") != 1 || kind(s: "n" + "o") != 0 || kind(s: "maybe") != -1 { return 10 }

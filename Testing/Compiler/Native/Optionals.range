@@ -8,7 +8,7 @@ construct Person {
 function find(let xs: Array<Int>, let wanted: Int): Int? {
     state i: 0
     while i < xs.count {
-        if xs.read(at: i) == wanted { return .present(i) }
+        if xs.read(at: i) = wanted { return .present(i) }
         i: i + 1
     }
     return .absent

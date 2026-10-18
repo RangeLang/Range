@@ -39,7 +39,7 @@ function strict(let n: Int): Int {
     guard n > 0 else { @diagnostic("n must be positive") }
     switch n {
     case 1:
-        guard n == 1 else { break }
+        guard n = 1 else { break }
         return 10
     default:
         return n

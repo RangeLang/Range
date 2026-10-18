@@ -885,7 +885,7 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
             return metaScalar(eval,node,RangeNodeBool,value);
         }
         RangeGraphValue right = metaExpression(eval,scope,node->b);
-        if (same(node->name,"==") || same(node->name,"!=")) {
+        if (same(node->name,"=") || same(node->name,"!=")) {
             int equal = left.kind == right.kind;
             if (equal && left.kind == RangeGraphNode) {
                 RangeNode *a=left.node, *b=right.node;
@@ -894,7 +894,7 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
                 else equal = a == b;
             } else if (equal && left.kind != RangeGraphNone)
                 fail(eval->vm,node,"unsupported compile-time equality operands");
-            return metaScalar(eval,node,RangeNodeBool,same(node->name,"==") ? equal : !equal);
+            return metaScalar(eval,node,RangeNodeBool,same(node->name,"=") ? equal : !equal);
         }
         long long a=metaNumber(eval,left,node), b=metaNumber(eval,right,node), value=0;
         if (same(node->name,"<")) return metaScalar(eval,node,RangeNodeBool,a < b);
@@ -2155,10 +2155,10 @@ static int bytesType(const RangeNode *type)
     return type && type->kind == RangeNodeSpecialization && bytesDeclaration(type->resolvedDeclaration);
 }
 
-/* Types `==` compares: integers, bytes, and enums whose payload fields are
+/* Types `=` compares: integers, bytes, and enums whose payload fields are
  * such types, compared structurally (equal cases, then equal fields). An enum
  * already being compared counts as comparable, so recursive enums are. On
- * failure *field names the payload field whose type has no `==`. */
+ * failure *field names the payload field whose type has no `=`. */
 typedef struct { RangeNode *seen[64]; size_t count; } Comparing;
 
 static int equatable(Typer *typer, RangeNode *type, Comparing *visit, RangeNode **field, RangeNode **entry)
@@ -2538,7 +2538,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         if (same(op,"..<")) { type = typeInterval(typer,scope,expr,context); break; }
         int logical = same(op,"&&") || same(op,"||");
         int comparison = same(op,"<") || same(op,">") || same(op,"<=") || same(op,">=");
-        int equality = same(op,"==") || same(op,"!=");
+        int equality = same(op,"=") || same(op,"!=");
         RangeNode *want = logical ? typer->booleanType : (comparison || equality) ? NULL : expected;
         RangeNode *left, *right;
         // A literal or `.case` takes the other operand's type when that side is neither.
@@ -2551,7 +2551,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         }
         if (!left || !right) break;
         if (left != right && equality) {
-            // `maybe == 5` compares with the present case holding 5.
+            // `maybe = 5` compares with the present case holding 5.
             if (optionalWrapped(typer,left,NULL) == right) { coerce(typer,expr->b,left,right,"operand"); right = left; }
             else if (optionalWrapped(typer,right,NULL) == left) { coerce(typer,expr->a,right,left,"operand"); left = right; }
         }
@@ -2568,7 +2568,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
             else {
                 char t[160], f[160]; describeType(t,sizeof(t),left);
                 describeType(f,sizeof(f),field ? field->type : NULL);
-                sourceDiagnostic(typer->report,expr,0,"not-implemented","operator '%s' on %s is not implemented: payload field '%s' of case '%s' is %s, which '==' does not compare",
+                sourceDiagnostic(typer->report,expr,0,"not-implemented","operator '%s' on %s is not implemented: payload field '%s' of case '%s' is %s, which '=' does not compare",
                     op,t,field ? field->name : "?",entry ? entry->name : "?",f);
             }
         } else if (equality) type = typer->booleanType;
@@ -4894,7 +4894,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         if (nativeKind(native,operand,expr) != NativeScalar && same(op,"+") && bytesType(operand)) return nativeJoin(native,expr,operand);
         if (nativeKind(native,operand,expr) != NativeScalar) {
             Comparing visit = {.count=0};
-            if ((same(op,"==") || same(op,"!=")) && equatable(native->typer,operand,&visit,NULL,NULL)) {
+            if ((same(op,"=") || same(op,"!=")) && equatable(native->typer,operand,&visit,NULL,NULL)) {
                 nativeCallHelper(native,operand,NativeEqual);
                 if (same(op,"!=")) { nativeEmit(native,armCmpImm(0,0)); nativeEmit(native,armCset(0,RangeEQ)); }
                 return type;
@@ -4903,7 +4903,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
             return NULL;
         }
         int isSigned = operand->scalarSigned;
-        int cond = same(op,"==") ? RangeEQ : same(op,"!=") ? RangeNE
+        int cond = same(op,"=") ? RangeEQ : same(op,"!=") ? RangeNE
             : same(op,"<") ? (isSigned ? RangeLT : RangeLO) : same(op,">") ? (isSigned ? RangeGT : RangeHI)
             : same(op,"<=") ? (isSigned ? RangeLE : RangeLS) : same(op,">=") ? (isSigned ? RangeGE : RangeHS) : -1;
         if (cond >= 0) { nativeEmit(native,armCmp(0,1)); nativeEmit(native,armCset(0,cond)); }
@@ -5296,7 +5296,7 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
     case RangePatternValue: case RangePatternRelation: {
         Comparing visit = {.count=0};
         if (!type->scalarBits && pattern->integer == RangePatternValue && equatable(native->typer,type,&visit,NULL,NULL)) {
-            // `case "yes":` or `case .pair(1, 2)` as a value: compared with `==`.
+            // `case "yes":` or `case .pair(1, 2)` as a value: compared with `=`.
             nativePlaceLoad(native,place,type);
             nativeEmit(native,armPush(0));
             nativeExpression(native,pattern->a);
@@ -5317,9 +5317,9 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
         nativeEmit(native,armMov(1,0));
         nativeEmit(native,armPop(0));
         nativeEmit(native,armCmp(0,1));
-        const char *op = pattern->integer == RangePatternValue ? "==" : pattern->name;
+        const char *op = pattern->integer == RangePatternValue ? "=" : pattern->name;
         int isSigned = type->scalarSigned;
-        int pass = same(op,"==") ? RangeEQ : same(op,"!=") ? RangeNE
+        int pass = same(op,"=") ? RangeEQ : same(op,"!=") ? RangeNE
             : same(op,"<") ? (isSigned ? RangeLT : RangeLO) : same(op,">") ? (isSigned ? RangeGT : RangeHI)
             : same(op,"<=") ? (isSigned ? RangeLE : RangeLS) : (isSigned ? RangeGE : RangeHS);
         nativeFail(match,nativeEmit(native,armBcond(pass ^ 1,0)),armBcond(pass ^ 1,0));

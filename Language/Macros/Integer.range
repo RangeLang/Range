@@ -60,5 +60,5 @@ function integerValueFits(let value: Int, let bits: Int, let signed: Bool): Bool
     remaining: remaining / 2
     available: available - 1
   }
-  return remaining == 0
+  return remaining = 0
 }

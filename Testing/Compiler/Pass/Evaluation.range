@@ -31,7 +31,7 @@ function identity(let value: Int): Int { return value }
 function early(let value: Int): Int {
     state index: Int(0)
     while index < 4 {
-        if index == value { return index }
+        if index = value { return index }
         index: index + 1
     }
     return 9
@@ -64,8 +64,8 @@ function start(): Int {
         index: index + 1
     }
     if total != 6 { return 7 }
-    if false && copy.element(index: 999) == 0 { return 8 }
-    if !(true || copy.element(index: 999) == 0) { return 9 }
+    if false && copy.element(index: 999) = 0 { return 8 }
+    if !(true || copy.element(index: 999) = 0) { return 9 }
     if labeled(left: 3) != 4 || labeled(right: 3) != 5 { return 10 }
     if identity(value: 42) != 42 { return 11 }
     let message: String("answer=\(store.values.element(index: 1)), ok=\(true)")

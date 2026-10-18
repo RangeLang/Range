@@ -28,7 +28,7 @@ macro collection(): Construct {
             @builtin function write(let at: Int, let value: Element)
 
             function isEmpty(): Bool {
-                return count == 0
+                return count = 0
             }
 
             // `for element in collection { }` calls this at positions 0, 1, 2, …
@@ -39,8 +39,8 @@ macro collection(): Construct {
             }
 
             function append(let value: Element) {
-                if count == capacity {
-                    if capacity == 0 {
+                if count = capacity {
+                    if capacity = 0 {
                         capacity: 1
                     } else {
                         capacity: capacity * 2

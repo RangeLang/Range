@@ -55,7 +55,7 @@ int main(void)
         "let element: #generics.filter(named: \"Element\").first "
         "#graph { extension #name { "
         "state count: 0 state capacity: 0 state elements: #element "
-        "function isEmpty(): Truth { return count == 0 } } } } "
+        "function isEmpty(): Truth { return count = 0 } } } } "
         "@collection construct Array<Element> {} "
         "extension Array { let written: capacity }");
     RangeNode *array = declaration(c.unit,"Array");

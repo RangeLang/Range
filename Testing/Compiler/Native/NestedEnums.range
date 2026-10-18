@@ -39,7 +39,7 @@ function name(let c: Light.Color): Int {
 }
 
 function bright(let s: Light.Color.Shade): Bool {
-    return s == .bright
+    return s = .bright
 }
 
 function lights(): Int {
