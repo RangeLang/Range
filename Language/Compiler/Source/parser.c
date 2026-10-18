@@ -185,6 +185,26 @@ static int atTypePosition(RangeParser *parser)
         static const char *const expression[] = {".", "+", "-", "*", "/", "%", "=", "!=", "<=", ">=", "&&", "||", ">", NULL};
         const RangeToken *ahead = parserPeek(parser);
         for (size_t i = 0; expression[i]; ++i) if (rangeTokenIs(ahead, expression[i])) return 0;
+        // `let v: Int(2) + 1` and `let v: f(n: 1) = 1` are expressions: skip
+        // the name, any generic list and argument list, and look for an
+        // operator after them.
+        RangeParser probe = *parser;
+        parserAdvance(&probe);
+        const char *const groups[][2] = {{"<", ">"}, {"(", ")"}};
+        for (size_t g = 0; g < 2; ++g) {
+            if (!parserAt(&probe, groups[g][0])) continue;
+            int depth = 0;
+            do {
+                if (parserAt(&probe, groups[g][0])) ++depth;
+                else if (parserAt(&probe, groups[g][1])) --depth;
+                // A `<` that never closes before a brace is a comparison.
+                else if (g == 0 && (parserAt(&probe, "{") || parserAt(&probe, "}"))) return 1;
+                parserAdvance(&probe);
+            } while (depth > 0 && !probe.failed && probe.current.kind != RangeTokenEnd);
+            if (depth > 0) return 1;
+        }
+        for (size_t i = 0; expression[i]; ++i) if (parserAt(&probe, expression[i])) return 0;
+        if (parserAt(&probe, "<") || parserAt(&probe, "..<")) return 0;
         return 1;
     }
     if (!parserAt(parser, "@")) return 0;
@@ -392,7 +412,21 @@ static int startsGenericArguments(RangeParser *parser)
     RangeParser probe = *parser;
     parserAdvance(&probe);
     if (parserAt(&probe, ">")) return 1;
-    return probe.current.kind == RangeTokenName && rangeTokenIs(parserPeek(&probe), ":");
+    if (probe.current.kind == RangeTokenName && rangeTokenIs(parserPeek(&probe), ":")) return 1;
+    // Positional arguments, as in `Array<Int>()`: as in Swift, `<` opens a
+    // generic list when a matching `>` follows with only type-like tokens
+    // inside and `(` or `.` after it; otherwise it is a comparison.
+    int depth = 1;
+    while (depth > 0) {
+        if (parserAt(&probe, "<")) ++depth;
+        else if (parserAt(&probe, ">")) --depth;
+        else if (!(probe.current.kind == RangeTokenName || probe.current.kind == RangeTokenInteger
+                   || parserAt(&probe, ",") || parserAt(&probe, ".") || parserAt(&probe, "?")
+                   || parserAt(&probe, ":"))) return 0;
+        parserAdvance(&probe);
+        if (probe.failed) return 0;
+    }
+    return parserAt(&probe, "(") || parserAt(&probe, ".");
 }
 
 static RangeNode *parsePrimary(RangeParser *parser)
@@ -506,7 +540,7 @@ static RangeNode *parsePostfix(RangeParser *parser)
                 parserFail(parser, &parser->current, "duplicate generic argument list");
                 break;
             }
-            value->generics = parseGenericArguments(parser, 0);
+            value->generics = parseGenericArguments(parser, 1);
             continue;
         }
         if (parserAt(parser, ".")) {

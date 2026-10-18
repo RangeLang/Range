@@ -1,0 +1,30 @@
+// After let/state, Name(...) is a typed construction unless an operator
+// follows: then the whole value is an expression, so `Int(2) + 1` is a
+// construction plus one. Positional generics such as Array<Int>() parse in
+// expressions and as arguments.
+function f(let n: Int): Int { return n * 2 }
+
+{
+    let a: Int(2) + 1
+    if a != 3 { return 1 }
+    let b: f(n: 1) = 2
+    if !b { return 2 }
+    let c: f(n: 3) + 1
+    if c != 7 { return 3 }
+    state xs: Array<Int>()
+    xs.append(value: 4)
+    let d: xs.count = 1
+    if !d { return 4 }
+    let e: Int(5)
+    if e != 5 { return 5 }
+    let g: 1 < 2
+    if !g { return 6 }
+    let h: Array<Int>().count + 1
+    if h != 1 { return 7 }
+    state ys: Array<Array<Int>>()
+    ys.append(value: Array<Int>())
+    if ys.count != 1 { return 8 }
+    let k: 3 < 4 = true
+    if !k { return 9 }
+    return 42
+}

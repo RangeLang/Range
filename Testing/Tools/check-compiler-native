@@ -55,6 +55,7 @@ run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
 run equality-syntax 42 "" Testing/Compiler/Native/EqualitySyntax.range
+run expressions 42 "" Testing/Compiler/Native/Expressions.range
 run promotion 42 "" Testing/Compiler/Native/Promotion.range
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
@@ -62,7 +63,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
-                   loops intervals guards enum-methods equality equality-syntax promotion strings-native; do
+                   loops intervals guards enum-methods equality equality-syntax expressions promotion strings-native; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -210,4 +211,4 @@ reject interval-undeclared "'..<' needs exactly one construct applying @interval
     '{ let r: 0..<3 return 0 }'
 core=("${full[@]}")
 
-echo "compiler native: programs=32 rejections=29 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equality-syntax=pass promotion=pass strings=pass"
+echo "compiler native: programs=33 rejections=29 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equality-syntax=pass expressions=pass promotion=pass strings=pass"
