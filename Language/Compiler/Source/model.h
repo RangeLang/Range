@@ -51,7 +51,7 @@ typedef enum {
     RangeNodeSpecialization, /* a construct plus one value per generic */
     RangeNodeType,
     RangeNodePattern,        /* a switch or if-case pattern; integer is its RangePattern form */
-    RangeNodeFor,            /* for-in: a is the loop it lowers to, over count and read(at:) */
+    RangeNodeFor,            /* for-in: a is the loop it lowers to, calling the @iteration function */
     RangeNodeBreak,
     RangeNodeContinue,
     RangeNodeKindCount

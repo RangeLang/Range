@@ -1,0 +1,13 @@
+// `a..<b` is Interval(lower: a, upper: b): the integers from lower up to, not
+// including, upper. `for i in 0..<n` visits them in order.
+@interval
+construct Interval {
+    let lower: Int
+    let upper: Int
+
+    @iteration
+    function element(let at: Int): Int? {
+        if lower + at < upper { return lower + at }
+        return .absent
+    }
+}

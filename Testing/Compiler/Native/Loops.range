@@ -1,6 +1,6 @@
-// for-in over any construct applying @collection, by its count and
-// read(at:), over a copy taken when the loop begins; break and continue in
-// for and while, releasing the values that end when they leave.
+// for-in over Array, through the @iteration function @collection emits,
+// over a copy taken when the loop begins; break and continue in for and
+// while, releasing the values that end when they leave.
 enum Shape {
     case group(Array<Int>)
     case nothing

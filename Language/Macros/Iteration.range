@@ -1,0 +1,16 @@
+// C primitive: `for x in s` iterates any value whose type declares one
+// function applying @iteration. It takes a position and returns the element
+// there, or absence past the end.
+//
+// Law, checked in C because macro bodies cannot inspect a function's types
+// yet: a type declares exactly one @iteration function, and it takes one Int
+// parameter and returns an optional, the enum applying @optional.
+//
+// `for pattern in s where guard { body }` copies s when the loop begins and
+// calls the function at positions 0, 1, 2, …; on absence the loop ends.
+// Otherwise the element is bound to pattern (a let), the guard applies, the
+// body runs, and the position advances by one, also on `continue`. C writes
+// the loop and finds the function by this role; it never names the function,
+// its parameter, or the type.
+@builtin
+macro iteration(): Function

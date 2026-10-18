@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Longest first: two-character symbols must win over their prefixes. */
+/* Longest first: longer symbols must win over their prefixes. */
 static const char *const RANGE_SYMBOLS[] = {
-    "&&", "||", "==", "!=", "<=", ">=",
+    "..<", "&&", "||", "==", "!=", "<=", ">=",
     "(", ")", "{", "}", "[", "]", ",", ":", ".", "@", "?", "|", "&",
     "+", "-", "*", "/", "%", "<", ">", "!", "=", "#", "$", NULL
 };
@@ -154,9 +154,12 @@ int rangeLexerNext(RangeLexer *lexer, RangeToken *token)
 
     if (isDigit(c)) {
         token->kind = RangeTokenInteger;
+        /* `0..<n`: a '.' followed by '.' begins an operator, not a fraction. */
         while (lexer->cursor < lexer->length
                && (isDigit(lexer->source[lexer->cursor])
-                   || lexer->source[lexer->cursor] == '.')) {
+                   || (lexer->source[lexer->cursor] == '.'
+                       && !(lexer->cursor + 1 < lexer->length
+                            && lexer->source[lexer->cursor + 1] == '.')))) {
             advance(lexer);
         }
         token->length = lexer->cursor - token->offset;

@@ -997,9 +997,11 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     RangeMacroApplication *app = attribute->macroApplication;
     if (!app) fail(vm,attribute,"macro application was not resolved");
     RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
-    // @many marks layout and @optional marks the `?` sugar's construct; applying
-    // either has no compile-time effect.
-    if (macroBuiltin(app->declaration,"many") || macroBuiltin(app->declaration,"optional")) return emitted;
+    // @many marks layout, @optional the `?` sugar's enum, @interval the `..<`
+    // sugar's construct, and @iteration the function `for … in` calls; applying
+    // any of them has no compile-time effect.
+    if (macroBuiltin(app->declaration,"many") || macroBuiltin(app->declaration,"optional")
+        || macroBuiltin(app->declaration,"interval") || macroBuiltin(app->declaration,"iteration")) return emitted;
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
         if (same(app->declaration->c->items[j]->name,"builtin")) {
             if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
@@ -1237,13 +1239,6 @@ static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
 
 static void diagnoseSourceNode(SourceReport *, SourceScope *, RangeNode *, int);
 
-/* `for … in` iterates the constructs applying @collection: the macro that
- * emits count and read(at:). C finds it by its name, as it finds @optional. */
-static int collectionRole(const RangeNode *macro)
-{
-    return macro && macro->kind == RangeNodeMacro && same(macro->name,"collection");
-}
-
 static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *node)
 {
     if (!node) return;
@@ -1274,8 +1269,12 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         }
         else if (macroBuiltin(node,"print"))
             sourceDiagnostic(report,node,1,"C-implementation","@print writes through libSystem write in C, formatting integers in C");
-        else if (collectionRole(node))
-            sourceDiagnostic(report,node,1,"C-implementation","'for … in' iterates a construct applying @collection by its count and read(at:); C finds the macro by its name and writes the loop");
+        else if (macroBuiltin(node,"iteration")) {
+            sourceDiagnostic(report,node,1,"C-implementation","'for … in' calls the function applying @iteration at positions 0, 1, 2, … until it returns absence; C writes the loop");
+            sourceDiagnostic(report,node,1,"C-implementation","the @iteration law (one per type, one Int parameter, an optional result) is checked in C");
+        }
+        else if (macroBuiltin(node,"interval"))
+            sourceDiagnostic(report,node,1,"C-implementation","'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic")
                  && !macroBuiltin(node,"print"))
             for (size_t i = 0; i < node->c->itemCount; ++i)
@@ -1343,6 +1342,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             "string literal values are supplied by C; Range literal materialization is not implemented");
         break;
     case RangeNodeUnary: case RangeNodeBinary:
+        if (node->kind == RangeNodeBinary && same(node->name,"..<")) break; /* the @interval sugar */
         sourceDiagnostic(report,node,1,"C-implementation",
             "operator '%s' is evaluated in C (integers, bytes, and enum structure); Range operator dispatch is not implemented",node->name);
         break;
@@ -2357,7 +2357,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         typePayload(typer,scope,call,type,entry,call->items,call->itemCount,context);
         return type;
     }
-    if (callee->kind == RangeNodeMemberAccess) {
+    if (callee->kind == RangeNodeMemberAccess && callee->name) {
         RangeNode *owner = typePath(typer->report,scope,callee->a);
         if (owner) {
             // `Outer.Inner(…)` constructs a nested type; `Tree.leaf(value: 1)` a case.
@@ -2398,7 +2398,8 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         receiver = typeOf(typer,scope,callee->a,NULL,context);
         if (!receiver) return NULL;
         if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,callee,"type parameter %s has no functions",receiver->name); return NULL; }
-        function = findFunction(receiver->resolvedDeclaration,callee->name);
+        // A member with no name is one `for … in` resolved by its @iteration role.
+        function = callee->name ? findFunction(receiver->resolvedDeclaration,callee->name) : callee->resolvedDeclaration;
         if (!function) {
             char type[160]; describeType(type,sizeof(type),receiver);
             typeError(typer,callee,"%s has no function '%s'",type,callee->name);
@@ -2424,6 +2425,33 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     }
     RangeNode *output = function->b;
     return output ? resolveTypeReference(typer,&functionScope,output->name,output->generics,output->flags,receiver,output) : NULL;
+}
+
+/* `a..<b` is sugar for the construct applying @interval, constructed with
+ * lower: a and upper: b; the construction's arguments are kept on the node. */
+static RangeNode *typeInterval(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context)
+{
+    RangeNode *interval = NULL;
+    size_t found = 0;
+    for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+        RangeNode *candidate = typer->report->units[u]->items[i];
+        if (candidate->kind == RangeNodeConstruct && appliesBuiltin(candidate,"interval")) { interval = candidate; ++found; }
+    }
+    if (found != 1) {
+        sourceDiagnostic(typer->report,expr,0,"undeclared","'..<' needs exactly one construct applying @interval; found %zu",found);
+        return NULL;
+    }
+    if (!expr->itemCount) {
+        static const char *const labels[] = {"lower","upper"};
+        for (int side = 0; side < 2; ++side) {
+            RangeNode *argument = rangeNodeCreate(typer->report->arena,RangeNodeArgument,expr->path,expr->line,expr->column);
+            argument->name = labels[side];
+            argument->a = side ? expr->b : expr->a;
+            rangeNodeAppend(typer->report->arena,expr,argument);
+        }
+    }
+    RangeNode *type = specialize(typer,scope,interval,NULL,context,expr);
+    return typeConstructionOf(typer,scope,expr,type,expr->items,expr->itemCount,context);
 }
 
 static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
@@ -2507,6 +2535,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     }
     case RangeNodeBinary: {
         const char *op = expr->name;
+        if (same(op,"..<")) { type = typeInterval(typer,scope,expr,context); break; }
         int logical = same(op,"&&") || same(op,"||");
         int comparison = same(op,"<") || same(op,">") || same(op,"<=") || same(op,">=");
         int equality = same(op,"==") || same(op,"!=");
@@ -2586,15 +2615,42 @@ static void guardFallsThrough(Typer *typer, RangeNode *guard)
     typeError(typer,guard,"the else block of 'guard' must not fall through; end it with return, break, or continue");
 }
 
-/* A construct applying @collection, which `for … in` iterates. */
-static int iterable(const RangeNode *type)
+/* The function a construct or enum declares with @iteration, which `for … in`
+ * calls; *count is how many it declares. The role, not a name, selects it. */
+static RangeNode *iterationFunction(const RangeNode *declaration, size_t *count)
 {
-    if (!type || type->kind != RangeNodeSpecialization || !type->resolvedDeclaration) return 0;
-    RangeNode *declaration = type->resolvedDeclaration;
-    if (declaration->kind != RangeNodeConstruct || !declaration->c) return 0;
-    for (size_t i = 0; i < declaration->c->itemCount; ++i)
-        if (collectionRole(declaration->c->items[i]->resolvedDeclaration)) return 1;
-    return 0;
+    RangeNode *found = NULL;
+    *count = 0;
+    if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
+        for (size_t i = 0; i < declaration->itemCount; ++i)
+            if (declaration->items[i]->kind == RangeNodeFunction && appliesBuiltin(declaration->items[i],"iteration")) {
+                found = declaration->items[i];
+                ++*count;
+            }
+    return found;
+}
+
+/* The @iteration law, checked in C: a type declares at most one such function,
+ * and it takes one Int position and returns an optional (the enum applying
+ * @optional), absent past the end. The function's own types are known. */
+static void checkIteration(Typer *typer, RangeNode *declaration)
+{
+    size_t count = 0;
+    (void)iterationFunction(declaration,&count);
+    if (count > 1) {
+        typeError(typer,declaration,"%s '%s' declares %zu @iteration functions; a type declares exactly one",
+            rangeNodeKindName(declaration->kind),declaration->name,count);
+        return;
+    }
+    RangeNode *function = iterationFunction(declaration,&count);
+    if (!function) return;
+    RangeNode *integer = typer->integer ? specialize(typer,NULL,typer->integer,NULL,NULL,typer->integer) : NULL;
+    RangeNode *output = function->type;
+    int position = function->itemCount == 1 && integer && function->items[0]->type == integer;
+    int optional = isEnum(output) && appliesBuiltin(output->resolvedDeclaration,"optional");
+    if (!position || !optional)
+        typeError(typer,function,"@iteration function '%s' of '%s' must take one Int position and return an optional, such as (let at: Int): Element?",
+            function->name,declaration->name);
 }
 
 /* `@print(…)` and `@diagnostic(…)` in runtime code: one message, a String or
@@ -2682,8 +2738,11 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         break;
     }
     case RangeNodeIf: case RangeNodeWhile: {
-        RangeNode *condition = typeOf(typer,scope,node->a,typer->booleanType,context);
-        expectType(typer,node->a,typer->booleanType,condition,"condition");
+        // A while without a condition is the loop `for … in` is written as; it ends at break.
+        if (node->a || node->kind == RangeNodeIf) {
+            RangeNode *condition = typeOf(typer,scope,node->a,typer->booleanType,context);
+            expectType(typer,node->a,typer->booleanType,condition,"condition");
+        }
         int loop = node->kind == RangeNodeWhile;
         typer->loops += loop; typer->breaks += loop;
         typeStatement(typer,scope,node->b,context,output);
@@ -2693,21 +2752,28 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         break;
     }
     case RangeNodeFor: {
-        // The collection is typed first: only a construct applying @collection
-        // has the count and read(at:) the loop uses.
+        // The sequence is typed first: its type's @iteration function is the
+        // member the loop calls, with that function's own parameter label.
         RangeNode *loop = node->a;
-        if (!loop || loop->itemCount < 1) break;
+        if (!loop || loop->itemCount != 3) break;
         SourceScope body = {.owner=loop,.parent=scope};
         RangeNode *sequence = loop->items[0];
         typeStatement(typer,&body,sequence,context,output);
         RangeNode *type = sequence->type;
         if (!type) break;
-        if (!iterable(type)) {
+        size_t count = 0;
+        RangeNode *function = type->kind == RangeNodeSpecialization ? iterationFunction(type->resolvedDeclaration,&count) : NULL;
+        if (count != 1) {
             char t[160]; describeType(t,sizeof(t),type);
-            typeError(typer,rangeNodeRHS(sequence),"'for … in' iterates a construct applying @collection; found %s",t);
+            if (count) typeError(typer,rangeNodeRHS(sequence),"'for … in' needs one @iteration function; %s declares %zu",t,count);
+            else typeError(typer,rangeNodeRHS(sequence),"'for … in' cannot iterate %s: it declares no @iteration function",t);
             break;
         }
-        for (size_t i = 1; i < loop->itemCount; ++i) typeStatement(typer,&body,loop->items[i],context,output);
+        RangeNode *next = loop->items[2]->b->items[0]->a; /* the call in `if let element: …` */
+        next->a->resolvedDeclaration = function;
+        if (function->itemCount == 1) next->items[0]->name = function->items[0]->name;
+        typeStatement(typer,&body,loop->items[1],context,output);
+        typeStatement(typer,&body,loop->items[2],context,output);
         break;
     }
     case RangeNodeBreak:
@@ -3064,6 +3130,7 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
     // Methods are typed once every case's payload is.
     for (size_t i = 0; i < declaration->itemCount; ++i)
         if (declaration->items[i]->kind == RangeNodeFunction) typeFunction(typer,&scope,declaration->items[i],context);
+    checkIteration(typer,declaration);
 }
 
 static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declaration)
@@ -3086,6 +3153,7 @@ static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declarat
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
+    checkIteration(typer,declaration);
 }
 
 static int builtinMember(const RangeNode *member)
@@ -3445,7 +3513,11 @@ static Typer *typeCheck(SourceReport *report)
             RangeNode *item = report->units[u]->items[i];
             if (item->kind == RangeNodeConstruct) typeConstruct(typer,&unit,item);
             else if (item->kind == RangeNodeEnum) typeEnum(typer,&unit,item);
-            else if (item->kind == RangeNodeFunction) typeFunction(typer,&unit,item,NULL);
+            else if (item->kind == RangeNodeFunction) {
+                typeFunction(typer,&unit,item,NULL);
+                if (appliesBuiltin(item,"iteration"))
+                    typeError(typer,item,"@iteration function '%s' must be a method of the type it iterates",item->name);
+            }
             else if (item->kind == RangeNodeMain) { item->type = status; typeBlock(typer,&unit,item->a,NULL,status); }
         }
     }
@@ -4689,7 +4761,8 @@ static RangeNode *nativeExpressionValue(Native *, RangeNode *);
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
     RangeNode *type = nativeExpressionValue(native,expr);
-    if (!expr || (expr->kind != RangeNodeCall && !(expr->resolvedDeclaration
+    int construction = expr && (expr->kind == RangeNodeCall || (expr->kind == RangeNodeBinary && same(expr->name,"..<")));
+    if (!expr || (!construction && !(expr->resolvedDeclaration
         && expr->resolvedDeclaration->kind == RangeNodeEnumCase))) native->resultTemp = -1;
     return type;
 }
@@ -4802,6 +4875,8 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
     }
     case RangeNodeBinary: {
         const char *op = expr->name;
+        if (same(op,"..<")) /* the @interval construct, with lower: and upper: */
+            return nativeConstruct(native,expr,type,expr->items,expr->itemCount,0);
         if (same(op,"&&") || same(op,"||")) {
             nativeExpression(native,expr->a);
             uint32_t base = same(op,"&&") ? armCbz(0,0) : armCbnz(0,0);
@@ -5083,13 +5158,15 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         break;
     }
     case RangeNodeWhile: {
-        size_t top = native->machine.size;
+        size_t top = native->machine.size, exit = 0;
         nativeEnter(native,1,top);
-        nativeCondition(native,node->a);
-        size_t exit = nativeEmit(native,armCbz(0,0));
+        if (node->a) { /* without a condition, the loop ends only at break */
+            nativeCondition(native,node->a);
+            exit = nativeEmit(native,armCbz(0,0));
+        }
         nativeStatement(native,node->b);
         nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
-        nativeBranchHere(native,exit,armCbz(0,0));
+        if (node->a) nativeBranchHere(native,exit,armCbz(0,0));
         nativeLeave(native);
         break;
     }

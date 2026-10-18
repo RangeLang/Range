@@ -49,6 +49,7 @@ run recursive-enums 42 "" Testing/Compiler/Native/RecursiveEnums.range
 run nested-enums 42 "" Testing/Compiler/Native/NestedEnums.range
 run optionals 42 "" Testing/Compiler/Native/Optionals.range
 run loops 42 "" Testing/Compiler/Native/Loops.range
+run intervals 42 "" Testing/Compiler/Native/Intervals.range
 run guards 42 "" Testing/Compiler/Native/Guards.range
 run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
@@ -60,7 +61,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
-                   loops guards enum-methods equality promotion strings-native; do
+                   loops intervals guards enum-methods equality promotion strings-native; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -165,8 +166,25 @@ reject guard-break-ends-switch "the else block of 'guard' must not fall through"
 reject guard-binding-in-else "no declaration for 'v' in the loaded sources" \
     'function f(let o: Int?): Int { guard let v: o else { return v } return v }
 { return f(o: .absent) }'
-reject for-non-collection "'for … in' iterates a construct applying @collection; found Int<bits: 64, signed: true>" \
+reject for-non-iterable "'for … in' cannot iterate Int<bits: 64, signed: true>: it declares no @iteration function" \
     '{ let n: 5 for x in n { } return 0 }'
+reject two-iterations "construct 'Twice' declares 2 @iteration functions; a type declares exactly one" \
+    'construct Twice {
+    let n: Int
+    @iteration function first(let at: Int): Int? { return .absent }
+    @iteration function second(let at: Int): Int? { return .absent }
+}
+{ for x in Twice(n: 1) { } return 0 }'
+reject iteration-signature "@iteration function 'next' of 'Bad' must take one Int position and return an optional" \
+    'construct Bad { @iteration function next(let at: Int): Int { return at } }
+{ return 0 }'
+reject iteration-not-method "@iteration function 'next' must be a method of the type it iterates" \
+    '@iteration function next(let at: Int): Int? { return .absent }
+{ return 0 }'
+reject interval-loop-variable "cannot assign to let 'i'" \
+    '{ for i in 0..<3 { i: 2 } return 0 }'
+reject interval-chain "'..<' does not chain; parenthesize one interval" \
+    '{ let r: 0..<3..<4 return 0 }'
 reject loop-variable "cannot assign to let 'x'" \
     '{ state xs: Array<Int>() for x in xs { x: 3 } return 0 }'
 reject enum-extension-member "an extension of enum 'Direction' cannot add stored member 'speed'" \
@@ -177,5 +195,12 @@ reject payload-equality "payload field '0' of case 'at' is Point, which '==' doe
     'construct Point { let x: Int }
 enum Place { case at(Point), nowhere }
 { let p: Place(.nowhere) if p == .nowhere { return 1 } return 0 }'
+# Without a construct applying @interval, as in the minimal core, `..<` has no meaning.
+full=("${core[@]}")
+core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macros/Diagnostic.range
+      Language/Macros/Boolean.range Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
+reject interval-undeclared "'..<' needs exactly one construct applying @interval; found 0" \
+    '{ let r: 0..<3 return 0 }'
+core=("${full[@]}")
 
-echo "compiler native: programs=30 rejections=21 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass guards=pass enum-methods=pass equality=pass promotion=pass strings=pass"
+echo "compiler native: programs=31 rejections=27 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass promotion=pass strings=pass"

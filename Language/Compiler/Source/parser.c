@@ -7,16 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Binary operator precedence, loosest first. */
+/* Binary operator precedence, loosest first. As in Swift, `..<` forms an
+ * interval below arithmetic and above comparison, and does not chain. */
 static const char *const RANGE_PRECEDENCE[][7] = {
     {"||", NULL},
     {"&&", NULL},
     {"==", "!=", "<", ">", "<=", ">=", NULL},
+    {"..<", NULL},
     {"+", "-", NULL},
     {"*", "/", "%", NULL}
 };
 #define RANGE_PRECEDENCE_LEVELS \
     ((int)(sizeof(RANGE_PRECEDENCE) / sizeof(RANGE_PRECEDENCE[0])))
+/* The level of `..<`, and of arithmetic: a pattern's value is arithmetic. */
+#define RANGE_INTERVAL_LEVEL 3
+#define RANGE_ARITHMETIC_LEVEL 4
 
 static void parserFail(RangeParser *parser, const RangeToken *token,
                        const char *format, ...)
@@ -607,6 +612,11 @@ static RangeNode *parseExpression(RangeParser *parser, int level)
         parserAdvance(parser);
         node->b = parseExpression(parser, level + 1);
         left = node;
+        if (level == RANGE_INTERVAL_LEVEL) {
+            if (parserAt(parser, "..<"))
+                parserFail(parser, &parser->current, "'..<' does not chain; parenthesize one interval");
+            break;
+        }
     }
     return left;
 }
@@ -641,7 +651,7 @@ static RangeNode *parsePattern(RangeParser *parser, RangeNode *bindings)
             pattern->integer = RangePatternRelation;
             pattern->name = RANGE_RELATIONS[i];
             parserAdvance(parser);
-            pattern->a = parseExpression(parser, 3);
+            pattern->a = parseExpression(parser, RANGE_ARITHMETIC_LEVEL);
             return pattern;
         }
     int leading = parserAt(parser, ".");
@@ -686,7 +696,7 @@ static RangeNode *parsePattern(RangeParser *parser, RangeNode *bindings)
         return pattern;
     }
     pattern->integer = RangePatternValue;
-    pattern->a = parseExpression(parser, 3);
+    pattern->a = parseExpression(parser, RANGE_ARITHMETIC_LEVEL);
     return pattern;
 }
 
@@ -825,20 +835,25 @@ static RangeNode *forInteger(RangeParser *parser, RangeNode *at, long long value
     return literal;
 }
 
-/* `for pattern in collection where guard { body }` visits the elements of a
- * construct applying @collection, by its count and read(at:). It is that loop,
- * written in ordinary nodes; the names it adds contain a space, so source
- * cannot name them:
+/* `for pattern in sequence where guard { body }` calls the function the
+ * sequence's type declares with @iteration, at positions 0, 1, 2, … until it
+ * returns absence. It is that loop, written in ordinary nodes; the names it
+ * adds contain a space, so source cannot name them:
  *
- *   let <sequence>: collection      (a copy: changing the collection in the
- *   state <index>: 0                 body does not change the iteration)
- *   while <index> < <sequence>.count {
- *       let element: <sequence>.read(at: <index>)
- *       <index>: <index> + 1
- *       if guard { body }            (or `if case pattern: element { body }`)
+ *   let <for sequence>: sequence     (a copy: changing the sequence in the
+ *   state <for index>: 0              body does not change the iteration)
+ *   repeat {                         (a while without a condition)
+ *       if let element: <for sequence>.<@iteration>(<position>: <for index>) {
+ *           <for index>: <for index> + 1
+ *           if guard { body }        (or `if case pattern where guard: element { body }`)
+ *       } else { break }
  *   }
  *
- * The element binding is a let, so a loop variable cannot be assigned. */
+ * The parser knows no member names: the call's member and label are left
+ * empty, and the type checker fills them from the @iteration function of the
+ * sequence's type once that type is known. The element binding is a let, so a
+ * loop variable cannot be assigned; the position advances before the body, so
+ * `continue` advances it too. */
 static RangeNode *parseFor(RangeParser *parser)
 {
     RangeNode *node = parserNode(parser, RangeNodeFor);
@@ -857,7 +872,7 @@ static RangeNode *parseFor(RangeParser *parser)
     } else element = parserExpectName(parser);
     parserExpect(parser, "in");
     parser->conditionDepth += 1;
-    RangeNode *collection = parseExpression(parser, 0);
+    RangeNode *sequence = parseExpression(parser, 0);
     RangeNode *where = NULL;
     if (parserAt(parser, "where")) {
         parserAdvance(parser);
@@ -868,36 +883,50 @@ static RangeNode *parseFor(RangeParser *parser)
     if (parser->failed) return node;
 
     RangeNode *loop = forNode(parser, node, RangeNodeBlock, NULL);
-    RangeNode *sequence = forNode(parser, node, RangeNodeLet, "for sequence");
-    rangeNodeAppend(parser->arena, sequence, forArgument(parser, node, NULL, collection));
+    RangeNode *copy = forNode(parser, node, RangeNodeLet, "for sequence");
+    rangeNodeAppend(parser->arena, copy, forArgument(parser, node, NULL, sequence));
     RangeNode *index = forNode(parser, node, RangeNodeState, "for index");
     rangeNodeAppend(parser->arena, index, forArgument(parser, node, NULL, forInteger(parser, node, 0)));
-    rangeNodeAppend(parser->arena, loop, sequence);
+    rangeNodeAppend(parser->arena, loop, copy);
     rangeNodeAppend(parser->arena, loop, index);
 
     RangeNode *repeat = forNode(parser, node, RangeNodeWhile, NULL);
-    RangeNode *test = forNode(parser, node, RangeNodeBinary, "<");
-    test->a = forNode(parser, node, RangeNodeName, "for index");
-    test->b = forNode(parser, node, RangeNodeMemberAccess, "count");
-    test->b->a = forNode(parser, node, RangeNodeName, "for sequence");
-    repeat->a = test;
     repeat->b = forNode(parser, node, RangeNodeBlock, NULL);
 
-    RangeNode *read = forNode(parser, node, RangeNodeCall, NULL);
-    read->a = forNode(parser, node, RangeNodeMemberAccess, "read");
-    read->a->a = forNode(parser, node, RangeNodeName, "for sequence");
-    rangeNodeAppend(parser->arena, read, forArgument(parser, node, "at", forNode(parser, node, RangeNodeName, "for index")));
+    /* The member and label are filled in by the type checker. */
+    RangeNode *next = forNode(parser, node, RangeNodeCall, NULL);
+    next->a = forNode(parser, node, RangeNodeMemberAccess, NULL);
+    next->a->a = forNode(parser, node, RangeNodeName, "for sequence");
+    rangeNodeAppend(parser->arena, next, forArgument(parser, node, NULL, forNode(parser, node, RangeNodeName, "for index")));
+
+    RangeNode *present = forNode(parser, node, RangeNodeSwitch, NULL);
+    present->flags |= RangeFlagConditional;
+    present->a = next;
+    RangeNode *bound = forNode(parser, node, RangeNodePattern, NULL);
+    bound->integer = RangePatternPresent;
+    bound->c = forNode(parser, node, RangeNodeBlock, "bindings");
     RangeNode *value = forNode(parser, node, RangeNodeLet, NULL);
     value->name = element;
-    rangeNodeAppend(parser->arena, value, forArgument(parser, node, NULL, read));
-    rangeNodeAppend(parser->arena, repeat->b, value);
+    rangeNodeAppend(parser->arena, bound->c, value);
+    bound->a = value;
+    RangeNode *found = forNode(parser, node, RangeNodeSwitchCase, NULL);
+    found->c = bound->c;
+    rangeNodeAppend(parser->arena, found, bound);
+    found->b = forNode(parser, node, RangeNodeBlock, NULL);
+    rangeNodeAppend(parser->arena, present, found);
+    RangeNode *end = forNode(parser, node, RangeNodeSwitchCase, NULL);
+    end->flags |= RangeFlagLiteral;
+    end->b = forNode(parser, node, RangeNodeBlock, NULL);
+    rangeNodeAppend(parser->arena, end->b, forNode(parser, node, RangeNodeBreak, NULL));
+    rangeNodeAppend(parser->arena, present, end);
+    rangeNodeAppend(parser->arena, repeat->b, present);
 
     RangeNode *step = forNode(parser, node, RangeNodeAssign, NULL);
     step->a = forNode(parser, node, RangeNodeName, "for index");
     step->b = forNode(parser, node, RangeNodeBinary, "+");
     step->b->a = forNode(parser, node, RangeNodeName, "for index");
     step->b->b = forInteger(parser, node, 1);
-    rangeNodeAppend(parser->arena, repeat->b, step);
+    rangeNodeAppend(parser->arena, found->b, step);
 
     RangeNode *run = body;
     if (pattern) {
@@ -922,7 +951,7 @@ static RangeNode *parseFor(RangeParser *parser)
         filter->b = body;
         run = filter;
     }
-    rangeNodeAppend(parser->arena, repeat->b, run);
+    rangeNodeAppend(parser->arena, found->b, run);
     rangeNodeAppend(parser->arena, loop, repeat);
     node->a = loop;
     return node;

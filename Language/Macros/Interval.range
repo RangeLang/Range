@@ -1,0 +1,5 @@
+// C primitive: `a..<b` is sugar for the construct applying @interval,
+// constructed with lower: a, upper: b; C never names the type. As in Swift,
+// `..<` binds below arithmetic and above comparison, and does not chain.
+@builtin
+macro interval(): Construct

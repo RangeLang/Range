@@ -1,0 +1,55 @@
+// `a..<b` is the construct applying @interval; `for` iterates it through its
+// @iteration function, like any other type that declares one.
+function sum(let n: Int): Int {
+    state total: 0
+    for i in 0..<n { total: total + i }
+    return total
+}
+
+// Any type can be iterated by declaring one @iteration function.
+construct Countdown {
+    let from: Int
+
+    @iteration
+    function next(let step: Int): Int? {
+        if step < from { return from - step }
+        return .absent
+    }
+}
+
+{
+    if sum(n: 10) != 45 { return 1 }
+
+    // An empty interval runs no iteration.
+    state empty: 0
+    for _ in 5..<5 { empty: empty + 1 }
+    for _ in 7..<3 { empty: empty + 1 }
+    if empty != 0 { return 2 }
+
+    // An interval is a value: iterating it twice visits it twice.
+    let r: 2..<5
+    state twice: 0
+    for i in r { twice: twice + i }
+    for i in r { twice: twice + i }
+    if twice != 18 { return 3 }
+    if r.lower != 2 || r.upper != 5 { return 4 }
+
+    // Precedence as in Swift: arithmetic binds tighter, comparison looser.
+    state wide: 0
+    for i in 1 + 1..<2 * 3 where i % 2 == 0 { wide: wide + i }
+    if wide != 6 { return 5 }
+
+    // continue still advances the position; break leaves the loop.
+    state odd: 0
+    for i in 0..<100 {
+        if i % 2 == 0 { continue }
+        if i > 9 { break }
+        odd: odd + i
+    }
+    if odd != 25 { return 6 }
+
+    state down: 0
+    for k in Countdown(from: 4) { down: down * 10 + k }
+    if down != 4321 { return 7 }
+    return 42
+}

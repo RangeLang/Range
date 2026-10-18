@@ -31,6 +31,13 @@ macro collection(): Construct {
                 return count == 0
             }
 
+            // `for element in collection { }` calls this at positions 0, 1, 2, …
+            @iteration
+            function element(let at: Int): Element? {
+                if at < count { return read(at: at) }
+                return .absent
+            }
+
             function append(let value: Element) {
                 if count == capacity {
                     if capacity == 0 {
@@ -55,9 +62,9 @@ macro collection(): Construct {
     // only to capacity. count never exceeds capacity.
 
     // `for element in collection { }` iterates any construct applying this
-    // macro by the count and read(at:) it emits, over a copy taken when the
-    // loop begins. C finds the constructs by this macro's name and writes the
-    // loop; there is no sequence protocol yet.
+    // macro through the element(at:) function it emits, which applies
+    // @iteration: C finds that function by its role, not by this macro's name
+    // or the names of the members it emits.
 
     // Open: restricting writes to count, capacity, and elements to these
     // operations (a later macro); copy semantics when an Array value is

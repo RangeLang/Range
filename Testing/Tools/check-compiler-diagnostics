@@ -43,8 +43,15 @@ assert 'no entry block, so no executable was written' in active, active
 for provided in ('@many storage is a C heap block', "builtin function 'resize' is implemented in C",
                  "builtin member 'storage' is a C layout primitive", "builtin member 'bytes' is a C layout primitive",
                  "builtin member 'count' is the byte count the bytes primitive holds", "builtin function 'byte' reads one byte",
-                 "'for … in' iterates a construct applying @collection", "a value of T where T? is expected"):
+                 "'for … in' calls the function applying @iteration at positions 0, 1, 2",
+                 "the @iteration law (one per type, one Int parameter, an optional result) is checked in C",
+                 "'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C",
+                 "a value of T where T? is expected"):
     assert provided in active, active
+# for … in finds its function by the @iteration role, never by a macro's name.
+assert '@collection' not in active and 'by its name' not in active, active
+assert "no C primitive is implemented for builtin macro 'iteration'" not in active, active
+assert "no C primitive is implemented for builtin macro 'interval'" not in active, active
 # Array<Element> declares a type parameter, so Array<Member> resolves;
 # @boolean and @string declare Bool and String the way @integer declares Int;
 # generics are @generic kinds, and every C graph shape has a grammar declaration.
