@@ -1,0 +1,56 @@
+// String in native code: count (bytes), byte(at:), ==, + into a new
+// reference-counted block, construction from a literal, and @print.
+enum Token { case word(String), end }
+construct Named { let name: String }
+function greet(let name: String): String {
+    return "hello, " + name
+}
+function vowels(let s: String): Int {
+    state found: 0
+    state i: 0
+    while i < s.count {
+        let b: s.byte(at: i)
+        if b == 97 || b == 101 || b == 105 || b == 111 || b == 117 { found: found + 1 }
+        i: i + 1
+    }
+    return found
+}
+function kind(let s: String): Int {
+    switch s {
+    case "yes": return 1
+    case "no": return 0
+    default: return -1
+    }
+}
+{
+    let s: String("hi")
+    @print("local: \(s)")
+    let empty: String()
+    if empty.count != 0 || empty != "" { return 1 }
+    if s.count != 2 || s != "hi" || s == "ho" { return 2 }
+    let g: greet(name: "world")
+    @print(g)
+    if g.count != 12 || g != "hello, world" { return 3 }
+    if vowels(s: g) != 3 { return 4 }
+    if s.byte(at: 0) != 104 { return 5 }
+    state words: Array<String>()
+    state round: 0
+    state joined: ""
+    while round < 3 {
+        joined: joined + "ab"
+        words.append(value: joined + "!")
+        round: round + 1
+    }
+    if joined != "ababab" || words.read(at: 1) != "abab!" { return 6 }
+    state total: 0
+    for w in words { total: total + w.count }
+    if total != 3 + 5 + 7 { return 7 }
+    if Token.word("a" + "b") != .word("ab") || Token.word("x") == .end { return 8 }
+    let n: Named(name: joined + "?")
+    if n.name.count != 7 { return 9 }
+    if kind(s: "yes") != 1 || kind(s: "n" + "o") != 0 || kind(s: "maybe") != -1 { return 10 }
+    let maybe: String?("z")
+    if maybe != "z" { return 11 }
+    @print("\(joined) \(words.read(at: 0)) \(n.name)")
+    return 42
+}

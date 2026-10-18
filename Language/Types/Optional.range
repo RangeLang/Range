@@ -1,4 +1,5 @@
-// `Wrapped?` is Optional<Wrapped>. `if let value: optional { }` binds the
+// `Wrapped?` is Optional<Wrapped>; a Wrapped value is promoted where an
+// optional is expected. `if let value: optional { }` binds the
 // payload of the present case.
 @optional
 enum Optional<Wrapped> {

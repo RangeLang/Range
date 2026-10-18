@@ -171,8 +171,8 @@ int main(void)
             fprintf(stderr,"%s: size %zu alignment %zu\n",expected[i].name,type->size,type->alignment);
         assert(type->size == expected[i].size && type->alignment == expected[i].alignment);
     }
-    // The bytes primitive: an address and a byte count.
-    assert(local(&c,"layouts","s")->type->size == 16 && local(&c,"layouts","s")->type->alignment == 8);
+    // The bytes primitive: an address, a byte count, and the owning block.
+    assert(local(&c,"layouts","s")->type->size == 24 && local(&c,"layouts","s")->type->alignment == 8);
     expectDescription(local(&c,"layouts","maybe")->type,"Optional<Wrapped: Int<bits: 8, signed: true>>");
     assert(reported(&c,"layout","Loop has no layout: it contains itself"));
     // Only root causes are reported; types that merely contain them stay quiet.

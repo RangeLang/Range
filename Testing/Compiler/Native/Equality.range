@@ -1,0 +1,35 @@
+// == on enums with payloads is structural: equal cases, then equal fields,
+// recursively. A value pattern of such a type compares with ==.
+enum Token {
+    case value(number: Int)
+    case pair(Int, Int)
+    case flag(Bool)
+    case end
+}
+enum Tree {
+    case leaf(value: Int)
+    case node(left: Tree, right: Tree)
+}
+enum Wrapper { case token(Token), none }
+function classify(let t: Token): Int {
+    switch t {
+    case Token.pair(1, 2): return 12
+    case .end: return 0
+    default: return -1
+    }
+}
+{
+    let a: Token(.value(number: 7))
+    if a != .value(number: 7) { return 1 }
+    if a == .value(number: 8) { return 2 }
+    if a == .end || Token.end != .end { return 3 }
+    if Token.pair(1, 2) == .pair(2, 1) { return 4 }
+    if !(Token.flag(true) == .flag(true)) { return 5 }
+    let t: Tree(.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3))))
+    let u: Tree(.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3))))
+    if t != u { return 6 }
+    if t == .node(left: .leaf(value: 1), right: .leaf(value: 5)) { return 7 }
+    if Wrapper.token(.pair(3, 4)) != .token(.pair(3, 4)) { return 8 }
+    if classify(t: .pair(1, 2)) != 12 || classify(t: .pair(2, 2)) != -1 { return 9 }
+    return 42
+}

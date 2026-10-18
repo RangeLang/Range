@@ -1,0 +1,80 @@
+// guard: the else block must exit; bindings stay in scope after the guard.
+enum Token {
+    case value(number: Int)
+    case end
+}
+
+function first(let xs: Array<Int>): Int? {
+    guard xs.count > 0 else { return .absent }
+    return .present(xs.read(at: 0))
+}
+
+function double(let maybe: Int?): Int {
+    guard let n: maybe else { return -1 }
+    return n * 2
+}
+
+function unwrap(let maybe: Int?): Int {
+    guard let maybe else { return 0 }
+    return maybe
+}
+
+function number(let t: Token): Int {
+    guard case .value(let n): t else { return -1 }
+    let twice: n + n
+    return twice
+}
+
+function filtered(let xs: Array<Int>): Int {
+    state total: 0
+    for x in xs {
+        guard x != 2 else { continue }
+        guard x < 4 else { break }
+        total: total + x
+    }
+    return total
+}
+
+function strict(let n: Int): Int {
+    guard n > 0 else { @diagnostic("n must be positive") }
+    switch n {
+    case 1:
+        guard n == 1 else { break }
+        return 10
+    default:
+        return n
+    }
+    return 0
+}
+
+function longest(let groups: Array<Array<Int>>): Int {
+    state best: 0
+    for group in groups {
+        guard group.count > best else { continue }
+        best: group.count
+    }
+    return best
+}
+
+{
+    state xs: Array<Int>()
+    if let f: first(xs: xs) { return 1 }
+    xs.append(value: 1)
+    xs.append(value: 2)
+    xs.append(value: 3)
+    xs.append(value: 4)
+    xs.append(value: 5)
+    guard let f: first(xs: xs) else { return 2 }
+    if f != 1 { return 3 }
+    if double(maybe: .present(4)) != 8 || double(maybe: .absent) != -1 { return 4 }
+    if unwrap(maybe: .present(7)) != 7 || unwrap(maybe: .absent) != 0 { return 5 }
+    if number(t: .value(number: 6)) != 12 || number(t: .end) != -1 { return 6 }
+    if filtered(xs: xs) != 4 { return 7 }
+    if strict(n: 1) != 10 || strict(n: 3) != 3 { return 8 }
+    state groups: Array<Array<Int>>()
+    groups.append(value: xs)
+    state empty: Array<Int>()
+    groups.append(value: empty)
+    if longest(groups: groups) != 5 { return 9 }
+    return 42
+}

@@ -1,0 +1,105 @@
+// for-in over any construct applying @collection, by its count and
+// read(at:), over a copy taken when the loop begins; break and continue in
+// for and while, releasing the values that end when they leave.
+enum Shape {
+    case group(Array<Int>)
+    case nothing
+}
+
+function make(let n: Int): Array<Int> {
+    state xs: Array<Int>()
+    state i: 0
+    while i < n {
+        xs.append(value: i)
+        i: i + 1
+    }
+    return xs
+}
+
+function sum(let xs: Array<Int>): Int {
+    state total: 0
+    for x in xs { total: total + x }
+    return total
+}
+
+{
+    let xs: make(n: 11)
+    if sum(xs: xs) != 55 { return 1 }
+    state evens: 0
+    for x in xs where x % 2 == 0 { evens: evens + x }
+    if evens != 30 { return 2 }
+    state count: 0
+    for _ in xs { count: count + 1 }
+    if count != 11 { return 3 }
+
+    state rows: Array<Array<Int>>()
+    state i: 0
+    while i < 6 {
+        rows.append(value: make(n: i))
+        i: i + 1
+    }
+    state total: 0
+    state round: 0
+    while round < 20 {
+        for row in rows {
+            let copy: row
+            if copy.count == 1 { continue }
+            for x in row {
+                if x == 3 { break }
+                total: total + x
+            }
+            if row.count == 5 { break }
+        }
+        state shapes: Array<Shape>()
+        shapes.append(value: .group(make(n: 3)))
+        shapes.append(value: .nothing)
+        shapes.append(value: .group(make(n: 4)))
+        for s in shapes {
+            switch s {
+            case .group(let items):
+                if items.count == 3 { continue }
+                total: total + items.count
+            case .nothing:
+                break // ends the switch, not the loop
+            }
+        }
+        for case .group(let items) in shapes where items.count > 3 { total: total + 100 }
+        round: round + 1
+    }
+    // Each round: rows 1 + 3 + 3 + 3, shapes 4, matched groups 100.
+    if total != 20 * 114 { return 4 }
+
+    state maybes: Array<Int?>()
+    maybes.append(value: .present(1))
+    maybes.append(value: .absent)
+    maybes.append(value: .present(4))
+    maybes.append(value: .present(9))
+    state found: 0
+    for m in maybes {
+        if let v: m {
+            if v == 9 { break } // an `if` is not a break target: this ends the loop
+            found: found + v
+        } else { continue }
+    }
+    if found != 5 { return 5 }
+
+    // Changing the collection in the body does not change the iteration.
+    state ys: Array<Int>()
+    ys.append(value: 1)
+    ys.append(value: 2)
+    state visits: 0
+    for y in ys {
+        ys.append(value: y)
+        visits: visits + 1
+    }
+    if visits != 2 || ys.count != 4 { return 6 }
+
+    state k: 0
+    while true {
+        k: k + 1
+        if k < 5 { continue }
+        break
+    }
+    if k != 5 { return 7 }
+    return 42
+}

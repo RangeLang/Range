@@ -1,6 +1,7 @@
-// A closed union: a value is exactly one of its cases. Nested constructs and
-// enums are listed among the cases but are not cases; generics are C-backed
-// and have no field adapter yet.
+// A closed union: a value is exactly one of its cases. Nested constructs,
+// enums, and functions (methods, whose `self` is the value) are listed among
+// the cases but are not cases; generics are C-backed and have no field
+// adapter yet.
 construct Enum {
     let name: String
     let cases: Array<EnumCase>

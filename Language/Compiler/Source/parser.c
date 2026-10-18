@@ -712,7 +712,9 @@ static RangeNode *parseCasePattern(RangeParser *parser)
  * arm as its default. */
 static RangeNode *parseIf(RangeParser *parser);
 
-static RangeNode *parseConditionalPattern(RangeParser *parser, RangeNode *node)
+/* The pattern and subject of `if case`, `if let`, `guard case`, and `guard let`:
+ * the node becomes a conditional switch whose first arm is returned. */
+static RangeNode *parseConditionalHead(RangeParser *parser, RangeNode *node, const char *keyword)
 {
     node->kind = RangeNodeSwitch;
     node->flags |= RangeFlagConditional;
@@ -721,8 +723,8 @@ static RangeNode *parseConditionalPattern(RangeParser *parser, RangeNode *node)
     if (parserAt(parser, "case")) {
         parserAdvance(parser);
         pattern = parseCasePattern(parser);
-        if (!pattern) return node;
-        if (pattern->b) parserFail(parser, &parser->current, "'if case' takes no where guard");
+        if (!pattern) return entry;
+        if (pattern->b) parserFail(parser, &parser->current, "'%s case' takes no where guard", keyword);
         parserExpect(parser, ":");
         parser->conditionDepth += 1;
         node->a = parseExpression(parser, 0);
@@ -750,6 +752,12 @@ static RangeNode *parseConditionalPattern(RangeParser *parser, RangeNode *node)
     }
     entry->c = pattern->c;
     rangeNodeAppend(parser->arena, entry, pattern);
+    return entry;
+}
+
+static RangeNode *parseConditionalPattern(RangeParser *parser, RangeNode *node)
+{
+    RangeNode *entry = parseConditionalHead(parser, node, "if");
     entry->b = parseBlock(parser);
     rangeNodeAppend(parser->arena, node, entry);
     RangeNode *otherwise = parserNode(parser, RangeNodeSwitchCase);
@@ -762,6 +770,161 @@ static RangeNode *parseConditionalPattern(RangeParser *parser, RangeNode *node)
         } else otherwise->b = parseBlock(parser);
     } else otherwise->b = parserNode(parser, RangeNodeBlock);
     rangeNodeAppend(parser->arena, node, otherwise);
+    return node;
+}
+
+/* `guard condition else { … }`, `guard let x: v else { … }`, and `guard case
+ * P: v else { … }`. The statements after a guard are its success arm, so its
+ * bindings are in scope for them and not in the else block: the guard is an
+ * if, or a conditional switch, whose first arm is *rest. The type checker
+ * requires the else block to exit. */
+static RangeNode *parseGuard(RangeParser *parser, RangeNode **rest)
+{
+    RangeNode *node = parserNode(parser, RangeNodeIf);
+    parserExpect(parser, "guard");
+    *rest = parserNode(parser, RangeNodeBlock);
+    if (parserAt(parser, "case") || parserAt(parser, "let")) {
+        RangeNode *entry = parseConditionalHead(parser, node, "guard");
+        entry->b = *rest;
+        rangeNodeAppend(parser->arena, node, entry);
+        RangeNode *otherwise = parserNode(parser, RangeNodeSwitchCase);
+        otherwise->flags |= RangeFlagLiteral;
+        parserExpect(parser, "else");
+        otherwise->b = parseBlock(parser);
+        rangeNodeAppend(parser->arena, node, otherwise);
+    } else {
+        parser->conditionDepth += 1;
+        node->a = parseExpression(parser, 0);
+        parser->conditionDepth -= 1;
+        parserExpect(parser, "else");
+        node->c = parseBlock(parser);
+        node->b = *rest;
+    }
+    node->flags |= RangeFlagGuard;
+    return node;
+}
+
+static RangeNode *forNode(RangeParser *parser, RangeNode *at, RangeNodeKind kind, const char *name)
+{
+    RangeNode *node = rangeNodeCreate(parser->arena, kind, at->path, at->line, at->column);
+    node->name = name ? rangeArenaIntern(parser->arena, name, strlen(name)) : NULL;
+    return node;
+}
+
+static RangeNode *forArgument(RangeParser *parser, RangeNode *at, const char *label, RangeNode *value)
+{
+    RangeNode *argument = forNode(parser, at, RangeNodeArgument, label);
+    argument->a = value;
+    return argument;
+}
+
+static RangeNode *forInteger(RangeParser *parser, RangeNode *at, long long value)
+{
+    RangeNode *literal = forNode(parser, at, RangeNodeInteger, value ? "1" : "0");
+    literal->integer = value;
+    return literal;
+}
+
+/* `for pattern in collection where guard { body }` visits the elements of a
+ * construct applying @collection, by its count and read(at:). It is that loop,
+ * written in ordinary nodes; the names it adds contain a space, so source
+ * cannot name them:
+ *
+ *   let <sequence>: collection      (a copy: changing the collection in the
+ *   state <index>: 0                 body does not change the iteration)
+ *   while <index> < <sequence>.count {
+ *       let element: <sequence>.read(at: <index>)
+ *       <index>: <index> + 1
+ *       if guard { body }            (or `if case pattern: element { body }`)
+ *   }
+ *
+ * The element binding is a let, so a loop variable cannot be assigned. */
+static RangeNode *parseFor(RangeParser *parser)
+{
+    RangeNode *node = parserNode(parser, RangeNodeFor);
+    parserExpect(parser, "for");
+    RangeNode *pattern = NULL, *bindings = NULL;
+    const char *element = "for element";
+    if (parserAt(parser, "case")) {
+        parserAdvance(parser);
+        bindings = parserNode(parser, RangeNodeBlock);
+        bindings->name = "bindings";
+        pattern = parsePattern(parser, bindings);
+        if (!pattern) return node;
+        pattern->c = bindings;
+    } else if (parserAt(parser, "_")) {
+        parserAdvance(parser);
+    } else element = parserExpectName(parser);
+    parserExpect(parser, "in");
+    parser->conditionDepth += 1;
+    RangeNode *collection = parseExpression(parser, 0);
+    RangeNode *where = NULL;
+    if (parserAt(parser, "where")) {
+        parserAdvance(parser);
+        where = parseExpression(parser, 0);
+    }
+    parser->conditionDepth -= 1;
+    RangeNode *body = parseBlock(parser);
+    if (parser->failed) return node;
+
+    RangeNode *loop = forNode(parser, node, RangeNodeBlock, NULL);
+    RangeNode *sequence = forNode(parser, node, RangeNodeLet, "for sequence");
+    rangeNodeAppend(parser->arena, sequence, forArgument(parser, node, NULL, collection));
+    RangeNode *index = forNode(parser, node, RangeNodeState, "for index");
+    rangeNodeAppend(parser->arena, index, forArgument(parser, node, NULL, forInteger(parser, node, 0)));
+    rangeNodeAppend(parser->arena, loop, sequence);
+    rangeNodeAppend(parser->arena, loop, index);
+
+    RangeNode *repeat = forNode(parser, node, RangeNodeWhile, NULL);
+    RangeNode *test = forNode(parser, node, RangeNodeBinary, "<");
+    test->a = forNode(parser, node, RangeNodeName, "for index");
+    test->b = forNode(parser, node, RangeNodeMemberAccess, "count");
+    test->b->a = forNode(parser, node, RangeNodeName, "for sequence");
+    repeat->a = test;
+    repeat->b = forNode(parser, node, RangeNodeBlock, NULL);
+
+    RangeNode *read = forNode(parser, node, RangeNodeCall, NULL);
+    read->a = forNode(parser, node, RangeNodeMemberAccess, "read");
+    read->a->a = forNode(parser, node, RangeNodeName, "for sequence");
+    rangeNodeAppend(parser->arena, read, forArgument(parser, node, "at", forNode(parser, node, RangeNodeName, "for index")));
+    RangeNode *value = forNode(parser, node, RangeNodeLet, NULL);
+    value->name = element;
+    rangeNodeAppend(parser->arena, value, forArgument(parser, node, NULL, read));
+    rangeNodeAppend(parser->arena, repeat->b, value);
+
+    RangeNode *step = forNode(parser, node, RangeNodeAssign, NULL);
+    step->a = forNode(parser, node, RangeNodeName, "for index");
+    step->b = forNode(parser, node, RangeNodeBinary, "+");
+    step->b->a = forNode(parser, node, RangeNodeName, "for index");
+    step->b->b = forInteger(parser, node, 1);
+    rangeNodeAppend(parser->arena, repeat->b, step);
+
+    RangeNode *run = body;
+    if (pattern) {
+        /* `for case pattern in` runs the body for the elements that match. */
+        RangeNode *match = forNode(parser, node, RangeNodeSwitch, NULL);
+        match->flags |= RangeFlagConditional;
+        match->a = forNode(parser, node, RangeNodeName, "for element");
+        RangeNode *entry = forNode(parser, node, RangeNodeSwitchCase, NULL);
+        pattern->b = where;
+        entry->c = bindings;
+        rangeNodeAppend(parser->arena, entry, pattern);
+        entry->b = body;
+        rangeNodeAppend(parser->arena, match, entry);
+        RangeNode *otherwise = forNode(parser, node, RangeNodeSwitchCase, NULL);
+        otherwise->flags |= RangeFlagLiteral;
+        otherwise->b = forNode(parser, node, RangeNodeBlock, NULL);
+        rangeNodeAppend(parser->arena, match, otherwise);
+        run = match;
+    } else if (where) {
+        RangeNode *filter = forNode(parser, node, RangeNodeIf, NULL);
+        filter->a = where;
+        filter->b = body;
+        run = filter;
+    }
+    rangeNodeAppend(parser->arena, repeat->b, run);
+    rangeNodeAppend(parser->arena, loop, repeat);
+    node->a = loop;
     return node;
 }
 
@@ -882,12 +1045,18 @@ static RangeNode *parseStatement(RangeParser *parser)
                 }
             }
             parserExpect(parser, ":");
-            RangeNode *body = parserNode(parser, RangeNodeBlock);
+            RangeNode *body = parserNode(parser, RangeNodeBlock), *into = body;
             while (!parser->failed && !parserAt(parser, "case")
                    && !parserAt(parser, "default") && !parserAt(parser, "}")
                    && !parserAtKind(parser, RangeTokenEnd)) {
+                if (parserAt(parser, "guard")) {
+                    RangeNode *rest = NULL;
+                    rangeNodeAppend(parser->arena, into, parseGuard(parser, &rest));
+                    into = rest;
+                    continue;
+                }
                 RangeNode *statement = parseStatement(parser);
-                if (statement) rangeNodeAppend(parser->arena, body, statement);
+                if (statement) rangeNodeAppend(parser->arena, into, statement);
             }
             entry->b = body;
             rangeNodeAppend(parser->arena, node, entry);
@@ -907,6 +1076,16 @@ static RangeNode *parseStatement(RangeParser *parser)
         parser->conditionDepth -= 1;
         node->b = parseBlock(parser);
         return node;
+    }
+    if (parserAt(parser, "for")) return parseFor(parser);
+    if (parserAt(parser, "break") || parserAt(parser, "continue")) {
+        RangeNode *node = parserNode(parser, parserAt(parser, "break") ? RangeNodeBreak : RangeNodeContinue);
+        parserAdvance(parser);
+        return node;
+    }
+    if (parserAt(parser, "guard")) {
+        parserFail(parser, &parser->current, "'guard' is a statement of a block");
+        return NULL;
     }
     if (parserAt(parser,"return")) {
         RangeNode *node = parserNode(parser,RangeNodeReturn);
@@ -929,7 +1108,7 @@ static RangeNode *parseStatement(RangeParser *parser)
 
 static RangeNode *parseBlock(RangeParser *parser)
 {
-    RangeNode *node = parserNode(parser, RangeNodeBlock);
+    RangeNode *node = parserNode(parser, RangeNodeBlock), *into = node;
     node->spanStart = parser->current.offset + parser->current.length;
     parserExpect(parser, "{");
     while (!parser->failed && !parserAt(parser, "}")
@@ -937,12 +1116,18 @@ static RangeNode *parseBlock(RangeParser *parser)
         if (parserAt(parser, "function")) {
             /* Macro bodies emit declarations as well as statements. */
             RangeNode *empty = parserNode(parser, RangeNodeAttribute);
-            rangeNodeAppend(parser->arena, node,
+            rangeNodeAppend(parser->arena, into,
                             parseFunction(parser, empty, NULL));
             continue;
         }
+        if (parserAt(parser, "guard")) {
+            RangeNode *rest = NULL;
+            rangeNodeAppend(parser->arena, into, parseGuard(parser, &rest));
+            into = rest;
+            continue;
+        }
         RangeNode *statement = parseStatement(parser);
-        if (statement) rangeNodeAppend(parser->arena, node, statement);
+        if (statement) rangeNodeAppend(parser->arena, into, statement);
     }
     node->spanEnd = parser->current.offset;
     parserExpect(parser, "}");
@@ -1158,6 +1343,7 @@ static RangeNode *parseExtension(RangeParser *parser, RangeNode *attributes)
 }
 
 /* `enum Name<Generics> { case a, b  case value(number: Int)  case present(Wrapped) }`.
+ * Functions in the body are methods, as in a construct.
  * Each case carries its payload as Let fields: a labeled field is named by its
  * label, an unlabeled one by its position ("0", "1", …), as a Swift tuple
  * element is. Constructs and enums may nest among the cases. */
@@ -1178,6 +1364,10 @@ static RangeNode *parseEnum(RangeParser *parser, RangeNode *attributes)
         }
         if (parserAt(parser, "enum")) {
             rangeNodeAppend(parser->arena, node, parseEnum(parser, memberAttributes));
+            continue;
+        }
+        if (parserAt(parser, "function")) {
+            rangeNodeAppend(parser->arena, node, parseFunction(parser, memberAttributes, node->name));
             continue;
         }
         if (memberAttributes->itemCount)

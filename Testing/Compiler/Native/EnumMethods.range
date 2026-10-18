@@ -1,0 +1,73 @@
+// Methods in an enum body and in an extension; self is the value, so a
+// method can switch over it. Calls are value.method().
+enum Direction {
+    case north, east, south, west
+
+    function turned(): Direction {
+        switch self {
+        case .north: return .east
+        case .east: return .south
+        case .south: return .west
+        case .west: return .north
+        }
+    }
+
+    function opposite(): Direction {
+        return turned().turned()
+    }
+}
+
+extension Direction {
+    function vertical(): Bool {
+        return self == .north || self == .south
+    }
+}
+
+enum Tree {
+    case leaf(value: Int)
+    case node(left: Tree, right: Tree)
+
+    function sum(): Int {
+        switch self {
+        case .leaf(let value): return value
+        case .node(let left, let right): return left.sum() + right.sum()
+        }
+    }
+}
+
+enum Either<Left, Right> {
+    case left(Left)
+    case right(Right)
+}
+
+extension Either {
+    function isLeft(): Bool {
+        if case .left(_): self { return true }
+        return false
+    }
+}
+
+construct Walker {
+    state facing: Direction(.north)
+    function step() { facing: facing.turned() }
+    function same(): Direction { return self.facing }
+}
+
+{
+    let d: Direction(.north)
+    if d.turned() != .east { return 1 }
+    if d.opposite() != .south { return 2 }
+    if !d.vertical() || Direction.east.vertical() { return 3 }
+    if d.turned().turned().turned().vertical() { return 4 }
+    let t: Tree(.node(left: .leaf(value: 4), right: .node(left: .leaf(value: 5), right: .leaf(value: 6))))
+    if t.sum() != 15 { return 5 }
+    let e: Either<Int, Bool>(.left(3))
+    if !e.isLeft() { return 6 }
+    let r: Either<Int, Bool>(.right(true))
+    if r.isLeft() { return 7 }
+    state w: Walker()
+    w.step()
+    if w.same() != .east { return 8 }
+    @print("\(d.opposite()) \(t.sum())")
+    return 42
+}

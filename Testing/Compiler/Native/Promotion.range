@@ -1,0 +1,49 @@
+// A value of T where T? is expected is promoted to .present(value): returns,
+// construction, arguments, assignments, members, and either side of ==.
+enum Direction { case north, south }
+construct Person {
+    let age: Int
+    state manager: Int?(.absent)
+}
+function find(let xs: Array<Int>, let wanted: Int): Int? {
+    for x in xs { if x == wanted { return x } }
+    return .absent
+}
+function small(let n: Int): Int<bits: 8>? {
+    if n > 100 { return .absent }
+    return 5
+}
+function heading(let up: Bool): Direction? {
+    if up { return .north }
+    return .absent
+}
+function describe(let maybe: Int?): Int {
+    guard let value: maybe else { return -1 }
+    return value
+}
+{
+    state xs: Array<Int>()
+    xs.append(value: 3) xs.append(value: 9)
+    if describe(maybe: find(xs: xs, wanted: 9)) != 9 { return 1 }
+    if describe(maybe: find(xs: xs, wanted: 4)) != -1 { return 2 }
+    if describe(maybe: 12) != 12 { return 3 }
+    let x: Int?(5)
+    if x != 5 || x == 6 || x == .absent { return 4 }
+    state y: Int?(.absent)
+    y: 7
+    if describe(maybe: y) != 7 { return 5 }
+    state p: Person(age: 30, manager: 2)
+    if p.manager != 2 { return 6 }
+    p.manager: .absent
+    if p.manager != .absent { return 7 }
+    guard let s: small(n: 1) else { return 8 }
+    if s != 5 { return 9 }
+    if heading(up: true) != .north || heading(up: false) != .absent { return 10 }
+    state names: Array<String?>()
+    names.append(value: "Ada")
+    names.append(value: .absent)
+    state count: 0
+    for case .present(let name) in names { count: count + 1 }
+    if count != 1 { return 11 }
+    return 42
+}

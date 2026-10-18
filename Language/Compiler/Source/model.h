@@ -51,6 +51,9 @@ typedef enum {
     RangeNodeSpecialization, /* a construct plus one value per generic */
     RangeNodeType,
     RangeNodePattern,        /* a switch or if-case pattern; integer is its RangePattern form */
+    RangeNodeFor,            /* for-in: a is the loop it lowers to, over count and read(at:) */
+    RangeNodeBreak,
+    RangeNodeContinue,
     RangeNodeKindCount
 } RangeNodeKind;
 
@@ -66,7 +69,8 @@ enum {
     RangeFlagChecked = 1 << 10,    /* specialization: its laws have run */
     RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
     RangeFlagMutationKnown = 1 << 12,
-    RangeFlagConditional = 1 << 13 /* switch: written as `if case` or `if let`, with an else arm */
+    RangeFlagConditional = 1 << 13, /* switch: written as `if case` or `if let`, with an else arm */
+    RangeFlagGuard = 1 << 14       /* if or conditional switch written as `guard`: its else arm must exit */
 };
 
 /* Pattern forms. A case pattern's items are arguments (label, sub-pattern); a
@@ -143,6 +147,7 @@ struct RangeNode {
     RangeNode *generics; /* declaration Let members or supplied type arguments */
     RangeNode *rhsReference; /* bare RHS identity, resolved like any name */
     RangeNode *emittedBy; /* macro application whose #graph block produced this node */
+    RangeNode *receiver; /* method: its implicit `self` declaration, made on first use */
     /* Complete declaration RHS source range, independent of legacy type slots. */
     size_t rhsStart;
     size_t rhsEnd;

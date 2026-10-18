@@ -1035,13 +1035,16 @@ static void mergeExtension(Resolver *vm, RangeNode *extension)
     for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
         RangeNode *candidate = vm->units[u]->items[i];
         if (!same(candidate->name,subject->name)) continue;
-        if (candidate->kind == RangeNodeEnum)
-            fail(vm,subject,"extending enum '%s' is not implemented",subject->name);
-        if (candidate->kind != RangeNodeConstruct) continue;
+        if (candidate->kind != RangeNodeConstruct && candidate->kind != RangeNodeEnum) continue;
         if (declaration) fail(vm,subject,"ambiguous extension of '%s'",subject->name);
         declaration = candidate;
     }
     if (!declaration) fail(vm,subject,"extension of undeclared '%s'",subject->name);
+    // An enum's values are its cases: an extension adds functions and nested types.
+    if (declaration->kind == RangeNodeEnum)
+        for (size_t i = 0; i < extension->itemCount; ++i)
+            if (rangeNodeDeclaresValue(extension->items[i]->kind))
+                fail(vm,extension->items[i],"an extension of enum '%s' cannot add stored member '%s'",declaration->name,extension->items[i]->name);
     for (size_t i = 0; i < extension->itemCount; ++i) {
         RangeNode *item = extension->items[i];
         if (item->kind == RangeNodeFunction) item->typeName = declaration->name;
@@ -1124,11 +1127,24 @@ static int sourceMatches(RangeNode *node, const char *name, int kind)
     return node->kind != RangeNodeMacro;
 }
 
+/* A method's receiver: `self` is an implicit let of the method, made on first
+ * use. The type checker gives it the method's receiver specialization. */
+static RangeNode *methodSelf(SourceReport *report, RangeNode *function)
+{
+    if (!function->receiver) {
+        function->receiver = rangeNodeCreate(report->arena,RangeNodeLet,function->path,function->line,function->column);
+        function->receiver->name = "self";
+    }
+    return function->receiver;
+}
+
 static RangeNode *sourceLookup(SourceReport *report, SourceScope *scope,
                                const char *name, int kind)
 {
     for (; scope; scope = scope->parent) {
         RangeNode *owner = scope->owner;
+        if (kind == 0 && owner->kind == RangeNodeFunction && owner->typeName && same(name,"self"))
+            return methodSelf(report,owner);
         if (kind != 1 && owner->generics && same(owner->generics->name,"genericMembers"))
             for (size_t i = 0; i < owner->generics->itemCount; ++i)
                 if (same(owner->generics->items[i]->name,name)) return owner->generics->items[i];
@@ -1221,6 +1237,13 @@ static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
 
 static void diagnoseSourceNode(SourceReport *, SourceScope *, RangeNode *, int);
 
+/* `for … in` iterates the constructs applying @collection: the macro that
+ * emits count and read(at:). C finds it by its name, as it finds @optional. */
+static int collectionRole(const RangeNode *macro)
+{
+    return macro && macro->kind == RangeNodeMacro && same(macro->name,"collection");
+}
+
 static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *node)
 {
     if (!node) return;
@@ -1245,10 +1268,14 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         if (node->kind == RangeNodeFunction || node->kind == RangeNodeMacro) diagnoseType(report,&declaration,node->b);
         if (macroBuiltin(node,"many"))
             sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of copy-on-write slots, allocated through libSystem and freed when its last reference ends");
-        else if (macroBuiltin(node,"optional"))
+        else if (macroBuiltin(node,"optional")) {
             sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the enum applying @optional, and 'if let' to its payload case, in C");
+            sourceDiagnostic(report,node,1,"C-implementation","a value of T where T? is expected becomes the payload case holding it, in C");
+        }
         else if (macroBuiltin(node,"print"))
             sourceDiagnostic(report,node,1,"C-implementation","@print writes through libSystem write in C, formatting integers in C");
+        else if (collectionRole(node))
+            sourceDiagnostic(report,node,1,"C-implementation","'for … in' iterates a construct applying @collection by its count and read(at:); C finds the macro by its name and writes the loop");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic")
                  && !macroBuiltin(node,"print"))
             for (size_t i = 0; i < node->c->itemCount; ++i)
@@ -1317,7 +1344,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         break;
     case RangeNodeUnary: case RangeNodeBinary:
         sourceDiagnostic(report,node,1,"C-implementation",
-            "operator '%s' uses the C scalar evaluator; Range operator dispatch is not implemented",node->name);
+            "operator '%s' is evaluated in C (integers, bytes, and enum structure); Range operator dispatch is not implemented",node->name);
         break;
     case RangeNodeEmission: case RangeNodeExtension:
         return; /* quoted and extension code is checked where it lands */
@@ -1509,22 +1536,29 @@ static int appliesBuiltin(const RangeNode *node, const char *name)
     return 0;
 }
 
+static int bytesDeclaration(const RangeNode *);
+
 static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
 {
     size_t slots = 0;
+    int bytes = owner->kind == RangeNodeConstruct && bytesDeclaration(owner);
     if (owner->kind == RangeNodeConstruct)
         for (size_t i = 0; i < owner->itemCount; ++i)
             if (rangeNodeDeclaresValue(owner->items[i]->kind) && appliesBuiltin(owner->items[i],"many")) ++slots;
     for (size_t i = 0; i < owner->itemCount; ++i) {
         RangeNode *item = owner->items[i];
         if (item->kind == RangeNodeConstruct) diagnoseBuiltinFunctions(report,item);
-        if (builtinMember(item) && ((!same(item->name,"storage") && !same(item->name,"signed") && !same(item->name,"bytes"))
+        if (builtinMember(item) && bytes && same(item->name,"count"))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin member 'count' is the byte count the bytes primitive holds, read in C");
+        else if (builtinMember(item) && ((!same(item->name,"storage") && !same(item->name,"signed") && !same(item->name,"bytes"))
             || owner->kind != RangeNodeConstruct))
             sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin member '%s'",item->name);
         else if (builtinMember(item))
             sourceDiagnostic(report,item,1,"C-implementation","builtin member '%s' is a C layout primitive",item->name);
         if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
-        if (!slotPrimitive(item) || owner->kind != RangeNodeConstruct)
+        if (bytes && same(item->name,"byte"))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'byte' reads one byte of the bytes primitive in C, checking the index");
+        else if (!slotPrimitive(item) || owner->kind != RangeNodeConstruct)
             sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin function '%s'",item->name);
         else if (slots != 1)
             sourceDiagnostic(report,item,0,"builtin","builtin function '%s' requires exactly one @many member in %s; found %zu",
@@ -1579,12 +1613,14 @@ typedef struct {
     RangeNode *integer, *boolean; /* constructs the integer and boolean literal rules select */
     RangeNode *booleanType;
     LawResult *laws; size_t lawCount, lawCapacity;
+    int loops, breaks; /* enclosing loops, and enclosing loops and switches, in this function */
 } Typer;
 
 static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 static RangeNode *declaredType(Typer *, SourceScope *, RangeNode *, RangeNode *);
 static RangeNode *resolveTypeReference(Typer *, SourceScope *, const char *, RangeNode *, int, RangeNode *, RangeNode *);
 static void expectType(Typer *, RangeNode *, RangeNode *, RangeNode *, const char *);
+static void coerce(Typer *, RangeNode *, RangeNode *, RangeNode *, const char *);
 
 static void typeError(Typer *typer, RangeNode *at, const char *format, ...)
 {
@@ -2085,7 +2121,7 @@ static void typePayload(Typer *typer, SourceScope *scope, RangeNode *at, RangeNo
         argument->resolvedDeclaration = field;
         RangeNode *expected = caseFieldType(typer,type,field);
         char what[200]; snprintf(what,sizeof(what),"payload field %zu of '%s'",i + 1,entry->name);
-        expectType(typer,argument->a,expected,typeOf(typer,scope,argument->a,expected,context),what);
+        coerce(typer,argument->a,expected,typeOf(typer,scope,argument->a,expected,context),what);
     }
 }
 
@@ -2106,6 +2142,47 @@ static int isInteger(Typer *typer, const RangeNode *type)
     return type && type->kind == RangeNodeSpecialization && typer->integer && type->resolvedDeclaration == typer->integer;
 }
 
+/* A construct whose layout is the bytes primitive: UTF-8 bytes C holds. */
+static int bytesDeclaration(const RangeNode *declaration)
+{
+    for (size_t i = 0; declaration && i < declaration->itemCount; ++i)
+        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"bytes")) return 1;
+    return 0;
+}
+
+static int bytesType(const RangeNode *type)
+{
+    return type && type->kind == RangeNodeSpecialization && bytesDeclaration(type->resolvedDeclaration);
+}
+
+/* Types `==` compares: integers, bytes, and enums whose payload fields are
+ * such types, compared structurally (equal cases, then equal fields). An enum
+ * already being compared counts as comparable, so recursive enums are. On
+ * failure *field names the payload field whose type has no `==`. */
+typedef struct { RangeNode *seen[64]; size_t count; } Comparing;
+
+static int equatable(Typer *typer, RangeNode *type, Comparing *visit, RangeNode **field, RangeNode **entry)
+{
+    if (!type || type->kind != RangeNodeSpecialization) return 0;
+    if (isInteger(typer,type) || bytesType(type)) return 1;
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (declaration->kind != RangeNodeEnum) return 0;
+    for (size_t i = 0; i < visit->count; ++i) if (visit->seen[i] == type) return 1;
+    if (visit->count == sizeof(visit->seen)/sizeof(*visit->seen)) return 0;
+    visit->seen[visit->count++] = type;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *item = declaration->items[i];
+        if (item->kind != RangeNodeEnumCase) continue;
+        for (size_t j = 0; j < item->itemCount; ++j) {
+            RangeNode *inner = NULL, *innerEntry = NULL;
+            if (equatable(typer,caseFieldType(typer,type,item->items[j]),visit,&inner,&innerEntry)) continue;
+            if (field && !*field) { *field = item->items[j]; *entry = item; }
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static void expectType(Typer *typer, RangeNode *at, RangeNode *expected, RangeNode *actual, const char *what)
 {
     if (!expected || !actual || expected == actual) return;
@@ -2114,12 +2191,66 @@ static void expectType(Typer *typer, RangeNode *at, RangeNode *expected, RangeNo
     typeError(typer,at,"%s requires %s; found %s",what,want,got);
 }
 
+/* `T?` is the enum applying @optional: its single payload case and, in this
+ * specialization, the type that case wraps. */
+static RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **present)
+{
+    if (!isEnum(type) || !appliesBuiltin(type->resolvedDeclaration,"optional")) return NULL;
+    RangeNode *declaration = type->resolvedDeclaration, *payload = NULL;
+    size_t payloads = 0;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *entry = declaration->items[i];
+        if (entry->kind != RangeNodeEnumCase || !entry->itemCount) continue;
+        payloads += entry->itemCount == 1 ? 1 : 2;
+        payload = entry;
+    }
+    if (payloads != 1) return NULL;
+    if (present) *present = payload;
+    return caseFieldType(typer,type,payload->items[0]);
+}
+
+/* Optional promotion, as in Swift: where `T?` is expected, a value of T is the
+ * present case holding it. The expression becomes `.present(value)` in place. */
+static void coerce(Typer *typer, RangeNode *expr, RangeNode *expected, RangeNode *actual, const char *what)
+{
+    RangeNode *present = NULL;
+    if (expr && expected && actual && expected != actual && optionalWrapped(typer,expected,&present) == actual) {
+        RangeArena *arena = typer->report->arena;
+        RangeNode *value = rangeArenaAllocate(arena,sizeof(*value));
+        *value = *expr;
+        RangeNode *callee = rangeNodeCreate(arena,RangeNodeCase,expr->path,expr->line,expr->column);
+        callee->name = present->name;
+        callee->resolvedDeclaration = present;
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,expr->path,expr->line,expr->column);
+        argument->a = value;
+        argument->resolvedDeclaration = present->items[0];
+        RangeNode *call = rangeNodeCreate(arena,RangeNodeCall,expr->path,expr->line,expr->column);
+        call->a = callee;
+        call->type = expected;
+        rangeNodeAppend(arena,call,argument);
+        *expr = *call;
+        return;
+    }
+    expectType(typer,expr,expected,actual,what);
+}
+
+/* `.north` where `Direction?` is expected names Direction's case, unless the
+ * optional has a case of that name. */
+static RangeNode *caseContext(Typer *typer, RangeNode *enumeration, const char *name)
+{
+    if (!enumeration || enumCase(enumeration->resolvedDeclaration,name)) return enumeration;
+    RangeNode *wrapped = optionalWrapped(typer,enumeration,NULL);
+    return isEnum(wrapped) && enumCase(wrapped->resolvedDeclaration,name) ? wrapped : enumeration;
+}
+
 /* The law checks `value`: the literal itself, or `-literal` as one value. */
 static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value, RangeNode *expected)
 {
     RangeNode *rule = literal->resolvedDeclaration;
     if (!rule || !rule->literalDefault) return NULL;
     RangeNode *declaration = rule->literalDefault, *type;
+    RangeNode *wrapped = optionalWrapped(typer,expected,NULL);
+    if (wrapped && expected->resolvedDeclaration != declaration) expected = wrapped; /* promoted where it is used */
     if (expected && expected->kind == RangeNodeSpecialization && expected->resolvedDeclaration == declaration) type = expected;
     else type = specialize(typer,NULL,declaration,NULL,NULL,literal);
     if (type && declaration->kind == RangeNodeEnum) {
@@ -2170,7 +2301,7 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
             return type;
         }
         char what[200]; snprintf(what,sizeof(what),"construction of %s",t);
-        expectType(typer,arguments[0]->a,type,typeOf(typer,scope,arguments[0]->a,type,context),what);
+        coerce(typer,arguments[0]->a,type,typeOf(typer,scope,arguments[0]->a,type,context),what);
         return type;
     }
     size_t inputs = 0;
@@ -2193,7 +2324,7 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
         RangeNode *expected = declaredType(typer,&declarationScope,member,type);
         RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
         char what[200]; snprintf(what,sizeof(what),"input '%s' of %s",member->name,typeName);
-        expectType(typer,argument->a,expected,actual,what);
+        coerce(typer,argument->a,expected,actual,what);
     }
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
@@ -2218,7 +2349,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     if (!callee) return NULL;
     if (callee->kind == RangeNodeCase) {
         // `.value(number: 7)`: a case with its payload, of the enum the context expects.
-        RangeNode *type = contextualEnum(typer,callee,expected);
+        RangeNode *type = caseContext(typer,contextualEnum(typer,callee,expected),callee->name);
         RangeNode *entry = type ? namedCase(typer,type,callee->name,callee) : NULL;
         if (!entry) return NULL;
         if (!entry->itemCount) { typeError(typer,call,"case '%s' has no payload; write .%s",entry->name,entry->name); return NULL; }
@@ -2289,7 +2420,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
         char what[160];
         snprintf(what,sizeof(what),"argument '%s' of '%s'",parameter->name,function->name);
-        expectType(typer,argument->a,expected,actual,what);
+        coerce(typer,argument->a,expected,actual,what);
     }
     RangeNode *output = function->b;
     return output ? resolveTypeReference(typer,&functionScope,output->name,output->generics,output->flags,receiver,output) : NULL;
@@ -2319,7 +2450,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     }
     case RangeNodeCase: {
         // `.red`: a case of the enum the context expects.
-        RangeNode *enumeration = contextualEnum(typer,expr,expected);
+        RangeNode *enumeration = caseContext(typer,contextualEnum(typer,expr,expected),expr->name);
         RangeNode *entry = enumeration ? namedCase(typer,enumeration,expr->name,expr) : NULL;
         if (!entry) break;
         if (entry->itemCount) { typeError(typer,expr,"case '%s' carries a payload; write .%s(…)",entry->name,entry->name); break; }
@@ -2390,6 +2521,11 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
             right = typeOf(typer,scope,expr->b,left ? left : want,context);
         }
         if (!left || !right) break;
+        if (left != right && equality) {
+            // `maybe == 5` compares with the present case holding 5.
+            if (optionalWrapped(typer,left,NULL) == right) { coerce(typer,expr->b,left,right,"operand"); right = left; }
+            else if (optionalWrapped(typer,right,NULL) == left) { coerce(typer,expr->a,right,left,"operand"); left = right; }
+        }
         if (left != right) {
             char l[160], r[160]; describeType(l,sizeof(l),left); describeType(r,sizeof(r),right);
             typeError(typer,expr,"operator '%s' requires matching types; found %s and %s",op,l,r);
@@ -2397,9 +2533,17 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         }
         if (logical) { expectType(typer,expr,typer->booleanType,left,"operator"); type = typer->booleanType; }
         else if (equality && isEnum(left) && enumPayloads(left->resolvedDeclaration)) {
-            char t[160]; describeType(t,sizeof(t),left);
-            sourceDiagnostic(typer->report,expr,0,"not-implemented","operator '%s' on %s is not implemented: its cases carry payloads; use switch",op,t);
+            Comparing visit = {.count=0};
+            RangeNode *field = NULL, *entry = NULL;
+            if (equatable(typer,left,&visit,&field,&entry)) type = typer->booleanType;
+            else {
+                char t[160], f[160]; describeType(t,sizeof(t),left);
+                describeType(f,sizeof(f),field ? field->type : NULL);
+                sourceDiagnostic(typer->report,expr,0,"not-implemented","operator '%s' on %s is not implemented: payload field '%s' of case '%s' is %s, which '==' does not compare",
+                    op,t,field ? field->name : "?",entry ? entry->name : "?",f);
+            }
         } else if (equality) type = typer->booleanType;
+        else if (same(op,"+") && bytesType(left)) type = left; /* joins the bytes */
         else if (!isInteger(typer,left)) { char t[160]; describeType(t,sizeof(t),left); typeError(typer,expr,"operator '%s' requires an integer type; found %s",op,t); }
         else type = comparison ? typer->booleanType : left;
         break;
@@ -2412,6 +2556,46 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
 
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 static void typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+
+/* Whether control cannot reach the end of `node`: it returns, breaks, or
+ * continues on every path, or ends the program through @diagnostic. A break
+ * inside a switch nested here ends only that switch. */
+static int exits(const RangeNode *node, int breaking)
+{
+    if (!node) return 0;
+    switch (node->kind) {
+    case RangeNodeReturn: case RangeNodeContinue: return 1;
+    case RangeNodeBreak: return breaking;
+    case RangeNodeBlock:
+        for (size_t i = 0; i < node->itemCount; ++i) if (exits(node->items[i],breaking)) return 1;
+        return 0;
+    case RangeNodeIf: return node->c && exits(node->b,breaking) && exits(node->c,breaking);
+    case RangeNodeSwitch:
+        if (!node->itemCount) return 0;
+        for (size_t i = 0; i < node->itemCount; ++i)
+            if (!exits(node->items[i]->b,breaking && (node->flags & RangeFlagConditional))) return 0;
+        return 1;
+    case RangeNodeExpressionStatement:
+        return node->a && node->a->kind == RangeNodeAttribute && macroBuiltin(node->a->resolvedDeclaration,"diagnostic");
+    default: return 0;
+    }
+}
+
+static void guardFallsThrough(Typer *typer, RangeNode *guard)
+{
+    typeError(typer,guard,"the else block of 'guard' must not fall through; end it with return, break, or continue");
+}
+
+/* A construct applying @collection, which `for … in` iterates. */
+static int iterable(const RangeNode *type)
+{
+    if (!type || type->kind != RangeNodeSpecialization || !type->resolvedDeclaration) return 0;
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (declaration->kind != RangeNodeConstruct || !declaration->c) return 0;
+    for (size_t i = 0; i < declaration->c->itemCount; ++i)
+        if (collectionRole(declaration->c->items[i]->resolvedDeclaration)) return 1;
+    return 0;
+}
 
 /* `@print(…)` and `@diagnostic(…)` in runtime code: one message, a String or
  * an interpolated literal whose parts are integers, booleans, or strings. */
@@ -2482,7 +2666,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
             if (member) {
                 RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
                 char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",member->name);
-                expectType(typer,node->b,expected,actual,what);
+                coerce(typer,node->b,expected,actual,what);
             }
             break;
         }
@@ -2494,20 +2678,48 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         RangeNode *expected = declaredType(typer,scope,declaration,context);
         RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
         char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",target->name);
-        expectType(typer,node->b,expected,actual,what);
+        coerce(typer,node->b,expected,actual,what);
         break;
     }
     case RangeNodeIf: case RangeNodeWhile: {
         RangeNode *condition = typeOf(typer,scope,node->a,typer->booleanType,context);
         expectType(typer,node->a,typer->booleanType,condition,"condition");
+        int loop = node->kind == RangeNodeWhile;
+        typer->loops += loop; typer->breaks += loop;
         typeStatement(typer,scope,node->b,context,output);
+        typer->loops -= loop; typer->breaks -= loop;
         typeStatement(typer,scope,node->c,context,output);
+        if ((node->flags & RangeFlagGuard) && !exits(node->c,1)) guardFallsThrough(typer,node);
         break;
     }
+    case RangeNodeFor: {
+        // The collection is typed first: only a construct applying @collection
+        // has the count and read(at:) the loop uses.
+        RangeNode *loop = node->a;
+        if (!loop || loop->itemCount < 1) break;
+        SourceScope body = {.owner=loop,.parent=scope};
+        RangeNode *sequence = loop->items[0];
+        typeStatement(typer,&body,sequence,context,output);
+        RangeNode *type = sequence->type;
+        if (!type) break;
+        if (!iterable(type)) {
+            char t[160]; describeType(t,sizeof(t),type);
+            typeError(typer,rangeNodeRHS(sequence),"'for … in' iterates a construct applying @collection; found %s",t);
+            break;
+        }
+        for (size_t i = 1; i < loop->itemCount; ++i) typeStatement(typer,&body,loop->items[i],context,output);
+        break;
+    }
+    case RangeNodeBreak:
+        if (!typer->breaks) typeError(typer,node,"'break' is only allowed inside a loop or a switch");
+        break;
+    case RangeNodeContinue:
+        if (!typer->loops) typeError(typer,node,"'continue' is only allowed inside a loop");
+        break;
     case RangeNodeReturn:
         if (output) {
             if (!node->a) { char t[160]; describeType(t,sizeof(t),output); typeError(typer,node,"return requires %s",t); break; }
-            expectType(typer,node->a,output,typeOf(typer,scope,node->a,output,context),"return");
+            coerce(typer,node->a,output,typeOf(typer,scope,node->a,output,context),"return");
         } else if (node->a) {
             (void)typeOf(typer,scope,node->a,NULL,context);
             typeError(typer,node,"this function returns no value");
@@ -2765,8 +2977,13 @@ static void typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeN
             }
         }
         SourceScope body = {.owner=entry->c ? entry->c : entry,.parent=scope};
+        // A switch ends at `break`; `if case` and `guard` do not.
+        int target = !(node->flags & RangeFlagConditional);
+        typer->breaks += target;
         typeBlock(typer,&body,entry->b,context,output);
+        typer->breaks -= target;
     }
+    if ((node->flags & RangeFlagGuard) && node->itemCount == 2 && !exits(node->items[1]->b,1)) guardFallsThrough(typer,node);
     if (!subject || typer->report->errors != errors || (node->flags & RangeFlagConditional)) return;
     // Each pattern must match something the earlier ones do not; together they
     // must match every value.
@@ -2817,16 +3034,22 @@ static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, Range
 static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function, RangeNode *context)
 {
     SourceScope scope = {.owner=function,.parent=parent};
+    // A method's `self` is its receiver, specialized by the receiver's own parameters.
+    if (function->typeName && context) methodSelf(typer->report,function)->type = context;
+    int loops = typer->loops, breaks = typer->breaks;
+    typer->loops = typer->breaks = 0;
     for (size_t i = 0; i < function->itemCount; ++i) function->items[i]->type = declaredType(typer,&scope,function->items[i],context);
     RangeNode *output = function->b
         ? resolveTypeReference(typer,&scope,function->b->name,function->b->generics,function->b->flags,context,function->b) : NULL;
     function->type = output;
     if (function->a) typeBlock(typer,&scope,function->a,context,output);
+    typer->loops = loops; typer->breaks = breaks;
 }
 
 static void typeConstruct(Typer *, SourceScope *, RangeNode *);
 
-/* A case's payload fields are typed in the enum, specialized by its own parameters. */
+/* A case's payload fields are typed in the enum, specialized by its own
+ * parameters; its methods see that specialization as `self`. */
 static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
 {
     RangeNode *context = selfSpecialization(typer,declaration);
@@ -2838,6 +3061,9 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
+    // Methods are typed once every case's payload is.
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (declaration->items[i]->kind == RangeNodeFunction) typeFunction(typer,&scope,declaration->items[i],context);
 }
 
 static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declaration)
@@ -3047,9 +3273,10 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
         if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"bytes")) bytes = declaration->items[i];
     }
     if (bytes) {
-        // UTF-8 bytes held by C: an address and a byte count. Its other
-        // members are its meaning, not separate storage.
-        size = 16;
+        // UTF-8 bytes held by C: an address, a byte count, and the block that
+        // owns them, or zero for a literal's bytes in the executable. Its
+        // other members are its meaning, not separate storage.
+        size = 24;
         alignment = 8;
     } else if (storage) {
         long long bits = storageBits(typer,specialization,storage);
@@ -3262,11 +3489,19 @@ typedef struct { size_t at; const char *bytes; size_t length; } NativeText;
  * statement ends. */
 typedef struct { int32_t offset; RangeNode *type; int consumed; } NativeTemp;
 /* A subroutine emitted once: release a value of `type` (x0 = its address),
- * release a block of `type` elements (x0 = the block, or zero), or write an
- * integer in decimal (x0 = the value, x1 = the file descriptor). */
-enum { NativeReleaseValue, NativeReleaseBlock, NativeWriteSigned, NativeWriteUnsigned };
+ * release a block of `type` elements (x0 = the block, or zero), write an
+ * integer in decimal (x0 = the value, x1 = the file descriptor), or compare
+ * two values of `type` (x0, x1 = their addresses; x0 = 1 when equal). */
+enum { NativeReleaseValue, NativeReleaseBlock, NativeWriteSigned, NativeWriteUnsigned, NativeEqual };
 typedef struct { RangeNode *type; int block; size_t offset; int compiled; } NativeHelper;
 typedef struct { size_t at; size_t helper; } NativeHelperCall;
+/* What `break` and `continue` leave: a loop (continue branches to top) or a
+ * switch, and the slots and temporaries that were live when it began. */
+typedef struct {
+    int loop;
+    size_t top, slots, temps;
+    NativeJump *breaks; size_t breakCount, breakCapacity;
+} NativeTarget;
 
 typedef struct {
     SourceReport *report;
@@ -3274,8 +3509,9 @@ typedef struct {
     RangeMachine machine;
     int failed;
     /* The function being compiled. */
-    RangeNode *owner, *self, *output;
+    RangeNode *owner, *self, *output, *function;
     int32_t frame, selfSlot, resultSlot;
+    NativeTarget *targets; size_t targetCount, targetCapacity;
     NativeSlot *slots; size_t slotCount, slotCapacity;
     size_t *returns; size_t returnCount, returnCapacity;
     /* The program. */
@@ -3663,6 +3899,25 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
     }
     int temporary = !destination;
     if (temporary) destination = nativeReserve(native,type->size ? type->size : 1,type->alignment);
+    if (bytesType(type)) {
+        // Like a scalar, a bytes construct's single input is the value itself:
+        // `String("hi")` is the literal's bytes, and `String()` its default's.
+        RangeNode *value = count ? arguments[0]->a : NULL;
+        for (size_t i = 0; !value && i < declaration->itemCount; ++i)
+            if (constructionInput(declaration->items[i])) value = memberDefault(declaration->items[i]);
+        nativeFrameAddress(native,0,destination);
+        nativeZero(native,0,type->size);
+        if (value) {
+            if (!nativeExpression(native,value)) return NULL;
+            int moved = nativeTakeTemp(native);
+            nativeFrameAddress(native,1,destination);
+            nativeCopyValue(native,1,0,type,!moved);
+        }
+        if (temporary) nativeTrackTemp(native,destination,type);
+        else native->resultTemp = -1;
+        nativeFrameAddress(native,0,destination);
+        return type;
+    }
     if (declaration->kind == RangeNodeEnum) {
         // `Tree(.leaf(value: 1))` copies the case value given.
         if (count != 1 || !nativeExpression(native,arguments[0]->a)) return NULL;
@@ -3809,6 +4064,7 @@ static int nativeSlotsOf(Native *native, RangeNode *self, RangeNode *at, NativeS
 /* A value of `type` holds @many storage, directly or in a member. */
 static int nativeSharesSlots(const RangeNode *type)
 {
+    if (bytesType(type)) return 1; /* its owning block, when it has one */
     if (!type || type->kind != RangeNodeSpecialization || type->scalarBits || !type->memberOffsets) return 0;
     RangeNode *declaration = type->resolvedDeclaration;
     if (type->variantTag) {
@@ -3836,6 +4092,7 @@ static void nativeRetainBlock(Native *native, int base, size_t at)
 static void nativeRetain(Native *native, int base, size_t offset, RangeNode *type)
 {
     RangeNode *declaration = type->resolvedDeclaration;
+    if (bytesType(type)) { nativeRetainBlock(native,base,offset + 16); return; }
     if (type->variantTag) {
         // Only the current case's fields hold references.
         for (size_t i = 0, k = 0; i < declaration->itemCount; ++i) {
@@ -4079,6 +4336,85 @@ static RangeNode *nativeElementOf(Native *native, RangeNode *type, RangeNode *me
     return resolveTypeReference(native->typer,&scope,member->typeName,member->generics,member->flags & ~RangeFlagMany,type,member);
 }
 
+/* x0 = 1 when the values at x0 and x1 are equal. Bytes compare their counts,
+ * then their bytes through libSystem memcmp. A union compares its tags, then
+ * the fields of its case: scalars directly, other fields through their own
+ * subroutine, which a recursive enum reaches again. */
+static void nativeEqualBody(Native *native, RangeNode *type)
+{
+    nativeEmit(native,armSubImm(31,31,16));
+    nativeStore(native,0,-8);
+    nativeStore(native,1,-16);
+    NativeJump *fails = NULL;
+    size_t failCount = 0, failCapacity = 0;
+    if (bytesType(type)) {
+        nativeEmit(native,armLdr(2,0,8));
+        nativeEmit(native,armLdr(3,1,8));
+        nativeEmit(native,armCmp(2,3));
+        NativeJump differ = {.at=nativeEmit(native,armBcond(RangeNE,0)),.base=armBcond(RangeNE,0)};
+        NATIVE_PUSH(fails,failCount,failCapacity,differ);
+        nativeEmit(native,armLdr(0,0,0));
+        nativeEmit(native,armLdr(1,1,0));
+        rangeCallImport(&native->machine,"_memcmp");
+        nativeEmit(native,0x7100001Fu);           /* cmp w0, #0: memcmp returns an int */
+        nativeEmit(native,armCset(0,RangeEQ));
+        size_t end = nativeEmit(native,armB(0));
+        for (size_t i = 0; i < failCount; ++i) nativeBranchHere(native,fails[i].at,fails[i].base);
+        nativeEmit(native,armMovz(0,0,0));
+        nativeBranchHere(native,end,armB(0));
+        free(fails);
+        return;
+    }
+    size_t tag = (size_t)type->variantTag;
+    nativeEmit(native,armLoadSized(tag,0,9,0,0));
+    nativeEmit(native,armLoadSized(tag,0,10,1,0));
+    nativeEmit(native,armCmp(9,10));
+    NativeJump differ = {.at=nativeEmit(native,armBcond(RangeNE,0)),.base=armBcond(RangeNE,0)};
+    NATIVE_PUSH(fails,failCount,failCapacity,differ);
+    RangeNode *declaration = type->resolvedDeclaration;
+    NativeJump *equal = NULL;
+    size_t equalCount = 0, equalCapacity = 0;
+    for (size_t i = 0, k = 0; i < declaration->itemCount; ++i) {
+        RangeNode *entry = declaration->items[i];
+        if (entry->kind != RangeNodeEnumCase) continue;
+        size_t first = k;
+        k += entry->itemCount;
+        if (!entry->itemCount) continue;
+        nativeLoad(native,0,-8);
+        size_t other = nativeUnlessCase(native,0,type,entry);
+        for (size_t f = first; f < k; ++f) {
+            RangeNode *fieldType = type->memberTypes[f];
+            for (int side = 0; side < 2; ++side) {
+                nativeLoad(native,side,side ? -16 : -8);
+                nativeAddOffset(native,side,side,type->memberOffsets[f]);
+                if (type->memberBoxed[f]) { nativeEmit(native,armLdr(side,side,0)); nativeEmit(native,armAddImm(side,side,16)); }
+            }
+            if (fieldType->scalarBits) {
+                nativeLoadScalar(native,0,0,0,fieldType);
+                nativeLoadScalar(native,1,1,0,fieldType);
+                nativeEmit(native,armCmp(0,1));
+                NativeJump jump = {.at=nativeEmit(native,armBcond(RangeNE,0)),.base=armBcond(RangeNE,0)};
+                NATIVE_PUSH(fails,failCount,failCapacity,jump);
+            } else {
+                nativeCallHelper(native,fieldType,NativeEqual);
+                NativeJump jump = {.at=nativeEmit(native,armCbz(0,0)),.base=armCbz(0,0)};
+                NATIVE_PUSH(fails,failCount,failCapacity,jump);
+            }
+        }
+        NativeJump jump = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
+        NATIVE_PUSH(equal,equalCount,equalCapacity,jump);
+        nativeBranchHere(native,other,armBcond(RangeNE,0));
+    }
+    // Equal tags of a case without fields, or every field equal.
+    for (size_t i = 0; i < equalCount; ++i) nativeBranchHere(native,equal[i].at,equal[i].base);
+    nativeEmit(native,armMovz(0,1,0));
+    size_t end = nativeEmit(native,armB(0));
+    for (size_t i = 0; i < failCount; ++i) nativeBranchHere(native,fails[i].at,fails[i].base);
+    nativeEmit(native,armMovz(0,0,0));
+    nativeBranchHere(native,end,armB(0));
+    free(fails); free(equal);
+}
+
 /* Emit one release subroutine. */
 static void nativeHelperBody(Native *native, size_t index)
 {
@@ -4088,7 +4424,8 @@ static void nativeHelperBody(Native *native, size_t index)
     RangeNode *type = helper.type;
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0));
-    if (helper.block == NativeWriteSigned || helper.block == NativeWriteUnsigned) {
+    if (helper.block == NativeEqual) nativeEqualBody(native,type);
+    else if (helper.block == NativeWriteSigned || helper.block == NativeWriteUnsigned) {
         // Digits are written backwards into a 32-byte buffer on the stack.
         nativeEmit(native,armSubImm(31,31,32));
         nativeEmit(native,armMov(9,0));              /* the magnitude */
@@ -4123,7 +4460,11 @@ static void nativeHelperBody(Native *native, size_t index)
         // A value: release each block it holds, directly or in members.
         nativeEmit(native,armPush(0));
         RangeNode *declaration = type->resolvedDeclaration;
-        if (type->variantTag) for (size_t i = 0, k = 0; i < declaration->itemCount; ++i) {
+        if (bytesType(type)) {
+            // Bytes own a block of their own, [references][count][bytes], or none.
+            nativeEmit(native,armLdr(0,0,16));
+            nativeCallHelper(native,NULL,NativeReleaseBlock);
+        } else if (type->variantTag) for (size_t i = 0, k = 0; i < declaration->itemCount; ++i) {
             // A union releases the fields of its current case.
             RangeNode *entry = declaration->items[i];
             if (entry->kind != RangeNodeEnumCase) continue;
@@ -4230,6 +4571,20 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
         self = native->self;
         hasSelf = 1;
     }
+    if ((target->flags & RangeFlagBuiltin) && hasSelf && bytesType(self) && same(target->name,"byte") && call->itemCount == 1) {
+        // One byte, zero-extended; the index is checked against the count.
+        if (!nativeExpression(native,call->items[0]->a)) return NULL;
+        nativeEmit(native,armLdr(1,31,0));
+        nativeEmit(native,armLdr(2,1,8));
+        nativeEmit(native,armCmp(0,2));
+        nativeTrap(native,armBcond(RangeHS,0),call,"byte index is outside the bytes");
+        nativeEmit(native,armLdr(1,1,0));
+        nativeEmit(native,armAdd(1,1,0));
+        nativeEmit(native,armLoadSized(1,0,0,1,0));
+        nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
+        native->resultTemp = -1;
+        return nativeSubstitute(native,target->type,self);
+    }
     if (target->flags & (RangeFlagBuiltin | RangeFlagExtern)) {
         if (!(target->flags & RangeFlagBuiltin) || !slotPrimitive(target) || !hasSelf) {
             nativeMissing(native,call,"native calls to builtin function '%s' are not implemented",target->name);
@@ -4265,13 +4620,18 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
     *frameSlot = 0;
     if (expr->kind == RangeNodeName) {
         RangeNode *declaration = expr->resolvedDeclaration;
+        if (declaration && native->function && declaration == native->function->receiver && native->owner) {
+            // `self` is the receiver, whose address the method holds.
+            nativeLoad(native,0,native->selfSlot);
+            return native->self;
+        }
         NativeSlot *slot = nativeSlotOf(native,declaration);
         if (slot) {
             nativeFrameAddress(native,0,slot->offset);
             *frameSlot = slot->type && slot->type->scalarBits;
             return slot->type;
         }
-        size_t index = native->owner ? nativeMemberIndex(native->owner,declaration) : SIZE_MAX;
+        size_t index = native->owner && native->owner->kind == RangeNodeConstruct ? nativeMemberIndex(native->owner,declaration) : SIZE_MAX;
         if (index != SIZE_MAX && native->self->memberOffsets && native->self->memberOffsets[index] != SIZE_MAX) {
             nativeLoad(native,0,native->selfSlot);
             nativeAddOffset(native,0,0,native->self->memberOffsets[index]);
@@ -4284,10 +4644,16 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
         nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name);
         return NULL;
     }
-    if (expr->kind == RangeNodeMemberAccess) {
+    if (expr->kind == RangeNodeMemberAccess && !(expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase)) {
         int innerSlot = 0;
         RangeNode *receiver = nativeAddress(native,expr->a,&innerSlot);
         if (!receiver) return NULL;
+        if (bytesType(receiver) && expr->resolvedDeclaration && builtinMember(expr->resolvedDeclaration)
+            && same(expr->resolvedDeclaration->name,"count")) {
+            // The byte count is the bytes primitive's second word.
+            nativeEmit(native,armAddImm(0,0,8));
+            return nativeType(native,expr->type);
+        }
         size_t index = nativeMemberIndex(receiver->resolvedDeclaration,expr->resolvedDeclaration);
         if (index == SIZE_MAX || !receiver->memberOffsets || receiver->memberOffsets[index] == SIZE_MAX) {
             nativeMissing(native,expr,"native access to member '%s' is not implemented",expr->name);
@@ -4328,6 +4694,54 @@ static RangeNode *nativeExpression(Native *native, RangeNode *expr)
     return type;
 }
 
+/* `a + b` on bytes (x0, x1 = their addresses): a new block holding a's bytes
+ * then b's, [references = 1][count][bytes], in a temporary that owns it. */
+static RangeNode *nativeJoin(Native *native, RangeNode *at, RangeNode *type)
+{
+    nativeEmit(native,armPush(0));            /* left: [sp + 16] */
+    nativeEmit(native,armPush(1));            /* right: [sp] */
+    nativeEmit(native,armLdr(2,0,8));
+    nativeEmit(native,armLdr(3,1,8));
+    nativeEmit(native,armAdds(0,2,3));
+    nativeTrap(native,armBcond(RangeHS,0),at,"joined bytes exceed addressable memory");
+    nativeEmit(native,armAddImm(0,0,16));
+    rangeCallImport(&native->machine,"_malloc");
+    nativeTrap(native,armCbz(0,0),at,"could not allocate storage for joined bytes");
+    nativeEmit(native,armPush(0));            /* block: [sp]; right: [sp + 16]; left: [sp + 32] */
+    nativeEmit(native,armMovz(9,1,0));
+    nativeEmit(native,armStr(9,0,0));         /* one reference */
+    nativeEmit(native,armLdr(1,31,32));
+    nativeEmit(native,armLdr(2,1,8));
+    nativeEmit(native,armLdr(3,31,16));
+    nativeEmit(native,armLdr(3,3,8));
+    nativeEmit(native,armAdd(9,2,3));
+    nativeEmit(native,armStr(9,0,8));         /* the count */
+    nativeEmit(native,armAddImm(0,0,16));
+    nativeEmit(native,armLdr(1,1,0));
+    rangeCallImport(&native->machine,"_memcpy");
+    nativeEmit(native,armLdr(0,31,0));
+    nativeEmit(native,armAddImm(0,0,16));
+    nativeEmit(native,armLdr(1,31,32));
+    nativeEmit(native,armLdr(2,1,8));
+    nativeEmit(native,armAdd(0,0,2));
+    nativeEmit(native,armLdr(1,31,16));
+    nativeEmit(native,armLdr(2,1,8));
+    nativeEmit(native,armLdr(1,1,0));
+    rangeCallImport(&native->machine,"_memcpy");
+    nativeEmit(native,armPop(0));             /* the block */
+    nativeEmit(native,armAddImm(31,31,32));
+    int32_t value = nativeReserve(native,type->size,type->alignment);
+    nativeFrameAddress(native,1,value);
+    nativeEmit(native,armAddImm(2,0,16));
+    nativeEmit(native,armStr(2,1,0));
+    nativeEmit(native,armLdr(2,0,8));
+    nativeEmit(native,armStr(2,1,8));
+    nativeEmit(native,armStr(0,1,16));
+    nativeTrackTemp(native,value,type);
+    nativeFrameAddress(native,0,value);
+    return type;
+}
+
 static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
 {
     if (!expr) return NULL;
@@ -4352,17 +4766,18 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
             nativeMissing(native,expr,"runtime string interpolation is not implemented");
             return NULL;
         }
-        if (nativeKind(native,type,expr) != NativeAggregate || type->size != 16) {
+        if (nativeKind(native,type,expr) != NativeAggregate || !bytesType(type)) {
             nativeMissing(native,expr,"string literals need a construct with the bytes primitive");
             return NULL;
         }
-        int32_t value = nativeReserve(native,16,8);
+        int32_t value = nativeReserve(native,type->size,8);
         NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=expr->items[0]->name,.length=(size_t)expr->items[0]->integer};
         NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
         nativeConstant(native,2,text.length);
         nativeFrameAddress(native,0,value);
         nativeEmit(native,armStr(1,0,0));
         nativeEmit(native,armStr(2,0,8));
+        nativeEmit(native,armStr(31,0,16)); /* no block: the bytes are in the executable */
         return type;
     }
     case RangeNodeName: case RangeNodeMemberAccess: {
@@ -4401,7 +4816,14 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         nativeEmit(native,armMov(1,0));
         nativeEmit(native,armPop(0));
         if (!operand) return NULL;
+        if (nativeKind(native,operand,expr) != NativeScalar && same(op,"+") && bytesType(operand)) return nativeJoin(native,expr,operand);
         if (nativeKind(native,operand,expr) != NativeScalar) {
+            Comparing visit = {.count=0};
+            if ((same(op,"==") || same(op,"!=")) && equatable(native->typer,operand,&visit,NULL,NULL)) {
+                nativeCallHelper(native,operand,NativeEqual);
+                if (same(op,"!=")) { nativeEmit(native,armCmpImm(0,0)); nativeEmit(native,armCset(0,RangeEQ)); }
+                return type;
+            }
             nativeMissing(native,expr,"native operator '%s' on aggregate values is not implemented",op);
             return NULL;
         }
@@ -4499,7 +4921,7 @@ static void nativeWriteMessage(Native *native, int fd, RangeNode *message)
         } else if (type->scalarBits) {
             nativeEmit(native,armMovz(1,(uint16_t)fd,0));
             nativeCallHelper(native,NULL,type->scalarSigned ? NativeWriteSigned : NativeWriteUnsigned);
-        } else if (type->size == 16 && type->resolvedDeclaration == (message->type ? message->type->resolvedDeclaration : NULL)) {
+        } else if (bytesType(type)) {
             nativeEmit(native,armLdr(2,0,8));
             nativeEmit(native,armLdr(1,0,0));
             nativeEmit(native,armMovz(0,(uint16_t)fd,0));
@@ -4545,6 +4967,31 @@ static void nativeStatement(Native *native, RangeNode *node)
     size_t temps = native->tempCount;
     nativeStatementBody(native,node);
     nativeReleaseTemps(native,temps);
+}
+
+/* Enter a break target; leaving it lands its breaks here. */
+static void nativeEnter(Native *native, int loop, size_t top)
+{
+    NativeTarget target = {.loop=loop,.top=top,.slots=native->slotCount,.temps=native->tempCount};
+    NATIVE_PUSH(native->targets,native->targetCount,native->targetCapacity,target);
+}
+
+static void nativeLeave(Native *native)
+{
+    NativeTarget *target = &native->targets[--native->targetCount];
+    for (size_t i = 0; i < target->breakCount; ++i) nativeBranchHere(native,target->breaks[i].at,target->breaks[i].base);
+    free(target->breaks);
+}
+
+/* End the live temporaries from `from` on a path that leaves their statements
+ * early; the statements still end them on their ordinary paths. */
+static void nativeEndTemps(Native *native, size_t from)
+{
+    for (size_t i = native->tempCount; i-- > from;) {
+        if (native->temps[i].consumed) continue;
+        nativeFrameAddress(native,0,native->temps[i].offset);
+        nativeRelease(native,native->temps[i].type);
+    }
 }
 
 /* A condition's temporaries end before its branch; x0 keeps the result. */
@@ -4637,11 +5084,33 @@ static void nativeStatementBody(Native *native, RangeNode *node)
     }
     case RangeNodeWhile: {
         size_t top = native->machine.size;
+        nativeEnter(native,1,top);
         nativeCondition(native,node->a);
         size_t exit = nativeEmit(native,armCbz(0,0));
         nativeStatement(native,node->b);
         nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
         nativeBranchHere(native,exit,armCbz(0,0));
+        nativeLeave(native);
+        break;
+    }
+    case RangeNodeFor:
+        nativeStatement(native,node->a); /* the loop it is written as */
+        break;
+    case RangeNodeBreak: case RangeNodeContinue: {
+        // Values that began inside the target end here, then control leaves it.
+        int loop = node->kind == RangeNodeContinue;
+        size_t index = native->targetCount;
+        while (index > 0 && loop && !native->targets[index - 1].loop) --index;
+        if (!index) { nativeMissing(native,node,"'%s' has no enclosing target",loop ? "continue" : "break"); break; }
+        NativeTarget *target = &native->targets[index - 1];
+        nativeEndTemps(native,target->temps);
+        nativeReleaseSlots(native,target->slots);
+        target = &native->targets[index - 1];
+        if (loop) nativeEmit(native,armB(-(int32_t)((native->machine.size - target->top) / 4)));
+        else {
+            NativeJump jump = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
+            NATIVE_PUSH(target->breaks,target->breakCount,target->breakCapacity,jump);
+        }
         break;
     }
     case RangeNodeReturn: {
@@ -4748,6 +5217,18 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
         return;
     }
     case RangePatternValue: case RangePatternRelation: {
+        Comparing visit = {.count=0};
+        if (!type->scalarBits && pattern->integer == RangePatternValue && equatable(native->typer,type,&visit,NULL,NULL)) {
+            // `case "yes":` or `case .pair(1, 2)` as a value: compared with `==`.
+            nativePlaceLoad(native,place,type);
+            nativeEmit(native,armPush(0));
+            nativeExpression(native,pattern->a);
+            nativeEmit(native,armMov(1,0));
+            nativeEmit(native,armPop(0));
+            nativeCallHelper(native,type,NativeEqual);
+            nativeFail(match,nativeEmit(native,armCbz(0,0)),armCbz(0,0));
+            return;
+        }
         if (!type->scalarBits) {
             char name[160]; describeType(name,sizeof(name),type);
             nativeMissing(native,pattern,"matching %s values by equality is not implemented",name);
@@ -4781,6 +5262,8 @@ static void nativeSwitch(Native *native, RangeNode *node)
     int32_t subject = nativeReserve(native,8,8);
     nativeStore(native,0,subject);
     NativePlace top = {.slot=subject,.value=kind == NativeScalar};
+    int target = !(node->flags & RangeFlagConditional); /* `break` ends a switch, not an `if case` */
+    if (target) nativeEnter(native,0,0);
     NativeJump *ends = NULL;
     size_t endCount = 0, endCapacity = 0;
     for (size_t i = 0; i < node->itemCount; ++i) {
@@ -4839,6 +5322,7 @@ static void nativeSwitch(Native *native, RangeNode *node)
     }
     for (size_t i = 0; i < endCount; ++i) nativeBranchHere(native,ends[i].at,ends[i].base);
     free(ends);
+    if (target) nativeLeave(native);
 }
 
 /* One function instance or the entry block: frame, receiver, parameters,
@@ -4848,6 +5332,8 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     RangeNode *function = instance->function;
     instance->offset = native->machine.size;
     instance->compiled = 1;
+    native->function = function;
+    native->targetCount = 0;
     native->self = instance->self;
     native->owner = instance->self ? instance->self->resolvedDeclaration : NULL;
     native->slotCount = 0; native->returnCount = 0; native->frame = 0;
@@ -4970,7 +5456,8 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
             nativeInstance(&native,item,NULL);
     }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
-        if (report->units[u]->items[i]->kind == RangeNodeConstruct) nativeMethods(&native,report->units[u]->items[i]);
+        if (report->units[u]->items[i]->kind == RangeNodeConstruct || report->units[u]->items[i]->kind == RangeNodeEnum)
+            nativeMethods(&native,report->units[u]->items[i]);
     // Compiling may reach new instances; the entry block stays first.
     for (size_t i = 0; i < native.instanceCount; ++i)
         if (!native.instances[i].compiled) nativeFunction(&native,&native.instances[i]);
@@ -4994,7 +5481,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     }
     rangeMachineFree(&native.machine);
     free(native.slots); free(native.returns); free(native.calls); free(native.traps); free(native.instances); free(native.texts);
-    free(native.temps); free(native.helpers); free(native.helperCalls);
+    free(native.temps); free(native.helpers); free(native.helperCalls); free(native.targets);
     return written;
 }
 

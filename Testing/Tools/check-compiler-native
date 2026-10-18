@@ -48,9 +48,19 @@ run patterns 42 "" Testing/Compiler/Native/Patterns.range
 run recursive-enums 42 "" Testing/Compiler/Native/RecursiveEnums.range
 run nested-enums 42 "" Testing/Compiler/Native/NestedEnums.range
 run optionals 42 "" Testing/Compiler/Native/Optionals.range
+run loops 42 "" Testing/Compiler/Native/Loops.range
+run guards 42 "" Testing/Compiler/Native/Guards.range
+run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
+[[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
+run equality 42 "" Testing/Compiler/Native/Equality.range
+run promotion 42 "" Testing/Compiler/Native/Promotion.range
+run strings-native 42 "" Testing/Compiler/Native/Strings.range
+printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
+    || fail "strings printed: $(cat "$work_root/stdout")"
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
-    for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals; do
+    for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
+                   loops guards enum-methods equality promotion strings-native; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -60,6 +70,8 @@ fi
 run slot-bounds 134 "slot index is outside the @many storage" "$(case_file slot-bounds \
     '{ state xs: Array<Int>() xs.append(value: 1) return xs.read(at: 1) }')"
 run strings 7 "" "$(case_file strings '{ let greeting: "hello" return 7 }')"
+run byte-bounds 134 "byte index is outside the bytes" "$(case_file byte-bounds \
+    '{ let s: String("hi") let b: s.byte(at: 2) return 0 }')"
 run narrow-overflow 134 "result of '+' does not fit Int<bits: 8, signed: true>" "$(case_file narrow-overflow \
     'function step(let x: Int<bits: 8>): Int<bits: 8> { return x + 100 }
 { let r: step(x: 100) return 0 }')"
@@ -139,5 +151,31 @@ reject missing-payload "case 'value' carries a payload" \
 { let t: Token(.value) return 0 }'
 reject not-optional "'if let' unwraps an optional value" \
     '{ let n: 3 if let m: n { return m } return 0 }'
+reject break-outside "'break' is only allowed inside a loop or a switch" \
+    '{ break return 0 }'
+reject continue-outside "'continue' is only allowed inside a loop" \
+    'function f(let b: Bool): Int { switch b { case true: continue case false: return 0 } }
+{ return f(b: true) }'
+reject guard-falls-through "the else block of 'guard' must not fall through" \
+    'function f(let n: Int): Int { guard n > 0 else { @print("no") } return n }
+{ return f(n: 1) }'
+reject guard-break-ends-switch "the else block of 'guard' must not fall through" \
+    'function f(let xs: Array<Int>): Int { for x in xs { guard x > 0 else { switch x { case 0: break default: return 0 } } } return 1 }
+{ return 0 }'
+reject guard-binding-in-else "no declaration for 'v' in the loaded sources" \
+    'function f(let o: Int?): Int { guard let v: o else { return v } return v }
+{ return f(o: .absent) }'
+reject for-non-collection "'for … in' iterates a construct applying @collection; found Int<bits: 64, signed: true>" \
+    '{ let n: 5 for x in n { } return 0 }'
+reject loop-variable "cannot assign to let 'x'" \
+    '{ state xs: Array<Int>() for x in xs { x: 3 } return 0 }'
+reject enum-extension-member "an extension of enum 'Direction' cannot add stored member 'speed'" \
+    'enum Direction { case north, south }
+extension Direction { let speed: 1 }
+{ return 0 }'
+reject payload-equality "payload field '0' of case 'at' is Point, which '==' does not compare" \
+    'construct Point { let x: Int }
+enum Place { case at(Point), nowhere }
+{ let p: Place(.nowhere) if p == .nowhere { return 1 } return 0 }'
 
-echo "compiler native: programs=23 rejections=12 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass"
+echo "compiler native: programs=30 rejections=21 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass guards=pass enum-methods=pass equality=pass promotion=pass strings=pass"

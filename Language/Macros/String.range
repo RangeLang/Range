@@ -8,11 +8,19 @@ macro string(): Construct {
     @diagnostic("Construct must specify value")
   }
 
-  // Layout: UTF-8 bytes held by C, as an address and a byte count. C reads
-  // the bytes primitive; it never names String.
+  // Layout: UTF-8 bytes held by C, as an address, a byte count, and the
+  // reference-counted block that owns them (none for a literal, whose bytes
+  // are in the executable). C reads the bytes primitive; it never names String.
+  //
+  // The byte primitives are C builtins selected by name: count is the byte
+  // count the bytes primitive holds, and byte(at:) reads one byte, checking
+  // the index against that count. `==` compares the bytes, and `+` joins two
+  // values into a new block; both are C operators, like integer arithmetic.
   #graph {
     extension #name {
       @builtin let bytes
+      @builtin let count: Int
+      @builtin function byte(let at: Int): Int<bits: 8, signed: false>
     }
   }
 }
