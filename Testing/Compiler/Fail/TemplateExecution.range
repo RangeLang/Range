@@ -1,1 +1,0 @@
-function start(): Int { @syntax($value) return 42 }

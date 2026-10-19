@@ -14,8 +14,9 @@ macro string(): Construct {
   //
   // The byte primitives are C builtins selected by name: count is the byte
   // count the bytes primitive holds, and byte(at:) reads one byte, checking
-  // the index against that count. `=` compares the bytes, and `+` joins two
-  // values into a new block; both are C operators, like integer arithmetic.
+  // the index against that count. `+` joins two values into a new block, a C
+  // operator like integer arithmetic. `=` comes from the default @equatable,
+  // whose structural primitive compares the bytes.
   #graph {
     extension #name {
       @builtin let bytes

@@ -12,8 +12,9 @@ int main(void)
     rangeGraphInitTypes(&arena);
     const char *sources[] = {
         ("function start(): Whole { return 42 } function deferred(): Missing { return 0 } "
-         "function throughCall(): Whole { return start() } function finish() { return }"),
-        "@integer construct Whole<let bits: 64, let signed: true> { let value: 0 }",
+         "function throughCall(): Whole { return start() } function finish() { return } "
+         "function take(let w: Whole, let m: Missing): Whole { return w }"),
+        "@integer construct Whole<let bits: 64, let signed: true> { let value: 0  function same(let other: Whole): Whole { return other } }",
         "macro integer(): Construct { let bits: #generics.filter(named: \"bits\").first }"
     };
     RangeNode *units[3];
@@ -37,11 +38,18 @@ int main(void)
     assert(units[0]->items[3]->a->items[0]->kind == RangeNodeReturn);
     assert(!units[0]->items[3]->a->items[0]->a);
     assert(rangeNodeRHS(construct->items[0])->integer == 0);
+    // Parameter.type and Function.receiver are declarations, absent when unresolved.
+    RangeNode *take = units[0]->items[4], *method = construct->items[1];
+    assert(rangeGraphStoredField(&arena,take->items[0],"type").node == construct);
+    assert(rangeGraphStoredField(&arena,take->items[1],"type").kind == RangeGraphNone);
+    assert(rangeGraphStoredField(&arena,take,"receiver").kind == RangeGraphNone);
+    assert(rangeGraphStoredField(&arena,method,"receiver").node == construct);
+    assert(rangeGraphStoredField(&arena,method->items[0],"type").node == construct);
     rangeNodeAppend(&arena,units[1],rangeNodeCreate(&arena,RangeNodeConstruct,"duplicate.range",1,1));
     units[1]->items[1]->name = "Whole";
     assert(!resolveGraphApplications(&arena,units,3,error,sizeof(error)));
     assert(strstr(error,"ambiguous graph output 'Whole'"));
     rangeArenaDestroy(&arena);
-    puts("graph output links: identity, macro, actual value, deferred, ambiguity=pass");
+    puts("graph output links: identity, macro, actual value, deferred, parameter types, receivers, ambiguity=pass");
     return 0;
 }

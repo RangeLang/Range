@@ -70,7 +70,8 @@ enum {
     RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
     RangeFlagMutationKnown = 1 << 12,
     RangeFlagConditional = 1 << 13, /* switch: written as `if case` or `if let`, with an else arm */
-    RangeFlagGuard = 1 << 14       /* if or conditional switch written as `guard`: its else arm must exit */
+    RangeFlagGuard = 1 << 14,      /* if or conditional switch written as `guard`: its else arm must exit */
+    RangeFlagImplicit = 1 << 15    /* attribute: applied by its grammar declaration's @defaults, not written */
 };
 
 /* Pattern forms. A case pattern's items are arguments (label, sub-pattern); a
@@ -147,7 +148,8 @@ struct RangeNode {
     RangeNode *generics; /* declaration Let members or supplied type arguments */
     RangeNode *rhsReference; /* bare RHS identity, resolved like any name */
     RangeNode *emittedBy; /* macro application whose #graph block produced this node */
-    RangeNode *receiver; /* method: its implicit `self` declaration, made on first use */
+    RangeNode *receiver; /* method: its implicit receiver declaration, made on first use */
+    RangeNode *owner;    /* method: the construct or enum that declares it */
     /* Complete declaration RHS source range, independent of legacy type slots. */
     size_t rhsStart;
     size_t rhsEnd;

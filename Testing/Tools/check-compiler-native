@@ -11,7 +11,8 @@ fail() { echo "compiler native: $*" >&2; exit 1; }
 compiler="$work_root/range-compiler"
 Language/Compiler/Tools/build-range-compiler "$compiler"
 core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macros/Diagnostic.range
-      Language/Macros/Boolean.range Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
+      Language/Macros/Boolean.range Language/Macros/Equatable.range Language/Macros/Defaults.range
+      Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
 
 # run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE
 run() {
@@ -54,8 +55,19 @@ run guards 42 "" Testing/Compiler/Native/Guards.range
 run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
+run equatable 42 "" Testing/Compiler/Native/Equatable.range
+grep -Fq "Equatable.range:43:1: warning[macro]: Plain applies @equatable but declares no equals; the default structural equality is used" \
+    "$work_root/log" || fail "explicit @equatable without equals was not warned"
+! grep -Fq "LooseFraction" "$work_root/log" || fail "equals without @equatable was warned"
 run equality-syntax 42 "" Testing/Compiler/Native/EqualitySyntax.range
 run expressions 42 "" Testing/Compiler/Native/Expressions.range
+run generics 42 "" Testing/Compiler/Native/Generics.range
+run bytes 42 "" Testing/Compiler/Native/Bytes.range
+run control 42 "" Testing/Compiler/Native/Control.range
+run evaluation 42 "" Testing/Compiler/Native/Evaluation.range
+run identity-references 42 "" Testing/Compiler/Native/IdentityReferences.range
+run value-generics 42 "" Testing/Compiler/Native/ValueGenerics.range
+run macro-applications 42 "" Testing/Compiler/Native/MacroApplications.range
 run promotion 42 "" Testing/Compiler/Native/Promotion.range
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
@@ -63,7 +75,8 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
-                   loops intervals guards enum-methods equality equality-syntax expressions promotion strings-native; do
+                   loops intervals guards enum-methods equality equatable equality-syntax expressions generics promotion strings-native \
+                   bytes control evaluation identity-references; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -94,6 +107,9 @@ function divide(let a: Int, let b: Int): Int { return a / b }
 run narrow-negation 134 "result of '-' does not fit Int<bits: 8, signed: true>" "$(case_file narrow-negation \
     'function flip(let a: Int<bits: 8>): Int<bits: 8> { return -a }
 { if flip(a: -127) != 127 { return 1 } let z: flip(a: -128) return 0 }')"
+run constant-overflow 134 "result of '+' does not fit Int<bits: 64, signed: true>" "$(case_file constant-overflow \
+    '{ return 9223372036854775807 + 1 }')"
+run constant-division 134 "division by zero in '/'" "$(case_file constant-division '{ return 4 / 0 }')"
 locals="{ $(for i in $(seq 1 40); do printf 'let v%s: %s ' "$i" "$i"; done) return (v40 - v1) }"
 run large-frame 39 "" "$(case_file large-frame "$locals")"
 
@@ -193,22 +209,184 @@ reject enum-extension-member "an extension of enum 'Direction' cannot add stored
     'enum Direction { case north, south }
 extension Direction { let speed: 1 }
 { return 0 }'
-reject payload-equality "payload field '0' of case 'at' is Point, which '=' does not compare" \
-    'construct Point { let x: Int }
-enum Place { case at(Point), nowhere }
+# A type compares only when every field it reaches compares.
+reject uncomparable-field "'=' cannot compare Bag: field 'items' is Array<Element: Int<bits: 64, signed: true>>, and field 'elements' of Array<Element: Int<bits: 64, signed: true>> is @many storage, which the structural '=' does not compare" \
+    'construct Bag { let items: Array<Int> }
+{ let a: Bag(items: Array<Int>()) if a = a { return 1 } return 0 }'
+reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case 'at' is Bag, and field 'items' is Array" \
+    'construct Bag { let items: Array<Int> }
+enum Place { case at(Bag), nowhere }
+function f(let p: Place): Int { switch p { case Place.nowhere: return 0 default: return 1 } }
 { let p: Place(.nowhere) if p = .nowhere { return 1 } return 0 }'
+reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Array<Element: Int<bits: 64, signed: true>>, and field 'elements' of Array<Element: Int<bits: 64, signed: true>> is @many storage, which the structural '=' does not compare (in Pair<Value: Bag>)" \
+    'construct Bag { let items: Array<Int> }
+construct Pair<Value> { let first: Value  let second: Value  function same(): Bool { return first = second } }
+{ let a: Bag(items: Array<Int>()) if Pair<Bag>(first: a, second: a).same() { return 1 } return 0 }'
+# @equatable checks equals in Range before it emits '=' calling it.
+reject equals-label "the parameter of Bad.equals must be labeled 'other', as in 'function equals(let other: Bad): Bool'; it is labeled 'value'" \
+    '@equatable
+construct Bad { let n: Int  function equals(let value: Bad): Bool { return true } }
+{ return 0 }'
+reject equals-type "the parameter of Bad.equals must be of type Bad, the type it compares" \
+    '@equatable
+construct Bad { let n: Int  function equals(let other: Int): Bool { return true } }
+{ return 0 }'
+reject equals-result "Bad.equals must return Bool" \
+    '@equatable
+construct Bad { let n: Int  function equals(let other: Bad): Int { return 1 } }
+{ return 0 }'
+reject equals-count "Bad.equals must take exactly one parameter, as in 'function equals(let other: Bad): Bool'; it takes 2" \
+    '@equatable
+enum Bad { case one, two  function equals(let other: Bad, let again: Bad): Bool { return true } }
+{ return 0 }'
+reject equals-enum-type "the parameter of Bad.equals must be of type Bad, the type it compares" \
+    '@equatable
+enum Bad { case one, two  function equals(let other: Bool): Bool { return true } }
+{ return 0 }'
+# One way to define equality: a type never writes '=' itself.
+reject user-equality "Own declares '=' itself; apply @equatable and declare 'function equals(let other: Own): Bool' instead" \
+    'construct Own { let n: Int  function =(let other: Own): Bool { return true } }
+{ if Own(n: 1) = Own(n: 2) { return 1 } return 0 }'
+reject user-equality-extension "Own declares '=' itself; apply @equatable and declare 'function equals(let other: Own): Bool' instead" \
+    'enum Own { case one, two }
+extension Own { function =(let other: Own): Bool { return true } }
+{ return 0 }'
+reject top-level-equality "'=' must be declared on the type it compares, in the type or an extension of it" \
+    'function =(let other: Int): Bool { return true }
+{ return 0 }'
+reject other-operator "operator '+' cannot be declared as a function; only '=' is, and other operators are C builtins" \
+    'construct N { let n: Int  function +(let other: N): N { return other } }
+{ return 0 }'
+# Overloads differ in labels or parameter types; identical ones are ambiguous.
+reject duplicate-method "ambiguous: f is declared twice with the same signature; first declared at" \
+    'construct Twice { let n: Int  function f(let x: Int): Int { return x }  function f(let x: Int): Bool { return true } }
+{ return Twice(n: 1).f(x: 1) }'
+reject duplicate-function "ambiguous: g is declared twice with the same signature; first declared at" \
+    'function g(let x: Int<bits: 8>): Int { return 1 }
+function g(let y: Int<bits: 8>): Int { return 2 }
+function g(let x: Int<bits: 8>): Int { return 3 }
+{ return g(x: 1) }'
+# Range has no self: members are bare names, and an enum's name is its value
+# only as a subject inside its own functions.
+reject self-rejected "Range has no self; use member names, or the enum's name as a switch subject" \
+    'construct Counter { let n: Int  function get(): Int { return self.n } }
+{ return 0 }'
+reject subject-outside-enum "'Direction' names a type; as a subject it is the current value only inside Direction's own functions" \
+    'enum Direction { case north, south }
+function f(): Int { switch Direction { case .north: return 1 default: return 0 } }
+{ return f() }'
+reject subject-other-enum "'Light' names a type; as a subject it is the current value only inside Light's own functions" \
+    'enum Light { case on, off
+    enum Color { case red  function f(): Int { switch Light { case .on: return 1 default: return 0 } } } }
+{ return 0 }'
 # Equality is a single `=`; `==` is never an alternative spelling.
 reject double-equals "double-equals.range:1:17: use '=' for equality" \
     '{ let a: 1 if a == 1 { return 1 } return 0 }'
 reject double-equals-pattern "double-equals-pattern.range:1:47: use '=' for equality" \
     'function f(let n: Int): Int { switch n { case == 1: return 1 default: return 0 } }
 { return f(n: 1) }'
+# Equality code is emitted on demand: only for the types a program compares
+# (here Point), never for types it only declares or constructs.
+text_size() { size -m "$1" | awk '/Section __text:/ { print $3 }'; }
+base='construct Point { let x: Int  let y: Int }
+function make(let n: Int): Point { return Point(x: n, y: n) }'
+compare='{ let p: make(n: 1) let q: make(n: 2) if p = q { return 1 } return 0 }'
+ignore='{ let p: make(n: 1) let q: make(n: 2) if p.x = q.x { return 1 } return 0 }'
+unused='construct Unused { let a: Int  let b: Point }
+enum Shape { case dot(Point), line(Point, Point), none }
+@equatable
+construct Custom { let n: Int  function equals(let other: Custom): Bool { return n = other.n } }'
+loose='construct Custom { let n: Int  function equals(let other: Custom): Bool { return n = other.n } }'
+for variant in compared:"$base
+$compare" ignored:"$base
+$ignore" unused:"$base
+$unused
+$ignore" loose:"$base
+$loose
+$ignore"; do
+    name="demand-${variant%%:*}"
+    "$compiler" -o "$work_root/$name" "${core[@]}" "$(case_file "$name" "${variant#*:}")" > /dev/null 2> "$work_root/log" \
+        || fail "$name did not compile: $(grep 'error\[' "$work_root/log")"
+done
+[[ "$(text_size "$work_root/demand-compared")" -gt "$(text_size "$work_root/demand-ignored")" ]] \
+    || fail "comparing Point emitted no equality code"
+[[ "$(text_size "$work_root/demand-unused")" == "$(text_size "$work_root/demand-loose")" ]] \
+    || fail "types that are never compared emitted equality code"
+loose_size="$(text_size "$work_root/demand-loose")"; ignored_size="$(text_size "$work_root/demand-ignored")"
+[[ "$loose_size" -gt "$ignored_size" ]] || fail "Custom's own equals method was not compiled"
+# Generic functions: a body is checked per instantiation, which the error names.
+reject generic-operation "operator '+' requires an integer type; found Bool; in sum<T: Bool>, specialized at" \
+    'function sum<T>(let a: T, let b: T): T { return a + b }
+{ if sum(a: true, b: false) { return 1 } return sum(a: 1, b: 2) }'
+reject generic-equality "'=' cannot compare Bag: field 'items' is Array<Element: Int<bits: 64, signed: true>>, and field 'elements' of Array<Element: Int<bits: 64, signed: true>> is @many storage, which the structural '=' does not compare; in same<T: Bag>" \
+    'construct Bag { let items: Array<Int> }
+function same<T>(let a: T, let b: T): Bool { return a = b }
+{ let b: Bag(items: Array<Int>()) if same(a: b, b: b) { return 1 } return 0 }'
+reject generic-uninferred "cannot infer type parameter Value of 'nothing'; write it, as in nothing<…>(…)" \
+    'function nothing<Value>(): Value? { return .absent }
+{ let x: nothing() return 0 }'
+reject generic-conflict "type parameter Value of 'pick' is Int<bits: 64, signed: true> from an earlier argument, but argument 'b' is Bool" \
+    'function pick<Value>(let a: Value, let b: Value): Value { return a }
+{ let x: pick(a: 1, b: true) return 0 }'
+reject generic-arity "'id' takes 1 type argument" \
+    'function id<T>(let a: T): T { return a }
+{ return id<Bool, Int>(a: 1) }'
+reject generic-method "generic methods are not implemented; declare 'get' as a top-level generic function" \
+    'construct Box { let n: Int  function get<T>(let t: T): T { return t } }
+{ return 0 }'
+# Declarations and calls the parser and type checker refuse.
+reject colon-function-default "parameter defaults require construction syntax, not a second colon" \
+    'function sample(let value: Int: 3): Int { return value }
+{ return 0 }'
+reject colon-macro-default "parameter defaults require construction syntax, not a second colon" \
+    'macro sample(let value: Int: 3): Construct {}
+{ return 0 }'
+for keyword in derived state; do
+    reject "$keyword-function-input" "inputs require explicit let or binding" "function identity($keyword value: Int): Int { return value }
+{ return 0 }"
+    reject "$keyword-macro-input" "inputs require explicit let or binding" "macro sample($keyword value: Int): Construct {}
+{ return 0 }"
+done
+reject implicit-function-input "inputs require explicit let or binding" \
+    'function identity(value: Int): Int { return value }
+{ return 0 }'
+reject implicit-macro-input "inputs require explicit let or binding" \
+    'macro sample(value: Int): Construct {}
+{ return 0 }'
+for alias in external _; do
+    reject "parameter-alias-$alias" "parameters require a single name used as the argument label" "function identity(let $alias value: Int): Int { return value }
+{ return 0 }"
+    reject "macro-parameter-alias-$alias" "parameters require a single name used as the argument label" "macro sample(let $alias value: Int): Construct {}
+{ return 0 }"
+done
+reject template-execution "@syntax is deferred; structural syntax is defined in C" '{ @syntax($value) return 0 }'
+reject trailing-interpolation "trailing tokens in interpolation" '{ let value: String("\(1 2)") return value.count }'
+reject immutable "cannot assign to let 'value'" '{ let value: Int(1) value: 2 return value }'
+reject missing-label "argument 1 of 'identity' requires label 'value'" \
+    'function identity(let value: Int): Int { return value }
+{ return identity(42) }'
+reject wrong-label "argument 1 of 'f' requires label 'value'" \
+    'function f(let value: Int): Int { return value }
+{ return f(other: 1) }'
+reject type-mismatch "argument 'value' of 'f' requires Bool; found Int<bits: 64, signed: true>" \
+    'function f(let value: Bool): Int { return 1 }
+{ return f(value: 3) }'
+reject undefined-unreached "no declaration for 'missing' in the loaded sources" \
+    '{ if false { return missing(value: 1) } return 0 }'
+reject unknown-reference "no declaration for 'missing' in the loaded sources" '{ let user: missing return 0 }'
+reject union-type "union type resolution is not implemented" \
+    'function f(let value: Int | Bool): Int { return 1 }
+{ return f(value: 3) }'
+reject macro-target "unknown macro target type 'Int'" \
+    'macro transform(): Int { return 3 }
+{ @transform return 0 }'
 # Without a construct applying @interval, as in the minimal core, `..<` has no meaning.
 full=("${core[@]}")
 core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macros/Diagnostic.range
-      Language/Macros/Boolean.range Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
+      Language/Macros/Boolean.range Language/Macros/Equatable.range Language/Macros/Defaults.range
+      Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
 reject interval-undeclared "'..<' needs exactly one construct applying @interval; found 0" \
     '{ let r: 0..<3 return 0 }'
 core=("${full[@]}")
 
-echo "compiler native: programs=33 rejections=29 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equality-syntax=pass expressions=pass promotion=pass strings=pass"
+echo "compiler native: programs=43 rejections=75 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"

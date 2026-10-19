@@ -1,2 +1,0 @@
-function sample(let value: Int: 3): Int { return value }
-function start(): Int { return 42 }

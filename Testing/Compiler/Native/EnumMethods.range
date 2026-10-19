@@ -1,10 +1,12 @@
-// Methods in an enum body and in an extension; self is the value, so a
-// method can switch over it. Calls are value.method().
+// Methods in an enum body and in an extension. Range has no self: inside an
+// enum's own functions the enum's name, as a switch, `if case`, or `guard
+// case` subject, is the current value; everywhere else it is the type.
+// Calls are value.method().
 enum Direction {
     case north, east, south, west
 
     function turned(): Direction {
-        switch self {
+        switch Direction {
         case .north: return .east
         case .east: return .south
         case .south: return .west
@@ -19,7 +21,16 @@ enum Direction {
 
 extension Direction {
     function vertical(): Bool {
-        return self = .north || self = .south
+        switch Direction {
+        case .north, .south: return true
+        default: return false
+        }
+    }
+
+    // The name is still the type outside a subject position.
+    function isStart(): Bool {
+        if case .north: Direction { return Direction.north = .north }
+        return false
     }
 }
 
@@ -28,13 +39,14 @@ enum Tree {
     case node(left: Tree, right: Tree)
 
     function sum(): Int {
-        switch self {
+        switch Tree {
         case .leaf(let value): return value
         case .node(let left, let right): return left.sum() + right.sum()
         }
     }
 }
 
+// A generic enum uses its bare name.
 enum Either<Left, Right> {
     case left(Left)
     case right(Right)
@@ -42,15 +54,51 @@ enum Either<Left, Right> {
 
 extension Either {
     function isLeft(): Bool {
-        if case .left(_): self { return true }
+        if case .left(_): Either { return true }
+        return false
+    }
+
+    function leftOr(let fallback: Left): Left {
+        guard case .left(let value): Either else { return fallback }
+        return value
+    }
+}
+
+extension Optional {
+    function isPresent(): Bool {
+        if case .present(_): Optional { return true }
         return false
     }
 }
 
+// With nesting, the innermost name wins.
+enum Light {
+    case on(Color), off
+
+    enum Color {
+        case red, green
+
+        function swapped(): Color {
+            switch Color {
+            case .red: return .green
+            case .green: return .red
+            }
+        }
+    }
+
+    function color(): Color {
+        switch Light {
+        case .on(let c): return c
+        case .off: return .red
+        }
+    }
+}
+
+// A construct's own functions reach its members by their bare names.
 construct Walker {
     state facing: Direction(.north)
     function step() { facing: facing.turned() }
-    function same(): Direction { return self.facing }
+    function current(): Direction { return facing }
 }
 
 {
@@ -62,12 +110,18 @@ construct Walker {
     let t: Tree(.node(left: .leaf(value: 4), right: .node(left: .leaf(value: 5), right: .leaf(value: 6))))
     if t.sum() != 15 { return 5 }
     let e: Either<Int, Bool>(.left(3))
-    if !e.isLeft() { return 6 }
+    if !e.isLeft() || e.leftOr(fallback: 9) != 3 { return 6 }
     let r: Either<Int, Bool>(.right(true))
-    if r.isLeft() { return 7 }
+    if r.isLeft() || r.leftOr(fallback: 9) != 9 { return 7 }
     state w: Walker()
     w.step()
-    if w.same() != .east { return 8 }
+    if w.current() != .east { return 8 }
+    if !d.isStart() || Direction.west.isStart() { return 9 }
+    let maybe: Int?(4)
+    let none: Int?(.absent)
+    if !maybe.isPresent() || none.isPresent() { return 10 }
+    let lit: Light(.on(.green))
+    if lit.color() != .green || lit.color().swapped() != .red || Light.off.color() != .red { return 11 }
     @print("\(d.opposite()) \(t.sum())")
     return 42
 }

@@ -161,16 +161,22 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
     if (!strcmp(name,"value") && node->kind == RangeNodeReturn)
         return node->a ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->a} : none;
     if (node->kind == RangeNodeFunction) {
-        if (!strcmp(name,"receiver")) return node->typeName
-            ? (RangeGraphValue){.kind=RangeGraphText,.text=node->typeName} : none;
-        if (!strcmp(name,"output")) return node->b
-            ? (RangeGraphValue){.kind=RangeGraphNode,
-                .node=node->b->resolvedDeclaration ? node->b->resolvedDeclaration : node->b} : none;
+        // receiver, output, and a parameter's type are declarations: the
+        // construct or enum that owns the method, or that the written type
+        // names. They are absent when the type names a type parameter or
+        // nothing declared.
+        if (!strcmp(name,"receiver")) return node->owner
+            ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->owner} : none;
+        if (!strcmp(name,"output")) return node->b && node->b->resolvedDeclaration
+            ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->b->resolvedDeclaration} : none;
         if (!strcmp(name,"body")) return node->a
             ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->a} : none;
         if (!strcmp(name,"parameters"))
             return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=node->items,.count=node->itemCount};
     }
+    if (!strcmp(name,"type") && node->kind == RangeNodeParameter)
+        return node->b && node->b->resolvedDeclaration
+            ? (RangeGraphValue){.kind=RangeGraphNode,.node=node->b->resolvedDeclaration} : none;
     if (!strcmp(name,"name")) return node->name
         ? (RangeGraphValue){.kind=RangeGraphText,.text=node->name} : none;
     if (!strcmp(name,"target") && node->kind == RangeNodeMacro)
@@ -187,8 +193,18 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
     if (!strcmp(name,"generics") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro || node->kind == RangeNodeFunction))
         list = node->generics;
     else if (!strcmp(name,"macros") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro
-        || node->kind == RangeNodeFunction || node->kind == RangeNodeEnum))
-        list = node->c;
+        || node->kind == RangeNodeFunction || node->kind == RangeNodeEnum)) {
+        // The applications a declaration writes; @defaults ones are not listed.
+        RangeNode result = {0};
+        for (size_t i = 0; node->c && i < node->c->itemCount; ++i)
+            if (!(node->c->items[i]->flags & RangeFlagImplicit)) rangeNodeAppend(arena,&result,node->c->items[i]);
+        return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
+    } else if (!strcmp(name,"functions") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum)) {
+        RangeNode result = {0};
+        for (size_t i = 0; i < node->itemCount; ++i)
+            if (node->items[i]->kind == RangeNodeFunction) rangeNodeAppend(arena,&result,node->items[i]);
+        return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
+    }
     else if (!strcmp(name,"members") && node->kind == RangeNodeConstruct) list = node;
     else if (!strcmp(name,"cases") && node->kind == RangeNodeEnum) list = node;
     else if (!strcmp(name,"members") && node->kind == RangeNodeBlock) {
@@ -212,9 +228,11 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Construct","macros",RangeFlagMany|RangeFlagOptional},
         {"Construct","generics",RangeFlagMany|RangeFlagOptional},
         {"Construct","members",RangeFlagMany|RangeFlagOptional},
+        {"Construct","functions",RangeFlagMany|RangeFlagOptional},
         {"Enum","name",0},
         {"Enum","macros",RangeFlagMany|RangeFlagOptional},
         {"Enum","cases",RangeFlagMany|RangeFlagOptional},
+        {"Enum","functions",RangeFlagMany|RangeFlagOptional},
         {"EnumCase","name",0},
         {"Function","name",0},
         {"Function","macros",RangeFlagMany|RangeFlagOptional},
@@ -235,6 +253,7 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Binding","name",0}, {"Binding","value",RangeFlagOptional},
         {"TypeParameter","name",0},
         {"Parameter","name",0},
+        {"Parameter","type",RangeFlagOptional},
         {"Return","value",RangeFlagOptional},
         {"Macro.body","members",RangeFlagMany|RangeFlagOptional},
         {"Macro.body","graph",RangeFlagMany|RangeFlagOptional}

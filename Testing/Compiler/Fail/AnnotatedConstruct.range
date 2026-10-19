@@ -1,4 +1,0 @@
-macro change(): Construct {}
-@change
-construct Thing { let value: Int }
-function start(): Int { let thing: Thing(value: 1) return thing.value }

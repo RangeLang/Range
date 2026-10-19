@@ -1,6 +1,10 @@
+// Every construct applies @equatable unless it writes @equatable itself.
+@nominal
+@defaults(equatable)
 construct Construct {
     let name: String
     let members: Array<@member>
+    let functions: Array<Function>
     let generics: Array<@generic>
     let macros: Array<Macro>
 }

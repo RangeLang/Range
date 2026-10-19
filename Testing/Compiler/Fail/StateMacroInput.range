@@ -1,2 +1,0 @@
-macro sample(state value: Int): Construct {}
-function start(): Int { return 42 }

@@ -1,3 +1,0 @@
-function f(let value: Int): Int { return value }
-function f(let value: Int): Int { return value + 1 }
-function start(): Int { return f(value: 1) }

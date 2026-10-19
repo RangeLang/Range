@@ -1,0 +1,107 @@
+// `a = b` calls the function named `=` that a's type declares, with b as its
+// one argument. The operator symbol is that function's name, so the
+// compiler finds it by the symbol itself; no role or hidden contract selects
+// it. `a != b` is `!(a = b)` through the same function, and a switch value
+// pattern compares with it too. An optional operand is promoted first, so
+// `maybe = 5` compares two Int? values. The other operators (`+`, `<`, …)
+// are still C builtins; declaring them like `=` is the next step.
+//
+// Every construct and enum applies @equatable (the grammar declarations carry
+// @defaults(equatable)), so every type declares one `=`, emitted here. Its
+// code is generated only for the types, per specialization, that a program
+// compares, and for the field and payload types those reach.
+
+// A construct is equal to another when every stored member is equal, each
+// compared with its own type's `=`. Writing @equatable makes `=` call the
+// construct's own `function equals(let other: <Type>): Bool` instead.
+macro equatable(): Construct {
+    let written: #macros.filter(named: "equatable").first
+    let equals: #functions.filter(named: "equals").first
+    let declared: #functions.filter(named: "=").first
+
+    // One way to define equality: a type does not write `=` itself.
+    if declared.isTarget {
+        @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead")
+    }
+
+    if written.isTarget && equals.isTarget {
+        if equals.parameters.count != 1 {
+            @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)")
+        }
+        let other: equals.parameters.first
+        if other.name != "other" {
+            @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'")
+        }
+        if other.type != equals.receiver {
+            @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares")
+        }
+        if equals.output != Bool {
+            @diagnostic("\(#name).equals must return Bool")
+        }
+        #graph {
+            extension #name {
+                function =(let other: #name): Bool { return equals(other: other) }
+            }
+        }
+    } else {
+        // Without @equatable written, an equals is an ordinary function.
+        if written.isTarget {
+            @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
+        }
+        // C primitive: compares every stored member in order, each with its
+        // own type's `=`. It becomes Range code once macros can iterate members.
+        #graph {
+            extension #name {
+                @builtin
+                function =(let other: #name): Bool
+            }
+        }
+    }
+}
+
+// An enum is equal to another when both hold the same case and that case's
+// payload fields are equal, each compared with its own type's `=`; an enum
+// that contains itself is compared recursively. Writing @equatable makes `=`
+// call the enum's own equals instead.
+macro equatable(): Enum {
+    let written: #macros.filter(named: "equatable").first
+    let equals: #functions.filter(named: "equals").first
+    let declared: #functions.filter(named: "=").first
+
+    if declared.isTarget {
+        @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead")
+    }
+
+    if written.isTarget && equals.isTarget {
+        if equals.parameters.count != 1 {
+            @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)")
+        }
+        let other: equals.parameters.first
+        if other.name != "other" {
+            @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'")
+        }
+        if other.type != equals.receiver {
+            @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares")
+        }
+        if equals.output != Bool {
+            @diagnostic("\(#name).equals must return Bool")
+        }
+        #graph {
+            extension #name {
+                function =(let other: #name): Bool { return equals(other: other) }
+            }
+        }
+    } else {
+        if written.isTarget {
+            @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
+        }
+        // C primitive: compares the tags, then the current case's payload
+        // fields. It becomes Range code once macros can iterate members.
+        #graph {
+            extension #name {
+                @builtin
+                function =(let other: #name): Bool
+            }
+        }
+    }
+}

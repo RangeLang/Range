@@ -1,9 +1,14 @@
 // A closed union: a value is exactly one of its cases. Nested constructs,
-// enums, and functions (methods, whose `self` is the value) are listed among
-// the cases but are not cases; generics are C-backed and have no field
-// adapter yet.
+// enums, and functions (methods) are listed among the cases but are not
+// cases; generics are C-backed and have no field adapter yet. Inside the
+// enum's own functions, its name as a switch, `if case`, or `guard case`
+// subject is the current value: `switch Direction { case .north: … }`.
+// Every enum applies @equatable unless it writes @equatable itself.
+@nominal
+@defaults(equatable)
 construct Enum {
     let name: String
     let cases: Array<EnumCase>
+    let functions: Array<Function>
     let macros: Array<Macro>
 }

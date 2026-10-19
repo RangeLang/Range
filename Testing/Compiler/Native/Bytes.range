@@ -1,0 +1,10 @@
+// A string holds any bytes, NUL among them; count is its byte count and
+// byte(at:) reads one, and `=` compares the bytes.
+{
+    let text: String("A\0B")
+    if text.count != 3 { return 1 }
+    if text.byte(at: 1) != 0 || text.byte(at: 2) != 66 { return 2 }
+    let copy: text
+    if copy != "A\0B" || copy = "A" { return 3 }
+    return 42
+}

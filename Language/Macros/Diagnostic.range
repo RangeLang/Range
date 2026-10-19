@@ -3,3 +3,8 @@
 // and exits with status 134, so it ends a `guard` else block as return does.
 @builtin
 macro diagnostic(let message: String)
+
+// Effect: inside a macro body, report the message as a warning at the
+// application and continue; a law run per specialization does not repeat it.
+@builtin
+macro warning(let message: String)

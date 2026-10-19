@@ -1,4 +1,7 @@
-// A parameter's declared type is C-backed but has no field adapter yet.
+// type is the construct or enum the parameter's written type names, its
+// generic arguments aside, or the @optional enum for `T?`; it is absent for
+// a type parameter.
 construct Parameter {
     let name: String
+    let type: @nominal?
 }

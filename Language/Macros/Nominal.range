@@ -1,0 +1,11 @@
+// Type kinds apply @nominal, so @nominal names any declaration that is a
+// type: a construct or an enum. Function.output, Function.receiver, and
+// Parameter.type hold one. Each kind declares its own fields; every kind has
+// a name.
+macro nominal(): Construct {
+  let name: #members.filter(named: "name").first
+
+  if !name.isTarget {
+    @diagnostic("Type kind must declare name")
+  }
+}

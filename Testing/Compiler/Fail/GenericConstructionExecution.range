@@ -1,5 +1,0 @@
-construct Box<let width: 64> { let value: 3 }
-function start(): Int {
-    let box: Box()
-    return 42
-}

@@ -1243,7 +1243,18 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
 {
     RangeNode *node = parserNode(parser, RangeNodeFunction);
     parserExpect(parser, "function");
-    node->name = parserExpectName(parser);
+    /* `function =(let other: T): Bool` declares the function `a = b` calls
+     * on a's type: the operator symbol is the function's name. Other
+     * operators are C builtins and cannot be declared yet. */
+    if (parserAt(parser, "=")) {
+        node->name = rangeArenaIntern(parser->arena, "=", 1);
+        parserAdvance(parser);
+    } else if (parser->current.kind == RangeTokenSymbol && !parserAt(parser, "(")) {
+        parserFail(parser, &parser->current,
+                   "operator '%.*s' cannot be declared as a function; only '=' is, and other operators are C builtins",
+                   (int)parser->current.length, parser->current.text);
+        return node;
+    } else node->name = parserExpectName(parser);
     if (parserAt(parser, "<")) node->generics = parseGenericMembers(parser);
     node->typeName = receiver;
     node->c = attributes;
@@ -1262,6 +1273,13 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
         if (strcmp(parameter->name, "_") == 0 || parser->current.kind == RangeTokenName)
             parserFail(parser, &parser->current, "parameters require a single name used as the argument label");
         parserExpect(parser, ":");
+        if (parser->macroDepth && parserAt(parser, "#")) {
+            /* Inside a macro's #graph, `let other: #name` splices the type. */
+            parameter->b = parsePrimary(parser);
+            rangeNodeAppend(parser->arena, node, parameter);
+            if (parserAt(parser, ",")) parserAdvance(parser);
+            continue;
+        }
         int typeFlags = 0;
         RangeNode *typeGenerics = NULL;
         const char *typeName = parseTypeName(parser, &typeFlags, &typeGenerics);

@@ -1,0 +1,68 @@
+// A method changes its construct's state through bare member names; values
+// are copies, so changing one never changes another. && and || short-circuit.
+construct Store {
+    state values: Array<Int>()
+    state revision: 0
+
+    function replace(let index: Int, let value: Int): Int {
+        values.write(at: index, value: value)
+        revision: revision + 1
+        return values.read(at: index)
+    }
+}
+
+construct Envelope { let store: Store }
+
+enum Outcome {
+    case success(value: Envelope)
+    case failure(code: Int)
+}
+
+function mutate(let store: Store): Envelope {
+    state changed: store
+    changed.values.append(value: 4294967297)
+    changed.values.append(value: 5)
+    let replaced: changed.replace(index: 1, value: 42)
+    if replaced != 42 { return Envelope(store: store) }
+    return Envelope(store: changed)
+}
+
+function choose(let store: Store): Outcome {
+    return .success(value: mutate(store: store))
+}
+
+function identity(let value: Int): Int { return value }
+
+function early(let value: Int): Int {
+    state index: 0
+    while index < 4 {
+        if index = value { return index }
+        index: index + 1
+    }
+    return 9
+}
+
+{
+    state original: 7
+    let copied: original
+    original: 8
+    if copied != 7 { return 16 }
+    let store: Store()
+    let result: choose(store: store)
+    guard case .success(let nested): result else { return 1 }
+    if store.revision != 0 || nested.store.revision != 1 { return 2 }
+    if nested.store.values.read(at: 0) != 4294967297 || nested.store.values.read(at: 1) != 42 { return 3 }
+    if store.values.count != 0 { return 4 }
+    state total: 0
+    state index: 0
+    while index < 4 {
+        total: total + early(value: index)
+        index: index + 1
+    }
+    if total != 6 { return 7 }
+    // The right side would read outside the storage; it never runs.
+    if false && store.values.read(at: 999) = 0 { return 8 }
+    if !(true || store.values.read(at: 999) = 0) { return 9 }
+    if identity(value: 42) != 42 { return 11 }
+    return nested.store.values.read(at: 1)
+}

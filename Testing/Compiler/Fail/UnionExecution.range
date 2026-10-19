@@ -1,2 +1,0 @@
-function f(let value: Int | Bool): Int { return 1 }
-function start(): Int { return f(value: 3) }

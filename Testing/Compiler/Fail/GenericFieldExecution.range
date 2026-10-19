@@ -1,5 +1,0 @@
-construct Box { let value: Int<bits: 32>(value: 3) }
-function start(): Int {
-    let box: Box()
-    return 42
-}

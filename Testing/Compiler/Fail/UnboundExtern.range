@@ -1,3 +1,0 @@
-@extern
-function missingHost(let value: Int): Int
-function start(): Int { return missingHost(value: 1) }

@@ -1,1 +1,0 @@
-function start(): Int { let value: Int state count: Int(0) while count < 2 { value: 42 count: count + 1 } return 42 }

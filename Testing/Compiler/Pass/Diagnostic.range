@@ -1,6 +1,0 @@
-@extern(symbol: "stringDiagnostic")
-function diagnostic(let text: String): Int
-function start(): Int {
-    if diagnostic(text: "compiler diagnostic") != 0 { return 1 }
-    return 42
-}

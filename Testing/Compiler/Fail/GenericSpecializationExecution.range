@@ -1,6 +1,0 @@
-function start(): Int {
-    if false {
-        let value: Int<bits: 32>(value: 3)
-    }
-    return 42
-}

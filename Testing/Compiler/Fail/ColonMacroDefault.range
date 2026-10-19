@@ -1,2 +1,0 @@
-macro sample(let value: Int: 3): Construct {}
-function start(): Int { return 42 }

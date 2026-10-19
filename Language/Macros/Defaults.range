@@ -1,0 +1,7 @@
+// C primitive: on a grammar declaration, @defaults(m) makes every declaration
+// of that kind apply @m unless it writes @m itself; the macro's target type
+// selects which @m. The implicit application is not listed in the
+// declaration's #macros, so @m can tell a default application from a written
+// one. C attaches it when the declaration joins the graph.
+@builtin
+macro defaults(let applies: Macro): Construct

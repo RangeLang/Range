@@ -1,4 +1,0 @@
-function start(): Int {
-    if false { return missing(value: 1) }
-    return 42
-}

@@ -1,0 +1,11 @@
+// A macro whose body checks nothing applies to a construct and leaves it as
+// written.
+macro change(): Construct {}
+
+@change
+construct Thing { let value: Int }
+
+{
+    let thing: Thing(value: 42)
+    return thing.value
+}

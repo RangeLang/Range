@@ -1,0 +1,71 @@
+// Generic functions are specialized per instantiation, as constructs are.
+// Type arguments are inferred from the arguments, then from the expected
+// result, or written: first<Int>(xs: …).
+construct Point { let x: Int  let y: Int }
+enum Shade { case light, dark }
+
+function first<Element>(let xs: Array<Element>): Element? {
+    for x in xs { return x }
+    return .absent
+}
+
+function pick<Value>(let a: Value, let b: Value, let flag: Bool): Value {
+    if flag { return a }
+    return b
+}
+
+// Generic functions calling generic functions, and recursion.
+function second<Element>(let xs: Array<Element>): Element? {
+    state rest: Array<Element>()
+    state skipped: false
+    for x in xs {
+        if skipped { rest.append(value: x) }
+        skipped: true
+    }
+    return first(xs: rest)
+}
+
+function count<Element>(let xs: Array<Element>, let value: Element): Int {
+    state n: 0
+    for x in xs where x = value { n: n + 1 }
+    return n
+}
+
+function repeated<Element>(let value: Element, let times: Int): Array<Element> {
+    state xs: Array<Element>()
+    if times > 0 {
+        xs: repeated(value: value, times: times - 1)
+        xs.append(value: value)
+    }
+    return xs
+}
+
+function orDefault<Value>(let maybe: Value?, let fallback: Value): Value {
+    if let v: maybe { return v }
+    return fallback
+}
+
+// The type comes only from the expected result.
+function nothing<Value>(): Value? { return .absent }
+
+{
+    state numbers: Array<Int>()
+    numbers.append(value: 7)
+    numbers.append(value: 8)
+    if first(xs: numbers) != 7 || second(xs: numbers) != 8 { return 1 }
+    if first(xs: Array<Int>()) != .absent { return 2 }
+    if pick(a: 1, b: 2, flag: true) != 1 || pick(a: 1, b: 2, flag: false) != 2 { return 3 }
+    let p: pick(a: Point(x: 1, y: 2), b: Point(x: 3, y: 4), flag: false)
+    if p.x != 3 { return 4 }
+    if pick(a: Shade.light, b: .dark, flag: false) != .dark { return 5 }
+    let narrow: Int<bits: 8>(5)
+    if pick(a: narrow, b: 6, flag: false) != 6 { return 6 }
+    if pick<Int>(a: 1, b: 2, flag: true) != 1 { return 7 }
+    let words: repeated(value: "ab", times: 3)
+    if words.count != 3 || first(xs: words) != "ab" || count(xs: words, value: "ab") != 3 { return 8 }
+    if count(xs: numbers, value: 8) != 1 { return 9 }
+    if orDefault(maybe: first(xs: Array<Point>()), fallback: p) != Point(x: 3, y: 4) { return 10 }
+    let none: Int?(nothing())
+    if none != .absent { return 11 }
+    return 42
+}

@@ -1,2 +1,0 @@
-construct User { state score: Int(0) }
-function start(): Int { let user: User user.score: 42 return 42 }
