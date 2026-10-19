@@ -112,8 +112,8 @@ int main(void)
     rangeArenaDestroy(&c.arena);
 
     // Literals take the type their context requires; the law runs on the supplied value.
-    compile(&c,"function widths() { let a: 0 let b: Int<bits: 64, signed: true> "
-        "state narrow: Int<bits: 8> narrow: 100 narrow: 800 let same: (narrow + 1) let ok: true }");
+    compile(&c,"function widths() { let a: 0 let b: Int<bits: 64, signed: true>(0) "
+        "state narrow: Int<bits: 8>(0) narrow: 100 narrow: 800 let same: (narrow + 1) let ok: true }");
     RangeNode *a = local(&c,"widths","a"), *b = local(&c,"widths","b"), *narrow = local(&c,"widths","narrow");
     assert(a->type && a->type->kind == RangeNodeSpecialization && a->type == b->type);
     expectDescription(a->type,"Int<bits: 64, signed: true>");
@@ -126,9 +126,9 @@ int main(void)
     rangeArenaDestroy(&c.arena);
 
     // Specialization substitutes type parameters through members and calls.
-    compile(&c,"function arrays() { state xs: Array<Int> xs.append(value: 7) "
+    compile(&c,"function arrays() { state xs: Array<Int>() xs.append(value: 7) "
         "let n: (xs.count) let r: (xs.read(at: 0) + 1) let e: (xs.isEmpty()) "
-        "state narrow: Array<Int<bits: 8>> narrow.append(value: 300) }");
+        "state narrow: Array<Int<bits: 8>>() narrow.append(value: 300) }");
     expectDescription(local(&c,"arrays","xs")->type,"Array<Element: Int<bits: 64, signed: true>>");
     assert(local(&c,"arrays","n")->type == local(&c,"arrays","r")->type);
     expectDescription(local(&c,"arrays","r")->type,"Int<bits: 64, signed: true>");
@@ -144,7 +144,7 @@ int main(void)
         "let bare: Array let twice: Array<Int, Int> let wide: Int<width: 8> a: 5 }");
     assert(reported(&c,"type","operator '+' requires matching types; found Int<bits: 64, signed: true> and Int<bits: 8, signed: true>"));
     assert(reported(&c,"type","condition requires Bool; found Int<bits: 64, signed: true>"));
-    assert(reported(&c,"type","operator '-' requires an integer type; found Bool"));
+    assert(reported(&c,"type","'-' is not declared on Bool"));
     assert(reported(&c,"type","Int<bits: 64, signed: true> has no member 'missing'"));
     assert(reported(&c,"type","argument 'value' of 'append' requires Int<bits: 64, signed: true>; found Bool"));
     assert(reported(&c,"type","argument 1 of 'append' requires label 'value'"));
@@ -154,6 +154,9 @@ int main(void)
     assert(reported(&c,"type","'Array' takes 1 type arguments; 2 supplied"));
     assert(reported(&c,"type","'Int' has no generic named 'width'"));
     assert(reported(&c,"type","cannot assign to let 'a'"));
+    // A local states its value; only construct members leave it to construction.
+    assert(reported(&c,"type","'narrow' needs an initial value"));
+    assert(!reported(&c,"type","'a' needs an initial value"));
     rangeArenaDestroy(&c.arena);
 
     // Layout: scalars from their storage width, constructs from members in order.

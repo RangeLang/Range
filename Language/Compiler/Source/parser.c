@@ -1228,6 +1228,14 @@ static RangeNode *parseGenericMembers(RangeParser *parser)
         member->a = parseExpression(parser, 0);
         parser->genericDepth -= 1;
         member->rhsEnd = parser->previousEnd;
+        /* `<let n: Int>` names the value's type: a requirement, written at
+         * each use, as a member's `let n: Int` is. `<let n: 2>` is a default. */
+        if (member->a && member->a->kind == RangeNodeName) {
+            member->typeName = member->a->name;
+            member->generics = member->a->generics;
+            if (!member->generics) member->rhsReference = member->a;
+            member->a = NULL;
+        }
         rangeNodeAppend(parser->arena, list, member);
         if (!parserAt(parser, ">")) parserExpect(parser, ",");
     }
@@ -1243,17 +1251,22 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
 {
     RangeNode *node = parserNode(parser, RangeNodeFunction);
     parserExpect(parser, "function");
-    /* `function =(let other: T): Bool` declares the function `a = b` calls
-     * on a's type: the operator symbol is the function's name. Other
-     * operators are C builtins and cannot be declared yet. */
-    if (parserAt(parser, "=")) {
-        node->name = rangeArenaIntern(parser->arena, "=", 1);
+    /* `function +(let other: T): T` declares the function `a + b` calls on
+     * a's type, and `function -(): T` the one `-a` calls: the operator symbol
+     * is the function's name. `!=` is the negation of `=` and `..<` the
+     * @interval sugar, so neither is declared. */
+    static const char *const declarable[] = {"=", "+", "-", "*", "/", "%", "<", ">", "<=", ">=", "!", "&&", "||", NULL};
+    if (parser->current.kind == RangeTokenSymbol && !parserAt(parser, "(")) {
+        for (size_t i = 0; declarable[i] && !node->name; ++i)
+            if (parserAt(parser, declarable[i])) node->name = rangeArenaIntern(parser->arena, declarable[i], strlen(declarable[i]));
+        if (!node->name) {
+            parserFail(parser, &parser->current,
+                       parserAt(parser, "!=") ? "operator '!=' cannot be declared: it is the negation of '='"
+                       : "operator '%.*s' cannot be declared as a function",
+                       (int)parser->current.length, parser->current.text);
+            return node;
+        }
         parserAdvance(parser);
-    } else if (parser->current.kind == RangeTokenSymbol && !parserAt(parser, "(")) {
-        parserFail(parser, &parser->current,
-                   "operator '%.*s' cannot be declared as a function; only '=' is, and other operators are C builtins",
-                   (int)parser->current.length, parser->current.text);
-        return node;
     } else node->name = parserExpectName(parser);
     if (parserAt(parser, "<")) node->generics = parseGenericMembers(parser);
     node->typeName = receiver;
@@ -1296,7 +1309,13 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
         if (parserAt(parser, ",")) parserAdvance(parser);
     }
     parserExpect(parser, ")");
-    if (parserAt(parser, ":")) {
+    if (parserAt(parser, ":") && parser->macroDepth && rangeTokenIs(parserPeek(parser), "#")) {
+        /* Inside a macro's #graph, `): #name` splices the result type. */
+        parserAdvance(parser);
+        parser->conditionDepth += 1; /* a body may follow: `#name {` is not #graph */
+        node->b = parsePrimary(parser);
+        parser->conditionDepth -= 1;
+    } else if (parserAt(parser, ":")) {
         parserAdvance(parser);
         int typeFlags = 0;
         RangeNode *returnGenerics = NULL;

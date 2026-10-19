@@ -4,7 +4,7 @@
 // it. `a != b` is `!(a = b)` through the same function, and a switch value
 // pattern compares with it too. An optional operand is promoted first, so
 // `maybe = 5` compares two Int? values. The other operators (`+`, `<`, …)
-// are still C builtins; declaring them like `=` is the next step.
+// work the same way, but any type may declare those; `=` comes only from here.
 //
 // Every construct and enum applies @equatable (the grammar declarations carry
 // @defaults(equatable)), so every type declares one `=`, emitted here. Its

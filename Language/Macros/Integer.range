@@ -35,10 +35,32 @@ macro integer(): Construct {
   // Layout and arithmetic: the construct is a scalar exactly bits wide, signed
   // or not. C reads these primitives from the specialization; it never names
   // Int, bits, or signed.
+  //
+  // `a + b` calls the function `+` that a's type declares, with b as its
+  // argument; `-a` calls `-` without one. These are C primitives on the
+  // storage: each traps when its result does not fit the specialization's bits
+  // and signedness, and `/` and `%` trap on division by zero. Inside the
+  // construct `#name` is the specialization itself, so Int<bits: 8> adds only
+  // Int<bits: 8> values: mixed widths are rejected.
+  //
+  // Precedence and associativity are fixed in the C parser, in Swift's order:
+  // `* / %`, then `+ -`, then `..<`, then the comparisons, then `&&`, then
+  // `||`, each left-associative except `..<`, which does not chain. Declaring
+  // precedence in Range is future work; C warns that it holds the table.
   #graph {
     extension #name {
       @builtin let storage: bits
       @builtin let signed: signed
+      @builtin function +(let other: #name): #name
+      @builtin function -(let other: #name): #name
+      @builtin function *(let other: #name): #name
+      @builtin function /(let other: #name): #name
+      @builtin function %(let other: #name): #name
+      @builtin function -(): #name
+      @builtin function <(let other: #name): Bool
+      @builtin function >(let other: #name): Bool
+      @builtin function <=(let other: #name): Bool
+      @builtin function >=(let other: #name): Bool
     }
   }
 }

@@ -60,6 +60,9 @@ grep -Fq "Equatable.range:43:1: warning[macro]: Plain applies @equatable but dec
     "$work_root/log" || fail "explicit @equatable without equals was not warned"
 ! grep -Fq "LooseFraction" "$work_root/log" || fail "equals without @equatable was warned"
 run equality-syntax 42 "" Testing/Compiler/Native/EqualitySyntax.range
+run operators 42 "" Testing/Compiler/Native/Operators.range
+run array-equality 42 "" Testing/Compiler/Native/ArrayEquality.range
+run member-defaults 42 "" Testing/Compiler/Native/MemberDefaults.range
 run expressions 42 "" Testing/Compiler/Native/Expressions.range
 run generics 42 "" Testing/Compiler/Native/Generics.range
 run bytes 42 "" Testing/Compiler/Native/Bytes.range
@@ -75,7 +78,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
-                   loops intervals guards enum-methods equality equatable equality-syntax expressions generics promotion strings-native \
+                   loops intervals guards enum-methods equality equatable equality-syntax operators array-equality member-defaults expressions generics promotion strings-native \
                    bytes control evaluation identity-references; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
@@ -209,19 +212,29 @@ reject enum-extension-member "an extension of enum 'Direction' cannot add stored
     'enum Direction { case north, south }
 extension Direction { let speed: 1 }
 { return 0 }'
-# A type compares only when every field it reaches compares.
-reject uncomparable-field "'=' cannot compare Bag: field 'items' is Array<Element: Int<bits: 64, signed: true>>, and field 'elements' of Array<Element: Int<bits: 64, signed: true>> is @many storage, which the structural '=' does not compare" \
-    'construct Bag { let items: Array<Int> }
-{ let a: Bag(items: Array<Int>()) if a = a { return 1 } return 0 }'
-reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case 'at' is Bag, and field 'items' is Array" \
-    'construct Bag { let items: Array<Int> }
+# A type compares only when every field it reaches compares. Array compares
+# through its own equals; raw @many storage has no '=' of its own.
+raw='construct Raw { @many state slots: Int }
+construct Bag { let items: Raw }'
+reject uncomparable-field "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare" \
+    "$raw
+{ let a: Bag(items: Raw()) if a = a { return 1 } return 0 }"
+reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case 'at' is Bag, and field 'items' is Raw" \
+    "$raw
 enum Place { case at(Bag), nowhere }
 function f(let p: Place): Int { switch p { case Place.nowhere: return 0 default: return 1 } }
-{ let p: Place(.nowhere) if p = .nowhere { return 1 } return 0 }'
-reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Array<Element: Int<bits: 64, signed: true>>, and field 'elements' of Array<Element: Int<bits: 64, signed: true>> is @many storage, which the structural '=' does not compare (in Pair<Value: Bag>)" \
-    'construct Bag { let items: Array<Int> }
+{ let p: Place(.nowhere) if p = .nowhere { return 1 } return 0 }"
+reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Pair<Value: Bag>)" \
+    "$raw
 construct Pair<Value> { let first: Value  let second: Value  function same(): Bool { return first = second } }
-{ let a: Bag(items: Array<Int>()) if Pair<Bag>(first: a, second: a).same() { return 1 } return 0 }'
+{ let a: Bag(items: Raw()) if Pair<Bag>(first: a, second: a).same() { return 1 } return 0 }"
+reject uncomparable-element "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Array<Element: Bag>)" \
+    "$raw
+{ state xs: Array<Bag>() if xs = xs { return 1 } return 0 }"
+# Demand-driven: an Array's equals, and its element's '=', exist only when
+# such arrays are compared, so an array of an uncomparable type compiles.
+run uncompared-element 7 "" "$(case_file uncompared-element "$raw
+{ state xs: Array<Bag>() xs.append(value: Bag(items: Raw())) return 6 + xs.count }")"
 # @equatable checks equals in Range before it emits '=' calling it.
 reject equals-label "the parameter of Bad.equals must be labeled 'other', as in 'function equals(let other: Bad): Bool'; it is labeled 'value'" \
     '@equatable
@@ -254,9 +267,32 @@ extension Own { function =(let other: Own): Bool { return true } }
 reject top-level-equality "'=' must be declared on the type it compares, in the type or an extension of it" \
     'function =(let other: Int): Bool { return true }
 { return 0 }'
-reject other-operator "operator '+' cannot be declared as a function; only '=' is, and other operators are C builtins" \
-    'construct N { let n: Int  function +(let other: N): N { return other } }
+# Every other operator is the function its left operand's type declares.
+reject undeclared-operator "'<' is not declared on Point" \
+    'construct Point { let x: Int }
+{ if Point(x: 1) < Point(x: 2) { return 1 } return 0 }'
+reject undeclared-prefix "'-' is not declared on Point" \
+    'construct Point { let x: Int }
+{ let p: -Point(x: 1) return 0 }'
+reject undeclared-relation "'<' is not declared on Point" \
+    'construct Point { let x: Int }
+function f(let p: Point): Int { switch p { case < Point(x: 0): return 1 default: return 0 } }
+{ return f(p: Point(x: 1)) }'
+reject mixed-widths "operator '+' requires matching types; found Int<bits: 8, signed: true> and Int<bits: 64, signed: true>" \
+    'function f(let a: Int<bits: 8>, let b: Int): Int<bits: 8> { return a + b }
 { return 0 }'
+reject not-equal-declared "operator '!=' cannot be declared: it is the negation of '='" \
+    'construct N { let n: Int  function !=(let other: N): Bool { return true } }
+{ return 0 }'
+reject top-level-operator "'+' must be declared on the type of its left operand, in the type or an extension of it" \
+    'function +(let other: Int): Int { return other }
+{ return 0 }'
+reject operator-arity "operator '+' takes one parameter, the right operand; N.+ takes 2" \
+    'construct N { let n: Int  function +(let a: N, let b: N): N { return a } }
+{ return 0 }'
+reject builtin-logical "builtin '!' is a C primitive of the condition type only; Flag declares it" \
+    'enum Flag { case up, down  @builtin function !(): Flag }
+{ let f: Flag(.up) let g: !f return 0 }'
 # Overloads differ in labels or parameter types; identical ones are ambiguous.
 reject duplicate-method "ambiguous: f is declared twice with the same signature; first declared at" \
     'construct Twice { let n: Int  function f(let x: Int): Int { return x }  function f(let x: Int): Bool { return true } }
@@ -315,13 +351,13 @@ done
 loose_size="$(text_size "$work_root/demand-loose")"; ignored_size="$(text_size "$work_root/demand-ignored")"
 [[ "$loose_size" -gt "$ignored_size" ]] || fail "Custom's own equals method was not compiled"
 # Generic functions: a body is checked per instantiation, which the error names.
-reject generic-operation "operator '+' requires an integer type; found Bool; in sum<T: Bool>, specialized at" \
+reject generic-operation "'+' is not declared on Bool; in sum<T: Bool>, specialized at" \
     'function sum<T>(let a: T, let b: T): T { return a + b }
 { if sum(a: true, b: false) { return 1 } return sum(a: 1, b: 2) }'
-reject generic-equality "'=' cannot compare Bag: field 'items' is Array<Element: Int<bits: 64, signed: true>>, and field 'elements' of Array<Element: Int<bits: 64, signed: true>> is @many storage, which the structural '=' does not compare; in same<T: Bag>" \
-    'construct Bag { let items: Array<Int> }
+reject generic-equality "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare; in same<T: Bag>" \
+    "$raw
 function same<T>(let a: T, let b: T): Bool { return a = b }
-{ let b: Bag(items: Array<Int>()) if same(a: b, b: b) { return 1 } return 0 }'
+{ let b: Bag(items: Raw()) if same(a: b, b: b) { return 1 } return 0 }"
 reject generic-uninferred "cannot infer type parameter Value of 'nothing'; write it, as in nothing<…>(…)" \
     'function nothing<Value>(): Value? { return .absent }
 { let x: nothing() return 0 }'
@@ -331,6 +367,25 @@ reject generic-conflict "type parameter Value of 'pick' is Int<bits: 64, signed:
 reject generic-arity "'id' takes 1 type argument" \
     'function id<T>(let a: T): T { return a }
 { return id<Bool, Int>(a: 1) }'
+# Value generics on functions: a literal per instantiation, required unless defaulted.
+reject value-generic-missing "'times' requires generic n; write it, as in times<n: …>(…)" \
+    'function times<let n: Int>(let value: Int): Int { return value * n }
+{ return times(value: 2) }'
+reject value-generic-literal "generic n of 'times' requires a literal value" \
+    'function times<let n: Int>(let value: Int): Int { return value * n }
+{ let k: 3 return times<n: k>(value: 2) }'
+reject value-generic-type "generic n of 'times' requires Int<bits: 64, signed: true>; found Bool" \
+    'function times<let n: Int>(let value: Int): Int { return value * n }
+{ return times<n: true>(value: 2) }'
+reject value-generic-law "Int<bits: 8, signed: true> does not satisfy @integer" \
+    'function small<let n: Int<bits: 8>>(): Int<bits: 8> { return n }
+{ let x: small<n: 300>() return 0 }'
+reject value-generic-unknown "'f' has no generic 'm'" \
+    'function f<let n: 2>(): Int { return n }
+{ return f<m: 3>() }'
+reject construct-value-required "'Grid' requires generic width" \
+    'construct Grid<let width: Int> { let cells: 0 }
+{ let g: Grid() return 0 }'
 reject generic-method "generic methods are not implemented; declare 'get' as a top-level generic function" \
     'construct Box { let n: Int  function get<T>(let t: T): T { return t } }
 { return 0 }'
@@ -359,6 +414,20 @@ for alias in external _; do
     reject "macro-parameter-alias-$alias" "parameters require a single name used as the argument label" "macro sample(let $alias value: Int): Construct {}
 { return 0 }"
 done
+# A local states its value; only construct members leave it to construction.
+reject local-let-value "'v' needs an initial value" '{ let v: Int return 0 }'
+reject local-state-value "'v' needs an initial value" '{ state v: Int v: 3 return v }'
+reject local-array-value "'xs' needs an initial value" '{ state xs: Array<Int> return xs.count }'
+# A member default sees only the members declared before it.
+reject default-forward "the default of 'a' refers to 'b', which is declared after it; a default sees only the members before it" \
+    'construct F { let a: b * 2  let b: Int }
+{ return F(b: 1).a }'
+reject default-self "the default of 'a' refers to 'a' itself" \
+    'construct F { let a: a }
+{ return 0 }'
+reject default-cycle "the type of 'a' depends on itself" \
+    'construct F { let a: b + 1  let b: a + 1 }
+{ return F().a }'
 reject template-execution "@syntax is deferred; structural syntax is defined in C" '{ @syntax($value) return 0 }'
 reject trailing-interpolation "trailing tokens in interpolation" '{ let value: String("\(1 2)") return value.count }'
 reject immutable "cannot assign to let 'value'" '{ let value: Int(1) value: 2 return value }'
@@ -389,4 +458,4 @@ reject interval-undeclared "'..<' needs exactly one construct applying @interval
     '{ let r: 0..<3 return 0 }'
 core=("${full[@]}")
 
-echo "compiler native: programs=43 rejections=75 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"
+echo "compiler native: programs=47 rejections=95 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"

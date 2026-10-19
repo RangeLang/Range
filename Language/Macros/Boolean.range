@@ -11,4 +11,18 @@ macro boolean(): Enum {
   // A literal names the case spelled like it. Conditions branch on the tag
   // and comparisons produce it, so C requires case false to be tag 0 and
   // case true tag 1, and checks that where it finds the condition type.
+  //
+  // `!a` calls the function `!` declared here, a C primitive on the tag.
+  // `a && b` and `a || b` short-circuit: b is evaluated only when a does not
+  // decide the result. A call evaluates its argument first, and Range has no
+  // closures to delay it, so these two stay C control-flow primitives. They
+  // are declared here so the operators exist only on this type, and C writes
+  // the branch.
+  #graph {
+    extension #name {
+      @builtin function !(): #name
+      @builtin function &&(let other: #name): #name
+      @builtin function ||(let other: #name): #name
+    }
+  }
 }

@@ -1,0 +1,49 @@
+// A member default may use the members declared before it, by bare name:
+// defaults run once, in declaration order, at construction, whether those
+// members were supplied or defaulted. This is not `derived`: nothing updates.
+construct Frame {
+    let width: Int
+    let height: width
+    let area: width * height
+    let label: "frame"
+}
+
+construct Narrow {
+    let side: Int<bits: 8>
+    let double: side + side
+    let flag: true
+    let wide: Int(7)
+    let sum: wide + 1
+}
+
+construct Inner { let n: Int  let twice: n * 2 }
+
+construct Outer {
+    let base: 3
+    let inner: Inner(n: base)
+    let total: inner.twice + base
+    state names: Array<String>()
+    let count: names.count + 1
+}
+
+enum Shape { case square(Frame), none }
+
+{
+    let square: Frame(width: 3)
+    if square.height != 3 || square.area != 9 || square.label != "frame" { return 1 }
+    let tall: Frame(width: 2, height: 5)
+    if tall.area != 10 { return 2 }
+    let given: Frame(width: 2, height: 5, area: 1)
+    if given.area != 1 { return 3 }
+    let n: Narrow(side: 20)
+    if n.double != 40 || n.sum != 8 || !n.flag { return 4 }
+    let o: Outer()
+    if o.inner.twice != 6 || o.total != 9 || o.count != 1 { return 5 }
+    let p: Outer(base: 5)
+    if p.inner.n != 5 || p.total != 15 { return 6 }
+    switch Shape.square(Frame(width: 4)) {
+    case .square(let f): if f.area != 16 { return 7 }
+    case .none: return 8
+    }
+    return 42
+}

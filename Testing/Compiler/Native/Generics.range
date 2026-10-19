@@ -48,6 +48,35 @@ function orDefault<Value>(let maybe: Value?, let fallback: Value): Value {
 // The type comes only from the expected result.
 function nothing<Value>(): Value? { return .absent }
 
+// Inside a generic construct, arguments mention its type parameter: the call
+// is checked with T, and each specialization calls the instance for its type.
+construct Box<T> {
+    state items: Array<T>()
+    function head(): T? { return first(xs: items) }
+    function written(): T? { return first<T>(xs: items) }
+    function tally(let value: T): Int { return count(xs: items, value: value) }
+}
+
+// Value generics are constants per instantiation: a default, or a value
+// written at the call; `<let n: Int>` has no default and is always written.
+function scaled<let factor: 2>(let n: Int): Int { return n * factor }
+function times<let n: Int>(let value: Int): Int { return value * n }
+function filled<Element, let size: Int>(let value: Element): Array<Element> {
+    state xs: Array<Element>()
+    for i in 0..<size { xs.append(value: value) }
+    return xs
+}
+function chosen<let flag: Bool, let small: Int<bits: 8>>(): Int<bits: 8> {
+    if flag { return small }
+    return -small
+}
+
+// A construct's required value generic, read in its methods.
+construct Grid<let width: Int> {
+    let cells: 0
+    function size(let rows: Int): Int { return width * rows }
+}
+
 {
     state numbers: Array<Int>()
     numbers.append(value: 7)
@@ -67,5 +96,19 @@ function nothing<Value>(): Value? { return .absent }
     if orDefault(maybe: first(xs: Array<Point>()), fallback: p) != Point(x: 3, y: 4) { return 10 }
     let none: Int?(nothing())
     if none != .absent { return 11 }
+    state box: Box<Int>()
+    box.items.append(value: 5)
+    box.items.append(value: 5)
+    if box.head() != 5 || box.written() != 5 || box.tally(value: 5) != 2 { return 12 }
+    state named: Box<String>()
+    if named.head() != .absent { return 13 }
+    named.items.append(value: "x")
+    if named.written() != "x" { return 14 }
+    if scaled(n: 5) != 10 || scaled<factor: 3>(n: 5) != 15 || scaled<factor: -1>(n: 5) != -5 { return 15 }
+    if times<n: 4>(value: 2) != 8 { return 16 }
+    let three: filled<size: 3>(value: "ab")
+    if three.count != 3 || first(xs: three) != "ab" || filled<size: 0>(value: 1).count != 0 { return 17 }
+    if chosen<flag: true, small: 7>() != 7 || chosen<flag: false, small: 7>() != -7 { return 18 }
+    if Grid<width: 3>().size(rows: 2) != 6 || Grid<width: 5>().size(rows: 2) != 10 { return 19 }
     return 42
 }

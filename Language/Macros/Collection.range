@@ -38,6 +38,19 @@ macro collection(): Construct {
                 return .absent
             }
 
+            // Two collections are equal when they hold equal elements in the
+            // same order, each pair compared with Element's own `=`; capacity
+            // is storage, not value, so it never takes part. The construct
+            // applying this macro writes @equatable after it to make `=`
+            // call this.
+            function equals(let other: #name): Bool {
+                if count != other.count { return false }
+                for index in 0..<count {
+                    if read(at: index) != other.read(at: index) { return false }
+                }
+                return true
+            }
+
             function append(let value: Element) {
                 if count = capacity {
                     if capacity = 0 {
