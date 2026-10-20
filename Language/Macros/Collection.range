@@ -16,7 +16,11 @@ macro collection(): Construct {
     // operations belong to the construct too: C implements them on its single
     // @many member. Bare names such as Element resolve in the target once this
     // code lands there.
+    //
+    // @equatable on the extension applies to the target as if the target
+    // wrote it, so every collection compares by the equals emitted beside it.
     #graph {
+        @equatable
         extension #name {
             state count: 0
             state capacity: 0
@@ -40,9 +44,8 @@ macro collection(): Construct {
 
             // Two collections are equal when they hold equal elements in the
             // same order, each pair compared with Element's own `=`; capacity
-            // is storage, not value, so it never takes part. The construct
-            // applying this macro writes @equatable after it to make `=`
-            // call this.
+            // is storage, not value, so it never takes part. The @equatable
+            // on this extension makes `=` call this.
             function equals(let other: #name): Bool {
                 if count != other.count { return false }
                 for index in 0..<count {

@@ -1,11 +1,9 @@
 // @collection supplies Array's storage members and operations: count,
 // capacity, @many elements, append, read, write, and the @iteration function.
-//
-// @equatable is written after @collection: it reads the equals that
-// @collection emits, so `a = b` compares count and elements, never capacity.
+// Equality comes with @collection: it applies @equatable with its own equals,
+// so `a = b` compares count and elements, never capacity.
 
 @collection
-@equatable
 construct Array<Element> {}
 
 // Proposed Array behavior: elements are ordered, and filtering preserves that

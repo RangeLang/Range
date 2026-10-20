@@ -1,0 +1,47 @@
+// Declarations whose equality is written through extensions in
+// ExtensionEquality.range, a separate file.
+construct Fraction {
+    let numerator: Int
+    let denominator: Int
+}
+
+enum Parity { case even, odd }
+
+construct Plain { let n: Int }
+
+// Written on the declaration and again through an extension: one application.
+@equatable
+construct Twice {
+    let n: Int
+    function equals(let other: Twice): Bool { return true }
+}
+
+// Reports whether @equatable is written, which #macros tells apart from a
+// @defaults application.
+macro reportsEquatable(): Construct {
+    let written: #macros.filter(named: "equatable").first
+    if written.isTarget {
+        @warning("\(#name) writes @equatable")
+    } else {
+        @warning("\(#name) has only the default @equatable")
+    }
+}
+
+@reportsEquatable
+construct Written { let n: Int }
+
+@reportsEquatable
+construct Defaulted { let n: Int }
+
+// Emitted through #graph: the application's extension carries @equatable.
+macro alwaysEqual(): Enum {
+    #graph {
+        @equatable
+        extension #name {
+            function equals(let other: #name): Bool { return true }
+        }
+    }
+}
+
+@alwaysEqual
+enum Coin { case heads, tails }

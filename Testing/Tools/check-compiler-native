@@ -14,10 +14,11 @@ core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macro
       Language/Macros/Boolean.range Language/Macros/Equatable.range Language/Macros/Defaults.range
       Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
 
-# run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE
+# run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE...
 run() {
-    local name="$1" status="$2" message="$3" source="$4" program="$work_root/$1"
-    "$compiler" -o "$program" "${core[@]}" "$source" > "$work_root/out" 2> "$work_root/log" \
+    local name="$1" status="$2" message="$3" program="$work_root/$1"
+    shift 3
+    "$compiler" -o "$program" "${core[@]}" "$@" > "$work_root/out" 2> "$work_root/log" \
         || fail "$name did not compile: $(grep -v 'warning\[' "$work_root/log")"
     grep -q "^wrote $program" "$work_root/log" || fail "$name claimed no executable"
     codesign -v "$program" 2> /dev/null || fail "$name signature does not verify"
@@ -62,6 +63,27 @@ grep -Fq "Equatable.range:43:1: warning[macro]: Plain applies @equatable but dec
 run equality-syntax 42 "" Testing/Compiler/Native/EqualitySyntax.range
 run operators 42 "" Testing/Compiler/Native/Operators.range
 run array-equality 42 "" Testing/Compiler/Native/ArrayEquality.range
+# A macro written on an extension applies to the extended declaration, here
+# from another file than the declaration, on constructs, enums, and #graph.
+run extension-equality 42 "" Testing/Compiler/Native/ExtensionTypes.range Testing/Compiler/Native/ExtensionEquality.range
+grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable but declares no equals; the default structural equality is used" \
+    "$work_root/log" || fail "@equatable extension without equals was not warned"
+grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
+    || fail "a second application of @equatable was not noted"
+grep -Fq "ExtensionTypes.range:30:1: warning[macro]: Written writes @equatable" "$work_root/log" \
+    || fail "#macros does not list an application written through an extension"
+grep -Fq "ExtensionTypes.range:33:1: warning[macro]: Defaulted has only the default @equatable" "$work_root/log" \
+    || fail "#macros lists a @defaults application"
+! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no equals" "$work_root/log" \
+    || fail "@equatable on an extension missed the equals beside it"
+! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its equals"
+# The same macro twice on one declaration: the same arguments are one
+# application, noted; different arguments are an error naming both sites.
+run defaults-repeated 0 "" "$(case_file defaults-repeated '@defaults(equatable)
+extension Construct {}
+{ return 0 }')"
+grep -Fq "defaults-repeated.range:1:1: note[macro]: @defaults is already applied to 'Construct' at" "$work_root/log" \
+    || fail "a repeated @defaults was not noted"
 run member-defaults 42 "" Testing/Compiler/Native/MemberDefaults.range
 run expressions 42 "" Testing/Compiler/Native/Expressions.range
 run generics 42 "" Testing/Compiler/Native/Generics.range
@@ -78,7 +100,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
-                   loops intervals guards enum-methods equality equatable equality-syntax operators array-equality member-defaults expressions generics promotion strings-native \
+                   loops intervals guards enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
                    bytes control evaluation identity-references; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
@@ -446,6 +468,10 @@ reject unknown-reference "no declaration for 'missing' in the loaded sources" '{
 reject union-type "union type resolution is not implemented" \
     'function f(let value: Int | Bool): Int { return 1 }
 { return f(value: 3) }'
+reject defaults-different "@defaults is applied to 'Construct' twice with different arguments, at" \
+    '@defaults(collection)
+extension Construct {}
+{ return 0 }'
 reject macro-target "unknown macro target type 'Int'" \
     'macro transform(): Int { return 3 }
 { @transform return 0 }'
@@ -456,6 +482,21 @@ core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macro
       Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
 reject interval-undeclared "'..<' needs exactly one construct applying @interval; found 0" \
     '{ let r: 0..<3 return 0 }'
+# @defaults written through an extension reaches every declaration of its kind.
+core=("${core[@]:0:8}")
+run defaults-extension 0 "" "$(case_file defaults-extension '@defaults(equatable)
+construct Construct {}
+construct Enum {}
+construct Function {}
+construct Macro {}
+construct String {}
+macro announce(): Enum { @warning("\(#name) is announced") }
+@defaults(announce)
+extension Enum {}
+enum Light { case on, off }
+{ return 0 }')"
+grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$work_root/log" \
+    || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=47 rejections=95 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"
+echo "compiler native: programs=50 rejections=96 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"

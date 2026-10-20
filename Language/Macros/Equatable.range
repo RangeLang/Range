@@ -14,6 +14,9 @@
 // A construct is equal to another when every stored member is equal, each
 // compared with its own type's `=`. Writing @equatable makes `=` call the
 // construct's own `function equals(let other: <Type>): Bool` instead.
+// `@equatable extension Type { … }` writes it as well: it applies to Type, as
+// written there, and sees the equals declared in that extension. That is how
+// @collection makes every collection compare by the equals it emits.
 macro equatable(): Construct {
     let written: #macros.filter(named: "equatable").first
     let equals: #functions.filter(named: "equals").first

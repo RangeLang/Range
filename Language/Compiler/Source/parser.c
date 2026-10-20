@@ -1423,12 +1423,12 @@ static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
 }
 
 /* `extension Name { … }` adds construct members to the declaration it names.
- * Inside #graph, the subject may be a splice such as `#name`. */
+ * Inside #graph, the subject may be a splice such as `#name`. Macro
+ * applications written on the extension apply to that declaration. */
 static RangeNode *parseExtension(RangeParser *parser, RangeNode *attributes)
 {
     RangeNode *node = parserNode(parser, RangeNodeExtension);
-    if (attributes->itemCount)
-        parserFail(parser, &parser->current, "extensions do not take macro applications");
+    node->c = attributes;
     parserExpect(parser, "extension");
     parser->conditionDepth += 1;
     node->a = parseExpression(parser, 0);

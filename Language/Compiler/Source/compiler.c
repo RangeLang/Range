@@ -209,39 +209,45 @@ static void applyDefaults(Resolver *vm, RangeNode *target)
     }
 }
 
+/* One application site on a target: its macro declaration, selected by name
+ * and the target's type, and the bindings its body reads. */
+static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attribute)
+{
+    RangeNode *unit = NULL;
+    attribute->macroApplication = NULL;
+    if (same(attribute->name,"builtin")
+        || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))) return;
+    RangeNode *macro = resolveMacroDeclaration(vm,attribute,target,&unit);
+    if (macroBuiltin(macro,"literal") || macroBuiltin(macro,"defaults")) return; /* registered compiler primitives */
+    if (attribute->itemCount || macro->itemCount)
+        fail(vm,attribute,"parameterized macro graph resolution is not implemented");
+    RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
+    *app = (RangeMacroApplication){.declaration=macro,.target=target,.unit=unit,.attribute=attribute};
+    if (macro->a) {
+        app->bindings = rangeArenaAllocate(vm->arena,macro->a->itemCount * sizeof(*app->bindings));
+        for (size_t i = 0; i < macro->a->itemCount; ++i) {
+            RangeNode *member = macro->a->items[i];
+            if (!rangeNodeDeclaresValue(member->kind)) continue;
+            for (size_t j = 0; j < app->count; ++j)
+                if (same(app->bindings[j].definition->name,member->name))
+                    fail(vm,member,"duplicate graph member '%s'",member->name);
+            app->bindings[app->count++] = (RangeGraphBinding){.definition=member};
+        }
+    }
+    attribute->resolvedDeclaration = macro;
+    attribute->macroApplication = app;
+    for (size_t i = 0; i < app->count; ++i)
+        if (rangeNodeHasContextReference(app->bindings[i].definition))
+            (void)graphBinding(vm,app,&app->bindings[i]);
+}
+
 static void resolveGraphTarget(Resolver *vm, RangeNode *target)
 {
     if (!target->graphType) return;
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum) applyDefaults(vm,target);
     RangeNode *attributes = target->c;
-    if (attributes) for (size_t a = 0; a < attributes->itemCount; ++a) {
-        RangeNode *attribute = attributes->items[a], *unit = NULL;
-        attribute->macroApplication = NULL;
-        if (same(attribute->name,"builtin")
-            || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))) continue;
-        RangeNode *macro = resolveMacroDeclaration(vm,attribute,target,&unit);
-        if (macroBuiltin(macro,"literal") || macroBuiltin(macro,"defaults")) continue; /* registered compiler primitives */
-        if (attribute->itemCount || macro->itemCount)
-            fail(vm,attribute,"parameterized macro graph resolution is not implemented");
-        RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
-        *app = (RangeMacroApplication){.declaration=macro,.target=target,.unit=unit,.attribute=attribute};
-        if (macro->a) {
-            app->bindings = rangeArenaAllocate(vm->arena,macro->a->itemCount * sizeof(*app->bindings));
-            for (size_t i = 0; i < macro->a->itemCount; ++i) {
-                RangeNode *member = macro->a->items[i];
-                if (!rangeNodeDeclaresValue(member->kind)) continue;
-                for (size_t j = 0; j < app->count; ++j)
-                    if (same(app->bindings[j].definition->name,member->name))
-                        fail(vm,member,"duplicate graph member '%s'",member->name);
-                app->bindings[app->count++] = (RangeGraphBinding){.definition=member};
-            }
-        }
-        attribute->resolvedDeclaration = macro;
-        attribute->macroApplication = app;
-        for (size_t i = 0; i < app->count; ++i)
-            if (rangeNodeHasContextReference(app->bindings[i].definition))
-                (void)graphBinding(vm,app,&app->bindings[i]);
-    }
+    if (attributes) for (size_t a = 0; a < attributes->itemCount; ++a)
+        resolveApplication(vm,target,attributes->items[a]);
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
         for (size_t i = 0; i < target->itemCount; ++i) resolveGraphTarget(vm,target->items[i]);
 }
@@ -1220,6 +1226,9 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
                 fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
             fail(vm,attribute,"builtin target effects are not supported by compile-time validation");
         }
+    // Bindings read the graph as it stands when the application runs, with
+    // every extension merged so far, not as it stood at resolution.
+    for (size_t i = 0; i < app->count; ++i) app->bindings[i].state = 0;
     vm->emitted = emitted;
     MetaEval eval = {.vm=vm};
     MetaScope scope = {.application=app};
@@ -1238,6 +1247,70 @@ static void resolveMergedNode(Resolver *vm, RangeNode *node)
     resolveSignatureTypes(vm,node,node->kind == RangeNodeFunction ? node->owner : NULL);
     resolveGraphTarget(vm,node);
     resolveLiteralDefaults(vm,node);
+}
+
+/* Two applications with the same written arguments, compared as syntax. */
+static int sameSyntax(const RangeNode *a, const RangeNode *b)
+{
+    if (!a || !b) return a == b;
+    if (a->kind != b->kind || a->integer != b->integer || a->itemCount != b->itemCount
+        || (a->flags & ~RangeFlagImplicit) != (b->flags & ~RangeFlagImplicit)) return 0;
+    if ((a->name || b->name) && !same(a->name,b->name)) return 0;
+    if ((a->typeName || b->typeName) && !same(a->typeName,b->typeName)) return 0;
+    if (!sameSyntax(a->a,b->a) || !sameSyntax(a->b,b->b) || !sameSyntax(a->c,b->c)
+        || !sameSyntax(a->generics,b->generics)) return 0;
+    for (size_t i = 0; i < a->itemCount; ++i) if (!sameSyntax(a->items[i],b->items[i])) return 0;
+    return 1;
+}
+
+static void attachDefaults(Resolver *vm, RangeNode *grammar, RangeNode *node)
+{
+    if (!node) return;
+    if (node->kind == RangeNodeUnit || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum)
+        for (size_t i = 0; i < node->itemCount; ++i) attachDefaults(vm,grammar,node->items[i]);
+    if ((node->kind != RangeNodeConstruct && node->kind != RangeNodeEnum) || !node->graphType
+        || grammarDeclaration(vm,node) != grammar) return;
+    size_t before = node->c ? node->c->itemCount : 0;
+    applyDefaults(vm,node);
+    for (size_t i = before; node->c && i < node->c->itemCount; ++i) resolveApplication(vm,node,node->c->items[i]);
+}
+
+/* A macro application written on an extension applies to the extended
+ * declaration as if written there: it is listed in #macros and replaces a
+ * @defaults application of the same macro. The same macro applied twice to
+ * one declaration is one application; different arguments are an error. */
+static void attachApplication(Resolver *vm, RangeNode *declaration, RangeNode *attribute)
+{
+    if (!declaration->c)
+        declaration->c = rangeNodeCreate(vm->arena,RangeNodeAttribute,declaration->path,declaration->line,declaration->column);
+    RangeNode *list = declaration->c;
+    for (size_t i = 0; i < list->itemCount; ++i) {
+        RangeNode *existing = list->items[i];
+        if (!same(existing->name,attribute->name)) continue;
+        if (existing->flags & RangeFlagImplicit) {
+            if (existing->macroApplication && existing->macroApplication->applied)
+                fail(vm,attribute,"@%s is applied to '%s' through an extension after its @defaults application already ran",
+                     attribute->name,declaration->name);
+            list->items[i] = attribute;
+            resolveApplication(vm,declaration,attribute);
+            return;
+        }
+        if (!sameSyntax(existing,attribute))
+            fail(vm,attribute,"@%s is applied to '%s' twice with different arguments, at %s:%d:%d and at %s:%d:%d",
+                 attribute->name,declaration->name,existing->path,existing->line,existing->column,
+                 attribute->path,attribute->line,attribute->column);
+        if (vm->report)
+            sourceDiagnostic(vm->report,attribute,2,"macro",
+                "@%s is already applied to '%s' at %s:%d:%d; this is the same application",
+                attribute->name,declaration->name,existing->path,existing->line,existing->column);
+        return;
+    }
+    rangeNodeAppend(vm->arena,list,attribute);
+    resolveApplication(vm,declaration,attribute);
+    // A @defaults written through an extension reaches every declaration of
+    // its grammar kind, as if written on the grammar declaration.
+    if (macroBuiltin(attribute->resolvedDeclaration,"defaults"))
+        for (size_t u = 0; u < vm->count; ++u) attachDefaults(vm,declaration,vm->units[u]);
 }
 
 /* An extension names its declaration; its members move there and resolve in
@@ -1274,6 +1347,13 @@ static void mergeExtension(Resolver *vm, RangeNode *extension)
     }
     extension->itemCount = 0;
     extension->resolvedDeclaration = declaration;
+    // Applications join only after the members: an application never runs
+    // while its extension is half merged, so it sees every member written
+    // beside it.
+    RangeNode *attributes = extension->c;
+    extension->c = NULL;
+    for (size_t i = 0; attributes && i < attributes->itemCount; ++i)
+        attachApplication(vm,declaration,attributes->items[i]);
 }
 
 static void mergeEmitted(Resolver *vm, RangeNode *emitted)
@@ -1329,8 +1409,8 @@ static void sourceDiagnostic(SourceReport *report, RangeNode *at, int warning,
     if (report->last) report->last->next = d;
     else report->first = d;
     report->last = d;
-    if (warning) ++report->warnings;
-    else ++report->errors;
+    if (warning == 1) ++report->warnings;
+    else if (!warning) ++report->errors;
 }
 
 static int sourceDeclaration(RangeNode *node)
@@ -1634,7 +1714,7 @@ static void writeSourceDiagnostics(SourceReport *report, FILE *output)
     for (SourceDiagnostic *d = report->first; d; d = d->next) {
         if (d->at) fprintf(output,"%s:%d:%d: ",d->at->path,d->at->line,d->at->column);
         else fputs("compiler: ",output);
-        fprintf(output,"%s[%s]: %s",d->warning ? "warning" : "error",d->category,d->message);
+        fprintf(output,"%s[%s]: %s",d->warning == 2 ? "note" : d->warning ? "warning" : "error",d->category,d->message);
         if (d->uses > 1) fprintf(output," (%zu uses in this source)",d->uses);
         fputc('\n',output);
     }
@@ -1642,7 +1722,8 @@ static void writeSourceDiagnostics(SourceReport *report, FILE *output)
 
 /* Macro application: written extensions merge first, then every application
  * runs once and its #graph output merges before the next round. Applications
- * introduced by emitted code run in a later round. This discovery order is a
+ * introduced by emitted code run in a later round; @defaults applications run
+ * only in a round where no written application is left. This discovery order is a
  * bootstrap stand-in: the accepted design is a Datalog scheduler that orders
  * applications by what they read and write, reruns only reads a write changes,
  * and rejects cycles through absence or whole-list reads. */
@@ -1667,13 +1748,14 @@ static void applyAndMerge(Resolver *vm, RangeNode *attribute)
 }
 
 static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
-                       RangeNode *target, size_t *checked)
+                       RangeNode *target, int defaults, size_t *checked)
 {
     if (!target->graphType) return 0;
     int ran = 0;
     if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
         RangeNode *attribute = target->c->items[i];
         if (compilerAttribute(target,attribute)) continue;
+        if ((attribute->flags & RangeFlagImplicit) && !defaults) continue;
         // An unresolved application here comes from a merge that already failed.
         RangeMacroApplication *app = attribute->macroApplication;
         if (!app || app->applied) continue;
@@ -1686,7 +1768,7 @@ static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
     // Members merged during this round wait for the next one.
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
         for (size_t i = 0, n = target->itemCount; i < n; ++i)
-            ran |= applyTarget(vm,report,unit,target->items[i],checked);
+            ran |= applyTarget(vm,report,unit,target->items[i],defaults,checked);
     return ran;
 }
 
@@ -1696,11 +1778,14 @@ static void applyMacros(Resolver *vm, SourceReport *report, size_t *checked)
         for (size_t i = 0; i < vm->units[u]->itemCount; ++i)
             if (vm->units[u]->items[i]->kind == RangeNodeExtension)
                 guarded(vm,report,"resolution",mergeExtension,vm->units[u]->items[i]);
+    // A @defaults application waits until written ones settle: one written
+    // through an emitted extension replaces it before it runs.
     for (int round = 0; round < RangeMacroRounds; ++round) {
         int ran = 0;
-        for (size_t u = 0; u < vm->count; ++u)
-            for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
-                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],checked);
+        for (int defaults = 0; defaults < 2 && !ran; ++defaults)
+            for (size_t u = 0; u < vm->count; ++u)
+                for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
+                    ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],defaults,checked);
         if (!ran) return;
     }
     if (!report) fail(vm,NULL,"macro emission did not settle after %d rounds",RangeMacroRounds);
