@@ -242,6 +242,16 @@ int main(void)
     // An optional is matched with switch; it has no isTarget, or any member.
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first().isTarget } @probe extension Light {}",
                      "this compile-time value has no member 'isTarget'",0);
+    // Bodies are Block values, absent for a builtin; a block lists the
+    // declarations written in it.
+    validateLanguage("macro probe(): Function { switch #body { .present(let b): switch b.members.count = 2 { "
+                     ".true: {}, .false: @diagnostic(\"members\") }, .absent: @diagnostic(\"no body\") } } "
+                     "@probe function work(): Int { let a: 1 let b: 2 return a + b } "
+                     "construct Holder { @probe @builtin function read(): Int }",
+                     "no body",0);
+    validateLanguage("macro probe(): Function { switch #body { .present(let b): switch b.members.count = 2 { "
+                     ".true: {}, .false: @diagnostic(\"members\") }, .absent: {} } } "
+                     "@probe function work(): Int { let a: 1 let b: 2 return a + b }",NULL,1);
     // Without the grammar, a reflection list has no Range type to be.
     validate("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
              "reflection field 'members' has no Range type",0);

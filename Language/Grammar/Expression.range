@@ -1,0 +1,6 @@
+// An expression: a literal, a name, a call, an operator, a switch, a case.
+// C holds expression nodes and Range declares no kinds of expression yet, so
+// this type has no fields: a field typed Expression says what it holds, but
+// nothing checks which kind of expression is there, and a macro can only
+// splice or compare it, not inspect it.
+construct Expression {}

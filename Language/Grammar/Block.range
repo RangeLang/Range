@@ -1,0 +1,8 @@
+// The body of a function or a macro. members are the declarations written
+// directly in it, as for a construct; graph lists its #graph blocks, which are
+// expressions. Its statements are C-backed: Range declares no statement
+// kinds yet, so a block's other statements are not reflected.
+construct Block {
+    let members: Array<@member>
+    let graph: Array<Expression>
+}

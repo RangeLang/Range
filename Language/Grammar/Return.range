@@ -1,3 +1,4 @@
-// value is C-backed but not declared here: it holds the returned
-// expression, which has no Range type until expression kinds are declared.
-construct Return {}
+// value is the returned expression, absent for a bare `return`.
+construct Return {
+    let value: Expression?
+}

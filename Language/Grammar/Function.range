@@ -1,10 +1,11 @@
 // receiver is the construct or enum that declares a method, absent for a
 // top-level function; output is the construct or enum the result type names,
-// as Parameter.type is for a parameter.
+// as Parameter.type is for a parameter. body is absent for a @builtin or
+// @extern function.
 construct Function {
     let name: String
     let receiver: @nominal?
     let parameters: Array<Parameter>
     let output: @nominal?
-    let body: Array<Return>
+    let body: Block?
 }

@@ -1,5 +1,7 @@
-// value is C-backed but not declared here: it holds the right-hand-side
-// expression, which has no Range type until expression kinds are declared.
+// value is C-backed but not declared here. It holds the right-hand-side
+// expression, but a macro reading `.value` gets that expression evaluated at
+// compile time (a generic's `bits.value` is 64, not an Expression), so
+// declaring it Expression? would misstate what C returns.
 @member @generic
 construct Let {
     let name: String

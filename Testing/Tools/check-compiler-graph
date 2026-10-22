@@ -47,7 +47,7 @@ for mode in ordinary sanitized; do
         if [[ "$fixture" == Forward ]]; then
             grep -Fq "unresolved compile-time local 'other'" "$work_root/error" || fail "$mode forward reference failed for wrong reason"
         elif [[ "$fixture" == UnknownBody ]]; then
-            grep -Fq "field 'unknown' is not declared by @type Macro.body" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
+            grep -Fq "field 'unknown' is not declared by @type Block" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
         else
             grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
         fi

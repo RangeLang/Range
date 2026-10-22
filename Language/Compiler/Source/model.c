@@ -255,8 +255,8 @@ void rangeGraphInitTypes(RangeArena *arena)
         {"Parameter","name",0},
         {"Parameter","type",RangeFlagOptional},
         {"Return","value",RangeFlagOptional},
-        {"Macro.body","members",RangeFlagMany|RangeFlagOptional},
-        {"Macro.body","graph",RangeFlagMany|RangeFlagOptional}
+        {"Block","members",RangeFlagMany|RangeFlagOptional},
+        {"Block","graph",RangeFlagMany|RangeFlagOptional}
     };
     arena->graphTypes = rangeNodeCreate(arena,RangeNodeUnit,"<compiler>",1,1);
     for (size_t i = 0; i < sizeof(fields)/sizeof(*fields); ++i) {
@@ -270,5 +270,7 @@ void rangeGraphInitTypes(RangeArena *arena)
         field->name=fields[i].field; field->flags=fields[i].flags;
         rangeNodeAppend(arena,type,field);
     }
-    rangeGraphField(rangeGraphType(arena,"Macro"),"body")->a=rangeGraphType(arena,"Macro.body");
+    // A macro's or function's body is a block, with its own reflective shape.
+    rangeGraphField(rangeGraphType(arena,"Macro"),"body")->a=rangeGraphType(arena,"Block");
+    rangeGraphField(rangeGraphType(arena,"Function"),"body")->a=rangeGraphType(arena,"Block");
 }
