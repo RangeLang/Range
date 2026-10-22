@@ -1,5 +1,0 @@
-@view
-construct Window {
-    let title: String
-    binding application: @app
-}

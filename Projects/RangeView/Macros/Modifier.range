@@ -1,8 +1,0 @@
-enum ModifierCategory {
-    case style
-    case layout
-    case behavior
-}
-
-// Registers an ordinary function for postfix modifier member lookup.
-macro modifier(let category: ModifierCategory): Function -> Void {}

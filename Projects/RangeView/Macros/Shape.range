@@ -1,7 +1,0 @@
-macro shape(): Construct {
-    #environment {
-        extension #environment.target.Declaration.identity {
-            @view
-        }
-    }
-}

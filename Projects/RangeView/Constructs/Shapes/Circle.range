@@ -1,5 +1,0 @@
-@shape
-construct Circle {
-    let center: Point
-    let radius: Int
-}

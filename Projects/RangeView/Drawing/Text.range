@@ -1,4 +1,0 @@
-@view
-construct Text {
-    let value: String
-}

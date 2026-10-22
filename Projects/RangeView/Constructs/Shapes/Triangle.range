@@ -1,5 +1,0 @@
-@shape
-construct Triangle {
-    @many(3)
-    let points: Point
-}
