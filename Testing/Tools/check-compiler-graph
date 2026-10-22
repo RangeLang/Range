@@ -38,14 +38,14 @@ for mode in ordinary sanitized; do
         Testing/Compiler/Graph/Types.c Language/Compiler/Source/{lexer,parser,model,graph,native}.c \
         -o "$work_root/$mode-types"
     "$work_root/$mode-types"
-    for fixture in Unknown UnknownBody Cycle; do
+    for fixture in Unknown UnknownBody Forward; do
         status=0
         "$compiler" "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?
         [[ "$status" == 65 ]] || fail "$mode $fixture exited $status"
         grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks source location"
         [[ ! -s "$work_root/log" ]] || fail "$mode $fixture claimed success"
-        if [[ "$fixture" == Cycle ]]; then
-            grep -Fq 'cyclic graph member' "$work_root/error" || fail "$mode cycle failed for wrong reason"
+        if [[ "$fixture" == Forward ]]; then
+            grep -Fq "unresolved compile-time local 'other'" "$work_root/error" || fail "$mode forward reference failed for wrong reason"
         elif [[ "$fixture" == UnknownBody ]]; then
             grep -Fq "field 'unknown' is not declared by @type Macro.body" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
         else
@@ -56,7 +56,7 @@ for mode in ordinary sanitized; do
     status=0
     "$compiler" Testing/Compiler/Graph/Resolution > "$work_root/log" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 && ! -s "$work_root/log" ]] || fail "$mode incomplete compilation claimed success"
-    grep -Fq 'hard-coded in C' "$work_root/error" || fail "$mode normal path concealed bootstrap behavior"
+    grep -Fq 'is a reflection list: C builds' "$work_root/error" || fail "$mode normal path concealed bootstrap behavior"
     if grep -Fq 'error[resolution]' "$work_root/error"; then fail "$mode graph resolution failed"; fi
     status=0
     "$compiler" --run start Language/Types > "$work_root/log" 2> "$work_root/error" || status=$?

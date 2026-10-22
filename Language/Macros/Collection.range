@@ -2,15 +2,10 @@
 // primitives resize, read, and write are C builtins without a runtime yet;
 // the compiler reports that where the emitted code lands.
 macro collection(): Construct {
-    let element: #generics.filter(named: "Element").first
-
-    switch element.isTarget {
-        .false: @diagnostic("Collection must declare generic Element"),
-        .true: {}
-    }
-
-    // Require element to be a type parameter, not only a generic spelled
-    // Element.
+    // A collection names its element type Element: the code emitted below
+    // refers to it, and the type checker reports a target without one. This
+    // macro cannot inspect #generics to say so earlier: reflection lists are
+    // collections, and their functions are the ones this macro is emitting.
 
     // The construct itself holds the header; count and capacity are ordinary
     // members, and only the element slots use the @many primitive. The slot
@@ -70,10 +65,41 @@ macro collection(): Construct {
                 count: count + 1
             }
 
-            // Proposed, not written yet:
-            // - first: read(at: 0), or absence when count is 0.
-            // - filter(predicate): build the same collection specialization from
-            //   matching elements in order, retaining any graph-node identities.
+            // The first element, or absence when there is none. A function, not
+            // a property: `derived` members are not compiled yet.
+            function first(): Element? {
+                switch count > 0 { .true: return read(at: 0), .false: {} }
+                return .absent
+            }
+
+            // The elements named `named`, in order, as a new collection.
+            // Selecting by any predicate needs closures, which are not typed
+            // or compiled yet; a name is what reflection elements share.
+            function filter(let named: String): #name {
+                state result: #name()
+                state index: 0
+                while index < count {
+                    let element: read(at: index)
+                    switch name(of: element) {
+                        .present(let found) where found = named: result.append(value: element),
+                        default: {}
+                    }
+                    index: index + 1
+                }
+                return result
+            }
+
+            // The first element named `named`, or absence.
+            function first(let named: String): Element? {
+                return filter(named: named).first()
+            }
+
+            // C primitive: the name of a declaration, such as an element of
+            // `#cases` or `#members`; absence for a value that is not one.
+            // Element declares no `name`, and Range has no constraints on
+            // type parameters to require one, so C reads the reflective
+            // field. It runs at compile time only.
+            @builtin function name(let of: Element): String?
         }
     }
 

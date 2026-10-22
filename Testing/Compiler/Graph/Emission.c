@@ -52,9 +52,8 @@ int main(void)
     // A collection-shaped macro extends its target; bare names resolve there.
     compile(&c,CORE
         "macro collection(): Construct { "
-        "let element: #generics.filter(named: \"Element\").first "
         "#graph { extension #name { "
-        "state count: 0 state capacity: 0 state elements: #element "
+        "state count: 0 state capacity: 0 state elements: Element "
         "function isEmpty(): Truth { return count = 0 } } } } "
         "@collection construct Array<Element> {} "
         "extension Array { let written: capacity }");
@@ -63,7 +62,6 @@ int main(void)
     RangeNode *elements = declaration(array,"elements");
     assert(elements && same(elements->typeName,"Element"));
     assert(elements->emittedBy == array->c->items[0]);
-    assert(elements->rhsReference && elements->rhsReference->resolvedDeclaration == array->generics->items[0]);
     RangeNode *isEmpty = declaration(array,"isEmpty");
     assert(isEmpty && isEmpty->kind == RangeNodeFunction && same(isEmpty->typeName,"Array"));
     assert(declaration(array,"written") && !declaration(array,"written")->emittedBy);

@@ -18,30 +18,34 @@
 // written there, and sees the equals declared in that extension. That is how
 // @collection makes every collection compare by the equals it emits.
 macro equatable(): Construct {
-    let written: #macros.filter(named: "equatable").first
-    let equals: #functions.filter(named: "equals").first
-    let declared: #functions.filter(named: "=").first
+    let written: #macros.first(named: "equatable")
+    let equals: #functions.first(named: "equals")
+    let declared: #functions.first(named: "=")
 
     // One way to define equality: a type does not write `=` itself.
-    switch declared.isTarget {
-        .true: @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-        .false: {}
+    switch declared {
+        .present: @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
+        .absent: {}
     }
 
-    switch written.isTarget && equals.isTarget {
-        .true: {
+    switch equals {
+        .present(let equals) where written != .absent: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
             }
-            let other: equals.parameters.first
-            switch other.name != "other" {
-                .true: @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
-                .false: {}
-            }
-            switch other.type != equals.receiver {
-                .true: @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
-                .false: {}
+            switch equals.parameters.first() {
+                .present(let other): {
+                    switch other.name != "other" {
+                        .true: @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+                        .false: {}
+                    }
+                    switch other.type != equals.receiver {
+                        .true: @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+                        .false: {}
+                    }
+                },
+                .absent: {}
             }
             switch equals.output != Bool {
                 .true: @diagnostic("\(#name).equals must return Bool"),
@@ -53,11 +57,11 @@ macro equatable(): Construct {
                 }
             }
         },
-        .false: {
+        default: {
             // Without @equatable written, an equals is an ordinary function.
-            switch written.isTarget {
-                .true: @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used"),
-                .false: {}
+            switch written {
+                .present: @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used"),
+                .absent: {}
             }
             // C primitive: compares every stored member in order, each with its
             // own type's `=`. It becomes Range code once macros can iterate members.
@@ -76,29 +80,33 @@ macro equatable(): Construct {
 // that contains itself is compared recursively. Writing @equatable makes `=`
 // call the enum's own equals instead.
 macro equatable(): Enum {
-    let written: #macros.filter(named: "equatable").first
-    let equals: #functions.filter(named: "equals").first
-    let declared: #functions.filter(named: "=").first
+    let written: #macros.first(named: "equatable")
+    let equals: #functions.first(named: "equals")
+    let declared: #functions.first(named: "=")
 
-    switch declared.isTarget {
-        .true: @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-        .false: {}
+    switch declared {
+        .present: @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
+        .absent: {}
     }
 
-    switch written.isTarget && equals.isTarget {
-        .true: {
+    switch equals {
+        .present(let equals) where written != .absent: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
             }
-            let other: equals.parameters.first
-            switch other.name != "other" {
-                .true: @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
-                .false: {}
-            }
-            switch other.type != equals.receiver {
-                .true: @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
-                .false: {}
+            switch equals.parameters.first() {
+                .present(let other): {
+                    switch other.name != "other" {
+                        .true: @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+                        .false: {}
+                    }
+                    switch other.type != equals.receiver {
+                        .true: @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+                        .false: {}
+                    }
+                },
+                .absent: {}
             }
             switch equals.output != Bool {
                 .true: @diagnostic("\(#name).equals must return Bool"),
@@ -110,10 +118,10 @@ macro equatable(): Enum {
                 }
             }
         },
-        .false: {
-            switch written.isTarget {
-                .true: @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used"),
-                .false: {}
+        default: {
+            switch written {
+                .present: @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used"),
+                .absent: {}
             }
             // C primitive: compares the tags, then the current case's payload
             // fields. It becomes Range code once macros can iterate members.

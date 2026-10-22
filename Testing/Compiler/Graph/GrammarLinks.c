@@ -53,7 +53,7 @@ int main(void)
         "construct Function { let name: String let parameters: Array<Parameter> let output: Construct? let body: Array<Return> } "
         "construct Let { let name: String let value: Any? } "
         "construct Return { let value: Any? } "
-        "macro probe(): Construct { let chosen: #members.first }";
+        "macro probe(): Construct { let chosen: #members }";
     RangeNode *units[] = {
         parse(&arena,RANGE_LANGUAGE_DIR "/Grammar/Grammar.range",core),
         parse(&arena,"Project.range",
@@ -85,7 +85,7 @@ int main(void)
     assert(units[1]->items[3]->a->items[0]->grammarDefinition == returns);
     assert(!units[1]->items[3]->a->items[0]->a);
     assert(units[0]->items[4]->b->resolvedDeclaration == construct);
-    assert(box->c->items[0]->macroApplication->bindings[0].value.node == box->items[0]);
+    assert(box->c->items[0]->macroApplication->bindings[0].value.nodes[0] == box->items[0]);
     assert(rangeGraphStoredField(&arena,start->a->items[1],"value").node == start->a->items[1]->a);
     // Re-resolution must rebuild bindings without confusing Core and project names.
     assert(resolveGraphApplications(&arena,units,2,error,sizeof(error)));

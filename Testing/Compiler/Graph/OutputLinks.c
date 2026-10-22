@@ -15,7 +15,7 @@ int main(void)
          "function throughCall(): Whole { return start() } function finish() { return } "
          "function take(let w: Whole, let m: Missing): Whole { return w }"),
         "@integer construct Whole<let bits: 64, let signed: true> { let value: 0  function same(let other: Whole): Whole { return other } }",
-        "macro integer(): Construct { let bits: #generics.filter(named: \"bits\").first }"
+        "macro integer(): Construct { let bits: #generics let first: #generics.first(named: \"bits\") }"
     };
     RangeNode *units[3];
     for (size_t i = 0; i < 3; ++i) {
@@ -29,8 +29,12 @@ int main(void)
     assert(!units[0]->items[1]->b->resolvedDeclaration);
     RangeMacroApplication *app = construct->c->items[0]->macroApplication;
     assert(app && app->target == construct && app->declaration == units[2]->items[0]);
-    assert(app->bindings[0].value.node == construct->generics->items[0]);
-    assert(rangeNodeRHS(app->bindings[0].value.node)->integer == 64);
+    // A field chain resolves with the application; a call is Range code and
+    // waits until the application runs.
+    assert(app->bindings[0].state == 2 && app->bindings[0].value.kind == RangeGraphNodes);
+    assert(app->bindings[0].value.nodes[0] == construct->generics->items[0]);
+    assert(rangeNodeRHS(app->bindings[0].value.nodes[0])->integer == 64);
+    assert(app->bindings[1].state == 0);
     assert(function->a->items[0]->a->integer == 42);
     RangeNode *call = units[0]->items[2]->a->items[0]->a;
     assert(units[0]->items[2]->b->resolvedDeclaration == construct);

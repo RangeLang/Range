@@ -1,39 +1,31 @@
 @literal("[0-9]+")
 macro integer(): Construct {
-  let value: #members.filter(named: "value").first
-  let bits: #generics.filter(named: "bits").first
-  let signed: #generics.filter(named: "signed").first
+  let value: #members.first(named: "value")
+  let bits: #generics.first(named: "bits")
+  let signed: #generics.first(named: "signed")
 
-  switch value.isTarget {
-    .false: @diagnostic("Construct must specify value"),
-    .true: {}
-  }
-
-  switch bits.isTarget {
-    .false: @diagnostic(
-      "Construct must specify bits"
-    ),
-    .true: {}
-  }
-
-  switch signed.isTarget {
-    .false: @diagnostic(
-      "Construct must specify signed"
-    ),
-    .true: {}
-  }
+  switch value { .absent: @diagnostic("Construct must specify value"), .present: {} }
+  switch bits { .absent: @diagnostic("Construct must specify bits"), .present: {} }
+  switch signed { .absent: @diagnostic("Construct must specify signed"), .present: {} }
 
   // The law runs per specialization and per supplied literal, so value and
-  // bits are the specialized ones here.
-  switch value.isTarget && bits.isTarget && signed.isTarget {
-    .true: switch bits.value <= 0 {
-      .true: @diagnostic("Integer bits must be positive"),
-      .false: switch integerValueFits(value: value.value, bits: bits.value, signed: signed.value) {
-        .false: @diagnostic("Integer value does not fit the declared bits and signedness"),
-        .true: {}
-      }
+  // bits are the specialized ones here. Each is present: a missing one
+  // ended the run above.
+  switch value {
+    .present(let stored): switch bits {
+      .present(let width): switch signed {
+        .present(let sign): switch width.value <= 0 {
+          .true: @diagnostic("Integer bits must be positive"),
+          .false: switch integerValueFits(value: stored.value, bits: width.value, signed: sign.value) {
+            .false: @diagnostic("Integer value does not fit the declared bits and signedness"),
+            .true: {}
+          }
+        },
+        .absent: {}
+      },
+      .absent: {}
     },
-    .false: {}
+    .absent: {}
   }
 
   // Layout and arithmetic: the construct is a scalar exactly bits wide, signed

@@ -19,10 +19,9 @@ construct Twice {
 // Reports whether @equatable is written, which #macros tells apart from a
 // @defaults application.
 macro reportsEquatable(): Construct {
-    let written: #macros.filter(named: "equatable").first
-    switch written.isTarget {
-        .true: @warning("\(#name) writes @equatable"),
-        .false: @warning("\(#name) has only the default @equatable")
+    switch #macros.first(named: "equatable") {
+        .present: @warning("\(#name) writes @equatable"),
+        .absent: @warning("\(#name) has only the default @equatable")
     }
 }
 

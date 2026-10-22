@@ -1,6 +1,0 @@
-macro cycle(): Construct {
-    let value: #members.filter(named: other).first
-    let other: value
-}
-@cycle
-construct Example {}

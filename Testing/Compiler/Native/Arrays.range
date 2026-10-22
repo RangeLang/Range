@@ -20,6 +20,10 @@ function total(let xs: Array<Int>): Int {
     switch xs.capacity != 128 { .true: return 3, .false: {} }
     switch xs.read(at: 41) != 42 { .true: return 4, .false: {} }
     switch total(xs: xs) != 5050 { .true: return 5, .false: {} }
+    // first() is Range code over count and read(at:), returning Element?.
+    switch xs.first() { .present(1): {}, default: return 7 }
+    state none: Array<Int>()
+    switch none.first() { .absent: {}, .present(let v): return 8 }
     state bytes: Array<Int<bits: 8>>()
     bytes.append(value: -128)
     bytes.append(value: 127)

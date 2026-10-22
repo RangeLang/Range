@@ -2,6 +2,7 @@
 #include "../../../Language/Compiler/Source/compiler.c"
 #undef main
 #include <assert.h>
+#include <dirent.h>
 
 static void validate(const char *source, const char *expected, size_t count)
 {
@@ -31,17 +32,77 @@ static void validate(const char *source, const char *expected, size_t count)
     rangeArenaDestroy(&arena);
 }
 
+/* The language sources, as relative paths so their declarations are the
+ * language's. Reflection lists are Array values and `first` returns an
+ * Optional, so macros that reflect need them. */
+static size_t loadLanguage(RangeArena *arena, RangeNode **units, size_t capacity)
+{
+    static const char *const directories[] = {"Language/Grammar", "Language/Macros", "Language/Types"};
+    size_t count = 0;
+    char error[512];
+    for (size_t d = 0; d < 3; ++d) {
+        DIR *directory = opendir(directories[d]);
+        assert(directory);
+        for (struct dirent *entry; (entry = readdir(directory));) {
+            size_t length = strlen(entry->d_name);
+            if (length < 7 || strcmp(entry->d_name + length - 6,".range")) continue;
+            char path[512]; snprintf(path,sizeof(path),"%s/%s",directories[d],entry->d_name);
+            size_t size; char *text = readFile(path,&size);
+            assert(text && count < capacity);
+            units[count] = rangeParseUnit(arena,rangeArenaIntern(arena,path,strlen(path)),text,size,error,sizeof(error));
+            free(text);
+            if (!units[count]) fprintf(stderr,"%s\n",error);
+            assert(units[count]);
+            ++count;
+        }
+        closedir(directory);
+    }
+    return count;
+}
+
+/* As validate, with the language loaded; count is the applications beyond
+ * the language's own, each construct's default @equatable among them. */
+static void validateLanguage(const char *source, const char *expected, size_t count)
+{
+    static size_t baseline = SIZE_MAX;
+    for (int pass = baseline == SIZE_MAX ? 0 : 1; pass < 2; ++pass) {
+        RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
+        RangeNode *units[64]; char error[512];
+        size_t n = loadLanguage(&arena,units,63);
+        if (pass) {
+            units[n] = rangeParseUnit(&arena,"Project.range",source,strlen(source),error,sizeof(error));
+            if (!units[n]) fprintf(stderr,"%s\n",error);
+            assert(units[n]);
+            ++n;
+        }
+        int ok = resolveGraphApplications(&arena,units,n,error,sizeof(error));
+        if (!ok) fprintf(stderr,"%s\n",error);
+        assert(ok);
+        size_t checked = 999;
+        ok = validateMacroApplications(&arena,units,n,&checked,error,sizeof(error));
+        if (!pass) { if (!ok) fprintf(stderr,"%s\n",error); assert(ok); baseline = checked; }
+        else if (expected) {
+            if (ok || !strstr(error,expected)) fprintf(stderr,"expected %s; got %s\n",expected,ok ? "success" : error);
+            assert(!ok && strstr(error,expected) && strstr(error,".range:"));
+        } else {
+            if (!ok) fprintf(stderr,"%s\n",error);
+            if (ok && checked != baseline + count) fprintf(stderr,"checked %zu, expected %zu\n",checked - baseline,count);
+            assert(ok && checked == baseline + count);
+        }
+        rangeArenaDestroy(&arena);
+    }
+}
+
 #define EFFECT "@builtin macro diagnostic(let message: TextValue) "
 #define POLICY \
-    EFFECT \
     "macro assess(): Construct { " \
-    "let chosen: #members.filter(named: \"payload\").first " \
-    "let rule: #generics.filter(named: \"ceiling\").first " \
-    "switch chosen.isTarget { .false: @diagnostic(\"missing payload\"), .true: {} } " \
-    "switch rule.isTarget { .false: @diagnostic(\"missing ceiling\"), .true: {} } " \
-    "switch chosen.isTarget && rule.isTarget { " \
-    ".true: switch accepts(limit: rule.value, candidate: chosen.value) { .false: @diagnostic(\"source policy rejected\"), .true: {} }, " \
-    ".false: {} } } " \
+    "let chosen: #members.first(named: \"payload\") " \
+    "let rule: #generics.first(named: \"ceiling\") " \
+    "switch chosen { .absent: @diagnostic(\"missing payload\"), .present: {} } " \
+    "switch rule { .absent: @diagnostic(\"missing ceiling\"), .present: {} } " \
+    "switch chosen { .present(let payload): switch rule { " \
+    ".present(let ceiling): switch accepts(limit: ceiling.value, candidate: payload.value) { .false: @diagnostic(\"source policy rejected\"), .true: {} }, " \
+    ".absent: {} }, .absent: {} } } " \
     "function accepts(let candidate: SomeNumber, let limit: SomeNumber): SomeTruth { " \
     "state remaining: candidate state consumed: 0 " \
     "while remaining > 0 { remaining: remaining - 1 consumed: consumed + 1 } " \
@@ -49,25 +110,8 @@ static void validate(const char *source, const char *expected, size_t count)
 
 static void validateInteger(const char *source, int accepted)
 {
-    RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
-    const char *paths[] = {"Language/Macros/Integer.range", "Language/Macros/Literal.range",
-        "Language/Macros/Diagnostic.range", "Language/Types/Int.range"};
-    RangeNode *units[5]; char error[512];
-    for (size_t i = 0; i < 4; ++i) {
-        size_t length; char *text = readFile(paths[i],&length);
-        assert(text);
-        units[i] = rangeParseUnit(&arena,paths[i],text,length,error,sizeof(error));
-        free(text); assert(units[i]);
-    }
-    units[4] = rangeParseUnit(&arena,"Project.range",source,strlen(source),error,sizeof(error));
-    assert(units[4]);
-    assert(resolveGraphApplications(&arena,units,5,error,sizeof(error)));
-    size_t checked;
-    int ok = validateMacroApplications(&arena,units,5,&checked,error,sizeof(error));
-    assert(ok == accepted);
-    if (accepted) assert(checked == 2);
-    else assert(strstr(error,"Integer value does not fit the declared bits and signedness"));
-    rangeArenaDestroy(&arena);
+    if (accepted) validateLanguage(source,NULL,2); /* @integer and the default @equatable */
+    else validateLanguage(source,"Integer value does not fit the declared bits and signedness",0);
 }
 
 int main(void)
@@ -77,34 +121,34 @@ int main(void)
     validateInteger("@integer construct Narrow<let bits: 8, let signed: true> { let value: 128 }",0);
     validateInteger("@integer construct Negative<let bits: 8, let signed: true> { let value: -128 }",1);
     validateInteger("@integer construct Unsigned<let bits: 8, let signed: false> { let value: -1 }",0);
-    validate(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 7 }",NULL,1);
-    validate(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 8 }","source policy rejected",0);
-    validate(POLICY "@assess construct Parcel<let ceiling: 8> { let payload: 8 }",NULL,1);
-    validate(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 3 + 4 }",NULL,1);
-    validate(POLICY "@assess construct Parcel<let ceiling: 7> {}","missing payload",0);
-    validate(POLICY "@assess construct Parcel { let payload: 1 }","missing ceiling",0);
-    validate(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
-                    "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,2);
-    validate(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 7 }",NULL,2);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 8 }","source policy rejected",0);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 8> { let payload: 8 }",NULL,2);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 3 + 4 }",NULL,2);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> {}","missing payload",0);
+    validateLanguage(POLICY "@assess construct Parcel { let payload: 1 }","missing ceiling",0);
+    validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
+                    "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,4);
+    validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
                     "@assess construct Second<let ceiling: 2> { let payload: 3 }","source policy rejected",0);
-    validate(EFFECT "macro assess(): Construct { switch #members.first.value < 0 { .true: @diagnostic(\"negative\"), .false: {} } } "
-                    "macro assess(): Function { switch #parameters.first.isTarget { .false: @diagnostic(\"missing input\"), .true: {} } } "
-                    "@assess construct Parcel { let payload: 8 } @assess function start(let input: Any) {}",NULL,2);
+    validateLanguage("macro assess(): Construct { switch #members.first() { .present(let m) where m.value < 0: @diagnostic(\"negative\"), default: {} } } "
+                     "macro assess(): Function { switch #parameters.first() { .absent: @diagnostic(\"missing input\"), .present: {} } } "
+                     "@assess construct Parcel { let payload: 8 } @assess function start(let input: Any) {}",NULL,3);
     validate(EFFECT "macro diagnostic(): Construct {} macro assess(): Function { @diagnostic(\"selected effect\") } "
                     "@assess function start() {}","selected effect",0);
     // Whole rule bodies are executed. Reversing the source condition changes validity.
-    validate(EFFECT "macro assess(): Construct { switch #members.first.value < 10 { .true: @diagnostic(\"too small\"), .false: {} } } "
-                    "@assess construct Parcel { let payload: 8 }","too small",0);
-    validate(EFFECT "macro assess(): Construct { switch #members.first.value > 10 { .true: @diagnostic(\"too large\"), .false: {} } } "
-                    "@assess construct Parcel { let payload: 8 }",NULL,1);
+#define FIRST_VALUE "switch #members.first() { .absent: {}, .present(let m): { "
+    validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch m.value < 10 { .true: @diagnostic(\"too small\"), .false: {} } } } } "
+                     "@assess construct Parcel { let payload: 8 }","too small",0);
+    validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch m.value > 10 { .true: @diagnostic(\"too large\"), .false: {} } } } } "
+                     "@assess construct Parcel { let payload: 8 }",NULL,2);
     // No concrete type, helper, or parameter spelling is an intrinsic;
     // builtin macros are selected by their own names.
     validate("@builtin macro diagnostic(let text: RenamedText) "
              "@builtin macro literal(let pattern: RenamedText): Macro "
              "@literal(\"[0-9]+\") macro decimalRule(): Construct { "
-             "let stored: #members.first "
-             "switch small(number: stored.value) { .false: @diagnostic(\"too big\"), .true: {} } } "
-             "function small(let number: RenamedNumber): RenamedTruth { return number < 4 } "
+             "switch small(text: #name) { .false: @diagnostic(\"too big\"), .true: {} } } "
+             "function small(let text: RenamedText): RenamedTruth { return text = \"Quantity\" } "
              "@decimalRule construct Quantity { let storage: 3 }",NULL,1);
     validate(EFFECT "macro assess(): Construct { switch false && absent { .true: @diagnostic(\"bad\"), .false: {} } "
                     "switch true || absent { .true: { let ok: true }, .false: {} } } @assess construct Parcel {}",NULL,1);
@@ -122,18 +166,18 @@ int main(void)
     validate("macro assess(): Construct { switch 1 { .true: {}, .false: {} } } @assess construct Parcel {}","case pattern matches an enum value",0);
     // switch runs at compile time: literal, relational, and `|` labels, a
     // binding with a where guard, default, text, and switch expressions.
-#define SIZES EFFECT "macro assess(): Construct { let n: #members.first.value " \
+#define SIZES "macro assess(): Construct { " FIRST_VALUE "let n: m.value " \
     "switch n { 1 | 2: @diagnostic(\"small\"), < 0: @diagnostic(\"negative\"), " \
-    "let big where big > 100: @diagnostic(\"big \\(big)\"), = 7: @diagnostic(\"seven\"), default: {} } } "
-    validate(SIZES "@assess construct Parcel { let payload: 500 }","big 500",0);
-    validate(SIZES "@assess construct Parcel { let payload: 2 }","small",0);
-    validate(SIZES "@assess construct Parcel { let payload: -3 }","negative",0);
-    validate(SIZES "@assess construct Parcel { let payload: 7 }","seven",0);
-    validate(SIZES "@assess construct Parcel { let payload: 50 }",NULL,1);
-    validate(EFFECT "macro assess(): Construct { let kind: switch #members.first.isTarget { .true: \"filled\", .false: \"empty\" } "
-                    "@diagnostic(\"\\(#name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
-    validate(EFFECT "macro assess(): Construct { let size: switch #members.first.value { 3: 30, default: 0 } "
-                    "switch size = 30 { .true: @diagnostic(\"thirty\"), .false: {} } } @assess construct Parcel { let payload: 3 }","thirty",0);
+    "let big where big > 100: @diagnostic(\"big \\(big)\"), = 7: @diagnostic(\"seven\"), default: {} } } } } "
+    validateLanguage(SIZES "@assess construct Parcel { let payload: 500 }","big 500",0);
+    validateLanguage(SIZES "@assess construct Parcel { let payload: 2 }","small",0);
+    validateLanguage(SIZES "@assess construct Parcel { let payload: -3 }","negative",0);
+    validateLanguage(SIZES "@assess construct Parcel { let payload: 7 }","seven",0);
+    validateLanguage(SIZES "@assess construct Parcel { let payload: 50 }",NULL,2);
+    validateLanguage("macro assess(): Construct { let kind: switch #members.first() { .present: \"filled\", .absent: \"empty\" } "
+                     "@diagnostic(\"\\(#name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
+    validateLanguage("macro assess(): Construct { let size: switch #members.first() { .present(let m): switch m.value { 3: 30, default: 0 }, .absent: 0 } "
+                     "switch size = 30 { .true: @diagnostic(\"thirty\"), .false: {} } } @assess construct Parcel { let payload: 3 }","thirty",0);
     validate(EFFECT "macro assess(): Construct { switch #name { \"Parcel\": @diagnostic(\"named\"), default: {} } } "
                     "@assess construct Parcel {}","named",0);
     validate("macro assess(): Construct { switch true { .true: {} } } @assess construct Parcel {}","'.false' is not handled",0);
@@ -174,9 +218,30 @@ int main(void)
     validate("macro assess(): Construct { let v: switch true { .true: { let x: 1 }, .false: 1 } } @assess construct Parcel {}",
              "neither yields a value nor diverges",0);
     validate("@builtin macro assess(): Construct @assess construct Parcel {}","no C primitive is implemented for builtin macro 'assess'",0);
-    validate("macro assess(): Construct { let leaked: 7 let selected: #members.first "
-             "switch selected.value = 7 { .true: {}, .false: {} } } @assess construct Parcel { let payload: leaked }",
-             "unresolved compile-time local 'leaked'",0);
+    validateLanguage("macro assess(): Construct { let leaked: 7 " FIRST_VALUE
+                     "switch m.value = 7 { .true: {}, .false: {} } } } } @assess construct Parcel { let payload: leaked }",
+                     "unresolved compile-time local 'leaked'",0);
+    // Reflection lists are Array values: count is its member, and first,
+    // first(named:), and filter(named:) are the Range functions @collection
+    // emits, run here. Any function Array declares runs the same way.
+#define LIGHT "enum Light { case red case green(Int) case blue } " \
+    "extension Array { function last(): Element? { switch count > 0 { .true: return read(at: count - 1), .false: {} } return .absent } } "
+    validateLanguage(LIGHT "macro probe(): Enum { "
+                     "switch #cases.count = 3 { .true: {}, .false: @diagnostic(\"count\") } "
+                     "switch #cases.first() { .present(let c) where c.name = \"red\": {}, default: @diagnostic(\"first\") } "
+                     "switch #cases.last() { .present(let c) where c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
+                     "switch #cases.first(named: \"green\") { .present(let c): switch c.name = \"green\" { .true: {}, .false: @diagnostic(\"named\") }, "
+                     ".absent: @diagnostic(\"missing green\") } "
+                     "switch #cases.first(named: \"purple\") { .absent: {}, .present: @diagnostic(\"purple\") } "
+                     "switch #cases.filter(named: \"blue\").count = 1 { .true: {}, .false: @diagnostic(\"filter\") } } "
+                     "@probe extension Light {}",NULL,2);
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.second() } @probe extension Light {}",
+                     "Array has no function 'second' with these labels",0);
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first.name } @probe extension Light {}",
+                     "'Array.first' is a function; call it",0);
+    // Without the grammar, a reflection list has no Range type to be.
+    validate("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
+             "reflection field 'members' has no Range type",0);
     puts("macro validation: source policies, renamed declarations, diagnostics, scopes, control flow, limits=pass");
     return 0;
 }

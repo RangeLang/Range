@@ -1,11 +1,12 @@
 @literal("true|false")
 macro boolean(): Enum {
-  let no: #cases.filter(named: "false").first
-  let yes: #cases.filter(named: "true").first
-
-  switch !no.isTarget || !yes.isTarget {
-    .true: @diagnostic("Enum must declare case false and case true"),
-    .false: {}
+  switch #cases.first(named: "false") {
+    .absent: @diagnostic("Enum must declare case false"),
+    .present(let no): {}
+  }
+  switch #cases.first(named: "true") {
+    .absent: @diagnostic("Enum must declare case true"),
+    .present(let yes): {}
   }
 
   // Layout: an enum without payloads is its tag, so the tag is the storage.

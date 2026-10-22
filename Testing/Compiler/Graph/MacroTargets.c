@@ -41,6 +41,14 @@ static RangeGraphValue binding(RangeMacroApplication *app, const char *name)
     return (RangeGraphValue){0};
 }
 
+static int deferred(RangeMacroApplication *app, const char *name)
+{
+    for (size_t i = 0; i < app->count; ++i)
+        if (same(app->bindings[i].definition->name,name)) return app->bindings[i].state == 0;
+    assert(0 && "binding is missing");
+    return 0;
+}
+
 static void reject(const char *source, const char *expected)
 {
     RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
@@ -57,22 +65,22 @@ int main(void)
     RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
     RangeNode *macros = parse(&arena,"Macros.range",
         "macro inspect(): Construct { let name: \"local\" let members: 0 "
-        "let targetName: #name let chosen: #members.filter(named: \"payload\").first "
-        "let config: #generics.first let attached: #macros.first "
-        "let width: #generics.first.value let evaluated: #members.first.value "
-        "let missing: #members.filter(named: \"absent\").first } "
+        "let targetName: #name let chosen: #members "
+        "let config: #generics let attached: #macros "
+        "let width: #generics.first(named: \"width\") "
+        "let missing: #members.first(named: \"absent\") } "
         "macro inspect(): Function { let targetName: #name let parameters: #parameters "
         "let output: #output let body: #body } "
-        "macro inspect(): Enum { let targetName: #name let chosen: #cases.first } "
+        "macro inspect(): Enum { let targetName: #name let chosen: #cases } "
         "macro inspect(): Macro { let targetName: #name let targetType: #target "
-        "let body: #body let original: #body.members.first let expansions: #body.graph }");
+        "let body: #body let original: #body.members let expansions: #body.graph }");
     RangeNode *targets = parse(&arena,"Targets.range",
         "@inspect construct First<let width: 8> { let payload: 11 "
         "@inspect function nested() {} } "
         "@inspect construct Second<let width: 16> { let payload: 22 } "
         "@inspect function start(let input: Any): First { return 0 } "
         "@inspect enum Choice { case alpha case beta } "
-        "@inspect macro recipe(): Construct { let original: #members.first "
+        "@inspect macro recipe(): Construct { let original: #members "
         "#graph { construct Deferred {} } }");
     RangeNode *grammar = parse(&arena,RANGE_LANGUAGE_DIR "/Grammar/Nodes.range",
         "construct Construct { let name: String let members: Array<Member> "
@@ -92,38 +100,32 @@ int main(void)
         assert(a != b);
         assert(same(binding(a,"targetName").text,"First"));
         assert(same(binding(b,"targetName").text,"Second"));
-        assert(binding(a,"chosen").node == first->items[0]);
-        assert(binding(b,"chosen").node == second->items[0]);
-        assert(binding(a,"config").node == first->generics->items[0]);
-        assert(binding(b,"config").node == second->generics->items[0]);
-        assert(binding(a,"attached").node == first->c->items[0]);
-        assert(binding(a,"width").node == rangeNodeRHS(first->generics->items[0]));
-        assert(binding(b,"width").node == rangeNodeRHS(second->generics->items[0]));
-        assert(binding(a,"width").node->integer == 8);
-        assert(binding(b,"width").node->integer == 16);
-        assert(binding(a,"evaluated").node == rangeNodeRHS(first->items[0]));
-        assert(binding(b,"evaluated").node == rangeNodeRHS(second->items[0]));
-        assert(binding(a,"evaluated").node->integer == 11);
-        assert(binding(b,"evaluated").node->integer == 22);
-        assert(binding(a,"missing").kind == RangeGraphNone);
-        assert(binding(b,"missing").kind == RangeGraphNone);
+        assert(binding(a,"chosen").nodes[0] == first->items[0]);
+        assert(binding(b,"chosen").nodes[0] == second->items[0]);
+        assert(binding(a,"config").nodes[0] == first->generics->items[0]);
+        assert(binding(b,"config").nodes[0] == second->generics->items[0]);
+        assert(binding(a,"attached").nodes[0] == first->c->items[0]);
+        // Collection functions are Range code: those bindings wait for the
+        // application to run.
+        assert(deferred(a,"width") && deferred(b,"width"));
+        assert(deferred(a,"missing") && deferred(b,"missing"));
         RangeMacroApplication *f = application(function,macros->items[1]);
         assert(binding(f,"parameters").nodes[0] == function->items[0]);
         assert(binding(f,"output").node == first);
         assert(binding(f,"body").node == function->a);
         assert(same(binding(application(first->items[1],macros->items[1]),"targetName").text,"nested"));
         RangeMacroApplication *e = application(enumeration,macros->items[2]);
-        assert(binding(e,"chosen").node == enumeration->items[0]);
+        assert(binding(e,"chosen").nodes[0] == enumeration->items[0]);
         RangeMacroApplication *m = application(recipe,macros->items[3]);
         assert(same(binding(m,"targetName").text,"recipe"));
         assert(binding(m,"targetType").node == graphTypeIdentity(first));
         assert(binding(m,"body").node == recipe->a);
-        assert(binding(m,"original").node == recipe->a->items[0]);
+        assert(binding(m,"original").nodes[0] == recipe->a->items[0]);
         assert(binding(m,"expansions").count == 1);
         assert(recipe->a->items[1]->kind == RangeNodeExpressionStatement);
         assert(binding(m,"expansions").nodes[0] == recipe->a->items[1]->a);
         assert(binding(m,"body").node->source == targets->source);
-        assert(binding(m,"original").node->source == targets->source);
+        assert(binding(m,"original").nodes[0]->source == targets->source);
         assert(binding(m,"expansions").nodes[0]->source == targets->source);
     }
     RangeNode *reordered[] = {grammar,macros,targets};

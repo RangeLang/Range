@@ -10,9 +10,9 @@ fail() { echo "compiler native: $*" >&2; exit 1; }
 [[ "$(uname -sm)" == "Darwin arm64" ]] || { echo "compiler native: skipped (needs Apple silicon)"; exit 0; }
 compiler="$work_root/range-compiler"
 Language/Compiler/Tools/build-range-compiler "$compiler"
-core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macros/Diagnostic.range
-      Language/Macros/Boolean.range Language/Macros/Equatable.range Language/Macros/Defaults.range
-      Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
+# The language sources: macros reflect through Array and Optional, so even
+# the integer and boolean checks need the grammar and the collection.
+core=(Language/Grammar Language/Macros Language/Types)
 
 # run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE...
 run() {
@@ -33,8 +33,7 @@ case_file() { printf '%s\n' "$2" > "$work_root/$1.range"; echo "$work_root/$1.ra
 run arithmetic 42 "" Testing/Compiler/Native/Arithmetic.range
 run aggregates 42 "" Testing/Compiler/Native/Aggregates.range
 
-# The full language sources: Array's emitted methods over @many storage.
-core=(Language/Grammar Language/Macros Language/Types)
+# Array's emitted methods over @many storage.
 run arrays 42 "" Testing/Compiler/Native/Arrays.range
 run copy-on-write 42 "" Testing/Compiler/Native/CopyOnWrite.range
 run lifetimes 42 "" Testing/Compiler/Native/Lifetimes.range
@@ -72,9 +71,9 @@ grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable
     "$work_root/log" || fail "@equatable extension without equals was not warned"
 grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
     || fail "a second application of @equatable was not noted"
-grep -Fq "ExtensionTypes.range:29:1: warning[macro]: Written writes @equatable" "$work_root/log" \
+grep -Fq "ExtensionTypes.range:28:1: warning[macro]: Written writes @equatable" "$work_root/log" \
     || fail "#macros does not list an application written through an extension"
-grep -Fq "ExtensionTypes.range:32:1: warning[macro]: Defaulted has only the default @equatable" "$work_root/log" \
+grep -Fq "ExtensionTypes.range:31:1: warning[macro]: Defaulted has only the default @equatable" "$work_root/log" \
     || fail "#macros lists a @defaults application"
 ! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no equals" "$work_root/log" \
     || fail "@equatable on an extension missed the equals beside it"
@@ -555,21 +554,30 @@ extension Construct {}
 reject macro-target "unknown macro target type 'Int'" \
     'macro transform(): Int { return 3 }
 { @transform return 0 }'
-# Without a construct applying @interval, as in the minimal core, `..<` has no meaning.
+# Without a construct applying @interval, `..<` has no meaning.
 full=("${core[@]}")
-core=(Language/Macros/Integer.range Language/Macros/Literal.range Language/Macros/Diagnostic.range
-      Language/Macros/Boolean.range Language/Macros/Equatable.range Language/Macros/Defaults.range
-      Language/Types/Int.range Language/Types/Bool.range Testing/Compiler/Native/Core.range)
+core=(Language/Grammar Language/Types/{Array,Bool,Int,Optional,String}.range)
+for macro in Language/Macros/*.range; do [[ "$macro" == */Interval.range ]] || core+=("$macro"); done
 reject interval-undeclared "'..<' needs exactly one construct applying @interval; found 0" \
     '{ let r: 0..<3 return 0 }'
-# @defaults written through an extension reaches every declaration of its kind.
-core=("${core[@]:0:8}")
-run defaults-extension 0 "" "$(case_file defaults-extension '@defaults(equatable)
-construct Construct {}
-construct Enum {}
-construct Function {}
-construct Macro {}
-construct String {}
+grep -Fq "interval-undeclared.range:1:11: error" "$work_root/log" || fail "interval-undeclared was not reported at its use"
+core=("${full[@]}")
+# name(of:) reads a declaration's name at compile time; compiled code has no
+# declarations to read, so calling it through first(named:) is refused.
+reject name-at-runtime "native calls to builtin function 'name' are not implemented" \
+    '{ state xs: Array<Int>() xs.append(value: 3) switch xs.first(named: "a") { .absent: return 0, .present(let v): return v } }'
+# @defaults written through an extension reaches every declaration of its
+# kind. The language's Enum already writes @defaults, so this grammar kind is
+# the project's own, without one.
+full=("${core[@]}")
+core=(Language/Macros Language/Types)
+for grammar in Language/Grammar/*.range; do [[ "$grammar" == */Enum.range ]] || core+=("$grammar"); done
+run defaults-extension 0 "" "$(case_file defaults-extension 'construct Enum {
+    let name: String
+    let cases: Array<EnumCase>
+    let functions: Array<Function>
+    let macros: Array<Macro>
+}
 macro announce(): Enum { @warning("\(#name) is announced") }
 @defaults(announce)
 extension Enum {}
@@ -579,4 +587,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=51 rejections=120 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"
+echo "compiler native: programs=51 rejections=121 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"

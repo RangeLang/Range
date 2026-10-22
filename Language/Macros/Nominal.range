@@ -3,10 +3,8 @@
 // Parameter.type hold one. Each kind declares its own fields; every kind has
 // a name.
 macro nominal(): Construct {
-  let name: #members.filter(named: "name").first
-
-  switch name.isTarget {
-    .false: @diagnostic("Type kind must declare name"),
-    .true: {}
+  switch #members.first(named: "name") {
+    .absent: @diagnostic("Type kind must declare name"),
+    .present: {}
   }
 }

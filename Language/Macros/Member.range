@@ -1,10 +1,8 @@
 // Member kinds apply @member, so @member names any of them as a type or a
 // macro target. Each kind declares its own fields; every kind has a name.
 macro member(): Construct {
-  let name: #members.filter(named: "name").first
-
-  switch name.isTarget {
-    .false: @diagnostic("Member kind must declare name"),
-    .true: {}
+  switch #members.first(named: "name") {
+    .absent: @diagnostic("Member kind must declare name"),
+    .present: {}
   }
 }

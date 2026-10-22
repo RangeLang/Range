@@ -25,6 +25,7 @@ typedef struct {
     RangeNode *unit;    /* unit holding the running application's target */
     int skipEmission;   /* law runs per specialization check; emission stays on the declaration */
     struct SourceReport *report; /* where @warning reports, when compiling */
+    int deferred; /* a resolution-time binding needs Range code that runs with the application */
 } Resolver;
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
@@ -53,7 +54,14 @@ static RangeGraphValue graphBinding(Resolver *vm, RangeMacroApplication *app, Ra
     RangeNode *rhs = rangeNodeRHS(binding->definition);
     if (!rhs) fail(vm,binding->definition,"graph member RHS is not supported yet");
     binding->state = 1;
+    int outer = vm->deferred;
+    vm->deferred = 0;
     binding->value = graphEval(vm,app,rhs);
+    int deferred = vm->deferred;
+    vm->deferred = outer || deferred;
+    // Calls and collection functions are Range code: such a binding is
+    // evaluated when the application runs, not at resolution.
+    if (deferred) { binding->state = 0; binding->value = (RangeGraphValue){0}; return binding->value; }
     binding->state = 2;
     return binding->value;
 }
@@ -61,13 +69,7 @@ static RangeGraphValue graphBinding(Resolver *vm, RangeMacroApplication *app, Ra
 static RangeGraphValue graphProperty(Resolver *vm, RangeMacroApplication *app,
                                     RangeGraphValue receiver, const char *name, RangeNode *at)
 {
-    if (receiver.kind == RangeGraphNodes && same(name,"first"))
-        return graphNode(receiver.count ? receiver.nodes[0] : NULL);
-    if (receiver.kind == RangeGraphNodes && same(name,"count")) {
-        RangeNode *count = rangeNodeCreate(vm->arena,RangeNodeInteger,at->path,at->line,at->column);
-        count->integer = (long long)receiver.count;
-        return graphNode(count);
-    }
+    if (receiver.kind == RangeGraphNodes) { vm->deferred = 1; return (RangeGraphValue){0}; }
     if (receiver.kind != RangeGraphNode) fail(vm,at,"graph value has no property '%s'",name);
     RangeNode *node = receiver.node;
     RangeNode *field = rangeGraphField(node->graphType,name);
@@ -89,7 +91,7 @@ static const char *graphText(Resolver *vm, RangeGraphValue value, RangeNode *at)
     if (value.kind == RangeGraphNode && value.node->kind == RangeNodeString
         && value.node->itemCount == 1 && (value.node->items[0]->flags & RangeFlagLiteral))
         return value.node->items[0]->name;
-    fail(vm,at,"graph filter requires a string name");
+    fail(vm,at,"a compile-time name requires text or a string literal");
     return NULL;
 }
 
@@ -98,8 +100,11 @@ static RangeGraphValue graphEval(Resolver *vm, RangeMacroApplication *app, Range
     switch (node->kind) {
     case RangeNodeEnvironment:
         return graphProperty(vm,app,graphNode(app->target),node->name,node);
-    case RangeNodeMemberAccess:
-        return graphProperty(vm,app,graphEval(vm,app,node->a),node->name,node);
+    case RangeNodeMemberAccess: {
+        RangeGraphValue receiver = graphEval(vm,app,node->a);
+        if (vm->deferred) return (RangeGraphValue){0};
+        return graphProperty(vm,app,receiver,node->name,node);
+    }
     case RangeNodeName:
         for (size_t i = 0; i < app->count; ++i)
             if (same(app->bindings[i].definition->name,node->name))
@@ -108,19 +113,9 @@ static RangeGraphValue graphEval(Resolver *vm, RangeMacroApplication *app, Range
         break;
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString:
         return graphNode(node);
-    case RangeNodeCall: {
-        if (!node->a || node->a->kind != RangeNodeMemberAccess || !same(node->a->name,"filter")
-            || node->itemCount != 1 || !same(node->items[0]->name,"named"))
-            fail(vm,node,"graph resolution currently supports filter(named:) calls only");
-        RangeGraphValue list = graphEval(vm,app,node->a->a);
-        if (list.kind != RangeGraphNodes) fail(vm,node,"graph filter requires member nodes");
-        const char *name = graphText(vm,graphEval(vm,app,node->items[0]->a),node);
-        RangeGraphValue result = {.kind=RangeGraphNodes};
-        result.nodes = rangeArenaAllocate(vm->arena,list.count * sizeof(*result.nodes));
-        for (size_t i = 0; i < list.count; ++i)
-            if (same(list.nodes[i]->name,name)) result.nodes[result.count++] = list.nodes[i];
-        return result;
-    }
+    case RangeNodeCall:
+        vm->deferred = 1;
+        return (RangeGraphValue){0};
     default: fail(vm,node,"unsupported graph expression '%s'",rangeNodeKindName(node->kind));
     }
     return (RangeGraphValue){0};
@@ -241,6 +236,7 @@ static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attri
         RangeNode *rhs = rangeNodeRHS(app->bindings[i].definition);
         if (rangeNodeHasContextReference(app->bindings[i].definition) && !(rhs && rhs->kind == RangeNodeSwitch))
             (void)graphBinding(vm,app,&app->bindings[i]);
+        vm->deferred = 0;
     }
 }
 
@@ -785,6 +781,8 @@ typedef struct {
     RangeNode *function; /* the running compile-time function, if any */
     RangeNode *output;   /* the enum it returns, if any */
     RangeNode *condition, *conditionShape; int conditionKnown;
+    RangeGraphValue *self;    /* the receiver of the running method */
+    RangeGraphValue *pending; /* a first argument already evaluated, for C's own calls */
     /* Emitted copies by original, so a node quoted code reaches twice (a
      * for-in's binding is in its pattern and its scope) stays one node. */
     RangeNode **emittedFrom, **emittedTo; size_t emittedCapacity, emittedCount;
@@ -864,10 +862,14 @@ static int macroLocal(const RangeMacroApplication *app, const RangeNode *node)
 }
 
 /* A splice is a #name chain such as #element or #element.name; the whole
- * chain runs at macro time. */
+ * chain runs at macro time. `#name(…)` calls the spliced name where the code
+ * lands: only the name is spliced. */
 static int spliceChain(const RangeNode *node)
 {
-    while (node && (node->kind == RangeNodeMemberAccess || node->kind == RangeNodeCall)) node = node->a;
+    while (node && (node->kind == RangeNodeMemberAccess || node->kind == RangeNodeCall)) {
+        if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeEnvironment) return 0;
+        node = node->a;
+    }
     return node && node->kind == RangeNodeEnvironment;
 }
 
@@ -963,18 +965,223 @@ static RangeNode *emitNode(MetaEval *eval, MetaScope *scope, RangeNode *node, in
     return copy;
 }
 
-static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *call)
+/* ---- construct values at compile time ------------------------------------
+ * A value of a construct is an instance: one value per stored member. Its
+ * functions run here as their Range bodies; inside one, a bare name is a
+ * member of the receiver and a bare call one of its functions. A @many
+ * member holds slots, and the slot primitives resize, read, and write act on
+ * them, as C implements them on @many storage in compiled code. */
+
+static RangeNode *runMacroApplication(Resolver *, RangeNode *);
+static void mergeEmitted(Resolver *, RangeNode *);
+static int compilerAttribute(RangeNode *, RangeNode *);
+static int slotPrimitive(const RangeNode *);
+
+/* A declaration's members and functions include what its written macros
+ * emit, so a compile-time use of it first applies those that have not run:
+ * `#cases.first()` needs the functions @collection gives Array. */
+static void metaPrepare(MetaEval *eval, RangeNode *declaration)
 {
-    if (!call->a || call->a->kind != RangeNodeName || call->a->generics)
-        fail(eval->vm,call,"compile-time calls require a plain function reference");
-    RangeNode *function = metaDeclaration(eval,call->a,RangeNodeFunction,call->a->name);
-    if (!function->a || function->generics || (function->flags & ~RangeFlagMutating) || function->typeName
-        || (function->c && function->c->itemCount))
-        fail(eval->vm,call,"unsupported compile-time function declaration");
+    Resolver *vm = eval->vm;
+    for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i) {
+        RangeNode *attribute = declaration->c->items[i];
+        RangeMacroApplication *app = attribute->macroApplication;
+        if (compilerAttribute(declaration,attribute) || (attribute->flags & RangeFlagImplicit) || !app || app->applied) continue;
+        app->applied = 1;
+        RangeNode *emitted = vm->emitted, *unit = vm->unit;
+        int skip = vm->skipEmission;
+        vm->unit = app->unit ? app->unit : unit;
+        for (size_t u = 0; u < vm->count; ++u)
+            for (size_t j = 0; j < vm->units[u]->itemCount; ++j)
+                if (vm->units[u]->items[j] == declaration) vm->unit = vm->units[u];
+        vm->skipEmission = 0;
+        mergeEmitted(vm,runMacroApplication(vm,attribute));
+        vm->emitted = emitted; vm->unit = unit; vm->skipEmission = skip;
+    }
+}
+
+static size_t metaMemberIndex(RangeGraphValue instance, const char *name)
+{
+    RangeNode *declaration = instance.declaration;
+    for (size_t i = 0; i < instance.count && i < declaration->itemCount; ++i)
+        if (rangeNodeDeclaresValue(declaration->items[i]->kind) && same(declaration->items[i]->name,name)) return i;
+    return SIZE_MAX;
+}
+
+static int metaManyMember(const RangeNode *member)
+{
+    return (member->flags & RangeFlagMany) || appliesBuiltin(member,"many");
+}
+
+/* Values never change in place: a write copies the instance's members. */
+static void metaSetMember(MetaEval *eval, RangeGraphValue *instance, size_t index, RangeGraphValue value)
+{
+    RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,instance->count * sizeof(*values));
+    memcpy(values,instance->values,instance->count * sizeof(*values));
+    values[index] = value;
+    instance->values = values;
+}
+
+static RangeGraphValue metaInvoke(MetaEval *, MetaScope *, RangeNode *, RangeNode *, RangeGraphValue *);
+
+/* `Point(x: 1)`: each stored member is its argument or its default, which
+ * sees the members before it; a @many member starts with no slots. */
+static RangeGraphValue metaConstruct(MetaEval *eval, MetaScope *scope, RangeNode *declaration, RangeNode **arguments,
+                                     size_t count, RangeNode *at)
+{
+    metaPrepare(eval,declaration);
+    RangeGraphValue instance = {.kind=RangeGraphInstance,.declaration=declaration,.count=declaration->itemCount};
+    instance.values = rangeArenaAllocate(eval->vm->arena,(instance.count ? instance.count : 1) * sizeof(*instance.values));
+    memset(instance.values,0,(instance.count ? instance.count : 1) * sizeof(*instance.values));
+    RangeGraphValue *outer = eval->self;
+    RangeNode *outerFunction = eval->function;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *member = declaration->items[i];
+        if (!rangeNodeDeclaresValue(member->kind)) continue;
+        if (metaManyMember(member)) { instance.values[i] = (RangeGraphValue){.kind=RangeGraphSlots}; continue; }
+        RangeNode *argument = NULL;
+        for (size_t j = 0; j < count; ++j) if (same(arguments[j]->name,member->name)) argument = arguments[j];
+        if (argument) {
+            eval->self = outer; eval->function = outerFunction;
+            instance.values[i] = metaExpect(eval,scope,argument->a,metaTypeEnum(eval,declaration,member->typeName,member->flags,member));
+            continue;
+        }
+        int builtin = 0;
+        for (size_t k = 0; member->c && k < member->c->itemCount; ++k) builtin |= same(member->c->items[k]->name,"builtin");
+        if (builtin) continue; /* a C layout primitive: no value at compile time */
+        if (member->rhsReference) {
+            // `let height: width` copies a member before it; any other bare
+            // name is the member's type, and construction must supply it.
+            size_t earlier = metaMemberIndex(instance,member->rhsReference->name);
+            if (earlier < i) { instance.values[i] = instance.values[earlier]; continue; }
+        }
+        RangeNode *rhs = member->rhsReference ? NULL : rangeNodeRHS(member);
+        if (!rhs && (member->flags & RangeFlagOptional)) {
+            instance.values[i] = metaConvert(eval,(RangeGraphValue){0},metaTypeEnum(eval,declaration,member->typeName,member->flags,member),member);
+            continue;
+        }
+        if (!rhs) fail(eval->vm,at,"constructing %s at compile time requires '%s'",declaration->name,member->name);
+        // A default sees the members before it, as in compiled construction.
+        eval->self = &instance; eval->function = NULL;
+        MetaScope defaults = {0};
+        instance.values[i] = metaExpression(eval,&defaults,rhs);
+    }
+    for (size_t j = 0; j < count; ++j) {
+        RangeGraphValue probe = instance;
+        if (metaMemberIndex(probe,arguments[j]->name) == SIZE_MAX)
+            fail(eval->vm,arguments[j],"%s has no member '%s'",declaration->name,arguments[j]->name ? arguments[j]->name : "");
+    }
+    eval->self = outer; eval->function = outerFunction;
+    return instance;
+}
+
+/* The function of `declaration` a call names: its name and argument labels. */
+static RangeNode *metaFunction(RangeNode *declaration, const char *name, RangeNode *call)
+{
+    for (size_t i = 0; declaration && i < declaration->itemCount; ++i) {
+        RangeNode *function = declaration->items[i];
+        if (function->kind != RangeNodeFunction || !same(function->name,name) || function->itemCount != call->itemCount) continue;
+        int labels = 1;
+        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = same(call->items[j]->name,function->items[j]->name);
+        if (labels) return function;
+    }
+    return NULL;
+}
+
+/* A reflection field holds declarations; as a Range value it is the type its
+ * grammar declaration gives it. A list, such as Enum.cases: Array<EnumCase>,
+ * becomes that collection, built as Range would build it: constructed, then
+ * each declaration appended in order with the collection's append. An
+ * optional field, such as Function.output, is a case of the optional. */
+static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char *name, RangeGraphValue value, RangeNode *at)
+{
+    if (value.kind != RangeGraphNodes && value.kind != RangeGraphNone && value.kind != RangeGraphNode) return value;
+    RangeNode *grammar = owner ? grammarDeclaration(eval->vm,owner) : NULL, *member = NULL;
+    for (size_t i = 0; grammar && i < grammar->itemCount; ++i)
+        if (rangeNodeDeclaresValue(grammar->items[i]->kind) && same(grammar->items[i]->name,name)) member = grammar->items[i];
+    if (!member) {
+        if (value.kind == RangeGraphNodes)
+            fail(eval->vm,at,"reflection field '%s' has no Range type: %s declares no member '%s' in the loaded grammar",
+                 name,grammar ? grammar->name : owner && owner->graphType ? owner->graphType->name : "its kind",name);
+        return value;
+    }
+    if (member->flags & RangeFlagOptional)
+        return metaConvert(eval,value,metaTypeEnum(eval,grammar,member->typeName,member->flags,member),at);
+    if (value.kind != RangeGraphNodes) return value;
+    RangeNode *collection = member->typeName ? namedDeclaration(eval->vm,grammar,member->typeName,0,member,"reflection type") : NULL;
+    if (!collection || collection->kind != RangeNodeConstruct)
+        fail(eval->vm,at,"reflection field %s.%s holds declarations; its type must be a collection construct",grammar->name,name);
+    RangeGraphValue result = metaConstruct(eval,NULL,collection,NULL,0,at);
+    RangeNode argument = {.kind=RangeNodeArgument,.name="value",.path=at->path,.line=at->line,.column=at->column};
+    RangeNode call = {.kind=RangeNodeCall,.items=(RangeNode *[]){&argument},.itemCount=1,.path=at->path,.line=at->line,.column=at->column};
+    RangeNode *append = metaFunction(collection,"append",&call);
+    if (!append) fail(eval->vm,at,"reflection field %s.%s is %s, which has no append(value:) to build it with%s",grammar->name,name,
+                      collection->name,eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
+    for (size_t i = 0; i < value.count; ++i) {
+        RangeGraphValue element = graphNode(value.nodes[i]);
+        eval->pending = &element;
+        (void)metaInvoke(eval,NULL,append,&call,&result);
+    }
+    return result;
+}
+
+/* A C primitive a function declares with @builtin, run on the receiver. */
+static RangeGraphValue metaBuiltin(MetaEval *eval, RangeNode *function, RangeGraphValue *self,
+                                   RangeGraphValue *arguments, RangeNode *call)
+{
+    if (same(function->name,"name") && function->itemCount == 1 && same(function->items[0]->name,"of")) {
+        // The name of a declaration: the one reflective field every element
+        // of a reflection list has. Other values have no name.
+        RangeGraphValue element = arguments[0];
+        RangeGraphValue text = element.kind == RangeGraphNode ? rangeGraphStoredField(eval->vm->arena,element.node,"name") : (RangeGraphValue){0};
+        if (element.kind == RangeGraphNode && (element.node->kind == RangeNodeInteger || element.node->kind == RangeNodeBool
+            || element.node->kind == RangeNodeString)) text = (RangeGraphValue){0};
+        return text;
+    }
+    if (!self || self->kind != RangeGraphInstance || !slotPrimitive(function))
+        fail(eval->vm,call,"no compile-time primitive is implemented for builtin function '%s'",function->name);
+    size_t many = SIZE_MAX;
+    for (size_t i = 0; i < self->count; ++i)
+        if (rangeNodeDeclaresValue(self->declaration->items[i]->kind) && metaManyMember(self->declaration->items[i])) {
+            if (many != SIZE_MAX) fail(eval->vm,call,"builtin function '%s' requires exactly one @many member in %s",function->name,self->declaration->name);
+            many = i;
+        }
+    if (many == SIZE_MAX) fail(eval->vm,call,"builtin function '%s' requires exactly one @many member in %s",function->name,self->declaration->name);
+    RangeGraphValue slots = self->values[many];
+    long long index = metaNumber(eval,arguments[0],call);
+    if (same(function->name,"resize")) {
+        if (index < 0) fail(eval->vm,call,"resize to %lld slots",index);
+        RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,(index ? (size_t)index : 1) * sizeof(*values));
+        memset(values,0,(index ? (size_t)index : 1) * sizeof(*values));
+        memcpy(values,slots.values,((size_t)index < slots.count ? (size_t)index : slots.count) * sizeof(*values));
+        metaSetMember(eval,self,many,(RangeGraphValue){.kind=RangeGraphSlots,.values=values,.count=(size_t)index});
+        return (RangeGraphValue){0};
+    }
+    if (index < 0 || (size_t)index >= slots.count)
+        fail(eval->vm,call,"slot %lld is outside the %zu slots of %s",index,slots.count,self->declaration->name);
+    if (same(function->name,"read")) return slots.values[index];
+    RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,slots.count * sizeof(*values));
+    memcpy(values,slots.values,slots.count * sizeof(*values));
+    values[index] = arguments[1];
+    metaSetMember(eval,self,many,(RangeGraphValue){.kind=RangeGraphSlots,.values=values,.count=slots.count});
+    return (RangeGraphValue){0};
+}
+
+/* Run `function` with the call's arguments: a function's body, or the C
+ * primitive it declares; `self` is the receiver a method acts on, changed in
+ * place when the method changes it. */
+static RangeGraphValue metaInvoke(MetaEval *eval, MetaScope *scope, RangeNode *function, RangeNode *call, RangeGraphValue *self)
+{
+    if (function->generics || (function->c && function->c->itemCount && !(function->flags & RangeFlagBuiltin)))
+        fail(eval->vm,call,"unsupported compile-time function declaration '%s'",function->name);
     if (call->itemCount != function->itemCount)
         fail(eval->vm,call,"compile-time call argument count differs from '%s'",function->name);
     if (++eval->depth > 64) fail(eval->vm,call,"compile-time call depth exceeded");
+    RangeNode *owner = function->owner ? function->owner : function;
+    RangeGraphValue *pending = eval->pending;
+    eval->pending = NULL;
     MetaScope arguments = {0};
+    RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,(call->itemCount ? call->itemCount : 1) * sizeof(*values));
     // Evaluate once, in source order. Labels select actual parameter declarations.
     for (size_t i = 0; i < call->itemCount; ++i) {
         RangeNode *argument = call->items[i], *parameter = NULL;
@@ -983,22 +1190,73 @@ static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *cal
         if (!parameter || (parameter->flags & ~RangeFlagOptional) || parameter->itemCount)
             fail(eval->vm,argument,"compile-time call requires an explicit label for each plain parameter");
         RangeNode *type = parameter->b;
-        metaBind(eval,&arguments,parameter,metaExpect(eval,scope,argument->a,
-            type ? metaTypeEnum(eval,function,type->name,parameter->flags,type) : NULL));
+        RangeNode *expected = type ? metaTypeEnum(eval,owner,type->name,parameter->flags,type) : NULL;
+        values[i] = pending && i == 0 ? metaConvert(eval,*pending,expected,argument) : metaExpect(eval,scope,argument->a,expected);
+        metaBind(eval,&arguments,parameter,values[i]);
     }
     // A return converts to the declared output: `return 5` from `Int?` is
     // the present case holding 5, and `.absent` is a case of that output.
     RangeNode *outer = eval->output, *outerFunction = eval->function;
-    eval->function = function;
-    eval->output = function->b ? metaTypeEnum(eval,function,function->b->name,function->b->flags,function->b) : NULL;
+    RangeGraphValue *outerSelf = eval->self;
+    RangeNode *output = function->b ? metaTypeEnum(eval,owner,function->b->name,function->b->flags,function->b) : NULL;
     RangeGraphValue result = {0};
-    if (!metaStatement(eval,&arguments,function->a,&result))
-        fail(eval->vm,function,"compile-time function did not return a value");
-    result = metaConvert(eval,result,eval->output,call);
+    if (function->flags & RangeFlagBuiltin) result = metaBuiltin(eval,function,self,values,call);
+    else {
+        if (!function->a) fail(eval->vm,call,"'%s' has no body to run at compile time",function->name);
+        eval->function = function;
+        eval->output = output;
+        eval->self = self;
+        if (!metaStatement(eval,&arguments,function->a,&result) && function->b)
+            fail(eval->vm,function,"compile-time function did not return a value");
+    }
+    result = metaConvert(eval,result,output,call);
     eval->output = outer;
     eval->function = outerFunction;
+    eval->self = outerSelf;
     --eval->depth;
     return result;
+}
+
+/* A call: a case with its payload, a construction, a top-level function, or
+ * a function of the receiver: written before it, or the running method's. */
+static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *call)
+{
+    RangeNode *callee = call->a;
+    if (callee && callee->kind == RangeNodeMemberAccess) {
+        // The receiver is changed in place when it is a state local or a
+        // member of the running method's receiver; otherwise a copy is.
+        RangeGraphValue copy, *place = &copy;
+        MetaLocal *local = callee->a->kind == RangeNodeName ? metaLocal(scope,callee->a->name) : NULL;
+        size_t member = !local && callee->a->kind == RangeNodeName && eval->self && eval->self->kind == RangeGraphInstance
+            ? metaMemberIndex(*eval->self,callee->a->name) : SIZE_MAX;
+        if (local && local->mutable) place = &local->value;
+        else if (member != SIZE_MAX) copy = eval->self->values[member];
+        else copy = metaExpression(eval,scope,callee->a);
+        if (local && !local->mutable) copy = local->value;
+        if (place->kind != RangeGraphInstance)
+            fail(eval->vm,call,"compile-time method calls need a construct value; '%s' is called on a %s",callee->name,
+                 place->kind == RangeGraphCase ? "enum value" : place->kind == RangeGraphNode ? "declaration" : "value without functions");
+        RangeNode *function = metaFunction(place->declaration,callee->name,call);
+        if (!function) fail(eval->vm,call,"%s has no function '%s' with these labels",place->declaration->name,callee->name);
+        RangeGraphValue result = metaInvoke(eval,scope,function,call,place);
+        if (member != SIZE_MAX) metaSetMember(eval,eval->self,member,copy);
+        return result;
+    }
+    if (!callee || callee->kind != RangeNodeName || callee->generics)
+        fail(eval->vm,call,"compile-time calls require a plain function reference");
+    if (!metaLocal(scope,callee->name) && eval->self && eval->self->kind == RangeGraphInstance) {
+        RangeNode *function = metaFunction(eval->self->declaration,callee->name,call);
+        if (function) return metaInvoke(eval,scope,function,call,eval->self);
+    }
+    RangeNode *from = eval->function ? eval->function : scope->application ? scope->application->target : NULL;
+    RangeNode *type = namedDeclaration(eval->vm,from,callee->name,0,callee,"compile-time type");
+    if (type && type->kind == RangeNodeConstruct) {
+        callee->resolvedDeclaration = type;
+        return metaConstruct(eval,scope,type,call->items,call->itemCount,call);
+    }
+    RangeNode *function = metaDeclaration(eval,callee,RangeNodeFunction,callee->name);
+    if (function->typeName) fail(eval->vm,call,"'%s' is a method; call it on a value",function->name);
+    return metaInvoke(eval,scope,function,call,NULL);
 }
 
 /* A compile-time message: a string whose interpolated parts are graph text,
@@ -1137,7 +1395,8 @@ static int metaLabeled(const RangeNode *field)
 static RangeNode *metaTypeEnum(MetaEval *eval, RangeNode *from, const char *name, int flags, RangeNode *at)
 {
     if (!name) return NULL;
-    RangeNode *declaration = namedDeclaration(eval->vm,from,name,flags & (RangeFlagOptional | RangeFlagMacroType),at,"compile-time type");
+    if (!(flags & RangeFlagOptional) && (flags & RangeFlagMacroType)) return NULL;
+    RangeNode *declaration = namedDeclaration(eval->vm,from,name,flags & RangeFlagOptional,at,"compile-time type");
     return declaration && declaration->kind == RangeNodeEnum ? declaration : NULL;
 }
 
@@ -1470,23 +1729,32 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
     case RangeNodeName: {
         MetaLocal *local = metaLocal(scope,node->name);
         if (local) return local->value;
+        // Inside a method, a member of its receiver.
+        size_t member = eval->self && eval->self->kind == RangeGraphInstance ? metaMemberIndex(*eval->self,node->name) : SIZE_MAX;
+        if (member != SIZE_MAX) {
+            if (metaManyMember(eval->self->declaration->items[member]))
+                fail(eval->vm,node,"'%s' holds @many storage and is not a value",node->name);
+            return eval->self->values[member];
+        }
         // Otherwise a name is the construct or enum it names from the target's
         // scope, as in code emitted there: `function.output = Bool`.
+        RangeNode *from = eval->function ? eval->function : scope->application ? scope->application->target : NULL;
         RangeNode *declaration = node->generics || node->flags ? NULL
-            : namedDeclaration(eval->vm,scope->application ? scope->application->target : NULL,node->name,0,node,"compile-time type");
+            : namedDeclaration(eval->vm,from,node->name,0,node,"compile-time type");
         if (!declaration) fail(eval->vm,node,"unresolved compile-time local '%s'",node->name);
         return graphNode(declaration);
     }
     case RangeNodeEnvironment: {
         if (!scope->application) fail(eval->vm,node,"graph context is unavailable in this function");
-        if (!eval->splicing) return graphEval(eval->vm,scope->application,node);
+        if (!eval->splicing)
+            return metaReflect(eval,scope->application->target,node->name,graphEval(eval->vm,scope->application,node),node);
         // Inside #graph, #name is a macro local or a target field, never both.
         MetaLocal *local = metaLocal(scope,node->name);
         RangeNode *field = rangeGraphField(scope->application->target->graphType,node->name);
         if (local && field) fail(eval->vm,node,"#%s names both a macro local and a target field",node->name);
         if (local) return local->value;
         if (!field) fail(eval->vm,node,"#%s is neither a macro local nor a target field",node->name);
-        return graphEval(eval->vm,scope->application,node);
+        return metaReflect(eval,scope->application->target,node->name,graphEval(eval->vm,scope->application,node),node);
     }
     case RangeNodeEmission:
         if (eval->vm->skipEmission) return (RangeGraphValue){0};
@@ -1506,21 +1774,43 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
             return metaConstructCase(eval,scope,enumeration,node->name,NULL,node);
         RangeGraphValue receiver = metaExpression(eval,scope,node->a);
         if (same(node->name,"isTarget")) {
+            if (receiver.kind == RangeGraphCase && appliesBuiltin(receiver.declaration,"optional"))
+                return metaScalar(eval,node,RangeNodeBool,receiver.count != 0);
             if (receiver.kind != RangeGraphNone && receiver.kind != RangeGraphNode)
                 fail(eval->vm,node,"isTarget requires a selected graph node");
             return metaScalar(eval,node,RangeNodeBool,receiver.kind == RangeGraphNode);
         }
-        if (!scope->application) fail(eval->vm,node,"graph reflection requires a macro context");
-        RangeGraphValue value = graphProperty(eval->vm,scope->application,receiver,node->name,node);
+        if (receiver.kind == RangeGraphInstance) {
+            size_t member = metaMemberIndex(receiver,node->name);
+            if (member == SIZE_MAX) {
+                RangeNode probe = {.kind=RangeNodeCall};
+                if (metaFunction(receiver.declaration,node->name,&probe))
+                    fail(eval->vm,node,"'%s.%s' is a function; call it",receiver.declaration->name,node->name);
+                fail(eval->vm,node,"%s has no member '%s'",receiver.declaration->name,node->name);
+            }
+            if (metaManyMember(receiver.declaration->items[member]))
+                fail(eval->vm,node,"'%s' holds @many storage and is not a value",node->name);
+            return receiver.values[member];
+        }
+        if (receiver.kind == RangeGraphCase || receiver.kind == RangeGraphSlots || receiver.kind == RangeGraphNodes)
+            fail(eval->vm,node,"this compile-time value has no member '%s'",node->name);
+        if (!scope->application && receiver.kind != RangeGraphNode) fail(eval->vm,node,"graph reflection requires a macro context");
+        RangeMacroApplication none = {0};
+        RangeGraphValue value = graphProperty(eval->vm,scope->application ? scope->application : &none,receiver,node->name,node);
         if (same(node->name,"value") && receiver.kind == RangeGraphNode
             && rangeNodeDeclaresValue(receiver.node->kind) && value.kind == RangeGraphNode
             && !macroLocal(scope->application,receiver.node)) {
             // A declaration initializer is evaluated outside the inspecting
             // macro's locals. Unsupported declaration-name lookup fails there.
             MetaScope initializer = {0};
-            return metaExpression(eval,&initializer,value.node);
+            RangeGraphValue *self = eval->self;
+            RangeNode *function = eval->function;
+            eval->self = NULL; eval->function = NULL;
+            RangeGraphValue initial = metaExpression(eval,&initializer,value.node);
+            eval->self = self; eval->function = function;
+            return initial;
         }
-        return value;
+        return metaReflect(eval,receiver.kind == RangeGraphNode ? receiver.node : NULL,node->name,value,node);
     }
     case RangeNodeCall:
         if (node->a && node->a->kind == RangeNodeCase) {
@@ -1531,18 +1821,6 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
             RangeNode *enumeration = metaTypePath(eval,scope,node->a->a);
             if (enumeration && metaCaseNamed(enumeration,node->a->name))
                 return metaConstructCase(eval,scope,enumeration,node->a->name,node,node);
-        }
-        if (node->a && node->a->kind == RangeNodeMemberAccess && same(node->a->name,"filter")) {
-            if (node->itemCount != 1 || !same(node->items[0]->name,"named"))
-                fail(eval->vm,node,"graph filter requires one named argument");
-            RangeGraphValue list = metaExpression(eval,scope,node->a->a);
-            if (list.kind != RangeGraphNodes) fail(eval->vm,node,"graph filter requires member nodes");
-            const char *name = graphText(eval->vm,metaExpression(eval,scope,node->items[0]->a),node);
-            RangeGraphValue result = {.kind=RangeGraphNodes};
-            result.nodes = rangeArenaAllocate(eval->vm->arena,list.count * sizeof(*result.nodes));
-            for (size_t i = 0; i < list.count; ++i)
-                if (same(list.nodes[i]->name,name)) result.nodes[result.count++] = list.nodes[i];
-            return result;
         }
         return metaCall(eval,scope,node);
     case RangeNodeUnary: {
@@ -1633,7 +1911,13 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
             // Declaration RHS applications use the parser's type-position storage.
             // Resolve the name as a function; no type-name cast or scalar shortcut.
             RangeNode target = {.kind=RangeNodeName,.name=node->typeName,.path=node->path,
-                .line=node->line,.column=node->column,.generics=node->generics};
+                .line=node->line,.column=node->column};
+            if (node->generics) {
+                // `Array<Int>()`: compile-time values carry no type arguments.
+                RangeNode *from = eval->function ? eval->function : scope->application ? scope->application->target : NULL;
+                RangeNode *type = namedDeclaration(eval->vm,from,node->typeName,0,node,"compile-time type");
+                if (!type || type->kind != RangeNodeConstruct) fail(eval->vm,node,"compile-time calls require a plain function reference");
+            }
             RangeNode call = {.kind=RangeNodeCall,.a=&target,.items=node->items,.itemCount=node->itemCount,
                 .path=node->path,.line=node->line,.column=node->column};
             metaBind(eval,scope,node,metaCall(eval,scope,&call));
@@ -1647,6 +1931,15 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
     case RangeNodeAssign: {
         if (!node->a || node->a->kind != RangeNodeName) fail(eval->vm,node,"compile-time assignment requires a local name");
         MetaLocal *local = metaLocal(scope,node->a->name);
+        size_t member = !local && eval->self && eval->self->kind == RangeGraphInstance ? metaMemberIndex(*eval->self,node->a->name) : SIZE_MAX;
+        if (member != SIZE_MAX) {
+            // `count: count + 1` in a method changes its receiver's member.
+            RangeNode *declaration = eval->self->declaration->items[member];
+            RangeGraphValue value = metaExpect(eval,scope,node->b,
+                metaTypeEnum(eval,eval->self->declaration,declaration->typeName,declaration->flags,declaration));
+            metaSetMember(eval,eval->self,member,value);
+            return 0;
+        }
         if (!local || !local->mutable) fail(eval->vm,node,"compile-time assignment requires a state local");
         local->value = metaExpression(eval,scope,node->b);
         return 0;
@@ -1698,6 +1991,7 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     // Bindings read the graph as it stands when the application runs, with
     // every extension merged so far, not as it stood at resolution.
     for (size_t i = 0; i < app->count; ++i) app->bindings[i].state = 0;
+    vm->deferred = 0;
     vm->emitted = emitted;
     MetaEval eval = {.vm=vm};
     MetaScope scope = {.application=app};
@@ -2013,6 +2307,16 @@ static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
 
 static void diagnoseSourceNode(SourceReport *, SourceScope *, RangeNode *, int);
 
+/* Whether `name` is a list field of some reflection shape, such as cases. */
+static int reflectionList(RangeArena *arena, const char *name)
+{
+    for (size_t i = 0; name && i < arena->graphTypes->itemCount; ++i) {
+        RangeNode *field = rangeGraphField(arena->graphTypes->items[i],name);
+        if (field && (field->flags & RangeFlagMany)) return 1;
+    }
+    return 0;
+}
+
 static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *node)
 {
     if (!node) return;
@@ -2088,19 +2392,15 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 0);
         break;
     case RangeNodeMemberAccess:
-        /* Runtime member access is typed later; these are graph-value shortcuts. */
-        if (scope && scope->meta && (same(node->name,"first") || same(node->name,"count") || same(node->name,"isTarget")))
+        /* Runtime member access is typed later; this is a graph-value shortcut. */
+        if (scope && scope->meta && same(node->name,"isTarget"))
             sourceDiagnostic(report,node,1,"C-implementation","'.%s' is hard-coded in C; Range member dispatch is not implemented",node->name);
+        if (scope && scope->meta && reflectionList(report->arena,node->name))
+            sourceDiagnostic(report,node,1,"C-implementation","'.%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's append(value:) for each declaration",node->name);
         break;
-    case RangeNodeCall:
-        // `Shape.circle(…)` and `Int?.present(…)` construct cases, not calls.
-        if (node->a && node->a->kind == RangeNodeMemberAccess && scope && scope->meta
-            && !(node->a->a && node->a->a->kind == RangeNodeName && (node->a->a->flags & RangeFlagOptional))
-            && !typePath(report,scope,node->a->a)) {
-            if (same(node->a->name,"filter") && node->itemCount == 1 && same(node->items[0]->name,"named"))
-                sourceDiagnostic(report,node,1,"C-implementation","'filter(named:)' is hard-coded in C; Range method dispatch is not implemented");
-            else sourceDiagnostic(report,node,0,"not-implemented","compile-time method call resolution for '%s' is not implemented",node->a->name);
-        }
+    case RangeNodeEnvironment:
+        if (reflectionList(report->arena,node->name))
+            sourceDiagnostic(report,node,1,"C-implementation","'#%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's append(value:) for each declaration",node->name);
         break;
     case RangeNodeAttribute: {
         if (same(node->name,"builtin") || same(node->name,"extern")) {
@@ -2400,6 +2700,8 @@ static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
         if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
         if (same(item->name,"="))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function '=' is C's structural comparison: every stored member, or the tag then the payload; it is emitted only for the types a program compares");
+        else if (same(item->name,"name") && item->itemCount == 1 && same(item->items[0]->name,"of"))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'name(of:)' reads a declaration's reflective name in C, at compile time only; compiled code that calls it is rejected");
         else if (bytes && same(item->name,"byte"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'byte' reads one byte of the bytes primitive in C, checking the index");
         else if (operatorName(item->name)) diagnoseBuiltinOperator(report,owner,item,bytes);
@@ -2900,6 +3202,21 @@ static RangeNode *findFunction(RangeNode *owner, const char *name)
     for (size_t i = 0; i < owner->itemCount; ++i)
         if (owner->items[i]->kind == RangeNodeFunction && same(owner->items[i]->name,name)) return owner->items[i];
     return NULL;
+}
+
+/* Overloads differ in their labels: a call selects the function whose
+ * labels it writes, or else the first of that name, which reports why the
+ * call does not fit it. */
+static RangeNode *findCalledFunction(RangeNode *owner, const char *name, const RangeNode *call)
+{
+    for (size_t i = 0; call && i < owner->itemCount; ++i) {
+        RangeNode *function = owner->items[i];
+        if (function->kind != RangeNodeFunction || !same(function->name,name) || function->itemCount != call->itemCount) continue;
+        int labels = 1;
+        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = same(call->items[j]->name,function->items[j]->name);
+        if (labels) return function;
+    }
+    return findFunction(owner,name);
 }
 
 static RangeNode *lookupFunction(SourceReport *report, SourceScope *scope, const char *name)
@@ -3701,6 +4018,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     }
     if (callee->kind == RangeNodeName) {
         function = lookupFunction(typer->report,scope,callee->name);
+        if (function && function->owner) function = findCalledFunction(function->owner,callee->name,call);
         if (!function) {
             RangeNode *declaration = sourceLookup(typer->report,scope,callee->name,0);
             if (!declaration) declaration = sourceLookup(typer->report,scope,callee->name,2);
@@ -3720,7 +4038,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         if (!receiver) return NULL;
         if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,callee,"type parameter %s has no functions",receiver->name); return NULL; }
         // A member with no name is one `for … in` resolved by its @iteration role.
-        function = callee->name ? findFunction(receiver->resolvedDeclaration,callee->name) : callee->resolvedDeclaration;
+        function = callee->name ? findCalledFunction(receiver->resolvedDeclaration,callee->name,call) : callee->resolvedDeclaration;
         if (!function) {
             char type[160]; describeType(type,sizeof(type),receiver);
             typeError(typer,callee,"%s has no function '%s'",type,callee->name);

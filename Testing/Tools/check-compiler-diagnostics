@@ -63,8 +63,11 @@ assert "has a C graph shape but no Range declaration" not in active, active
 assert 'error[type]' not in active and 'error[law]' not in active, active
 assert 'optional types are not implemented' not in active, active
 assert "'?' sugar resolves to the enum applying @optional, and 'for … in' unwraps its payload case, in C" in active, active
-for shortcut in ('filter(named:)', '.first', '.isTarget'):
-    assert f"'{shortcut}' is hard-coded in C" in active, active
+# Macros reflect through Range: first, count, and filter are Array's own
+# functions and member. C builds reflection lists and reads names, and says so.
+assert "is hard-coded in C" not in active, active
+assert "'#cases' is a reflection list: C builds the collection its grammar field declares" in active, active
+assert "builtin function 'name(of:)' reads a declaration's reflective name in C" in active, active
 assert 'uses in this source' in active, active
 
 first, second = folder/'First.range', folder/'Second.range'

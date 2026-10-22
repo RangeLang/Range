@@ -1,0 +1,8 @@
+// A macro's locals run in order, as a function's do: a local cannot read one
+// declared after it, so two locals cannot depend on each other.
+macro forward(): Construct {
+    let value: other
+    let other: #name
+}
+@forward
+construct Example {}
