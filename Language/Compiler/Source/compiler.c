@@ -778,6 +778,13 @@ typedef struct {
     unsigned steps;
     unsigned depth;
     int splicing; /* evaluating a #name splice inside #graph */
+    /* The enum a `.case` written here belongs to, consumed by the next
+     * expression: the switch subject's type, a function's output, a payload
+     * field's type, the other operand of `=`. */
+    RangeNode *expected;
+    RangeNode *function; /* the running compile-time function, if any */
+    RangeNode *output;   /* the enum it returns, if any */
+    RangeNode *condition, *conditionShape; int conditionKnown;
     /* Emitted copies by original, so a node quoted code reaches twice (a
      * for-in's binding is in its pattern and its scope) stays one node. */
     RangeNode **emittedFrom, **emittedTo; size_t emittedCapacity, emittedCount;
@@ -844,6 +851,9 @@ static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind k
 static RangeGraphValue metaExpression(MetaEval *, MetaScope *, RangeNode *);
 static int metaStatement(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue *);
 static const char *metaText(MetaEval *, MetaScope *, RangeNode *, RangeNode *);
+static RangeGraphValue metaExpect(MetaEval *, MetaScope *, RangeNode *, RangeNode *);
+static RangeGraphValue metaConvert(MetaEval *, RangeGraphValue, RangeNode *, RangeNode *);
+static RangeNode *metaTypeEnum(MetaEval *, RangeNode *, const char *, int, RangeNode *);
 
 /* A macro's own top-level declarations are bound once per application. */
 static int macroLocal(const RangeMacroApplication *app, const RangeNode *node)
@@ -868,6 +878,8 @@ static RangeNode *spliceNode(MetaEval *eval, RangeNode *at, RangeGraphValue valu
     if (value.kind == RangeGraphNodes)
         fail(eval->vm,at,"cannot splice a list of %zu declarations",value.count);
     if (value.kind == RangeGraphNone) fail(eval->vm,at,"splice has no value");
+    if (value.kind == RangeGraphCase || value.kind == RangeGraphInstance || value.kind == RangeGraphSlots)
+        fail(eval->vm,at,"cannot splice a compile-time %s value",value.kind == RangeGraphCase ? "enum" : "construct");
     RangeNode *node = value.kind == RangeGraphNode ? value.node : NULL;
     if (node && (node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString)) {
         RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
@@ -956,7 +968,7 @@ static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *cal
     if (!call->a || call->a->kind != RangeNodeName || call->a->generics)
         fail(eval->vm,call,"compile-time calls require a plain function reference");
     RangeNode *function = metaDeclaration(eval,call->a,RangeNodeFunction,call->a->name);
-    if (!function->a || function->generics || function->flags || function->typeName
+    if (!function->a || function->generics || (function->flags & ~RangeFlagMutating) || function->typeName
         || (function->c && function->c->itemCount))
         fail(eval->vm,call,"unsupported compile-time function declaration");
     if (call->itemCount != function->itemCount)
@@ -968,13 +980,23 @@ static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *cal
         RangeNode *argument = call->items[i], *parameter = NULL;
         for (size_t j = 0; j < function->itemCount; ++j)
             if (same(argument->name,function->items[j]->name)) parameter = function->items[j];
-        if (!parameter || parameter->flags || parameter->itemCount)
+        if (!parameter || (parameter->flags & ~RangeFlagOptional) || parameter->itemCount)
             fail(eval->vm,argument,"compile-time call requires an explicit label for each plain parameter");
-        metaBind(eval,&arguments,parameter,metaExpression(eval,scope,argument->a));
+        RangeNode *type = parameter->b;
+        metaBind(eval,&arguments,parameter,metaExpect(eval,scope,argument->a,
+            type ? metaTypeEnum(eval,function,type->name,parameter->flags,type) : NULL));
     }
+    // A return converts to the declared output: `return 5` from `Int?` is
+    // the present case holding 5, and `.absent` is a case of that output.
+    RangeNode *outer = eval->output, *outerFunction = eval->function;
+    eval->function = function;
+    eval->output = function->b ? metaTypeEnum(eval,function,function->b->name,function->b->flags,function->b) : NULL;
     RangeGraphValue result = {0};
     if (!metaStatement(eval,&arguments,function->a,&result))
         fail(eval->vm,function,"compile-time function did not return a value");
+    result = metaConvert(eval,result,eval->output,call);
+    eval->output = outer;
+    eval->function = outerFunction;
     --eval->depth;
     return result;
 }
@@ -998,6 +1020,7 @@ static const char *metaText(MetaEval *eval, MetaScope *scope, RangeNode *message
             else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeInteger) snprintf(piece,sizeof(piece),"%lld",v.node->integer);
             else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeString) value = graphText(eval->vm,v,part->a);
             else if (v.kind == RangeGraphNode && v.node->name) value = v.node->name;
+            else if (v.kind == RangeGraphCase && !v.count) value = v.node->name;
             else fail(eval->vm,part->a ? part->a : at,"a compile-time message cannot interpolate this value");
         }
         length += (size_t)snprintf(text + length,length < sizeof(text) ? sizeof(text) - length : 0,"%s",value);
@@ -1013,6 +1036,21 @@ static const char *metaText(MetaEval *eval, MetaScope *scope, RangeNode *message
  * name) with a string literal by its characters. */
 static int metaRelation(MetaEval *eval, const char *op, RangeGraphValue left, RangeGraphValue right, RangeNode *at)
 {
+    if ((same(op,"=") || same(op,"!=")) && (left.kind == RangeGraphCase || right.kind == RangeGraphCase)) {
+        // An optional operand promotes the other, as `maybe = 5` does; enum
+        // values are equal when they are the same case with equal payloads.
+        if (left.kind == RangeGraphCase) right = metaConvert(eval,right,left.declaration,at);
+        if (right.kind == RangeGraphCase) left = metaConvert(eval,left,right.declaration,at);
+        if (left.kind != RangeGraphCase || right.kind != RangeGraphCase || left.declaration != right.declaration)
+            fail(eval->vm,at,"operator '%s' requires matching types; one operand is a value of %s",op,
+                 (left.kind == RangeGraphCase ? left : right).declaration->name);
+        int equal = left.node == right.node;
+        for (size_t i = 0; equal && i < left.count; ++i) equal = metaRelation(eval,"=",left.values[i],right.values[i],at);
+        return same(op,"=") ? equal : !equal;
+    }
+    if ((same(op,"=") || same(op,"!=")) && (left.kind == RangeGraphInstance || right.kind == RangeGraphInstance
+        || left.kind == RangeGraphSlots || right.kind == RangeGraphSlots))
+        fail(eval->vm,at,"compile-time '%s' on construct values is not implemented",op);
     if (same(op,"=") || same(op,"!=")) {
         int text = left.kind == RangeGraphText || right.kind == RangeGraphText;
         int equal = left.kind == right.kind;
@@ -1038,6 +1076,8 @@ static int metaRelation(MetaEval *eval, const char *op, RangeGraphValue left, Ra
 
 static const char *literalSpelling(const RangeNode *literal);
 
+static int appliesBuiltin(const RangeNode *, const char *);
+
 /* A compile-time Bool is a C literal node; the case it is, is the one its
  * literal spells, as the @literal rule of the condition type says. */
 static int metaBoolCase(const char *name)
@@ -1049,6 +1089,154 @@ static int metaBoolCase(const char *name)
     return -1;
 }
 
+/* The enum the boolean literals select, the condition type. Without one in
+ * the loaded sources, a C shape with the two cases the literals spell stands
+ * in for it, so switches over comparisons stay checkable. */
+static RangeNode *metaCondition(MetaEval *eval)
+{
+    if (!eval->conditionKnown) {
+        RangeNode literal = {.kind=RangeNodeBool,.integer=1};
+        resolveLiteralDefaults(eval->vm,&literal);
+        eval->condition = literal.resolvedType && literal.resolvedType->kind == RangeNodeEnum ? literal.resolvedType : NULL;
+        eval->conditionKnown = 1;
+    }
+    if (eval->condition) return eval->condition;
+    if (!eval->conditionShape) {
+        RangeArena *arena = eval->vm->arena;
+        RangeNode *shape = rangeNodeCreate(arena,RangeNodeEnum,"<compiler>",1,1);
+        shape->name = "the condition type";
+        for (int value = 0; value < 2; ++value) {
+            RangeNode literal = {.kind=RangeNodeBool,.integer=value};
+            RangeNode *entry = rangeNodeCreate(arena,RangeNodeEnumCase,"<compiler>",1,1);
+            entry->name = literalSpelling(&literal);
+            entry->integer = value;
+            rangeNodeAppend(arena,shape,entry);
+        }
+        eval->conditionShape = shape;
+    }
+    return eval->conditionShape;
+}
+
+static RangeNode *metaCaseNamed(const RangeNode *enumeration, const char *name)
+{
+    for (size_t i = 0; enumeration && name && i < enumeration->itemCount; ++i)
+        if (enumeration->items[i]->kind == RangeNodeEnumCase && same(enumeration->items[i]->name,name))
+            return enumeration->items[i];
+    return NULL;
+}
+
+static int metaLabeled(const RangeNode *field)
+{
+    return field->name && !(field->name[0] >= '0' && field->name[0] <= '9');
+}
+
+/* The enum a written type names, seen from `from`: `T?` is the declaration
+ * applying @optional, found by that role; any other name the enum it names.
+ * NULL for a type parameter, a construct, or nothing declared: compile-time
+ * values carry no static type there. */
+static RangeNode *metaTypeEnum(MetaEval *eval, RangeNode *from, const char *name, int flags, RangeNode *at)
+{
+    if (!name) return NULL;
+    RangeNode *declaration = namedDeclaration(eval->vm,from,name,flags & (RangeFlagOptional | RangeFlagMacroType),at,"compile-time type");
+    return declaration && declaration->kind == RangeNodeEnum ? declaration : NULL;
+}
+
+/* A payload field's enum, as its enum declares it. */
+static RangeNode *metaFieldEnum(MetaEval *eval, RangeNode *enumeration, RangeNode *field)
+{
+    if (!enumeration || enumeration == eval->conditionShape) return NULL;
+    return metaTypeEnum(eval,enumeration,field->typeName,field->flags,field);
+}
+
+/* The enum a compile-time value is a case of. */
+static RangeNode *metaValueEnum(MetaEval *eval, RangeGraphValue value)
+{
+    if (value.kind == RangeGraphCase) return value.declaration;
+    if (value.kind == RangeGraphNode && value.node->kind == RangeNodeBool) return metaCondition(eval);
+    return NULL;
+}
+
+/* A case value. The condition type's cases are C literal nodes, as the
+ * literals true and false are. */
+static RangeGraphValue metaCase(MetaEval *eval, RangeNode *enumeration, RangeNode *entry,
+                                RangeGraphValue *payload, RangeNode *at)
+{
+    if (enumeration == metaCondition(eval)) {
+        int which = metaBoolCase(entry->name);
+        if (which < 0 || entry->itemCount) fail(eval->vm,at,"the condition type's case '%s' is not a boolean literal",entry->name);
+        return metaScalar(eval,at,RangeNodeBool,which);
+    }
+    return (RangeGraphValue){.kind=RangeGraphCase,.node=entry,.declaration=enumeration,
+        .values=payload,.count=entry->itemCount};
+}
+
+/* Where `T?` is expected, a value of T is its payload case, as in Swift; a
+ * value C's reflection holds as missing is the case without one. Values of
+ * any other expected type pass unchanged. */
+static RangeGraphValue metaConvert(MetaEval *eval, RangeGraphValue value, RangeNode *expected, RangeNode *at)
+{
+    if (!expected || !appliesBuiltin(expected,"optional")) return value;
+    if (value.kind == RangeGraphCase && value.declaration == expected) return value;
+    RangeNode *absent = NULL, *present = NULL;
+    for (size_t i = 0; i < expected->itemCount; ++i) {
+        RangeNode *entry = expected->items[i];
+        if (entry->kind != RangeNodeEnumCase) continue;
+        if (!entry->itemCount) absent = absent ? expected : entry;
+        else present = present || entry->itemCount != 1 ? expected : entry;
+    }
+    if (!absent || absent == expected || !present || present == expected)
+        fail(eval->vm,at,"%s applies @optional, so it needs one case without a payload and one with a single payload field",expected->name);
+    if (value.kind == RangeGraphNone) return metaCase(eval,expected,absent,NULL,at);
+    RangeGraphValue *payload = rangeArenaAllocate(eval->vm->arena,sizeof(*payload));
+    *payload = value;
+    return metaCase(eval,expected,present,payload,at);
+}
+
+/* Evaluate an expression where a value of `expected` is wanted. */
+static RangeGraphValue metaExpect(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeNode *expected)
+{
+    eval->expected = expected;
+    RangeGraphValue value = metaExpression(eval,scope,node);
+    eval->expected = NULL;
+    return metaConvert(eval,value,expected,node);
+}
+
+/* `.name`, `.name(…)`, `Type.name`, or `Type.name(…)`: a case of
+ * `enumeration`, its payload one argument per field, labeled as the field is. */
+static RangeGraphValue metaConstructCase(MetaEval *eval, MetaScope *scope, RangeNode *enumeration,
+                                         const char *name, RangeNode *call, RangeNode *at)
+{
+    RangeNode *entry = metaCaseNamed(enumeration,name);
+    if (!entry) fail(eval->vm,at,"%s has no case '%s'",enumeration->name,name);
+    if (!call) {
+        if (entry->itemCount) fail(eval->vm,at,"case '%s' carries a payload; write .%s(…)",name,name);
+        return metaCase(eval,enumeration,entry,NULL,at);
+    }
+    if (!entry->itemCount) fail(eval->vm,call,"case '%s' has no payload; write .%s",name,name);
+    if (call->itemCount != entry->itemCount)
+        fail(eval->vm,call,"case '%s' of %s takes %zu payload fields; %zu supplied",name,enumeration->name,entry->itemCount,call->itemCount);
+    RangeGraphValue *payload = rangeArenaAllocate(eval->vm->arena,entry->itemCount * sizeof(*payload));
+    for (size_t i = 0; i < entry->itemCount; ++i) {
+        RangeNode *argument = call->items[i], *field = entry->items[i];
+        if (metaLabeled(field) && !same(argument->name,field->name))
+            fail(eval->vm,argument,"payload field %zu of '%s' requires label '%s'",i + 1,name,field->name);
+        if (!metaLabeled(field) && argument->name)
+            fail(eval->vm,argument,"payload field %zu of '%s' takes no label",i + 1,name);
+        payload[i] = metaExpect(eval,scope,argument->a,metaFieldEnum(eval,enumeration,field));
+    }
+    return metaCase(eval,enumeration,entry,payload,at);
+}
+
+/* `Light` or `Int?` before `.case`: the enum it names, unless the name is a
+ * compile-time local. */
+static RangeNode *metaTypePath(MetaEval *eval, MetaScope *scope, RangeNode *path)
+{
+    if (!path || path->kind != RangeNodeName) return NULL;
+    if (!(path->flags & RangeFlagOptional) && metaLocal(scope,path->name)) return NULL;
+    RangeNode *from = scope->application ? scope->application->target : NULL;
+    return metaTypeEnum(eval,eval->function ? eval->function : from,path->name,path->flags,path);
+}
+
 /* Whether `pattern` matches `value` at compile time; its bindings join `into`. */
 static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeGraphValue value)
 {
@@ -1057,15 +1245,26 @@ static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeG
     case RangePatternAny: return 1;
     case RangePatternBind: metaBind(eval,into,pattern->a,value); return 1;
     case RangePatternCase: {
-        if (pattern->flags & RangeFlagApplication) fail(eval->vm,pattern,"compile-time values have no payloads to match");
+        if (value.kind == RangeGraphCase) {
+            RangeNode *entry = metaCaseNamed(value.declaration,pattern->name);
+            if (!entry) fail(eval->vm,pattern,"%s has no case '%s'",value.declaration->name,pattern->name);
+            if (value.node != entry) return 0;
+            if (!(pattern->flags & RangeFlagApplication)) return 1; /* `.value` matches any payload */
+            if (pattern->itemCount != entry->itemCount)
+                fail(eval->vm,pattern,"case '%s' has %zu payload fields; the pattern matches %zu",entry->name,entry->itemCount,pattern->itemCount);
+            for (size_t i = 0; i < pattern->itemCount; ++i)
+                if (!metaMatch(eval,into,pattern->items[i]->a,value.values[i])) return 0;
+            return 1;
+        }
         if (value.kind != RangeGraphNode || value.node->kind != RangeNodeBool)
-            fail(eval->vm,pattern,"a compile-time case pattern matches a boolean graph value; this value is not one");
+            fail(eval->vm,pattern,"a compile-time case pattern matches an enum value; this value is not one");
+        if (pattern->flags & RangeFlagApplication) fail(eval->vm,pattern,"case '%s' has no payload to match",pattern->name);
         int which = metaBoolCase(pattern->name);
         if (which < 0) fail(eval->vm,pattern,"the compile-time Bool has no case '%s'",pattern->name);
         return which == (value.node->integer != 0);
     }
     case RangePatternValue: case RangePatternRelation: {
-        RangeGraphValue operand = metaExpression(eval,into,pattern->a);
+        RangeGraphValue operand = metaExpect(eval,into,pattern->a,metaValueEnum(eval,value));
         int result = metaRelation(eval,pattern->integer == RangePatternValue ? "=" : pattern->name,value,operand,pattern);
         if (result < 0) fail(eval->vm,pattern,"unsupported compile-time relation '%s'",pattern->name);
         return result;
@@ -1074,38 +1273,163 @@ static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeG
     }
 }
 
-/* The arm a compile-time switch runs, its bindings in *arm. Switches are
- * exhaustive here too: a Bool subject needs .true and .false or a default,
- * any other value a default or an arm that matches anything; a default
- * comes last and must be reachable. */
+/* Exhaustiveness and reachability, as the type checker decides them for
+ * compiled switches: a column's type is the enum its values are cases of, or
+ * NULL when nothing is known statically, which only a wildcard covers. */
+static int metaWild(const RangeNode *pattern)
+{
+    return !pattern || pattern->integer == RangePatternAny || pattern->integer == RangePatternBind;
+}
+
+static RangeNode *metaPatternField(const RangeNode *pattern, size_t index)
+{
+    return pattern && (pattern->flags & RangeFlagApplication) && index < pattern->itemCount ? pattern->items[index]->a : NULL;
+}
+
+/* The case a pattern names in a column of `type`, checked as the type
+ * checker checks it; NULL when the type is unknown. */
+static RangeNode *metaPatternCase(MetaEval *eval, RangeNode *type, RangeNode *pattern)
+{
+    if (!type || !pattern || pattern->integer != RangePatternCase) return NULL;
+    RangeNode *entry = metaCaseNamed(type,pattern->name);
+    if (!entry) fail(eval->vm,pattern,"%s has no case '%s'",type->name,pattern->name);
+    if (!(pattern->flags & RangeFlagApplication)) return entry;
+    if (!entry->itemCount) fail(eval->vm,pattern,"case '%s' has no payload to match",entry->name);
+    if (pattern->itemCount != entry->itemCount)
+        fail(eval->vm,pattern,"case '%s' has %zu payload fields; the pattern matches %zu",entry->name,entry->itemCount,pattern->itemCount);
+    for (size_t i = 0; i < entry->itemCount; ++i) {
+        RangeNode *argument = pattern->items[i], *field = entry->items[i];
+        if (argument->name && !same(argument->name,field->name))
+            fail(eval->vm,argument,"payload field %zu of '%s' is %s",i + 1,entry->name,metaLabeled(field) ? field->name : "unlabeled");
+    }
+    return entry;
+}
+
+static int metaLiteral(const RangeNode *value, long long *out)
+{
+    if (!value) return 0;
+    if (value->kind == RangeNodeInteger || value->kind == RangeNodeBool) { *out = value->integer; return 1; }
+    if (value->kind == RangeNodeUnary && same(value->name,"-") && value->a && value->a->kind == RangeNodeInteger) {
+        *out = -value->a->integer;
+        return 1;
+    }
+    return 0;
+}
+
+static int metaSameValuePattern(const RangeNode *a, const RangeNode *b)
+{
+    long long x, y;
+    return a && b && a->integer == RangePatternValue && b->integer == RangePatternValue
+        && metaLiteral(a->a,&x) && metaLiteral(b->a,&y) && x == y;
+}
+
+static int metaUseful(MetaEval *, RangeNode ***, size_t, RangeNode **, RangeNode **, size_t);
+
+static int metaUsefulCase(MetaEval *eval, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types,
+                          size_t width, RangeNode *entry)
+{
+    RangeArena *arena = eval->vm->arena;
+    size_t arity = entry->itemCount, w = arity + width - 1;
+    RangeNode **ntypes = rangeArenaAllocate(arena,(w ? w : 1) * sizeof(*ntypes));
+    for (size_t i = 0; i < arity; ++i) ntypes[i] = metaFieldEnum(eval,types[0],entry->items[i]);
+    for (size_t i = 1; i < width; ++i) ntypes[arity + i - 1] = types[i];
+    RangeNode ***nrows = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*nrows));
+    size_t n = 0;
+    for (size_t r = 0; r <= count; ++r) {
+        RangeNode **source = r < count ? rows[r] : q;
+        if (r < count && !metaWild(source[0]) && metaPatternCase(eval,types[0],source[0]) != entry) continue;
+        RangeNode **row = rangeArenaAllocate(arena,(w ? w : 1) * sizeof(*row));
+        for (size_t i = 0; i < arity; ++i) row[i] = metaWild(source[0]) ? NULL : metaPatternField(source[0],i);
+        for (size_t i = 1; i < width; ++i) row[arity + i - 1] = source[i];
+        if (r < count) nrows[n++] = row; else q = row;
+    }
+    return metaUseful(eval,nrows,n,q,ntypes,w);
+}
+
+static int metaUseful(MetaEval *eval, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width)
+{
+    if (!width) return count == 0;
+    RangeNode *head = q[0], *type = types[0];
+    if (head && head->integer == RangePatternCase) {
+        RangeNode *entry = metaPatternCase(eval,type,head);
+        return entry ? metaUsefulCase(eval,rows,count,q,types,width,entry) : 1;
+    }
+    RangeNode ***rest = rangeArenaAllocate(eval->vm->arena,(count ? count : 1) * sizeof(*rest));
+    size_t n = 0;
+    if (!metaWild(head)) {
+        for (size_t r = 0; r < count; ++r)
+            if (metaWild(rows[r][0]) || metaSameValuePattern(rows[r][0],head)) rest[n++] = rows[r] + 1;
+        return metaUseful(eval,rest,n,q + 1,types + 1,width - 1);
+    }
+    if (type) {
+        int complete = 1;
+        size_t cases = 0;
+        for (size_t i = 0; i < type->itemCount; ++i) {
+            RangeNode *entry = type->items[i];
+            if (entry->kind != RangeNodeEnumCase) continue;
+            ++cases;
+            int found = 0;
+            for (size_t r = 0; r < count && !found; ++r) found = metaPatternCase(eval,type,rows[r][0]) == entry;
+            if (!found) complete = 0;
+        }
+        if (!cases) return 0;
+        if (complete) {
+            for (size_t i = 0; i < type->itemCount; ++i)
+                if (type->items[i]->kind == RangeNodeEnumCase
+                    && metaUsefulCase(eval,rows,count,q,types,width,type->items[i])) return 1;
+            return 0;
+        }
+    }
+    for (size_t r = 0; r < count; ++r) if (metaWild(rows[r][0])) rest[n++] = rows[r] + 1;
+    return metaUseful(eval,rest,n,q + 1,types + 1,width - 1);
+}
+
+/* The arm a compile-time switch runs, its bindings in *arm. The subject's
+ * type is the enum its value is a case of; as in compiled code, every pattern
+ * must match something the arms above do not, a default comes last, and the
+ * arms together match every value of that type. */
 static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
 {
     RangeGraphValue subject = metaExpression(eval,scope,node->a);
-    int boolean = subject.kind == RangeGraphNode && subject.node->kind == RangeNodeBool;
-    int covered[2] = {0,0}, everything = 0;
+    RangeNode *type = metaValueEnum(eval,subject);
+    RangeArena *arena = eval->vm->arena;
+    size_t capacity = 1;
+    for (size_t i = 0; i < node->itemCount; ++i) capacity += node->items[i]->itemCount + 1;
+    RangeNode ***rows = rangeArenaAllocate(arena,capacity * sizeof(*rows));
+    RangeNode *types[1] = {type};
+    size_t count = 0;
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
-        if (entry->flags & RangeFlagLiteral) {
-            if (i + 1 != node->itemCount) fail(eval->vm,entry,"'default' must be the last arm of a switch");
-            if (everything || (covered[0] && covered[1]))
+        int fallback = (entry->flags & RangeFlagLiteral) != 0;
+        if (fallback && i + 1 != node->itemCount) fail(eval->vm,entry,"'default' must be the last arm of a switch");
+        size_t patterns = fallback ? 1 : entry->itemCount;
+        for (size_t j = 0; j < patterns; ++j) {
+            RangeNode *pattern = fallback ? NULL : entry->items[j];
+            if (pattern && pattern->integer == RangePatternCase && !type)
+                fail(eval->vm,pattern,"a compile-time case pattern matches an enum value; this value is not one");
+            RangeNode **row = rangeArenaAllocate(arena,sizeof(*row));
+            row[0] = pattern;
+            if (!metaUseful(eval,rows,count,row,types,1)) {
+                if (pattern) fail(eval->vm,pattern,"this pattern is already handled by earlier arms");
                 fail(eval->vm,entry,"'default' is never reached: the arms above match every value");
-            everything = 1;
-            continue;
-        }
-        for (size_t j = 0; j < entry->itemCount; ++j) {
-            RangeNode *pattern = entry->items[j];
-            if (pattern->b) continue;
-            if (pattern->integer == RangePatternAny || pattern->integer == RangePatternBind) everything = 1;
-            else if (pattern->integer == RangePatternCase) {
-                if (!boolean) fail(eval->vm,pattern,"a compile-time case pattern matches a boolean graph value; this value is not one");
-                int which = (pattern->flags & RangeFlagApplication) ? -1 : metaBoolCase(pattern->name);
-                if (which >= 0) covered[which] = 1;
             }
+            if (!pattern || !pattern->b) rows[count++] = row;
         }
     }
-    if (!everything && !(boolean && covered[0] && covered[1]))
-        fail(eval->vm,node,boolean ? "compile-time switch over Bool must be exhaustive: handle .true and .false, or add a default"
-                                   : "compile-time switch must be exhaustive; add a default");
+    RangeNode *wild[1] = {NULL};
+    if (metaUseful(eval,rows,count,wild,types,1)) {
+        char missing[256] = "";
+        size_t length = 0;
+        for (size_t i = 0; type && i < type->itemCount; ++i) {
+            RangeNode *entry = type->items[i];
+            if (entry->kind != RangeNodeEnumCase || !metaUsefulCase(eval,rows,count,wild,types,1,entry)) continue;
+            if (length + strlen(entry->name) + 8 < sizeof(missing))
+                length += (size_t)snprintf(missing + length,sizeof(missing) - length,"%s'.%s'",length ? ", " : "",entry->name);
+        }
+        if (length) fail(eval->vm,node,"compile-time switch over %s must be exhaustive: %s %s not handled; add %s or a default",
+                         type->name,missing,strchr(missing,',') ? "are" : "is",strchr(missing,',') ? "those cases" : "that case");
+        fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
+    }
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         *arm = (MetaScope){.parent=scope,.application=scope->application};
@@ -1122,6 +1446,8 @@ static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, Met
 
 static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNode *node)
 {
+    RangeNode *expected = eval->expected;
+    eval->expected = NULL;
     if (!node) return (RangeGraphValue){0};
     metaStep(eval,node);
     switch (node->kind) {
@@ -1130,13 +1456,17 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         // block can only end compile-time evaluation, through @diagnostic.
         MetaScope arm;
         RangeNode *entry = metaArm(eval,scope,node,&arm);
-        if (entry->a) return metaExpression(eval,&arm,entry->a);
+        if (entry->a) return metaExpect(eval,&arm,entry->a,expected);
         RangeGraphValue returned = {0};
         if (metaStatement(eval,&arm,entry->b,&returned))
             fail(eval->vm,entry,"a compile-time switch expression cannot return from an arm");
         fail(eval->vm,entry,"this arm of a switch expression neither yields a value nor diverges");
     }
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return graphNode(node);
+    case RangeNodeCase:
+        // `.absent`: a case of the enum the context expects.
+        if (!expected) fail(eval->vm,node,"'.%s' needs a context that names its enum",node->name);
+        return metaConstructCase(eval,scope,expected,node->name,NULL,node);
     case RangeNodeName: {
         MetaLocal *local = metaLocal(scope,node->name);
         if (local) return local->value;
@@ -1170,6 +1500,10 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         }
         return (RangeGraphValue){0};
     case RangeNodeMemberAccess: {
+        // `Light.red` and `Int?.absent` are cases.
+        RangeNode *enumeration = metaTypePath(eval,scope,node->a);
+        if (enumeration && metaCaseNamed(enumeration,node->name))
+            return metaConstructCase(eval,scope,enumeration,node->name,NULL,node);
         RangeGraphValue receiver = metaExpression(eval,scope,node->a);
         if (same(node->name,"isTarget")) {
             if (receiver.kind != RangeGraphNone && receiver.kind != RangeGraphNode)
@@ -1189,6 +1523,15 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         return value;
     }
     case RangeNodeCall:
+        if (node->a && node->a->kind == RangeNodeCase) {
+            if (!expected) fail(eval->vm,node->a,"'.%s' needs a context that names its enum",node->a->name);
+            return metaConstructCase(eval,scope,expected,node->a->name,node,node);
+        }
+        if (node->a && node->a->kind == RangeNodeMemberAccess) {
+            RangeNode *enumeration = metaTypePath(eval,scope,node->a->a);
+            if (enumeration && metaCaseNamed(enumeration,node->a->name))
+                return metaConstructCase(eval,scope,enumeration,node->a->name,node,node);
+        }
         if (node->a && node->a->kind == RangeNodeMemberAccess && same(node->a->name,"filter")) {
             if (node->itemCount != 1 || !same(node->items[0]->name,"named"))
                 fail(eval->vm,node,"graph filter requires one named argument");
@@ -1211,6 +1554,20 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         return metaScalar(eval,node,RangeNodeInteger,-value);
     }
     case RangeNodeBinary: {
+        if (same(node->name,"=") || same(node->name,"!=")) {
+            // A `.case` operand is a case of the other operand's type.
+            int contextual = node->a && (node->a->kind == RangeNodeCase
+                || (node->a->kind == RangeNodeCall && node->a->a && node->a->a->kind == RangeNodeCase));
+            RangeGraphValue left, right;
+            if (contextual) {
+                right = metaExpression(eval,scope,node->b);
+                left = metaExpect(eval,scope,node->a,metaValueEnum(eval,right));
+            } else {
+                left = metaExpression(eval,scope,node->a);
+                right = metaExpect(eval,scope,node->b,metaValueEnum(eval,left));
+            }
+            return metaScalar(eval,node,RangeNodeBool,metaRelation(eval,node->name,left,right,node));
+        }
         RangeGraphValue left = metaExpression(eval,scope,node->a);
         if (same(node->name,"&&") || same(node->name,"||")) {
             int value = metaBoolean(eval,left,node);
@@ -1304,7 +1661,7 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
             if (metaStatement(eval,scope,node->b,returned)) return 1;
         return 0;
     case RangeNodeReturn:
-        *returned = metaExpression(eval,scope,node->a);
+        *returned = metaExpect(eval,scope,node->a,eval->output);
         return 1;
     case RangeNodeExpressionStatement:
         (void)metaExpression(eval,scope,node->a);
@@ -1736,7 +2093,10 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             sourceDiagnostic(report,node,1,"C-implementation","'.%s' is hard-coded in C; Range member dispatch is not implemented",node->name);
         break;
     case RangeNodeCall:
-        if (node->a && node->a->kind == RangeNodeMemberAccess && scope && scope->meta) {
+        // `Shape.circle(…)` and `Int?.present(…)` construct cases, not calls.
+        if (node->a && node->a->kind == RangeNodeMemberAccess && scope && scope->meta
+            && !(node->a->a && node->a->a->kind == RangeNodeName && (node->a->a->flags & RangeFlagOptional))
+            && !typePath(report,scope,node->a->a)) {
             if (same(node->a->name,"filter") && node->itemCount == 1 && same(node->items[0]->name,"named"))
                 sourceDiagnostic(report,node,1,"C-implementation","'filter(named:)' is hard-coded in C; Range method dispatch is not implemented");
             else sourceDiagnostic(report,node,0,"not-implemented","compile-time method call resolution for '%s' is not implemented",node->a->name);

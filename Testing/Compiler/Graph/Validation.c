@@ -119,7 +119,7 @@ int main(void)
     validate("macro assess(): Construct { @unknown(\"bad\") } @assess construct Parcel {}","unresolved compile-time declaration",0);
     validate("function f(let a: Any, let b: Any): Any { return a } "
              "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","duplicate compile-time local",0);
-    validate("macro assess(): Construct { switch 1 { .true: {}, .false: {} } } @assess construct Parcel {}","boolean graph value",0);
+    validate("macro assess(): Construct { switch 1 { .true: {}, .false: {} } } @assess construct Parcel {}","case pattern matches an enum value",0);
     // switch runs at compile time: literal, relational, and `|` labels, a
     // binding with a where guard, default, text, and switch expressions.
 #define SIZES EFFECT "macro assess(): Construct { let n: #members.first.value " \
@@ -136,11 +136,41 @@ int main(void)
                     "switch size = 30 { .true: @diagnostic(\"thirty\"), .false: {} } } @assess construct Parcel { let payload: 3 }","thirty",0);
     validate(EFFECT "macro assess(): Construct { switch #name { \"Parcel\": @diagnostic(\"named\"), default: {} } } "
                     "@assess construct Parcel {}","named",0);
-    validate("macro assess(): Construct { switch true { .true: {} } } @assess construct Parcel {}","must be exhaustive: handle .true and .false",0);
+    validate("macro assess(): Construct { switch true { .true: {} } } @assess construct Parcel {}","'.false' is not handled",0);
     validate("macro assess(): Construct { switch 1 { 1: {} } } @assess construct Parcel {}","must be exhaustive; add a default",0);
     validate("macro assess(): Construct { switch 1 { default: {}, 1: {} } } @assess construct Parcel {}","'default' must be the last arm",0);
     validate("macro assess(): Construct { switch true { .true: {}, .false: {}, default: {} } } @assess construct Parcel {}","'default' is never reached",0);
-    validate("macro assess(): Construct { switch 1 { .value(let n): {}, default: {} } } @assess construct Parcel {}","boolean graph value",0);
+    validate("macro assess(): Construct { switch 1 { .value(let n): {}, default: {} } } @assess construct Parcel {}","case pattern matches an enum value",0);
+    // Compile-time values include enum values with payloads. The optional is
+    // the enum applying @optional, whatever it and its cases are named.
+#define CASES "@builtin macro diagnostic(let text: RenamedText) @builtin macro optional(): Enum " \
+    "@optional enum Maybe<Value> { case nothing case just(Value) } " \
+    "enum Shape { case circle(radius: Size) case square(Size) case empty } " \
+    "function half(let n: Size): Size? { switch n < 0 { .true: return .nothing, .false: {} } return n / 2 } " \
+    "function shape(let n: Size): Shape { switch n { 0: return .empty, 1: return Shape.circle(radius: 5), default: return .square(n) } } "
+    validate(CASES "macro assess(): Construct { switch half(n: 8) { .nothing: @diagnostic(\"none\"), "
+                   ".just(let v) where v > 10: @diagnostic(\"big\"), .just(4): @diagnostic(\"four\"), .just(let v): {} } } "
+                   "@assess construct Parcel {}","four",0);
+    validate(CASES "macro assess(): Construct { switch half(n: -1) { .nothing: @diagnostic(\"none\"), .just(let v): {} } } "
+                   "@assess construct Parcel {}","none",0);
+    validate(CASES "macro assess(): Construct { let w: switch shape(n: 9) { .square(let w) | .circle(radius: let w): w, .empty: 0 } "
+                   "switch w = 9 { .true: {}, .false: @diagnostic(\"wrong payload\") } "
+                   "switch shape(n: 1) = Shape.circle(radius: 5) { .true: {}, .false: @diagnostic(\"unequal\") } "
+                   "switch half(n: 6) = 3 { .true: {}, .false: @diagnostic(\"not promoted\") } "
+                   "switch half(n: -2) = .nothing { .true: {}, .false: @diagnostic(\"not absent\") } "
+                   "let held: Size?.just(5) switch held { .just(5): {}, default: @diagnostic(\"not held\") } } "
+                   "@assess construct Parcel {}",NULL,2); /* @optional is an application too */
+    validate(CASES "macro assess(): Construct { switch half(n: 2) { .nothing: {} } } @assess construct Parcel {}",
+             "compile-time switch over Maybe must be exhaustive: '.just' is not handled",0);
+    validate(CASES "macro assess(): Construct { switch shape(n: 2) { .circle(let r): {}, .square(let s): {}, .empty: {}, default: {} } } "
+                   "@assess construct Parcel {}","'default' is never reached",0);
+    validate(CASES "macro assess(): Construct { switch shape(n: 2) { .square(let s): {}, .square(3): {}, default: {} } } "
+                   "@assess construct Parcel {}","already handled by earlier arms",0);
+    validate(CASES "macro assess(): Construct { switch shape(n: 2) { .round: {}, default: {} } } @assess construct Parcel {}",
+             "Shape has no case 'round'",0);
+    validate(CASES "macro assess(): Construct { switch shape(n: 2) { .empty(let x): {}, default: {} } } @assess construct Parcel {}",
+             "case 'empty' has no payload to match",0);
+    validate(CASES "macro assess(): Construct { let v: .empty } @assess construct Parcel {}","needs a context that names its enum",0);
     validate("macro assess(): Construct { let v: switch true { .true: { let x: 1 }, .false: 1 } } @assess construct Parcel {}",
              "neither yields a value nor diverges",0);
     validate("@builtin macro assess(): Construct @assess construct Parcel {}","no C primitive is implemented for builtin macro 'assess'",0);

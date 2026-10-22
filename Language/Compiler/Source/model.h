@@ -88,13 +88,22 @@ enum {
 typedef struct RangeNode RangeNode;
 typedef struct RangeMacroApplication RangeMacroApplication;
 
-typedef enum { RangeGraphNone, RangeGraphNode, RangeGraphNodes, RangeGraphText } RangeGraphValueKind;
-typedef struct {
+/* A compile-time value. Graph nodes, node lists, and text are what C's
+ * reflection adapters hold. A case is a value of an enum: node is the case,
+ * declaration the enum, values its payload, one per field. An instance is a
+ * value of a construct: declaration is the construct, values one per item of
+ * the declaration (only stored members are set). Slots are the elements of a
+ * @many member: values, count of them. */
+typedef enum { RangeGraphNone, RangeGraphNode, RangeGraphNodes, RangeGraphText,
+               RangeGraphCase, RangeGraphInstance, RangeGraphSlots } RangeGraphValueKind;
+typedef struct RangeGraphValue {
     RangeGraphValueKind kind;
     RangeNode *node;
     RangeNode **nodes;
     size_t count;
     const char *text;
+    RangeNode *declaration;
+    struct RangeGraphValue *values;
 } RangeGraphValue;
 
 typedef struct {
