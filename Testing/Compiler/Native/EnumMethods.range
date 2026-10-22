@@ -1,16 +1,16 @@
 // Methods in an enum body and in an extension. Range has no self: inside an
-// enum's own functions the enum's name, as a switch, `if case`, or `guard
-// case` subject, is the current value; everywhere else it is the type.
+// enum's own functions the enum's name, as a switch subject, is the current
+// value; everywhere else it is the type.
 // Calls are value.method().
 enum Direction {
     case north, east, south, west
 
     function turned(): Direction {
         switch Direction {
-        case .north: return .east
-        case .east: return .south
-        case .south: return .west
-        case .west: return .north
+        .north: return .east,
+        .east: return .south,
+        .south: return .west,
+        .west: return .north
         }
     }
 
@@ -22,14 +22,14 @@ enum Direction {
 extension Direction {
     function vertical(): Bool {
         switch Direction {
-        case .north, .south: return true
+        .north | .south: return true,
         default: return false
         }
     }
 
     // The name is still the type outside a subject position.
     function isStart(): Bool {
-        if case .north: Direction { return Direction.north = .north }
+        switch Direction { .north: return Direction.north = .north, default: {} }
         return false
     }
 }
@@ -40,8 +40,8 @@ enum Tree {
 
     function sum(): Int {
         switch Tree {
-        case .leaf(let value): return value
-        case .node(let left, let right): return left.sum() + right.sum()
+        .leaf(let value): return value,
+        .node(let left, let right): return left.sum() + right.sum()
         }
     }
 }
@@ -54,19 +54,19 @@ enum Either<Left, Right> {
 
 extension Either {
     function isLeft(): Bool {
-        if case .left(_): Either { return true }
+        switch Either { .left(_): return true, default: {} }
         return false
     }
 
     function leftOr(let fallback: Left): Left {
-        guard case .left(let value): Either else { return fallback }
+        let value: switch Either { .left(let value): value, default: { return fallback } }
         return value
     }
 }
 
 extension Optional {
     function isPresent(): Bool {
-        if case .present(_): Optional { return true }
+        switch Optional { .present(_): return true, default: {} }
         return false
     }
 }
@@ -80,48 +80,48 @@ enum Light {
 
         function swapped(): Color {
             switch Color {
-            case .red: return .green
-            case .green: return .red
+            .red: return .green,
+            .green: return .red
             }
         }
     }
 
     function color(): Color {
         switch Light {
-        case .on(let c): return c
-        case .off: return .red
+        .on(let c): return c,
+        .off: return .red
         }
     }
 }
 
 // A construct's own functions reach its members by their bare names.
 construct Walker {
-    state facing: Direction(.north)
+    state facing: Direction.north
     function step() { facing: facing.turned() }
     function current(): Direction { return facing }
 }
 
 {
-    let d: Direction(.north)
-    if d.turned() != .east { return 1 }
-    if d.opposite() != .south { return 2 }
-    if !d.vertical() || Direction.east.vertical() { return 3 }
-    if d.turned().turned().turned().vertical() { return 4 }
-    let t: Tree(.node(left: .leaf(value: 4), right: .node(left: .leaf(value: 5), right: .leaf(value: 6))))
-    if t.sum() != 15 { return 5 }
-    let e: Either<Int, Bool>(.left(3))
-    if !e.isLeft() || e.leftOr(fallback: 9) != 3 { return 6 }
-    let r: Either<Int, Bool>(.right(true))
-    if r.isLeft() || r.leftOr(fallback: 9) != 9 { return 7 }
+    let d: Direction.north
+    switch d.turned() != .east { .true: return 1, .false: {} }
+    switch d.opposite() != .south { .true: return 2, .false: {} }
+    switch !d.vertical() || Direction.east.vertical() { .true: return 3, .false: {} }
+    switch d.turned().turned().turned().vertical() { .true: return 4, .false: {} }
+    let t: Tree.node(left: .leaf(value: 4), right: .node(left: .leaf(value: 5), right: .leaf(value: 6)))
+    switch t.sum() != 15 { .true: return 5, .false: {} }
+    let e: Either<Int, Bool>.left(3)
+    switch !e.isLeft() || e.leftOr(fallback: 9) != 3 { .true: return 6, .false: {} }
+    let r: Either<Int, Bool>.right(true)
+    switch r.isLeft() || r.leftOr(fallback: 9) != 9 { .true: return 7, .false: {} }
     state w: Walker()
     w.step()
-    if w.current() != .east { return 8 }
-    if !d.isStart() || Direction.west.isStart() { return 9 }
+    switch w.current() != .east { .true: return 8, .false: {} }
+    switch !d.isStart() || Direction.west.isStart() { .true: return 9, .false: {} }
     let maybe: Int?(4)
-    let none: Int?(.absent)
-    if !maybe.isPresent() || none.isPresent() { return 10 }
-    let lit: Light(.on(.green))
-    if lit.color() != .green || lit.color().swapped() != .red || Light.off.color() != .red { return 11 }
+    let none: Int?.absent
+    switch !maybe.isPresent() || none.isPresent() { .true: return 10, .false: {} }
+    let lit: Light.on(.green)
+    switch lit.color() != .green || lit.color().swapped() != .red || Light.off.color() != .red { .true: return 11, .false: {} }
     @print("\(d.opposite()) \(t.sum())")
     return 42
 }

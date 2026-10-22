@@ -25,7 +25,6 @@ typedef enum {
     RangeNodeAttribute,
     RangeNodeBlock,
     RangeNodeAssign,
-    RangeNodeIf,
     RangeNodeWhile,
     RangeNodeReturn,
     RangeNodeExpressionStatement,
@@ -50,7 +49,7 @@ typedef enum {
     RangeNodeExtension,
     RangeNodeSpecialization, /* a construct plus one value per generic */
     RangeNodeType,
-    RangeNodePattern,        /* a switch or if-case pattern; integer is its RangePattern form */
+    RangeNodePattern,        /* a switch arm's pattern; integer is its RangePattern form */
     RangeNodeFor,            /* for-in: a is the loop it lowers to, calling the @iteration function */
     RangeNodeBreak,
     RangeNodeContinue,
@@ -69,20 +68,21 @@ enum {
     RangeFlagChecked = 1 << 10,    /* specialization: its laws have run */
     RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
     RangeFlagMutationKnown = 1 << 12,
-    RangeFlagConditional = 1 << 13, /* switch: written as `if case` or `if let`, with an else arm */
-    RangeFlagGuard = 1 << 14,      /* if or conditional switch written as `guard`: its else arm must exit */
-    RangeFlagImplicit = 1 << 15    /* attribute: applied by its grammar declaration's @defaults, not written */
+    RangeFlagValue = 1 << 13,      /* switch: an expression; an arm yields its a, or its block diverges */
+    RangeFlagImplicit = 1 << 15    /* attribute: applied by its grammar declaration's @defaults, not written;
+                                    * switch arm: a default the compiler wrote for a lowering */
 };
 
 /* Pattern forms. A case pattern's items are arguments (label, sub-pattern); a
- * top-level pattern's b is its `where` guard and c the block of its bindings. */
+ * top-level pattern's b is its arm's `where` guard, shared by every `|`
+ * alternative of the arm, and c the block of its bindings. */
 enum {
     RangePatternAny,      /* _ */
     RangePatternBind,     /* let name: a is the Let it declares */
     RangePatternCase,     /* .name(…) or Type.name(…): a is the type path, if written */
-    RangePatternValue,    /* an expression compared for equality: a */
-    RangePatternRelation, /* < 0: name is the operator, a the operand */
-    RangePatternPresent   /* if let: the payload of the @optional declaration's payload case */
+    RangePatternValue,    /* a literal compared for equality: a */
+    RangePatternRelation, /* < 0 or = limit: name is the operator, a the operand */
+    RangePatternPresent   /* for-in lowering: the payload of the @optional declaration's payload case */
 };
 
 typedef struct RangeNode RangeNode;

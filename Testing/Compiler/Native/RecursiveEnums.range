@@ -12,16 +12,14 @@ enum List {
 }
 
 function build(let depth: Int, let start: Int): Tree {
-    if depth = 0 { return .leaf(value: start) }
+    switch depth = 0 { .true: return .leaf(value: start), .false: {} }
     return .node(left: build(depth: depth - 1, start: start), right: build(depth: depth - 1, start: start + 1))
 }
 
 function sum(let tree: Tree): Int {
     switch tree {
-    case .leaf(let value):
-        return value
-    case .node(let left, let right):
-        return sum(tree: left) + sum(tree: right)
+    .leaf(let value): return value,
+    .node(let left, let right): return sum(tree: left) + sum(tree: right)
     }
 }
 
@@ -31,18 +29,18 @@ function count(let list: List): Int {
     state going: true
     while going {
         switch rest {
-        case .end:
-            going: false
-        case .link(let value, let next):
+        .end: going: false,
+        .link(let value, let next): {
             total: total + value
             rest: next
+        }
         }
     }
     return total
 }
 
 function range(let n: Int): List {
-    state list: List(.end)
+    state list: List.end
     state i: n
     while i > 0 {
         list: .link(value: i, next: list)
@@ -65,9 +63,9 @@ function range(let n: Int): List {
         checksum: checksum + count(list: xs) + count(list: ys)
         round: round + 1
     }
-    if sum(tree: build(depth: 1, start: 1)) != 3 { return 1 }
-    if count(list: range(n: 4)) != 10 { return 2 }
+    switch sum(tree: build(depth: 1, start: 1)) != 3 { .true: return 1, .false: {} }
+    switch count(list: range(n: 4)) != 10 { .true: return 2, .false: {} }
     // Per round: trees 256 + 356, lists 5050 + 6050.
-    if checksum != 50 * (256 + 356 + 5050 + 6050) { return 3 }
+    switch checksum != 50 * (256 + 356 + 5050 + 6050) { .true: return 3, .false: {} }
     return 42
 }

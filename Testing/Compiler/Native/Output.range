@@ -18,8 +18,9 @@ function greet(let name: String): Int {
     let min: (-9223372036854775807 - 1)
     @print("\(small) \(big) \(min) \(0) \(true)")
     @print("done")
-    if xs.count > 3 {
-        @diagnostic("count is \(xs.count), expected at most 3")
+    switch xs.count > 3 {
+        .true: @diagnostic("count is \(xs.count), expected at most 3"),
+        .false: {}
     }
     return 0
 }

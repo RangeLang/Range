@@ -8,7 +8,7 @@ enum Holding { case some(Array<Point>), none }
 function ints(let values: Array<Int>, let extra: Int): Array<Int> {
     state xs: Array<Int>()
     for value in values { xs.append(value: value) }
-    if extra > 0 { xs.append(value: extra) }
+    switch extra > 0 { .true: xs.append(value: extra), .false: {} }
     return xs
 }
 
@@ -21,13 +21,13 @@ function points(let n: Int): Array<Point> {
 {
     state a: Array<Int>()
     state b: Array<Int>()
-    if a != b { return 1 }
+    switch a != b { .true: return 1, .false: {} }
     a.append(value: 1) a.append(value: 2) a.append(value: 3)
-    if a = b { return 2 }
+    switch a = b { .true: return 2, .false: {} }
     b.append(value: 1) b.append(value: 2) b.append(value: 3)
-    if a != b { return 3 }
+    switch a != b { .true: return 3, .false: {} }
     b.append(value: 4)
-    if a = b || b = a { return 4 }
+    switch a = b || b = a { .true: return 4, .false: {} }
 
     // Equal contents with different capacities: 4 slots against 3.
     state c: Array<Int>()
@@ -35,15 +35,15 @@ function points(let n: Int): Array<Point> {
     c.capacity: 3
     c.write(at: 0, value: 1) c.write(at: 1, value: 2) c.write(at: 2, value: 3)
     c.count: 3
-    if a.capacity = c.capacity || a != c { return 5 }
+    switch a.capacity = c.capacity || a != c { .true: return 5, .false: {} }
     state d: Array<Int>()
     d.append(value: 1) d.append(value: 2) d.append(value: 9)
-    if a = d { return 6 }
+    switch a = d { .true: return 6, .false: {} }
 
-    if points(n: 3) != points(n: 3) || points(n: 3) = points(n: 2) { return 7 }
+    switch points(n: 3) != points(n: 3) || points(n: 3) = points(n: 2) { .true: return 7, .false: {} }
     state moved: points(n: 2)
     moved.write(at: 1, value: Point(x: 1, y: 3))
-    if moved = points(n: 2) { return 8 }
+    switch moved = points(n: 2) { .true: return 8, .false: {} }
 
     // Nested: each inner array compares with Array<Int>'s own `=`.
     state grid: Array<Array<Int>>()
@@ -52,16 +52,16 @@ function points(let n: Int): Array<Point> {
     state same: Array<Array<Int>>()
     same.append(value: ints(values: a, extra: 0))
     same.append(value: b)
-    if grid != same { return 9 }
+    switch grid != same { .true: return 9, .false: {} }
     same.write(at: 1, value: a)
-    if grid = same { return 10 }
+    switch grid = same { .true: return 10, .false: {} }
 
     // A construct with an Array field compares it with Array's `=`.
-    if Bag(label: "x", items: a) != Bag(label: "x", items: c) { return 11 }
-    if Bag(label: "x", items: a) = Bag(label: "x", items: d) || Bag(label: "x", items: a) = Bag(label: "y", items: a) { return 12 }
+    switch Bag(label: "x", items: a) != Bag(label: "x", items: c) { .true: return 11, .false: {} }
+    switch Bag(label: "x", items: a) = Bag(label: "x", items: d) || Bag(label: "x", items: a) = Bag(label: "y", items: a) { .true: return 12, .false: {} }
 
     // An enum payload holding an Array.
-    if Holding.some(points(n: 2)) != .some(points(n: 2)) || Holding.some(points(n: 2)) = .some(points(n: 1)) { return 13 }
-    if Holding.some(points(n: 0)) = .none || Holding.none != .none { return 14 }
+    switch Holding.some(points(n: 2)) != .some(points(n: 2)) || Holding.some(points(n: 2)) = .some(points(n: 1)) { .true: return 13, .false: {} }
+    switch Holding.some(points(n: 0)) = .none || Holding.none != .none { .true: return 14, .false: {} }
     return 42
 }

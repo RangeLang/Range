@@ -236,9 +236,12 @@ static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attri
     }
     attribute->resolvedDeclaration = macro;
     attribute->macroApplication = app;
-    for (size_t i = 0; i < app->count; ++i)
-        if (rangeNodeHasContextReference(app->bindings[i].definition))
+    // A switch is evaluated when the application runs, not at resolution.
+    for (size_t i = 0; i < app->count; ++i) {
+        RangeNode *rhs = rangeNodeRHS(app->bindings[i].definition);
+        if (rangeNodeHasContextReference(app->bindings[i].definition) && !(rhs && rhs->kind == RangeNodeSwitch))
             (void)graphBinding(vm,app,&app->bindings[i]);
+    }
 }
 
 static void resolveGraphTarget(Resolver *vm, RangeNode *target)
@@ -993,6 +996,7 @@ static const char *metaText(MetaEval *eval, MetaScope *scope, RangeNode *message
             if (v.kind == RangeGraphText) value = v.text;
             else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeBool) value = v.node->integer ? "true" : "false";
             else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeInteger) snprintf(piece,sizeof(piece),"%lld",v.node->integer);
+            else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeString) value = graphText(eval->vm,v,part->a);
             else if (v.kind == RangeGraphNode && v.node->name) value = v.node->name;
             else fail(eval->vm,part->a ? part->a : at,"a compile-time message cannot interpolate this value");
         }
@@ -1003,11 +1007,135 @@ static const char *metaText(MetaEval *eval, MetaScope *scope, RangeNode *message
     return rangeArenaIntern(eval->vm->arena,text,length);
 }
 
+/* `=`, `!=`, and the orderings on compile-time values: 1 or 0, or -1 when
+ * `op` is not one of them. Graph values compare by identity: a declaration is
+ * equal only to itself. Numbers and booleans compare by value, and text (a
+ * name) with a string literal by its characters. */
+static int metaRelation(MetaEval *eval, const char *op, RangeGraphValue left, RangeGraphValue right, RangeNode *at)
+{
+    if (same(op,"=") || same(op,"!=")) {
+        int text = left.kind == RangeGraphText || right.kind == RangeGraphText;
+        int equal = left.kind == right.kind;
+        if (text && left.kind != RangeGraphNone && right.kind != RangeGraphNone)
+            equal = same(graphText(eval->vm,left,at),graphText(eval->vm,right,at));
+        else if (equal && left.kind == RangeGraphNode) {
+            RangeNode *a=left.node, *b=right.node;
+            if (a->kind == b->kind && (a->kind == RangeNodeInteger || a->kind == RangeNodeBool))
+                equal = a->integer == b->integer;
+            else equal = a == b;
+        } else if (equal && left.kind != RangeGraphNone)
+            fail(eval->vm,at,"unsupported compile-time equality operands");
+        return same(op,"=") ? equal : !equal;
+    }
+    static const char *const orderings[] = {"<", ">", "<=", ">=", NULL};
+    for (size_t i = 0; orderings[i]; ++i) {
+        if (!same(op,orderings[i])) continue;
+        long long a=metaNumber(eval,left,at), b=metaNumber(eval,right,at);
+        return i == 0 ? a < b : i == 1 ? a > b : i == 2 ? a <= b : a >= b;
+    }
+    return -1;
+}
+
+static const char *literalSpelling(const RangeNode *literal);
+
+/* A compile-time Bool is a C literal node; the case it is, is the one its
+ * literal spells, as the @literal rule of the condition type says. */
+static int metaBoolCase(const char *name)
+{
+    for (int value = 0; value < 2; ++value) {
+        RangeNode literal = {.kind=RangeNodeBool,.integer=value};
+        if (same(name,literalSpelling(&literal))) return value;
+    }
+    return -1;
+}
+
+/* Whether `pattern` matches `value` at compile time; its bindings join `into`. */
+static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeGraphValue value)
+{
+    metaStep(eval,pattern);
+    switch (pattern->integer) {
+    case RangePatternAny: return 1;
+    case RangePatternBind: metaBind(eval,into,pattern->a,value); return 1;
+    case RangePatternCase: {
+        if (pattern->flags & RangeFlagApplication) fail(eval->vm,pattern,"compile-time values have no payloads to match");
+        if (value.kind != RangeGraphNode || value.node->kind != RangeNodeBool)
+            fail(eval->vm,pattern,"a compile-time case pattern matches a boolean graph value; this value is not one");
+        int which = metaBoolCase(pattern->name);
+        if (which < 0) fail(eval->vm,pattern,"the compile-time Bool has no case '%s'",pattern->name);
+        return which == (value.node->integer != 0);
+    }
+    case RangePatternValue: case RangePatternRelation: {
+        RangeGraphValue operand = metaExpression(eval,into,pattern->a);
+        int result = metaRelation(eval,pattern->integer == RangePatternValue ? "=" : pattern->name,value,operand,pattern);
+        if (result < 0) fail(eval->vm,pattern,"unsupported compile-time relation '%s'",pattern->name);
+        return result;
+    }
+    default: fail(eval->vm,pattern,"unsupported compile-time pattern");
+    }
+}
+
+/* The arm a compile-time switch runs, its bindings in *arm. Switches are
+ * exhaustive here too: a Bool subject needs .true and .false or a default,
+ * any other value a default or an arm that matches anything; a default
+ * comes last and must be reachable. */
+static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
+{
+    RangeGraphValue subject = metaExpression(eval,scope,node->a);
+    int boolean = subject.kind == RangeGraphNode && subject.node->kind == RangeNodeBool;
+    int covered[2] = {0,0}, everything = 0;
+    for (size_t i = 0; i < node->itemCount; ++i) {
+        RangeNode *entry = node->items[i];
+        if (entry->flags & RangeFlagLiteral) {
+            if (i + 1 != node->itemCount) fail(eval->vm,entry,"'default' must be the last arm of a switch");
+            if (everything || (covered[0] && covered[1]))
+                fail(eval->vm,entry,"'default' is never reached: the arms above match every value");
+            everything = 1;
+            continue;
+        }
+        for (size_t j = 0; j < entry->itemCount; ++j) {
+            RangeNode *pattern = entry->items[j];
+            if (pattern->b) continue;
+            if (pattern->integer == RangePatternAny || pattern->integer == RangePatternBind) everything = 1;
+            else if (pattern->integer == RangePatternCase) {
+                if (!boolean) fail(eval->vm,pattern,"a compile-time case pattern matches a boolean graph value; this value is not one");
+                int which = (pattern->flags & RangeFlagApplication) ? -1 : metaBoolCase(pattern->name);
+                if (which >= 0) covered[which] = 1;
+            }
+        }
+    }
+    if (!everything && !(boolean && covered[0] && covered[1]))
+        fail(eval->vm,node,boolean ? "compile-time switch over Bool must be exhaustive: handle .true and .false, or add a default"
+                                   : "compile-time switch must be exhaustive; add a default");
+    for (size_t i = 0; i < node->itemCount; ++i) {
+        RangeNode *entry = node->items[i];
+        *arm = (MetaScope){.parent=scope,.application=scope->application};
+        if (entry->flags & RangeFlagLiteral) return entry;
+        for (size_t j = 0; j < entry->itemCount; ++j) {
+            *arm = (MetaScope){.parent=scope,.application=scope->application};
+            RangeNode *pattern = entry->items[j];
+            if (metaMatch(eval,arm,pattern,subject)
+                && (!pattern->b || metaBoolean(eval,metaExpression(eval,arm,pattern->b),pattern->b))) return entry;
+        }
+    }
+    fail(eval->vm,node,"compile-time switch has no arm for this value");
+}
+
 static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNode *node)
 {
     if (!node) return (RangeGraphValue){0};
     metaStep(eval,node);
     switch (node->kind) {
+    case RangeNodeSwitch: {
+        // A switch expression is the value its arm yields; an arm that is a
+        // block can only end compile-time evaluation, through @diagnostic.
+        MetaScope arm;
+        RangeNode *entry = metaArm(eval,scope,node,&arm);
+        if (entry->a) return metaExpression(eval,&arm,entry->a);
+        RangeGraphValue returned = {0};
+        if (metaStatement(eval,&arm,entry->b,&returned))
+            fail(eval->vm,entry,"a compile-time switch expression cannot return from an arm");
+        fail(eval->vm,entry,"this arm of a switch expression neither yields a value nor diverges");
+    }
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return graphNode(node);
     case RangeNodeName: {
         MetaLocal *local = metaLocal(scope,node->name);
@@ -1091,28 +1219,9 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
             return metaScalar(eval,node,RangeNodeBool,value);
         }
         RangeGraphValue right = metaExpression(eval,scope,node->b);
-        if (same(node->name,"=") || same(node->name,"!=")) {
-            // Graph values compare by identity: a declaration is equal only to
-            // itself. Numbers and booleans compare by value, and text (a name)
-            // with a string literal by its characters.
-            int text = left.kind == RangeGraphText || right.kind == RangeGraphText;
-            int equal = left.kind == right.kind;
-            if (text && left.kind != RangeGraphNone && right.kind != RangeGraphNone)
-                equal = same(graphText(eval->vm,left,node),graphText(eval->vm,right,node));
-            else if (equal && left.kind == RangeGraphNode) {
-                RangeNode *a=left.node, *b=right.node;
-                if (a->kind == b->kind && (a->kind == RangeNodeInteger || a->kind == RangeNodeBool))
-                    equal = a->integer == b->integer;
-                else equal = a == b;
-            } else if (equal && left.kind != RangeGraphNone)
-                fail(eval->vm,node,"unsupported compile-time equality operands");
-            return metaScalar(eval,node,RangeNodeBool,same(node->name,"=") ? equal : !equal);
-        }
+        int relation = metaRelation(eval,node->name,left,right,node);
+        if (relation >= 0) return metaScalar(eval,node,RangeNodeBool,relation);
         long long a=metaNumber(eval,left,node), b=metaNumber(eval,right,node), value=0;
-        if (same(node->name,"<")) return metaScalar(eval,node,RangeNodeBool,a < b);
-        if (same(node->name,">")) return metaScalar(eval,node,RangeNodeBool,a > b);
-        if (same(node->name,"<=")) return metaScalar(eval,node,RangeNodeBool,a <= b);
-        if (same(node->name,">=")) return metaScalar(eval,node,RangeNodeBool,a >= b);
         int overflow = 0;
         if (same(node->name,"+")) overflow = __builtin_add_overflow(a,b,&value);
         else if (same(node->name,"-")) overflow = __builtin_sub_overflow(a,b,&value);
@@ -1185,8 +1294,11 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
         local->value = metaExpression(eval,scope,node->b);
         return 0;
     }
-    case RangeNodeIf:
-        return metaStatement(eval,scope,metaBoolean(eval,metaExpression(eval,scope,node->a),node) ? node->b : node->c,returned);
+    case RangeNodeSwitch: {
+        MetaScope arm;
+        RangeNode *entry = metaArm(eval,scope,node,&arm);
+        return metaStatement(eval,&arm,entry->b,returned);
+    }
     case RangeNodeWhile:
         while (metaBoolean(eval,metaExpression(eval,scope,node->a),node))
             if (metaStatement(eval,scope,node->b,returned)) return 1;
@@ -1430,8 +1542,8 @@ static int sourceMatches(RangeNode *node, const char *name, int kind)
 
 /* A method's receiver: an implicit let of the method, made on first use and
  * never found by name. Range has no `self`: members are reached by their bare
- * names, and inside an enum's own functions the enum's name as a switch,
- * `if case`, or `guard case` subject is the current value. The type checker
+ * names, and inside an enum's own functions the enum's name as a switch
+ * subject is the current value. The type checker
  * gives it the method's receiver specialization. */
 static RangeNode *methodReceiver(SourceReport *report, RangeNode *function)
 {
@@ -1569,7 +1681,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         if (macroBuiltin(node,"many"))
             sourceDiagnostic(report,node,1,"C-implementation","@many storage is a C heap block of copy-on-write slots, allocated through libSystem and freed when its last reference ends");
         else if (macroBuiltin(node,"optional")) {
-            sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the enum applying @optional, and 'if let' to its payload case, in C");
+            sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the enum applying @optional, and 'for … in' unwraps its payload case, in C");
             sourceDiagnostic(report,node,1,"C-implementation","a value of T where T? is expected becomes the payload case holding it, in C");
         }
         else if (macroBuiltin(node,"print"))
@@ -1681,20 +1793,19 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     case RangeNodeEmission: case RangeNodeExtension:
         return; /* quoted and extension code is checked where it lands */
     case RangeNodeSwitchCase: {
-        // Each pattern sees its own bindings in its guard; the body sees the
-        // first pattern's, which every pattern of the case binds.
+        // The arm's guard, shared by its `|` alternatives, and its body see
+        // the first pattern's bindings, which every alternative binds.
         for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,scope,node->items[i],metadata);
         SourceScope bound = {.owner=node->c ? node->c : node,.parent=scope,.meta=scope && scope->meta};
+        if (node->itemCount) diagnoseSourceNode(report,&bound,node->items[0]->b,metadata);
+        diagnoseSourceNode(report,&bound,node->a,metadata);
         diagnoseSourceNode(report,&bound,node->b,metadata);
         return;
     }
-    case RangeNodePattern: {
+    case RangeNodePattern:
         diagnoseSourceNode(report,scope,node->a,metadata);
         for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,scope,node->items[i],metadata);
-        SourceScope bound = {.owner=node->c ? node->c : node,.parent=scope,.meta=scope && scope->meta};
-        diagnoseSourceNode(report,&bound,node->b,metadata);
         return;
-    }
     case RangeNodeClosure: case RangeNodeSyntaxTemplate:
         sourceDiagnostic(report,node,0,"not-implemented","execution of '%s' is not implemented",rangeNodeKindName(node->kind));
         break;
@@ -1987,8 +2098,9 @@ typedef struct {
     RangeNode *integer, *boolean; /* constructs the integer and boolean literal rules select */
     RangeNode *booleanType;
     LawResult *laws; size_t lawCount, lawCapacity;
-    int loops, breaks; /* enclosing loops, and enclosing loops and switches, in this function */
+    int loops; /* enclosing loops in this function: the targets of break and continue */
     RangeNode *function; /* the function being typed */
+    RangeNode *output;   /* what its `return` gives: the function's result, or the entry block's status */
     /* Values compared with `=`: checked once every type is known. */
     struct { RangeNode *type, *at; const char *in; } *equalities; size_t equalityCount, equalityCapacity;
     /* Generic functions, specialized per instantiation: each instance is a
@@ -2527,6 +2639,15 @@ static RangeNode *pathEnum(Typer *typer, SourceScope *scope, RangeNode *declarat
     return NULL;
 }
 
+/* `Int?` written before `.case`, as in `Int?.absent`: the optional of the
+ * type, the enum applying @optional specialized with it. */
+static RangeNode *optionalPath(Typer *typer, SourceScope *scope, RangeNode *path, RangeNode *context)
+{
+    if (!path || path->kind != RangeNodeName || !(path->flags & RangeFlagOptional)) return NULL;
+    RangeNode *type = resolveTypeReference(typer,scope,path->name,path->generics,RangeFlagOptional,context,path);
+    return isEnum(type) ? type : NULL;
+}
+
 static RangeNode *namedCase(Typer *typer, RangeNode *type, const char *name, RangeNode *at)
 {
     RangeNode *found = enumCase(type->resolvedDeclaration,name);
@@ -2736,7 +2857,18 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
     if (type->kind == RangeNodeTypeParameter) { typeError(typer,at,"type parameter %s cannot be constructed",type->name); return NULL; }
     RangeNode *declaration = type->resolvedDeclaration;
     if (declaration->kind == RangeNodeEnum) {
-        // An enum value is one of its cases: `Light(.red)` copies the value given.
+        // `Int?(maybe)` copies the enum value given, promoted if it is a Wrapped.
+        // A case has one spelling, Light.red or .red in context, so
+        // `Light(.red)` is not one.
+        RangeNode *given = count == 1 ? arguments[0]->a : NULL;
+        if (given && (given->kind == RangeNodeCase || (given->kind == RangeNodeCall && given->a && given->a->kind == RangeNodeCase))) {
+            const char *name = given->kind == RangeNodeCase ? given->name : given->a->name;
+            const char *written = at->typeName ? at->typeName : at->kind == RangeNodeCall && at->a && at->a->name ? at->a->name : declaration->name;
+            const char *optional = (at->flags & RangeFlagOptional) || (at->kind == RangeNodeCall && at->a && (at->a->flags & RangeFlagOptional)) ? "?" : "";
+            typeError(typer,at,"an enum value is written %s%s.%s, or .%s where the context names its type; %s%s(.%s) is not Range",
+                      written,optional,name,name,written,optional,name);
+            return type;
+        }
         char t[160]; describeType(t,sizeof(t),type);
         if (count != 1 || arguments[0]->name) {
             typeError(typer,at,"%s is constructed from one unlabeled value, such as %s(.%s)",t,declaration->name,
@@ -3177,7 +3309,8 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         return type;
     }
     if (callee->kind == RangeNodeMemberAccess && callee->name) {
-        RangeNode *owner = typePath(typer->report,scope,callee->a);
+        RangeNode *optional = optionalPath(typer,scope,callee->a,context);
+        RangeNode *owner = optional ? optional->resolvedDeclaration : typePath(typer->report,scope,callee->a);
         if (owner) {
             // `Outer.Inner(…)` constructs a nested type; `Tree.leaf(value: 1)` a case.
             RangeNode *nested = nestedDeclaration(owner,callee->name,strlen(callee->name));
@@ -3190,7 +3323,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
                 typeError(typer,callee,"'%s' has no case or nested type '%s'",owner->name,callee->name);
                 return NULL;
             }
-            RangeNode *type = pathEnum(typer,scope,owner,callee->a,expected,context,callee);
+            RangeNode *type = optional ? optional : pathEnum(typer,scope,owner,callee->a,expected,context,callee);
             RangeNode *entry = type ? namedCase(typer,type,callee->name,callee) : NULL;
             if (!entry) return NULL;
             if (!entry->itemCount) { typeError(typer,call,"case '%s' has no payload; write %s.%s",entry->name,owner->name,entry->name); return NULL; }
@@ -3335,6 +3468,8 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
     return type;
 }
 
+static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
+
 static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
 {
     if (!expr) return NULL;
@@ -3383,7 +3518,8 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         break;
     }
     case RangeNodeMemberAccess: {
-        RangeNode *owner = typePath(typer->report,scope,expr->a);
+        RangeNode *optional = optionalPath(typer,scope,expr->a,context);
+        RangeNode *owner = optional ? optional->resolvedDeclaration : typePath(typer->report,scope,expr->a);
         if (owner) {
             // `Light.red` is a case; `Outer.Inner` names a type.
             if (nestedDeclaration(owner,expr->name,strlen(expr->name))) {
@@ -3391,7 +3527,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
                 break;
             }
             if (owner->kind != RangeNodeEnum) { typeError(typer,expr,"'%s' names a type, not a value",owner->name); break; }
-            RangeNode *enumeration = pathEnum(typer,scope,owner,expr->a,expected,context,expr);
+            RangeNode *enumeration = optional ? optional : pathEnum(typer,scope,owner,expr->a,expected,context,expr);
             RangeNode *entry = enumeration ? namedCase(typer,enumeration,expr->name,expr) : NULL;
             if (!entry) break;
             if (entry->itemCount) { typeError(typer,expr,"case '%s' carries a payload; write %s.%s(…)",entry->name,owner->name,entry->name); break; }
@@ -3414,6 +3550,9 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     }
     case RangeNodeCall:
         type = typeCall(typer,scope,expr,expected,context);
+        break;
+    case RangeNodeSwitch:
+        type = typeSwitch(typer,scope,expr,expected,context,typer->output);
         break;
     case RangeNodeUnary: {
         if (same(expr->name,"-") && expr->a && expr->a->kind == RangeNodeInteger) {
@@ -3467,35 +3606,32 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
 }
 
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
-static void typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
 
 /* Whether control cannot reach the end of `node`: it returns, breaks, or
- * continues on every path, or ends the program through @diagnostic. A break
- * inside a switch nested here ends only that switch. */
+ * continues on every path, or ends the program through @diagnostic. `break`
+ * and `continue` leave the innermost loop; a switch is never their target. A
+ * loop nested here ends its own breaks, so they do not leave `node`. */
 static int exits(const RangeNode *node, int breaking)
 {
     if (!node) return 0;
     switch (node->kind) {
-    case RangeNodeReturn: case RangeNodeContinue: return 1;
-    case RangeNodeBreak: return breaking;
+    case RangeNodeReturn: return 1;
+    case RangeNodeBreak: case RangeNodeContinue: return breaking;
     case RangeNodeBlock:
         for (size_t i = 0; i < node->itemCount; ++i) if (exits(node->items[i],breaking)) return 1;
         return 0;
-    case RangeNodeIf: return node->c && exits(node->b,breaking) && exits(node->c,breaking);
     case RangeNodeSwitch:
         if (!node->itemCount) return 0;
-        for (size_t i = 0; i < node->itemCount; ++i)
-            if (!exits(node->items[i]->b,breaking && (node->flags & RangeFlagConditional))) return 0;
+        for (size_t i = 0; i < node->itemCount; ++i) {
+            RangeNode *entry = node->items[i];
+            if (!exits(entry->a ? entry->a : entry->b,breaking)) return 0;
+        }
         return 1;
     case RangeNodeExpressionStatement:
         return node->a && node->a->kind == RangeNodeAttribute && macroBuiltin(node->a->resolvedDeclaration,"diagnostic");
     default: return 0;
     }
-}
-
-static void guardFallsThrough(Typer *typer, RangeNode *guard)
-{
-    typeError(typer,guard,"the else block of 'guard' must not fall through; end it with return, break, or continue");
 }
 
 /* The function a construct or enum declares with @iteration, which `for … in`
@@ -3628,18 +3764,15 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         coerce(typer,node->b,expected,actual,what);
         break;
     }
-    case RangeNodeIf: case RangeNodeWhile: {
+    case RangeNodeWhile: {
         // A while without a condition is the loop `for … in` is written as; it ends at break.
-        if (node->a || node->kind == RangeNodeIf) {
+        if (node->a) {
             RangeNode *condition = typeOf(typer,scope,node->a,typer->booleanType,context);
             expectType(typer,node->a,typer->booleanType,condition,"condition");
         }
-        int loop = node->kind == RangeNodeWhile;
-        typer->loops += loop; typer->breaks += loop;
+        typer->loops += 1;
         typeStatement(typer,scope,node->b,context,output);
-        typer->loops -= loop; typer->breaks -= loop;
-        typeStatement(typer,scope,node->c,context,output);
-        if ((node->flags & RangeFlagGuard) && !exits(node->c,1)) guardFallsThrough(typer,node);
+        typer->loops -= 1;
         break;
     }
     case RangeNodeFor: {
@@ -3660,7 +3793,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
             else typeError(typer,rangeNodeRHS(sequence),"'for … in' cannot iterate %s: it declares no @iteration function",t);
             break;
         }
-        RangeNode *next = loop->items[2]->b->items[0]->a; /* the call in `if let element: …` */
+        RangeNode *next = loop->items[2]->b->items[0]->a; /* the subject of the switch over the next element */
         next->a->resolvedDeclaration = function;
         if (function->itemCount == 1) next->items[0]->name = function->items[0]->name;
         typeStatement(typer,&body,loop->items[1],context,output);
@@ -3668,7 +3801,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         break;
     }
     case RangeNodeBreak:
-        if (!typer->breaks) typeError(typer,node,"'break' is only allowed inside a loop or a switch");
+        if (!typer->loops) typeError(typer,node,"'break' is only allowed inside a loop");
         break;
     case RangeNodeContinue:
         if (!typer->loops) typeError(typer,node,"'continue' is only allowed inside a loop");
@@ -3683,7 +3816,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         }
         break;
     case RangeNodeSwitch:
-        typeSwitch(typer,scope,node,context,output);
+        (void)typeSwitch(typer,scope,node,NULL,context,output);
         break;
     case RangeNodeExpressionStatement:
         if (node->a && node->a->kind == RangeNodeAttribute) typeEffect(typer,scope,node->a,context);
@@ -3815,7 +3948,8 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
     case RangePatternAny: return;
     case RangePatternBind: pattern->a->type = type; return;
     case RangePatternPresent: {
-        // `if let`: the payload of the @optional declaration's single payload case.
+        // The element `for … in` binds: the payload of the @optional
+        // declaration's single payload case.
         RangeNode *payload = NULL;
         size_t payloads = 0;
         if (isEnum(type) && appliesBuiltin(type->resolvedDeclaration,"optional"))
@@ -3826,7 +3960,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
                 payload = entry;
             }
         if (!type) return;
-        if (!payload || payloads != 1) { typeError(typer,pattern,"'if let' unwraps an optional value; found %s",t); return; }
+        if (!payload || payloads != 1) { typeError(typer,pattern,"'for … in' unwraps an optional element; found %s",t); return; }
         RangeNode *inner = rangeNodeCreate(typer->report->arena,RangeNodePattern,pattern->path,pattern->line,pattern->column);
         inner->integer = RangePatternBind;
         inner->a = pattern->a;
@@ -3841,25 +3975,9 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
         return;
     }
     case RangePatternCase: {
+        // `.name` is always a case of the subject's type.
         if (!type) return;
-        if (pattern->a) {
-            RangeNode *owner = typePath(typer->report,scope,pattern->a);
-            if (!owner && !(pattern->flags & RangeFlagApplication)) {
-                // `limits.max`: a value compared for equality.
-                RangeNode *access = rangeNodeCreate(typer->report->arena,RangeNodeMemberAccess,pattern->path,pattern->line,pattern->column);
-                access->a = pattern->a;
-                access->name = pattern->name;
-                pattern->integer = RangePatternValue;
-                pattern->a = access;
-                pattern->name = NULL;
-                typePattern(typer,scope,pattern,type,context);
-                return;
-            }
-            if (!owner || !isEnum(type) || owner != type->resolvedDeclaration) {
-                typeError(typer,pattern,"pattern '%s' cannot match %s",pattern->name,t);
-                return;
-            }
-        } else if (!isEnum(type)) {
+        if (!isEnum(type)) {
             typeError(typer,pattern,"'.%s' matches an enum case, but the subject is %s",pattern->name,t);
             return;
         }
@@ -3885,7 +4003,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
     case RangePatternValue: {
         RangeNode *actual = typeOf(typer,scope,pattern->a,type,context);
         expectType(typer,pattern->a,type,actual,"pattern");
-        // A value that names a case, such as `true`, is that case's pattern.
+        // A literal that names a case of a literal enum is that case's pattern.
         if (isEnum(type) && actual == type) {
             RangeNode *value = pattern->a, *entry = NULL;
             if (isLiteral(value)) entry = literalCase(type->resolvedDeclaration,value);
@@ -3897,7 +4015,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
         return;
     }
     case RangePatternRelation: {
-        // `case < 0:` calls the subject type's `<` with the operand, as `subject < 0` does.
+        // `< 0:` calls the subject type's `<` with the operand, as `subject < 0` does.
         if (!type) return;
         if (same(pattern->name,"=") || same(pattern->name,"!=")) {
             expectType(typer,pattern->a,type,typeOf(typer,scope,pattern->a,type,context),"pattern");
@@ -3921,9 +4039,8 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
 }
 
 /* Inside an enum's own functions, its extensions' included, the enum's name as
- * a switch, `if case`, or `guard case` subject is the current value; the
- * innermost enum's name, bare even when it is generic. Elsewhere the name is
- * the type. */
+ * a switch subject is the current value; the innermost enum's name, bare even
+ * when it is generic. Elsewhere the name is the type. */
 static RangeNode *typeSubject(Typer *typer, SourceScope *scope, RangeNode *subject, RangeNode *context)
 {
     if (subject && subject->kind == RangeNodeName && !subject->generics) {
@@ -3943,14 +4060,43 @@ static RangeNode *typeSubject(Typer *typer, SourceScope *scope, RangeNode *subje
     return typeOf(typer,scope,subject,NULL,context);
 }
 
-static void typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
+/* The type a switch expression has, from its arms' values: the first arm's,
+ * or the optional one arm's value promotes the others to. */
+static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, RangeNode *arm, RangeNode *actual)
 {
-    RangeNode *subject = typeSubject(typer,scope,node->a,context);
+    if (!type || !actual || type == actual) return type ? type : actual;
+    if (optionalWrapped(typer,type,NULL) == actual) {
+        coerce(typer,arm,type,actual,"an arm of a switch expression");
+        return type;
+    }
+    if (optionalWrapped(typer,actual,NULL) == type) {
+        // An earlier arm's value is promoted to the optional this one yields.
+        for (size_t i = 0; i < node->itemCount && node->items[i]->a != arm; ++i)
+            if (node->items[i]->a && node->items[i]->a->type == type) {
+                coerce(typer,node->items[i]->a,actual,type,"an arm of a switch expression");
+                node->items[i]->a->type = actual;
+            }
+        return actual;
+    }
+    char t[160], a[160]; describeType(t,sizeof(t),type); describeType(a,sizeof(a),actual);
+    typeError(typer,arm,"the arms of a switch expression yield one type; this arm yields %s, an earlier one %s",a,t);
+    return type;
+}
+
+/* A switch statement, or, with RangeFlagValue, a switch expression: its type
+ * is the one its arms yield, each typed with `expected` (or, without one,
+ * with the first value's type) as context, as any value is. An arm that does
+ * not yield is a block that must diverge. */
+static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *expected, RangeNode *context, RangeNode *output)
+{
     size_t errors = typer->report->errors;
+    RangeNode *subject = typeSubject(typer,scope,node->a,context);
+    int value = (node->flags & RangeFlagValue) != 0;
+    RangeNode *type = NULL;
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount)
-            typeError(typer,entry,"'default' must be the last case of a switch");
+            typeError(typer,entry,"'default' must be the last arm of a switch");
         for (size_t j = 0; j < entry->itemCount; ++j) {
             RangeNode *pattern = entry->items[j], *bindings = pattern->c;
             typePattern(typer,scope,pattern,subject,context);
@@ -3958,32 +4104,36 @@ static void typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeN
                 for (size_t m = 0; m < k; ++m)
                     if (same(bindings->items[m]->name,bindings->items[k]->name))
                         typeError(typer,bindings->items[k],"'%s' is bound twice in one pattern",bindings->items[k]->name);
-            // Every pattern of a case binds the same names, with the same types.
+            // Every alternative of an arm binds the same names, with the same types.
             if (j) {
                 for (size_t k = 0; bindings && k < bindings->itemCount; ++k) {
                     RangeNode *binding = bindings->items[k], *first = bindingNamed(entry->c,binding->name);
-                    if (!first) { typeError(typer,binding,"'%s' must be bound by every pattern of this case",binding->name); continue; }
+                    if (!first) { typeError(typer,binding,"'%s' must be bound by every pattern of this arm",binding->name); continue; }
                     binding->resolvedDeclaration = first;
-                    expectType(typer,binding,first->type,binding->type,"a binding shared by the patterns of a case");
+                    expectType(typer,binding,first->type,binding->type,"a binding shared by the patterns of an arm");
                 }
                 for (size_t k = 0; entry->c && k < entry->c->itemCount; ++k)
                     if (!bindingNamed(bindings,entry->c->items[k]->name))
                         typeError(typer,pattern,"this pattern must also bind '%s'",entry->c->items[k]->name);
             }
-            if (pattern->b) {
-                SourceScope guard = {.owner=bindings,.parent=scope};
-                expectType(typer,pattern->b,typer->booleanType,typeOf(typer,&guard,pattern->b,typer->booleanType,context),"guard");
-            }
         }
+        // The arm's guard, shared by its alternatives, sees the first one's bindings.
+        RangeNode *guard = entry->itemCount ? entry->items[0]->b : NULL;
         SourceScope body = {.owner=entry->c ? entry->c : entry,.parent=scope};
-        // A switch ends at `break`; `if case` and `guard` do not.
-        int target = !(node->flags & RangeFlagConditional);
-        typer->breaks += target;
+        if (guard) expectType(typer,guard,typer->booleanType,typeOf(typer,&body,guard,typer->booleanType,context),"guard");
+        if (entry->a) {
+            RangeNode *actual = typeOf(typer,&body,entry->a,expected ? expected : type,context);
+            type = armsType(typer,node,type,entry->a,actual);
+            continue;
+        }
         typeBlock(typer,&body,entry->b,context,output);
-        typer->breaks -= target;
+        if (value && !exits(entry->b,typer->loops > 0))
+            typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic");
     }
-    if ((node->flags & RangeFlagGuard) && node->itemCount == 2 && !exits(node->items[1]->b,1)) guardFallsThrough(typer,node);
-    if (!subject || typer->report->errors != errors || (node->flags & RangeFlagConditional)) return;
+    if (value && !type && typer->report->errors == errors)
+        typeError(typer,node,"no arm of this switch expression yields a value");
+    node->type = type;
+    if (!subject || typer->report->errors != errors) return type;
     // Each pattern must match something the earlier ones do not; together they
     // must match every value.
     RangeArena *arena = typer->report->arena;
@@ -3999,15 +4149,16 @@ static void typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeN
             RangeNode *pattern = (entry->flags & RangeFlagLiteral) ? NULL : entry->items[j];
             RangeNode **row = rangeArenaAllocate(arena,sizeof(*row));
             row[0] = pattern;
-            if (!useful(typer,rows,count,row,types,1)) {
-                if (pattern) typeError(typer,pattern,"this pattern is already handled by earlier cases");
-                else typeError(typer,entry,"'default' is never reached: the cases above match every value");
+            // A default the compiler wrote for a lowering may be unreachable.
+            if (!useful(typer,rows,count,row,types,1) && !(entry->flags & RangeFlagImplicit)) {
+                if (pattern) typeError(typer,pattern,"this pattern is already handled by earlier arms");
+                else typeError(typer,entry,"'default' is never reached: the arms above match every value");
             }
             if (!pattern || !pattern->b) rows[count++] = row;
         }
     }
     RangeNode *wild[1] = {NULL};
-    if (!useful(typer,rows,count,wild,types,1)) return;
+    if (!useful(typer,rows,count,wild,types,1)) return type;
     char t[160]; describeType(t,sizeof(t),subject);
     char missing[512] = "";
     size_t length = 0;
@@ -4021,6 +4172,7 @@ static void typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeN
     if (length) typeError(typer,node,"switch over %s must be exhaustive: %s %s not handled; add %s or a default",t,missing,
                           strchr(missing,',') ? "are" : "is",strchr(missing,',') ? "those cases" : "that case");
     else typeError(typer,node,"switch over %s must be exhaustive; add a default",t);
+    return type;
 }
 
 static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, RangeNode *context, RangeNode *output)
@@ -4048,16 +4200,18 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     }
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
-    int loops = typer->loops, breaks = typer->breaks;
-    RangeNode *outer = typer->function;
-    typer->loops = typer->breaks = 0;
+    int loops = typer->loops;
+    RangeNode *outer = typer->function, *outerOutput = typer->output;
+    typer->loops = 0;
     typer->function = function;
     for (size_t i = 0; i < function->itemCount; ++i) function->items[i]->type = declaredType(typer,&scope,function->items[i],context);
     RangeNode *output = function->b
         ? resolveTypeReference(typer,&scope,function->b->name,function->b->generics,function->b->flags,context,function->b) : NULL;
     function->type = output;
+    typer->output = output;
     if (function->a) typeBlock(typer,&scope,function->a,context,output);
-    typer->loops = loops; typer->breaks = breaks;
+    typer->loops = loops;
+    typer->output = outerOutput;
     typer->function = outer;
 }
 
@@ -4618,7 +4772,12 @@ static Typer *typeCheck(SourceReport *report)
                 else if (operatorName(item->name))
                     typeError(typer,item,"'%s' must be declared on the type of its left operand, in the type or an extension of it",item->name);
             }
-            else if (item->kind == RangeNodeMain) { item->type = status; typeBlock(typer,&unit,item->a,NULL,status); }
+            else if (item->kind == RangeNodeMain) {
+                item->type = status;
+                typer->output = status;
+                typeBlock(typer,&unit,item->a,NULL,status);
+                typer->output = NULL;
+            }
         }
     }
     for (size_t u = 0; u < report->count; ++u) checkOverloads(typer,report->units[u]);
@@ -4671,11 +4830,13 @@ typedef struct { int32_t offset; RangeNode *type; int consumed; } NativeTemp;
 enum { NativeReleaseValue, NativeReleaseBlock, NativeWriteSigned, NativeWriteUnsigned, NativeEqual };
 typedef struct { RangeNode *type; int block; size_t offset; int compiled; } NativeHelper;
 typedef struct { size_t at; size_t helper; } NativeHelperCall;
-/* What `break` and `continue` leave: a loop (continue branches to top) or a
- * switch, and the slots and temporaries that were live when it began. */
+/* What `break` and `continue` leave: a loop (continue branches to top), and
+ * the slots and temporaries that were live when it began. */
 typedef struct {
     int loop;
     size_t top, slots, temps;
+    int valueDepth;  /* switch expressions around the loop */
+    int32_t stack;   /* the slot holding sp at the loop, inside a switch expression; 0 outside */
     NativeJump *breaks; size_t breakCount, breakCapacity;
 } NativeTarget;
 
@@ -4688,6 +4849,8 @@ typedef struct {
     RangeNode *owner, *self, *output, *function;
     int32_t frame, selfSlot, resultSlot;
     NativeTarget *targets; size_t targetCount, targetCapacity;
+    int valueDepth; /* switch expressions whose arms are being compiled */
+    size_t *stackResets; size_t stackResetCount, stackResetCapacity; /* sp := frame base, patched at the end */
     NativeSlot *slots; size_t slotCount, slotCapacity;
     size_t *returns; size_t returnCount, returnCapacity;
     /* The program. */
@@ -5981,12 +6144,12 @@ static RangeNode *nativeLoadPlace(Native *native, RangeNode *type, int frameSlot
 
 static RangeNode *nativeExpressionValue(Native *, RangeNode *);
 
-/* Only a call, construction, or slot read produces a temporary; any other
+/* Only a call, construction, switch expression, or slot read produces a temporary; any other
  * expression reports none, whatever its operands left behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
     RangeNode *type = nativeExpressionValue(native,expr);
-    int construction = expr && (expr->kind == RangeNodeCall || (expr->kind == RangeNodeBinary && same(expr->name,"..<"))
+    int construction = expr && (expr->kind == RangeNodeCall || expr->kind == RangeNodeSwitch || (expr->kind == RangeNodeBinary && same(expr->name,"..<"))
         || ((expr->kind == RangeNodeBinary || expr->kind == RangeNodeUnary) && expr->c));
     if (!expr || (!construction && !(expr->resolvedDeclaration
         && expr->resolvedDeclaration->kind == RangeNodeEnumCase))) native->resultTemp = -1;
@@ -6067,6 +6230,8 @@ static int nativeValueGeneric(Native *native, RangeNode *expr)
     native->resultTemp = -1;
     return 1;
 }
+
+static RangeNode *nativeSwitch(Native *, RangeNode *);
 
 static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
 {
@@ -6175,6 +6340,8 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
     }
     case RangeNodeCall:
         return nativeCall(native,expr);
+    case RangeNodeSwitch:
+        return nativeSwitch(native,expr);
     default:
         nativeMissing(native,expr,"native %s expressions are not implemented",rangeNodeKindName(expr->kind));
         return NULL;
@@ -6297,7 +6464,7 @@ static void nativeEffect(Native *native, RangeNode *node, RangeNode *attribute)
 }
 
 static void nativeStatementBody(Native *, RangeNode *);
-static void nativeSwitch(Native *, RangeNode *);
+static RangeNode *nativeSwitch(Native *, RangeNode *);
 
 /* Temporaries a statement creates end with it, unless moved into place. */
 static void nativeStatement(Native *native, RangeNode *node)
@@ -6307,11 +6474,33 @@ static void nativeStatement(Native *native, RangeNode *node)
     nativeReleaseTemps(native,temps);
 }
 
-/* Enter a break target; leaving it lands its breaks here. */
+/* Enter a loop; leaving it lands its breaks here. Inside a switch
+ * expression's arm the stack may hold operands; the loop keeps sp then. */
 static void nativeEnter(Native *native, int loop, size_t top)
 {
-    NativeTarget target = {.loop=loop,.top=top,.slots=native->slotCount,.temps=native->tempCount};
+    NativeTarget target = {.loop=loop,.top=top,.slots=native->slotCount,.temps=native->tempCount,.valueDepth=native->valueDepth};
+    if (native->valueDepth) {
+        target.stack = nativeReserve(native,8,8);
+        nativeEmit(native,armAddImm(10,31,0)); /* mov x10, sp */
+        nativeStore(native,10,target.stack);
+    }
+    if (target.stack) target.top = native->machine.size;
     NATIVE_PUSH(native->targets,native->targetCount,native->targetCapacity,target);
+}
+
+/* `break` or `continue` inside a switch expression's arm leaves operands the
+ * enclosing expression pushed: sp returns to its value at the loop, the
+ * frame's base outside any switch expression, patched once the frame is known. */
+static void nativeResetStack(Native *native, NativeTarget *target)
+{
+    if (target->stack) {
+        nativeLoad(native,10,target->stack);
+        nativeEmit(native,armAddImm(31,10,0)); /* mov sp, x10 */
+        return;
+    }
+    size_t at = nativeEmit(native,armAddImm(31,29,0));
+    nativeEmit(native,armSubImm(31,31,0));
+    NATIVE_PUSH(native->stackResets,native->stackResetCount,native->stackResetCapacity,at);
 }
 
 static void nativeLeave(Native *native)
@@ -6405,18 +6594,6 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         nativeStorePlace(native,placed,frameSlot,!moved);
         break;
     }
-    case RangeNodeIf: {
-        nativeCondition(native,node->a);
-        size_t otherwise = nativeEmit(native,armCbz(0,0));
-        nativeStatement(native,node->b);
-        if (node->c) {
-            size_t end = nativeEmit(native,armB(0));
-            nativeBranchHere(native,otherwise,armCbz(0,0));
-            nativeStatement(native,node->c);
-            nativeBranchHere(native,end,armB(0));
-        } else nativeBranchHere(native,otherwise,armCbz(0,0));
-        break;
-    }
     case RangeNodeWhile: {
         size_t top = native->machine.size, exit = 0;
         nativeEnter(native,1,top);
@@ -6443,6 +6620,7 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         nativeEndTemps(native,target->temps);
         nativeReleaseSlots(native,target->slots);
         target = &native->targets[index - 1];
+        if (native->valueDepth > target->valueDepth) nativeResetStack(native,target);
         if (loop) nativeEmit(native,armB(-(int32_t)((native->machine.size - target->top) / 4)));
         else {
             NativeJump jump = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
@@ -6460,8 +6638,10 @@ static void nativeStatementBody(Native *native, RangeNode *node)
                 nativeCopyValue(native,1,0,type,!moved);
             }
         }
+        // Ending the temporaries leaves them listed: other paths through the
+        // enclosing statement, such as a switch expression's other arms, still end them.
         nativeEmit(native,armPush(0));
-        nativeReleaseTemps(native,0);
+        nativeEndTemps(native,0);
         nativeReleaseSlots(native,0);
         nativeEmit(native,armPop(0));
         size_t at = nativeEmit(native,armB(0));
@@ -6473,7 +6653,7 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         else nativeExpression(native,node->a);
         break;
     case RangeNodeSwitch:
-        nativeSwitch(native,node);
+        (void)nativeSwitch(native,node);
         break;
     case RangeNodeFunction: case RangeNodeConstruct:
         nativeMissing(native,node,"nested %s declarations are not implemented natively",rangeNodeKindName(node->kind));
@@ -6486,10 +6666,11 @@ static void nativeStatementBody(Native *native, RangeNode *node)
 
 /* ---- switch ----
  * The subject is evaluated once and kept in a frame slot: a scalar's value, or
- * an aggregate's address. A case tries its patterns in order. A pattern tests
- * tags and values first, then copies its bindings into the case's slots (a
- * copy holds its own references), then runs its guard; a failed guard ends
- * the bindings. The first match runs its arm, and arms do not fall through. */
+ * an aggregate's address. An arm tries its `|` alternatives in order. A
+ * pattern tests tags and values first, then copies its bindings into the
+ * arm's slots (a copy holds its own references), then runs the arm's guard; a
+ * failed guard ends the bindings. The first match runs its arm, and arms do
+ * not fall through. */
 
 typedef struct { int32_t slot; size_t offset; int value; } NativePlace; /* value: the slot holds the scalar itself */
 typedef struct { RangeNode *binding; NativePlace place; RangeNode *type; } NativeBind;
@@ -6554,8 +6735,8 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
         return;
     }
     case RangePatternValue: case RangePatternRelation: {
-        // `case 0:`, `case "yes":`, or `case limits.max:` compare with `=`;
-        // `case < 0:` calls the subject type's `<` with the operand.
+        // `0:`, `"yes":`, or `= limits.max:` compare with `=`; `< 0:` calls
+        // the subject type's `<` with the operand.
         const char *op = pattern->integer == RangePatternValue ? "=" : pattern->name;
         RangeNode *function = pattern->integer == RangePatternRelation ? pattern->resolvedDeclaration : NULL;
         nativePlaceLoad(native,place,type);
@@ -6593,17 +6774,26 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
     }
 }
 
-static void nativeSwitch(Native *native, RangeNode *node)
+/* A switch statement, or a switch expression (RangeFlagValue): each arm that
+ * yields leaves the value in one frame slot, a scalar or the aggregate itself
+ * holding its own references, which the expression then is, as a temporary.
+ * Only the chosen arm is evaluated. Returns the expression's type. */
+static RangeNode *nativeSwitch(Native *native, RangeNode *node)
 {
+    int value = (node->flags & RangeFlagValue) != 0;
+    RangeNode *valueType = value ? nativeType(native,node->type) : NULL;
+    int valueKind = value ? nativeKind(native,valueType,node) : NativeNone;
+    if (value && valueKind == NativeNone) return NULL;
     RangeNode *type = nativeExpression(native,node->a);
-    if (!type) return;
+    if (!type) return NULL;
     int kind = nativeKind(native,type,node->a);
-    if (kind == NativeNone) return;
+    if (kind == NativeNone) return NULL;
     int32_t subject = nativeReserve(native,8,8);
     nativeStore(native,0,subject);
     NativePlace top = {.slot=subject,.value=kind == NativeScalar};
-    int target = !(node->flags & RangeFlagConditional); /* `break` ends a switch, not an `if case` */
-    if (target) nativeEnter(native,0,0);
+    int32_t result = valueKind == NativeAggregate ? nativeReserve(native,valueType->size ? valueType->size : 1,valueType->alignment)
+                   : valueKind == NativeScalar ? nativeReserve(native,8,8) : 0;
+    native->valueDepth += value;
     NativeJump *ends = NULL;
     size_t endCount = 0, endCapacity = 0;
     for (size_t i = 0; i < node->itemCount; ++i) {
@@ -6653,7 +6843,20 @@ static void nativeSwitch(Native *native, RangeNode *node)
         size_t next = fallible ? nativeEmit(native,armB(0)) : 0;
         for (size_t b = 0; b < bodyCount; ++b) nativeBranchHere(native,bodies[b].at,bodies[b].base);
         free(bodies);
-        nativeBlock(native,entry->b);
+        if (entry->a) {
+            // The arm's value moves, or is retained, into the result; the
+            // arm's temporaries end before it joins the others.
+            size_t temps = native->tempCount;
+            if (nativeExpression(native,entry->a)) {
+                if (valueKind == NativeScalar) nativeStore(native,0,result);
+                else {
+                    int moved = nativeTakeTemp(native);
+                    nativeFrameAddress(native,1,result);
+                    nativeCopyValue(native,1,0,valueType,!moved);
+                }
+            }
+            nativeReleaseTemps(native,temps);
+        } else nativeBlock(native,entry->b);
         nativeReleaseSlots(native,scope);
         native->slotCount = scope;
         NativeJump end = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
@@ -6662,7 +6865,15 @@ static void nativeSwitch(Native *native, RangeNode *node)
     }
     for (size_t i = 0; i < endCount; ++i) nativeBranchHere(native,ends[i].at,ends[i].base);
     free(ends);
-    if (target) nativeLeave(native);
+    native->valueDepth -= value;
+    if (valueKind == NativeScalar) {
+        nativeLoad(native,0,result);
+        native->resultTemp = -1;
+    } else if (valueKind == NativeAggregate) {
+        nativeTrackTemp(native,result,valueType);
+        nativeFrameAddress(native,0,result);
+    }
+    return valueType;
 }
 
 /* One function instance or the entry block: frame, receiver, parameters,
@@ -6677,6 +6888,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     native->self = instance->self;
     native->owner = instance->self ? instance->self->resolvedDeclaration : NULL;
     native->slotCount = 0; native->returnCount = 0; native->frame = 0;
+    native->valueDepth = 0; native->stackResetCount = 0;
     native->tempCount = 0; native->resultTemp = -1;
     native->selfSlot = 0; native->resultSlot = 0;
     nativeEmit(native,armPushFrame());
@@ -6713,6 +6925,11 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     if (bytes >> 24) nativeMissing(native,function,"frames beyond 16 MB are not implemented");
     rangePatch(&native->machine,frameHigh,bytes >> 12 ? armSubImmHigh(31,31,(uint32_t)(bytes >> 12)) : armAddImm(31,31,0));
     rangePatch(&native->machine,frameLow,armSubImm(31,31,(uint32_t)(bytes & 0xFFF)));
+    for (size_t i = 0; i < native->stackResetCount; ++i) {
+        size_t at = native->stackResets[i];
+        rangePatch(&native->machine,at,bytes >> 12 ? armSubImmHigh(31,29,(uint32_t)(bytes >> 12)) : armAddImm(31,29,0));
+        rangePatch(&native->machine,at + 4,armSubImm(31,31,(uint32_t)(bytes & 0xFFF)));
+    }
 }
 
 /* Trap stubs: write the message to stderr, then exit with status 134, as an
@@ -6838,7 +7055,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     }
     rangeMachineFree(&native.machine);
     free(native.slots); free(native.returns); free(native.calls); free(native.traps); free(native.instances); free(native.texts);
-    free(native.temps); free(native.helpers); free(native.helperCalls); free(native.targets);
+    free(native.temps); free(native.helpers); free(native.helperCalls); free(native.targets); free(native.stackResets);
     return written;
 }
 

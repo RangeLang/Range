@@ -7,7 +7,7 @@ construct Interval {
 
     @iteration
     function element(let at: Int): Int? {
-        if lower + at < upper { return lower + at }
+        switch lower + at < upper { .true: return lower + at, .false: {} }
         return .absent
     }
 }

@@ -6,25 +6,25 @@ function f(let n: Int): Int { return n * 2 }
 
 {
     let a: Int(2) + 1
-    if a != 3 { return 1 }
+    switch a != 3 { .true: return 1, .false: {} }
     let b: f(n: 1) = 2
-    if !b { return 2 }
+    switch b { .false: return 2, .true: {} }
     let c: f(n: 3) + 1
-    if c != 7 { return 3 }
+    switch c != 7 { .true: return 3, .false: {} }
     state xs: Array<Int>()
     xs.append(value: 4)
     let d: xs.count = 1
-    if !d { return 4 }
+    switch d { .false: return 4, .true: {} }
     let e: Int(5)
-    if e != 5 { return 5 }
+    switch e != 5 { .true: return 5, .false: {} }
     let g: 1 < 2
-    if !g { return 6 }
+    switch g { .false: return 6, .true: {} }
     let h: Array<Int>().count + 1
-    if h != 1 { return 7 }
+    switch h != 1 { .true: return 7, .false: {} }
     state ys: Array<Array<Int>>()
     ys.append(value: Array<Int>())
-    if ys.count != 1 { return 8 }
+    switch ys.count != 1 { .true: return 8, .false: {} }
     let k: 3 < 4 = true
-    if !k { return 9 }
+    switch k { .false: return 9, .true: {} }
     return 42
 }

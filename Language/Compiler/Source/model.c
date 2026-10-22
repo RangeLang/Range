@@ -84,7 +84,7 @@ void rangeNodeAppend(RangeArena *arena, RangeNode *node, RangeNode *item)
 
 static const char *const RANGE_NODE_NAMES[RangeNodeKindCount] = {
     "unit", "construct", "enum", "enumCase", "function", "macro", "main",
-    "let", "state", "derived", "binding", "typeParameter", "parameter", "attribute", "block", "assign", "if",
+    "let", "state", "derived", "binding", "typeParameter", "parameter", "attribute", "block", "assign",
     "while", "return", "expressionStatement", "call", "argument",
     "memberAccess", "name", "integer", "bool", "string", "stringPart",
     "case", "unary", "binary", "manyLiteral", "environment", "syntaxTemplate",

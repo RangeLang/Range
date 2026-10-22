@@ -45,6 +45,6 @@ function grid(let rows: Int): Array<Array<Int>> {
         checksum: checksum + sum(xs: a) + sum(xs: filled(n: 3)) + g.count + grid(rows: 3).count
         round: round + 1
     }
-    if checksum != 200 * (1226 + 3 + 6 + 3) { return 1 }
+    switch checksum != 200 * (1226 + 3 + 6 + 3) { .true: return 1, .false: {} }
     return 42
 }

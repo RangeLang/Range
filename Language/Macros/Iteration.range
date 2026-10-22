@@ -8,9 +8,10 @@
 //
 // `for pattern in s where guard { body }` copies s when the loop begins and
 // calls the function at positions 0, 1, 2, …; on absence the loop ends.
-// Otherwise the element is bound to pattern (a let), the guard applies, the
-// body runs, and the position advances by one, also on `continue`. C writes
-// the loop and finds the function by this role; it never names the function,
-// its parameter, or the type.
+// Otherwise the element is matched against pattern (a name, `_`, or a case
+// pattern after a leading dot, as in `for .group(let items) in shapes`), the
+// guard applies, the body runs for a match, and the position advances by one,
+// also on `continue`. C writes the loop as switches and finds the function by
+// this role; it never names the function, its parameter, or the type.
 @builtin
 macro iteration(): Function

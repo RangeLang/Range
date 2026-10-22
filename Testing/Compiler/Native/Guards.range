@@ -1,26 +1,28 @@
-// guard: the else block must exit; bindings stay in scope after the guard.
+// Early exits: an arm diverges with return, break, continue, or @diagnostic.
+// A switch expression whose other arms diverge binds the value that one yields,
+// in scope for the rest of the block.
 enum Token {
     case value(number: Int)
     case end
 }
 
 function first(let xs: Array<Int>): Int? {
-    guard xs.count > 0 else { return .absent }
+    switch xs.count > 0 { .false: return .absent, .true: {} }
     return .present(xs.read(at: 0))
 }
 
 function double(let maybe: Int?): Int {
-    guard let n: maybe else { return -1 }
+    let n: switch maybe { .present(let n): n, .absent: { return -1 } }
     return n * 2
 }
 
 function unwrap(let maybe: Int?): Int {
-    guard let maybe else { return 0 }
-    return maybe
+    let value: switch maybe { .present(let value): value, .absent: { return 0 } }
+    return value
 }
 
 function number(let t: Token): Int {
-    guard case .value(let n): t else { return -1 }
+    let n: switch t { .value(let n): n, default: { return -1 } }
     let twice: n + n
     return twice
 }
@@ -28,21 +30,21 @@ function number(let t: Token): Int {
 function filtered(let xs: Array<Int>): Int {
     state total: 0
     for x in xs {
-        guard x != 2 else { continue }
-        guard x < 4 else { break }
+        switch x != 2 { .false: continue, .true: {} }
+        switch x < 4 { .false: break, .true: {} }
         total: total + x
     }
     return total
 }
 
 function strict(let n: Int): Int {
-    guard n > 0 else { @diagnostic("n must be positive") }
+    switch n > 0 { .false: @diagnostic("n must be positive"), .true: {} }
     switch n {
-    case 1:
-        guard n = 1 else { break }
+    1: {
+        switch n = 1 { .false: return 0, .true: {} }
         return 10
-    default:
-        return n
+    },
+    default: return n
     }
     return 0
 }
@@ -50,7 +52,7 @@ function strict(let n: Int): Int {
 function longest(let groups: Array<Array<Int>>): Int {
     state best: 0
     for group in groups {
-        guard group.count > best else { continue }
+        switch group.count > best { .false: continue, .true: {} }
         best: group.count
     }
     return best
@@ -58,23 +60,23 @@ function longest(let groups: Array<Array<Int>>): Int {
 
 {
     state xs: Array<Int>()
-    if let f: first(xs: xs) { return 1 }
+    switch first(xs: xs) { .present(let f): return 1, .absent: {} }
     xs.append(value: 1)
     xs.append(value: 2)
     xs.append(value: 3)
     xs.append(value: 4)
     xs.append(value: 5)
-    guard let f: first(xs: xs) else { return 2 }
-    if f != 1 { return 3 }
-    if double(maybe: .present(4)) != 8 || double(maybe: .absent) != -1 { return 4 }
-    if unwrap(maybe: .present(7)) != 7 || unwrap(maybe: .absent) != 0 { return 5 }
-    if number(t: .value(number: 6)) != 12 || number(t: .end) != -1 { return 6 }
-    if filtered(xs: xs) != 4 { return 7 }
-    if strict(n: 1) != 10 || strict(n: 3) != 3 { return 8 }
+    let f: switch first(xs: xs) { .present(let f): f, .absent: { return 2 } }
+    switch f != 1 { .true: return 3, .false: {} }
+    switch double(maybe: .present(4)) != 8 || double(maybe: .absent) != -1 { .true: return 4, .false: {} }
+    switch unwrap(maybe: .present(7)) != 7 || unwrap(maybe: .absent) != 0 { .true: return 5, .false: {} }
+    switch number(t: .value(number: 6)) != 12 || number(t: .end) != -1 { .true: return 6, .false: {} }
+    switch filtered(xs: xs) != 4 { .true: return 7, .false: {} }
+    switch strict(n: 1) != 10 || strict(n: 3) != 3 { .true: return 8, .false: {} }
     state groups: Array<Array<Int>>()
     groups.append(value: xs)
     state empty: Array<Int>()
     groups.append(value: empty)
-    if longest(groups: groups) != 5 { return 9 }
+    switch longest(groups: groups) != 5 { .true: return 9, .false: {} }
     return 42
 }

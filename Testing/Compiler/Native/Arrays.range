@@ -10,19 +10,19 @@ function total(let xs: Array<Int>): Int {
 
 {
     state xs: Array<Int>()
-    if !xs.isEmpty() { return 1 }
+    switch xs.isEmpty() { .false: return 1, .true: {} }
     state i: 1
     while i <= 100 {
         xs.append(value: i)
         i: i + 1
     }
-    if xs.count != 100 { return 2 }
-    if xs.capacity != 128 { return 3 }
-    if xs.read(at: 41) != 42 { return 4 }
-    if total(xs: xs) != 5050 { return 5 }
+    switch xs.count != 100 { .true: return 2, .false: {} }
+    switch xs.capacity != 128 { .true: return 3, .false: {} }
+    switch xs.read(at: 41) != 42 { .true: return 4, .false: {} }
+    switch total(xs: xs) != 5050 { .true: return 5, .false: {} }
     state bytes: Array<Int<bits: 8>>()
     bytes.append(value: -128)
     bytes.append(value: 127)
-    if (bytes.read(at: 0) + bytes.read(at: 1)) != -1 { return 6 }
+    switch (bytes.read(at: 0) + bytes.read(at: 1)) != -1 { .true: return 6, .false: {} }
     return 42
 }

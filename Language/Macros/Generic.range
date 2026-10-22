@@ -3,7 +3,8 @@
 macro generic(): Construct {
   let name: #members.filter(named: "name").first
 
-  if !name.isTarget {
-    @diagnostic("Generic kind must declare name")
+  switch name.isTarget {
+    .false: @diagnostic("Generic kind must declare name"),
+    .true: {}
   }
 }

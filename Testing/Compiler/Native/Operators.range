@@ -17,14 +17,14 @@ enum Level {
 
     function <(let other: Level): Bool {
         switch Level {
-        case .low: return other = .high
-        case .high: return false
+        .low: return other = .high,
+        .high: return false
         }
     }
     function !(): Level {
         switch Level {
-        case .low: return .high
-        case .high: return .low
+        .low: return .high,
+        .high: return .low
         }
     }
 }
@@ -43,7 +43,7 @@ construct Tally {
 
 function ranked(let v: Vector): Int {
     switch v {
-    case < Vector(x: 1, y: 1): return 0
+    < Vector(x: 1, y: 1): return 0,
     default: return 1
     }
 }
@@ -53,19 +53,19 @@ function width(let n: Int<bits: 8, signed: false>): Int<bits: 8, signed: false> 
 {
     let a: Vector(x: 1, y: 2)
     let b: Vector(x: 3, y: 4)
-    if a + b != Vector(x: 4, y: 6) { return 1 }
-    if b - a != Vector(x: 2, y: 2) { return 2 }
-    if a * 3 != Vector(x: 3, y: 6) { return 3 }
-    if -a != Vector(x: -1, y: -2) { return 4 }
-    if !(a < b) || b < a { return 5 }
+    switch a + b != Vector(x: 4, y: 6) { .true: return 1, .false: {} }
+    switch b - a != Vector(x: 2, y: 2) { .true: return 2, .false: {} }
+    switch a * 3 != Vector(x: 3, y: 6) { .true: return 3, .false: {} }
+    switch -a != Vector(x: -1, y: -2) { .true: return 4, .false: {} }
+    switch !(a < b) || b < a { .true: return 5, .false: {} }
     // Precedence stays Swift's: `*` binds tighter than `+`, `+` than `<`.
-    if a + b * 2 != Vector(x: 7, y: 10) || !(a < a + b) { return 6 }
-    if ranked(v: Vector(x: 0, y: 0)) != 0 || ranked(v: b) != 1 { return 7 }
-    if !(Level.low < .high) || Level.high < .low || !Level.low != .high { return 8 }
+    switch a + b * 2 != Vector(x: 7, y: 10) || !(a < a + b) { .true: return 6, .false: {} }
+    switch ranked(v: Vector(x: 0, y: 0)) != 0 || ranked(v: b) != 1 { .true: return 7, .false: {} }
+    switch !(Level.low < .high) || Level.high < .low || !Level.low != .high { .true: return 8, .false: {} }
     let t: Tally() + 1 + 2 + 3
-    if t.items.count != 3 || t.items.read(at: 2) != 3 { return 9 }
-    if width(n: 20) != 41 { return 10 }
-    if !(1 < 2) || 2 <= 1 || !(3 >= 3) || 7 % 4 != 3 || -(2 - 5) != 3 { return 11 }
-    if "ab" + "cd" != "abcd" { return 12 }
+    switch t.items.count != 3 || t.items.read(at: 2) != 3 { .true: return 9, .false: {} }
+    switch width(n: 20) != 41 { .true: return 10, .false: {} }
+    switch !(1 < 2) || 2 <= 1 || !(3 >= 3) || 7 % 4 != 3 || -(2 - 5) != 3 { .true: return 11, .false: {} }
+    switch "ab" + "cd" != "abcd" { .true: return 12, .false: {} }
     return 42
 }

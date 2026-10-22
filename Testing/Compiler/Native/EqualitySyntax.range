@@ -3,21 +3,21 @@
 enum Shade { case light, dark(level: Int) }
 construct Box { let size: Int }
 function flagged(let flag: Bool): Int {
-    if flag { return 1 }
+    switch flag { .true: return 1, .false: {} }
     return 0
 }
 function same(let a: Int, let b: Int): Bool { return a = b }
 function width(let n: Int<bits: 8>): Bool { return n = 8 }
 function bucket(let n: Int): Int {
     switch n {
-    case 0: return 0
-    case = 1: return 1
-    case let m where m % 2 = 0: return 2
+    0: return 0,
+    = 1: return 1,
+    let m where m % 2 = 0: return 2,
     default: return 3
     }
 }
 function level(let s: Shade): Int {
-    guard case .dark(let l): s else { return -1 }
+    let l: switch s { .dark(let l): l, default: { return -1 } }
     return l
 }
 {
@@ -26,44 +26,44 @@ function level(let s: Shade): Int {
     // Assignment and construction take a comparison as their value.
     state x: false
     x: a = b
-    if !x { return 1 }
+    switch x { .false: return 1, .true: {} }
     x: a = b + 1
-    if x { return 2 }
+    switch x { .true: return 2, .false: {} }
     let direct: a = b
     let typed: Bool(a = b)
     state held: a + 1 = b
-    if !direct || !typed || held { return 3 }
+    switch !direct || !typed || held { .true: return 3, .false: {} }
     let member: Box(size: 4)
     let measured: member.size = 4
-    if !measured { return 4 }
+    switch measured { .false: return 4, .true: {} }
     // A named argument whose value is a comparison.
-    if flagged(flag: a = b) != 1 || flagged(flag: a != b) != 0 { return 5 }
-    if !same(a: a, b: 3) || same(a: 1, b: 2) { return 6 }
+    switch flagged(flag: a = b) != 1 || flagged(flag: a != b) != 0 { .true: return 5, .false: {} }
+    switch !same(a: a, b: 3) || same(a: 1, b: 2) { .true: return 6, .false: {} }
     // Generic `<bits: 8>` and return types `): T` beside `=`.
     let small: Int<bits: 8>(8)
-    if !width(n: small) || small = 9 { return 7 }
+    switch !width(n: small) || small = 9 { .true: return 7, .false: {} }
     // Precedence: arithmetic binds tighter, `&&` and `||` looser.
-    if !(a + 1 = b * 2 - 2) { return 8 }
-    if !(a = 3 && b = 3) || (a = 4 || b = 4) { return 9 }
-    if a < b = true { return 10 }
-    // if let, if case, guard case, and switch labels next to `=`.
+    switch (a + 1 = b * 2 - 2) { .false: return 8, .true: {} }
+    switch !(a = 3 && b = 3) || (a = 4 || b = 4) { .true: return 9, .false: {} }
+    switch a < b = true { .true: return 10, .false: {} }
+    // Switch subjects, payload bindings, and arm bodies next to `=`.
     let maybe: Int?(3)
-    if let m: maybe { if !(m = a) { return 11 } } else { return 12 }
-    if case .present(let m): maybe { x: m = 3 } else { return 13 }
-    if !x { return 14 }
-    if level(s: .dark(level: 2)) != 2 || level(s: .light) != -1 { return 15 }
-    if bucket(n: 0) != 0 || bucket(n: 1) != 1 || bucket(n: 4) != 2 || bucket(n: 5) != 3 { return 16 }
+    switch maybe { .present(let m): switch (m = a) { .false: return 11, .true: {} }, .absent: return 12 }
+    switch maybe { .present(let m): x: m = 3, default: return 13 }
+    switch x { .false: return 14, .true: {} }
+    switch level(s: .dark(level: 2)) != 2 || level(s: .light) != -1 { .true: return 15, .false: {} }
+    switch bucket(n: 0) != 0 || bucket(n: 1) != 1 || bucket(n: 4) != 2 || bucket(n: 5) != 3 { .true: return 16, .false: {} }
     // Optional promotion, enums with payloads, and strings.
-    if maybe = .absent || !(maybe = 3) { return 17 }
-    if !(Shade.dark(level: 1) = .dark(level: 1)) || Shade.light = .dark(level: 0) { return 18 }
+    switch maybe = .absent || !(maybe = 3) { .true: return 17, .false: {} }
+    switch !(Shade.dark(level: 1) = .dark(level: 1)) || Shade.light = .dark(level: 0) { .true: return 18, .false: {} }
     let word: String("hi")
-    if !(word = "hi") || word = "ho" { return 19 }
-    // while, guard, and where conditions.
+    switch !(word = "hi") || word = "ho" { .true: return 19, .false: {} }
+    // while and where conditions.
     state i: 0
     while !(i = 3) { i: i + 1 }
-    guard i = 3 else { return 20 }
+    switch i = 3 { .false: return 20, .true: {} }
     state evens: 0
     for n in 0..<6 where n % 2 = 0 { evens: evens + 1 }
-    if evens != 3 { return 21 }
+    switch evens != 3 { .true: return 21, .false: {} }
     return 42
 }

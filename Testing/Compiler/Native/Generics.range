@@ -10,7 +10,7 @@ function first<Element>(let xs: Array<Element>): Element? {
 }
 
 function pick<Value>(let a: Value, let b: Value, let flag: Bool): Value {
-    if flag { return a }
+    switch flag { .true: return a, .false: {} }
     return b
 }
 
@@ -19,7 +19,7 @@ function second<Element>(let xs: Array<Element>): Element? {
     state rest: Array<Element>()
     state skipped: false
     for x in xs {
-        if skipped { rest.append(value: x) }
+        switch skipped { .true: rest.append(value: x), .false: {} }
         skipped: true
     }
     return first(xs: rest)
@@ -33,15 +33,18 @@ function count<Element>(let xs: Array<Element>, let value: Element): Int {
 
 function repeated<Element>(let value: Element, let times: Int): Array<Element> {
     state xs: Array<Element>()
-    if times > 0 {
-        xs: repeated(value: value, times: times - 1)
-        xs.append(value: value)
+    switch times > 0 {
+        .true: {
+            xs: repeated(value: value, times: times - 1)
+            xs.append(value: value)
+        },
+        .false: {}
     }
     return xs
 }
 
 function orDefault<Value>(let maybe: Value?, let fallback: Value): Value {
-    if let v: maybe { return v }
+    switch maybe { .present(let v): return v, .absent: {} }
     return fallback
 }
 
@@ -67,7 +70,7 @@ function filled<Element, let size: Int>(let value: Element): Array<Element> {
     return xs
 }
 function chosen<let flag: Bool, let small: Int<bits: 8>>(): Int<bits: 8> {
-    if flag { return small }
+    switch flag { .true: return small, .false: {} }
     return -small
 }
 
@@ -81,34 +84,34 @@ construct Grid<let width: Int> {
     state numbers: Array<Int>()
     numbers.append(value: 7)
     numbers.append(value: 8)
-    if first(xs: numbers) != 7 || second(xs: numbers) != 8 { return 1 }
-    if first(xs: Array<Int>()) != .absent { return 2 }
-    if pick(a: 1, b: 2, flag: true) != 1 || pick(a: 1, b: 2, flag: false) != 2 { return 3 }
+    switch first(xs: numbers) != 7 || second(xs: numbers) != 8 { .true: return 1, .false: {} }
+    switch first(xs: Array<Int>()) != .absent { .true: return 2, .false: {} }
+    switch pick(a: 1, b: 2, flag: true) != 1 || pick(a: 1, b: 2, flag: false) != 2 { .true: return 3, .false: {} }
     let p: pick(a: Point(x: 1, y: 2), b: Point(x: 3, y: 4), flag: false)
-    if p.x != 3 { return 4 }
-    if pick(a: Shade.light, b: .dark, flag: false) != .dark { return 5 }
+    switch p.x != 3 { .true: return 4, .false: {} }
+    switch pick(a: Shade.light, b: .dark, flag: false) != .dark { .true: return 5, .false: {} }
     let narrow: Int<bits: 8>(5)
-    if pick(a: narrow, b: 6, flag: false) != 6 { return 6 }
-    if pick<Int>(a: 1, b: 2, flag: true) != 1 { return 7 }
+    switch pick(a: narrow, b: 6, flag: false) != 6 { .true: return 6, .false: {} }
+    switch pick<Int>(a: 1, b: 2, flag: true) != 1 { .true: return 7, .false: {} }
     let words: repeated(value: "ab", times: 3)
-    if words.count != 3 || first(xs: words) != "ab" || count(xs: words, value: "ab") != 3 { return 8 }
-    if count(xs: numbers, value: 8) != 1 { return 9 }
-    if orDefault(maybe: first(xs: Array<Point>()), fallback: p) != Point(x: 3, y: 4) { return 10 }
+    switch words.count != 3 || first(xs: words) != "ab" || count(xs: words, value: "ab") != 3 { .true: return 8, .false: {} }
+    switch count(xs: numbers, value: 8) != 1 { .true: return 9, .false: {} }
+    switch orDefault(maybe: first(xs: Array<Point>()), fallback: p) != Point(x: 3, y: 4) { .true: return 10, .false: {} }
     let none: Int?(nothing())
-    if none != .absent { return 11 }
+    switch none != .absent { .true: return 11, .false: {} }
     state box: Box<Int>()
     box.items.append(value: 5)
     box.items.append(value: 5)
-    if box.head() != 5 || box.written() != 5 || box.tally(value: 5) != 2 { return 12 }
+    switch box.head() != 5 || box.written() != 5 || box.tally(value: 5) != 2 { .true: return 12, .false: {} }
     state named: Box<String>()
-    if named.head() != .absent { return 13 }
+    switch named.head() != .absent { .true: return 13, .false: {} }
     named.items.append(value: "x")
-    if named.written() != "x" { return 14 }
-    if scaled(n: 5) != 10 || scaled<factor: 3>(n: 5) != 15 || scaled<factor: -1>(n: 5) != -5 { return 15 }
-    if times<n: 4>(value: 2) != 8 { return 16 }
+    switch named.written() != "x" { .true: return 14, .false: {} }
+    switch scaled(n: 5) != 10 || scaled<factor: 3>(n: 5) != 15 || scaled<factor: -1>(n: 5) != -5 { .true: return 15, .false: {} }
+    switch times<n: 4>(value: 2) != 8 { .true: return 16, .false: {} }
     let three: filled<size: 3>(value: "ab")
-    if three.count != 3 || first(xs: three) != "ab" || filled<size: 0>(value: 1).count != 0 { return 17 }
-    if chosen<flag: true, small: 7>() != 7 || chosen<flag: false, small: 7>() != -7 { return 18 }
-    if Grid<width: 3>().size(rows: 2) != 6 || Grid<width: 5>().size(rows: 2) != 10 { return 19 }
+    switch three.count != 3 || first(xs: three) != "ab" || filled<size: 0>(value: 1).count != 0 { .true: return 17, .false: {} }
+    switch chosen<flag: true, small: 7>() != 7 || chosen<flag: false, small: 7>() != -7 { .true: return 18, .false: {} }
+    switch Grid<width: 3>().size(rows: 2) != 6 || Grid<width: 5>().size(rows: 2) != 10 { .true: return 19, .false: {} }
     return 42
 }

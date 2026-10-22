@@ -13,23 +13,23 @@ enum Tree {
 enum Wrapper { case token(Token), none }
 function classify(let t: Token): Int {
     switch t {
-    case Token.pair(1, 2): return 12
-    case .end: return 0
+    .pair(1, 2): return 12,
+    .end: return 0,
     default: return -1
     }
 }
 {
-    let a: Token(.value(number: 7))
-    if a != .value(number: 7) { return 1 }
-    if a = .value(number: 8) { return 2 }
-    if a = .end || Token.end != .end { return 3 }
-    if Token.pair(1, 2) = .pair(2, 1) { return 4 }
-    if !(Token.flag(true) = .flag(true)) { return 5 }
-    let t: Tree(.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3))))
-    let u: Tree(.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3))))
-    if t != u { return 6 }
-    if t = .node(left: .leaf(value: 1), right: .leaf(value: 5)) { return 7 }
-    if Wrapper.token(.pair(3, 4)) != .token(.pair(3, 4)) { return 8 }
-    if classify(t: .pair(1, 2)) != 12 || classify(t: .pair(2, 2)) != -1 { return 9 }
+    let a: Token.value(number: 7)
+    switch a != .value(number: 7) { .true: return 1, .false: {} }
+    switch a = .value(number: 8) { .true: return 2, .false: {} }
+    switch a = .end || Token.end != .end { .true: return 3, .false: {} }
+    switch Token.pair(1, 2) = .pair(2, 1) { .true: return 4, .false: {} }
+    switch (Token.flag(true) = .flag(true)) { .false: return 5, .true: {} }
+    let t: Tree.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3)))
+    let u: Tree.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3)))
+    switch t != u { .true: return 6, .false: {} }
+    switch t = .node(left: .leaf(value: 1), right: .leaf(value: 5)) { .true: return 7, .false: {} }
+    switch Wrapper.token(.pair(3, 4)) != .token(.pair(3, 4)) { .true: return 8, .false: {} }
+    switch classify(t: .pair(1, 2)) != 12 || classify(t: .pair(2, 2)) != -1 { .true: return 9, .false: {} }
     return 42
 }

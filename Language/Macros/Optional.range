@@ -1,7 +1,8 @@
-// C primitive: `T?` in a type position is sugar for the enum that applies
-// @optional, specialized with T, and `if let` and `guard let` unwrap the
-// payload of its one payload case. Where `T?` is expected, a value of T is
-// promoted to that case holding it, as in Swift: `return 5` from a function
+// C primitive: `T?` in a type position, and before a case as in
+// `Int?.absent`, is sugar for the enum that applies @optional, specialized
+// with T, and `for … in` unwraps the payload of its one payload case. Where
+// `T?` is expected, a value of T is promoted to that case holding it, as in
+// Swift: `return 5` from a function
 // returning `Int?`, `let x: Int?(5)`, an argument, an assignment, and either
 // side of `=`. Absence is written with the absent case, `.absent`; there is
 // no nil literal. C resolves all of these; it never names the type or its cases.

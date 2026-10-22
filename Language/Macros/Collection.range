@@ -4,8 +4,9 @@
 macro collection(): Construct {
     let element: #generics.filter(named: "Element").first
 
-    if !element.isTarget {
-        @diagnostic("Collection must declare generic Element")
+    switch element.isTarget {
+        .false: @diagnostic("Collection must declare generic Element"),
+        .true: {}
     }
 
     // Require element to be a type parameter, not only a generic spelled
@@ -38,7 +39,7 @@ macro collection(): Construct {
             // `for element in collection { }` calls this at positions 0, 1, 2, …
             @iteration
             function element(let at: Int): Element? {
-                if at < count { return read(at: at) }
+                switch at < count { .true: return read(at: at), .false: {} }
                 return .absent
             }
 
@@ -47,21 +48,23 @@ macro collection(): Construct {
             // is storage, not value, so it never takes part. The @equatable
             // on this extension makes `=` call this.
             function equals(let other: #name): Bool {
-                if count != other.count { return false }
+                switch count != other.count { .true: return false, .false: {} }
                 for index in 0..<count {
-                    if read(at: index) != other.read(at: index) { return false }
+                    switch read(at: index) != other.read(at: index) { .true: return false, .false: {} }
                 }
                 return true
             }
 
             function append(let value: Element) {
-                if count = capacity {
-                    if capacity = 0 {
-                        capacity: 1
-                    } else {
-                        capacity: capacity * 2
-                    }
-                    resize(to: capacity)
+                switch count = capacity {
+                    .true: {
+                        switch capacity = 0 {
+                            .true: capacity: 1,
+                            .false: capacity: capacity * 2
+                        }
+                        resize(to: capacity)
+                    },
+                    .false: {}
                 }
                 write(at: count, value: value)
                 count: count + 1

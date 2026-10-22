@@ -20,10 +20,9 @@ construct Twice {
 // @defaults application.
 macro reportsEquatable(): Construct {
     let written: #macros.filter(named: "equatable").first
-    if written.isTarget {
-        @warning("\(#name) writes @equatable")
-    } else {
-        @warning("\(#name) has only the default @equatable")
+    switch written.isTarget {
+        .true: @warning("\(#name) writes @equatable"),
+        .false: @warning("\(#name) has only the default @equatable")
     }
 }
 

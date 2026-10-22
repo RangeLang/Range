@@ -4,32 +4,36 @@ macro integer(): Construct {
   let bits: #generics.filter(named: "bits").first
   let signed: #generics.filter(named: "signed").first
 
-  if !value.isTarget {
-    @diagnostic("Construct must specify value")
+  switch value.isTarget {
+    .false: @diagnostic("Construct must specify value"),
+    .true: {}
   }
 
-  if !bits.isTarget {
-    @diagnostic(
+  switch bits.isTarget {
+    .false: @diagnostic(
       "Construct must specify bits"
-    )
+    ),
+    .true: {}
   }
 
-  if !signed.isTarget {
-    @diagnostic(
+  switch signed.isTarget {
+    .false: @diagnostic(
       "Construct must specify signed"
-    )
+    ),
+    .true: {}
   }
 
   // The law runs per specialization and per supplied literal, so value and
   // bits are the specialized ones here.
-  if value.isTarget && bits.isTarget && signed.isTarget {
-    if bits.value <= 0 {
-      @diagnostic("Integer bits must be positive")
-    } else {
-      if !integerValueFits(value: value.value, bits: bits.value, signed: signed.value) {
-        @diagnostic("Integer value does not fit the declared bits and signedness")
+  switch value.isTarget && bits.isTarget && signed.isTarget {
+    .true: switch bits.value <= 0 {
+      .true: @diagnostic("Integer bits must be positive"),
+      .false: switch integerValueFits(value: value.value, bits: bits.value, signed: signed.value) {
+        .false: @diagnostic("Integer value does not fit the declared bits and signedness"),
+        .true: {}
       }
-    }
+    },
+    .false: {}
   }
 
   // Layout and arithmetic: the construct is a scalar exactly bits wide, signed
@@ -67,16 +71,17 @@ macro integer(): Construct {
 
 // Bounds are language rules. C evaluates the arithmetic and control flow.
 function integerValueFits(let value: Int, let bits: Int, let signed: Bool): Bool {
-  if bits <= 0 { return false }
+  switch bits <= 0 { .true: return false, .false: {} }
   state remaining: value
   state available: bits
-  if signed {
-    available: available - 1
-    // -1 - value maps negatives to their required magnitude bits without
-    // negating the minimum signed integer or computing overflowing powers.
-    if remaining < 0 { remaining: -1 - remaining }
-  } else {
-    if remaining < 0 { return false }
+  switch signed {
+    .true: {
+      available: available - 1
+      // -1 - value maps negatives to their required magnitude bits without
+      // negating the minimum signed integer or computing overflowing powers.
+      switch remaining < 0 { .true: remaining: -1 - remaining, .false: {} }
+    },
+    .false: switch remaining < 0 { .true: return false, .false: {} }
   }
   while remaining > 0 && available > 0 {
     remaining: remaining / 2

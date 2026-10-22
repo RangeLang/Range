@@ -67,7 +67,7 @@ int main(void)
     rangeArenaDestroy(&arena);
 
     source = "construct Construct {} macro inspect(): Construct { "
-        "let selected: #members.filter(named: \"payload\").first if selected.isTarget {} }";
+        "let selected: #members.filter(named: \"payload\").first switch selected.isTarget { .true: {}, .false: {} } }";
     report = collect(&arena,source,"construct Bag { function filter(let named: Bag): Bag { return named } "
         "function first(): Bag { return Bag } function isTarget(): Bag { return Bag } }");
     assert(!report.errors);

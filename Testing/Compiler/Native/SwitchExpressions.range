@@ -1,0 +1,183 @@
+// switch is the only selector: every arm form, switch as a statement and as
+// an expression, and the patterns its labels are written with.
+enum Shape {
+    case circle(radius: Int)
+    case square(side: Int)
+    case group(Array<Int>)
+    case nothing
+}
+
+enum Light {
+    case red, amber, green
+}
+
+// Every arm form of a statement switch: an expression (a call), a block, `{}`,
+// return, an assignment, an effect, and a nested switch.
+function forms(let n: Int): Int {
+    state total: 0
+    switch n {
+        0: return 100,
+        1: total: 1,
+        2: {
+            total: 20
+            total: total + 2
+        },
+        3: @print("three"),
+        4: switch n > 3 { .true: total: 4, .false: {} },
+        5: note(total: total),
+        default: {}
+    }
+    return total
+}
+
+function note(let total: Int): Int {
+    return total
+}
+
+// break and continue in arms leave the loop; a switch is not their target.
+function loop(let xs: Array<Int>): Int {
+    state sum: 0
+    for x in xs {
+        switch x {
+            2: continue,
+            5: break,
+            default: sum: sum + x
+        }
+    }
+    return sum
+}
+
+// An expression switch in a return, with `|` alternatives that bind, a where
+// guard, and a payload binding.
+function measure(let s: Shape): Int {
+    return switch s {
+        .circle(radius: let n) | .square(side: let n) where n > 10: 1000,
+        .circle(let n) | .square(let n): n,
+        .group(let items): items.count,
+        .nothing: 0
+    }
+}
+
+// Literal arms on Int and String, and relational arms.
+function classify(let n: Int): Int {
+    return switch n {
+        0: 1,
+        -1: 2,
+        < 0: 3,
+        >= 100: 4,
+        = 7: 5,
+        default: 6
+    }
+}
+
+function command(let word: String): Int {
+    return switch word {
+        "quit": 1,
+        "go": 2,
+        default: 0
+    }
+}
+
+// An arm that diverges with return: the value is bound for the rest.
+function first(let xs: Array<Int>): Int {
+    let value: switch xs.count {
+        0: { return -1 },
+        default: xs.read(at: 0)
+    }
+    return value + 1
+}
+
+function twice(let n: Int): Int {
+    return n * 2
+}
+
+function next(let l: Light): Light {
+    return switch l { .red: .green, .amber: .red, .green: .amber }
+}
+
+function lookup(let found: Bool): Int? {
+    return switch found { .true: 5, .false: Int?.absent }
+}
+
+// An aggregate value: the chosen arm's value moves or is retained into place.
+function pick(let left: Bool, let a: Array<Int>, let b: Array<Int>): Array<Int> {
+    return switch left { .true: a, .false: b }
+}
+
+function made(let n: Int): Array<Int> {
+    state xs: Array<Int>()
+    for i in 0..<n { xs.append(value: i) }
+    return xs
+}
+
+// Nested switches, as statements and as expressions.
+function nested(let a: Bool, let b: Bool): Int {
+    switch a {
+        .true: switch b {
+            .true: return 1,
+            .false: return 2
+        },
+        .false: {}
+    }
+    return switch b { .true: 3, .false: switch a { .true: 9, .false: 4 } }
+}
+
+// break and continue inside a switch expression's arm, with the left operand
+// of `+` already evaluated: the loop leaves it behind.
+function partial(let xs: Array<Int>): Int {
+    state sum: 0
+    for x in xs {
+        sum: sum + switch x {
+            3: continue,
+            9: { break },
+            default: x
+        }
+    }
+    return sum
+}
+
+{
+    switch forms(n: 0) != 100 || forms(n: 1) != 1 || forms(n: 2) != 22 { .true: return 1, .false: {} }
+    switch forms(n: 3) != 0 || forms(n: 4) != 4 || forms(n: 5) != 0 || forms(n: 6) != 0 { .true: return 2, .false: {} }
+    state xs: Array<Int>()
+    for i in 1..<8 { xs.append(value: i) }
+    switch loop(xs: xs) != 1 + 3 + 4 { .true: return 3, .false: {} }
+    switch measure(s: .circle(radius: 4)) + measure(s: .square(side: 11)) != 1004 { .true: return 4, .false: {} }
+    switch measure(s: .group(xs)) != 7 || measure(s: .nothing) != 0 { .true: return 5, .false: {} }
+    switch classify(n: 0) != 1 || classify(n: -1) != 2 || classify(n: -5) != 3 { .true: return 6, .false: {} }
+    switch classify(n: 100) != 4 || classify(n: 7) != 5 || classify(n: 8) != 6 { .true: return 7, .false: {} }
+    switch command(word: "quit") + command(word: "go") + command(word: "stay") != 3 { .true: return 8, .false: {} }
+    state empty: Array<Int>()
+    switch first(xs: empty) != -1 || first(xs: xs) != 2 { .true: return 9, .false: {} }
+    // In a let, an argument, and an operand.
+    let light: switch xs.count > 3 { .true: Light.red, .false: .green }
+    switch next(l: light) != .green { .true: return 10, .false: {} }
+    let doubled: twice(n: switch light { .red: 21, .amber | .green: 0 })
+    switch doubled != 42 { .true: return 11, .false: {} }
+    let sum: 1 + switch light { .red: 2, default: 0 } * 10
+    switch sum != 21 { .true: return 12, .false: {} }
+    // Optional promotion across arms, and Type?.case.
+    switch lookup(found: true) != Int?.present(5) || lookup(found: false) != .absent { .true: return 13, .false: {} }
+    let none: Int?.absent
+    switch none { .present(let n): return 14, .absent: {} }
+    let chosen: pick(left: false, a: xs, b: made(n: 3))
+    switch chosen.count != 3 || pick(left: true, a: made(n: 2), b: xs).count != 2 { .true: return 15, .false: {} }
+    let text: switch chosen.count { 3: "three", default: "other" }
+    switch text != "three" { .true: return 16, .false: {} }
+    switch nested(a: true, b: true) != 1 || nested(a: true, b: false) != 2 { .true: return 17, .false: {} }
+    switch nested(a: false, b: true) != 3 || nested(a: false, b: false) != 4 { .true: return 18, .false: {} }
+    state ys: Array<Int>()
+    for i in 1..<12 { ys.append(value: i) }
+    switch partial(xs: ys) != 1 + 2 + 4 + 5 + 6 + 7 + 8 { .true: return 19, .false: {} }
+    // for with a case pattern and a guard.
+    state shapes: Array<Shape>()
+    shapes.append(value: .group(made(n: 2)))
+    shapes.append(value: .nothing)
+    shapes.append(value: .group(made(n: 5)))
+    shapes.append(value: .circle(radius: 1))
+    state counted: 0
+    for .group(let items) in shapes where items.count > 3 { counted: counted + items.count }
+    for .group(let items) in shapes { counted: counted + 100 }
+    switch counted != 205 { .true: return 20, .false: {} }
+    return 42
+}

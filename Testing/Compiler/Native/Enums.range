@@ -7,36 +7,36 @@ enum Direction {
 }
 
 construct Heading {
-    state facing: Direction(.north)
+    state facing: Direction.north
     let fallback: Direction
 }
 
 function turn(let d: Direction): Direction {
-    if d = .north { return .east }
-    if d = Direction.east { return .south }
-    if .south = d { return Direction.west }
+    switch d = .north { .true: return .east, .false: {} }
+    switch d = Direction.east { .true: return .south, .false: {} }
+    switch .south = d { .true: return Direction.west, .false: {} }
     return .north
 }
 
 {
-    let a: Direction(.north)
+    let a: Direction.north
     let b: turn(d: a)
-    if b != .east { return 1 }
-    if a = b { return 2 }
+    switch b != .east { .true: return 1, .false: {} }
+    switch a = b { .true: return 2, .false: {} }
     state h: Heading(fallback: .west)
     h.facing: turn(d: h.facing)
-    if h.facing != Direction.east || h.fallback != .west { return 3 }
+    switch h.facing != Direction.east || h.fallback != .west { .true: return 3, .false: {} }
     let copy: h
     h.facing: .south
-    if copy.facing != .east { return 4 }
+    switch copy.facing != .east { .true: return 4, .false: {} }
     state xs: Array<Direction>()
     xs.append(value: .south)
     xs.append(value: turn(d: .south))
     xs.append(value: turn(d: xs.read(at: 1)))
-    if xs.read(at: 1) != .west || xs.read(at: 2) != .north { return 5 }
+    switch xs.read(at: 1) != .west || xs.read(at: 2) != .north { .true: return 5, .false: {} }
     state d: Direction.west
     d: turn(d: d)
-    if d != .north { return 6 }
+    switch d != .north { .true: return 6, .false: {} }
     @print("\(a) \(b) \(xs.read(at: 1)) \(h.fallback)")
     return 42
 }

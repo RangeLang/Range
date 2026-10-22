@@ -29,11 +29,11 @@ extension Written {}
 {
     let half1: Fraction(numerator: 1, denominator: 2)
     let half2: Fraction(numerator: 2, denominator: 4)
-    if half1 != half2 || half1 = Fraction(numerator: 1, denominator: 3) { return 1 }
-    if Parity.even != .odd { return 2 }
-    if Plain(n: 1) = Plain(n: 2) || Plain(n: 3) != Plain(n: 3) { return 3 }
-    if Twice(n: 1) != Twice(n: 2) { return 4 }
-    if Written(n: 1) = Written(n: 2) || Defaulted(n: 1) = Defaulted(n: 2) { return 5 }
-    if Coin.heads != .tails { return 6 }
+    switch half1 != half2 || half1 = Fraction(numerator: 1, denominator: 3) { .true: return 1, .false: {} }
+    switch Parity.even != .odd { .true: return 2, .false: {} }
+    switch Plain(n: 1) = Plain(n: 2) || Plain(n: 3) != Plain(n: 3) { .true: return 3, .false: {} }
+    switch Twice(n: 1) != Twice(n: 2) { .true: return 4, .false: {} }
+    switch Written(n: 1) = Written(n: 2) || Defaulted(n: 1) = Defaulted(n: 2) { .true: return 5, .false: {} }
+    switch Coin.heads != .tails { .true: return 6, .false: {} }
     return 42
 }

@@ -4,23 +4,23 @@ enum Direction { case north, south }
 
 function classify(let direction: Direction): Int {
     switch direction {
-    case .north: return 40
-    case .south: return 9
+    .north: return 40,
+    .south: return 9
     }
 }
 
 function small(let value: Int): Int {
     switch value {
-    case < 0: return 8
-    case 0: return 2
+    < 0: return 8,
+    0: return 2,
     default: return 5
     }
 }
 
 {
-    let direction: Direction(.north)
+    let direction: Direction.north
     state values: Array<Int>()
     values.append(value: 10)
-    if values.count != 1 || small(value: -1) != 8 || small(value: 3) != 5 { return 1 }
+    switch values.count != 1 || small(value: -1) != 8 || small(value: 3) != 5 { .true: return 1, .false: {} }
     return classify(direction: direction) + small(value: 0)
 }

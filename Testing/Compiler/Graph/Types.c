@@ -139,7 +139,7 @@ int main(void)
 
     // Refusals: mixed widths, non-Bool conditions, labels, members, generics, storage, immutability.
     compile(&c,"function refuse() { let a: 0 state narrow: Int<bits: 8> "
-        "let mixed: (a + narrow) if a {} let neg: -true let nope: (a.missing) "
+        "let mixed: (a + narrow) while a {} let neg: -true let nope: (a.missing) "
         "state xs: Array<Int> xs.append(value: true) xs.append(7) xs.nothing() let slots: (xs.elements) "
         "let bare: Array let twice: Array<Int, Int> let wide: Int<width: 8> a: 5 }");
     assert(reported(&c,"type","operator '+' requires matching types; found Int<bits: 64, signed: true> and Int<bits: 8, signed: true>"));

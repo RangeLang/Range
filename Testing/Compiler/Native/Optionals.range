@@ -1,5 +1,5 @@
-// Optional is an enum: `T?` is Optional<T>, `if let` unwraps its present
-// case, and `if case` matches any pattern, with else and else if.
+// Optional is an enum: `T?` is Optional<T>, and a switch over its cases
+// unwraps the present one, as a statement or nested in another arm.
 construct Person {
     let age: Int
     let manager: Int?
@@ -8,17 +8,16 @@ construct Person {
 function find(let xs: Array<Int>, let wanted: Int): Int? {
     state i: 0
     while i < xs.count {
-        if xs.read(at: i) = wanted { return .present(i) }
+        switch xs.read(at: i) = wanted { .true: return .present(i), .false: {} }
         i: i + 1
     }
     return .absent
 }
 
 function describe(let maybe: Int?): Int {
-    if let value: maybe {
-        return value
-    } else if case .absent: maybe {
-        return -1
+    switch maybe {
+        .present(let value): return value,
+        .absent: return -1
     }
     return -2
 }
@@ -27,23 +26,25 @@ function describe(let maybe: Int?): Int {
     state xs: Array<Int>()
     xs.append(value: 5)
     xs.append(value: 9)
-    if let index: find(xs: xs, wanted: 9) {
-        if index != 1 { return 1 }
-    } else { return 2 }
-    if let index: find(xs: xs, wanted: 4) { return 3 }
+    switch find(xs: xs, wanted: 9) {
+        .present(let index): switch index != 1 { .true: return 1, .false: {} },
+        .absent: return 2
+    }
+    switch find(xs: xs, wanted: 4) { .present(let index): return 3, .absent: {} }
     let boss: Person(age: 40, manager: .absent)
     let worker: Person(age: 30, manager: .present(1))
-    if describe(maybe: boss.manager) != -1 { return 4 }
-    if describe(maybe: worker.manager) != 1 { return 5 }
+    switch describe(maybe: boss.manager) != -1 { .true: return 4, .false: {} }
+    switch describe(maybe: worker.manager) != 1 { .true: return 5, .false: {} }
     let found: find(xs: xs, wanted: 5)
-    if let found {
-        if found != 0 { return 6 }
-    } else { return 7 }
+    switch found {
+        .present(let found): switch found != 0 { .true: return 6, .false: {} },
+        .absent: return 7
+    }
     state names: Array<String?>()
     names.append(value: .present("Ada"))
     names.append(value: .absent)
     switch names.read(at: 1) {
-    case .present(let name): return 8
-    case .absent: return 42
+    .present(let name): return 8,
+    .absent: return 42
     }
 }

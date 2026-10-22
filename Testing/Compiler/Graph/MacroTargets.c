@@ -141,7 +141,7 @@ int main(void)
     reject("macro mark(): Array<Construct> {}","macro target requires one declaration type");
     reject("macro mark(): Construct { let old: #target.members }","field 'target' is not declared by @type Construct");
     reject("macro mark(): Construct { let old: #body }","field 'body' is not declared by @type Construct");
-    reject("macro mark(): Function { if false { let bad: #members } }","field 'members' is not declared by @type Function");
+    reject("macro mark(): Function { switch false { .true: { let bad: #members }, .false: {} } }","field 'members' is not declared by @type Function");
     reject("macro mark() { let bad: #name }","#name requires a declared macro target");
 
     // Primitive annotation spelling is overloadable by target too.
