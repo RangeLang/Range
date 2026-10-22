@@ -4739,6 +4739,35 @@ static RangeNode *literalFamily(Typer *typer, const char *spelling)
     return NULL;
 }
 
+/* `let v: Int?` with no value is `let v: Int?.absent`: an optional binding
+ * starts as the case of the @optional enum that carries no payload. Rewritten
+ * before typing, so locals and construct members (as construction defaults)
+ * read it like any written value. */
+static void absentDefaults(RangeArena *arena, RangeNode *node, const char *absent)
+{
+    if (!node || node->kind == RangeNodeEnumCase) return; /* payload fields are types, not bindings */
+    if ((node->kind == RangeNodeLet || node->kind == RangeNodeState) && node->typeName
+        && (node->flags & RangeFlagOptional) && !(node->flags & (RangeFlagApplication | RangeFlagMacroType))
+        && !node->rhsReference && !node->a && !node->itemCount) {
+        RangeNode *type = rangeNodeCreate(arena,RangeNodeName,node->path,node->line,node->column);
+        type->name = node->typeName;
+        type->generics = node->generics;
+        type->flags = RangeFlagOptional;
+        RangeNode *value = rangeNodeCreate(arena,RangeNodeMemberAccess,node->path,node->line,node->column);
+        value->a = type;
+        value->name = absent;
+        node->a = value;
+        node->typeName = NULL;
+        node->generics = NULL;
+        node->flags &= ~RangeFlagOptional;
+        return;
+    }
+    absentDefaults(arena,node->a,absent);
+    absentDefaults(arena,node->b,absent);
+    absentDefaults(arena,node->c,absent);
+    for (size_t i = 0; i < node->itemCount; ++i) absentDefaults(arena,node->items[i],absent);
+}
+
 /* Returns the typer, kept for code generation: generic methods are lowered per
  * concrete specialization, which substitutes and lays out new types. */
 static Typer *typeCheck(SourceReport *report)
@@ -4750,6 +4779,14 @@ static Typer *typeCheck(SourceReport *report)
     *typer = (Typer){.report=report,.vm=vm};
     typer->specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return typer; }
+    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
+        RangeNode *candidate = report->units[u]->items[i];
+        if (candidate->kind != RangeNodeEnum || !appliesBuiltin(candidate,"optional")) continue;
+        for (size_t c = 0; c < candidate->itemCount; ++c)
+            if (candidate->items[c]->kind == RangeNodeEnumCase && !candidate->items[c]->itemCount)
+                for (size_t v = 0; v < report->count; ++v) absentDefaults(report->arena,report->units[v],candidate->items[c]->name);
+        break;
+    }
     typer->integer = literalFamily(typer,"0");
     typer->boolean = literalFamily(typer,"true");
     if (typer->boolean) typer->booleanType = specialize(typer,NULL,typer->boolean,NULL,NULL,typer->boolean);

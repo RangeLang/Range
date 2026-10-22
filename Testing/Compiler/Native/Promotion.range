@@ -1,9 +1,11 @@
 // A value of T where T? is expected is promoted to .present(value): returns,
 // construction, arguments, assignments, members, and either side of =.
+// A binding of T? with no value starts as .absent.
 enum Direction { case north, south }
 construct Person {
     let age: Int
     state manager: Int?.absent
+    state mentor: Int?
 }
 function find(let xs: Array<Int>, let wanted: Int): Int? {
     for x in xs { switch x = wanted { .true: return x, .false: {} } }
@@ -45,5 +47,13 @@ function describe(let maybe: Int?): Int {
     state count: 0
     for .present(let name) in names { count: count + 1 }
     switch count != 1 { .true: return 11, .false: {} }
+    // A binding of T? with no value starts absent, locals and members alike.
+    state z: Int?
+    switch z != .absent { .true: return 12, .false: {} }
+    z: 4
+    switch z != 4 { .true: return 13, .false: {} }
+    switch p.mentor != .absent { .true: return 14, .false: {} }
+    let q: Person(age: 1, mentor: 9)
+    switch q.mentor != 9 { .true: return 15, .false: {} }
     return 42
 }
