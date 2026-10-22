@@ -1773,13 +1773,6 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         if (enumeration && metaCaseNamed(enumeration,node->name))
             return metaConstructCase(eval,scope,enumeration,node->name,NULL,node);
         RangeGraphValue receiver = metaExpression(eval,scope,node->a);
-        if (same(node->name,"isTarget")) {
-            if (receiver.kind == RangeGraphCase && appliesBuiltin(receiver.declaration,"optional"))
-                return metaScalar(eval,node,RangeNodeBool,receiver.count != 0);
-            if (receiver.kind != RangeGraphNone && receiver.kind != RangeGraphNode)
-                fail(eval->vm,node,"isTarget requires a selected graph node");
-            return metaScalar(eval,node,RangeNodeBool,receiver.kind == RangeGraphNode);
-        }
         if (receiver.kind == RangeGraphInstance) {
             size_t member = metaMemberIndex(receiver,node->name);
             if (member == SIZE_MAX) {
@@ -2392,9 +2385,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 0);
         break;
     case RangeNodeMemberAccess:
-        /* Runtime member access is typed later; this is a graph-value shortcut. */
-        if (scope && scope->meta && same(node->name,"isTarget"))
-            sourceDiagnostic(report,node,1,"C-implementation","'.%s' is hard-coded in C; Range member dispatch is not implemented",node->name);
+        /* Runtime member access is typed later. */
         if (scope && scope->meta && reflectionList(report->arena,node->name))
             sourceDiagnostic(report,node,1,"C-implementation","'.%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's append(value:) for each declaration",node->name);
         break;

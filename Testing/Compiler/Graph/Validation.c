@@ -239,6 +239,9 @@ int main(void)
                      "Array has no function 'second' with these labels",0);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first.name } @probe extension Light {}",
                      "'Array.first' is a function; call it",0);
+    // An optional is matched with switch; it has no isTarget, or any member.
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first().isTarget } @probe extension Light {}",
+                     "this compile-time value has no member 'isTarget'",0);
     // Without the grammar, a reflection list has no Range type to be.
     validate("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
              "reflection field 'members' has no Range type",0);
