@@ -97,7 +97,7 @@ construct Grid<let width: Int> {
     switch words.count != 3 || first(xs: words) != "ab" || count(xs: words, value: "ab") != 3 { .true: return 8, .false: {} }
     switch count(xs: numbers, value: 8) != 1 { .true: return 9, .false: {} }
     switch orDefault(maybe: first(xs: Array<Point>()), fallback: p) != Point(x: 3, y: 4) { .true: return 10, .false: {} }
-    let none: Int?(nothing())
+    let none: nothing<Int>()
     switch none != .absent { .true: return 11, .false: {} }
     state box: Box<Int>()
     box.items.append(value: 5)

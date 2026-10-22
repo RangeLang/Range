@@ -2,9 +2,10 @@
 // `Int?.absent`, is sugar for the enum that applies @optional, specialized
 // with T, and `for … in` unwraps the payload of its one payload case. Where
 // `T?` is expected, a value of T is promoted to that case holding it, as in
-// Swift: `return 5` from a function
-// returning `Int?`, `let x: Int?(5)`, an argument, an assignment, and either
-// side of `=`. Absence is written with the absent case, `.absent`; there is
-// no nil literal. C resolves all of these; it never names the type or its cases.
+// Swift: `return 5` from a function returning `Int?`, an argument, an
+// assignment, and either side of `=`. A new binding names the case,
+// `let x: Int?.present(5)`; `Int?(5)` is not Range, since an enum value is
+// always a case. Absence is the absent case, `.absent`; there is no nil
+// literal. C resolves all of these; it never names the type or its cases.
 @builtin
 macro optional(): Enum

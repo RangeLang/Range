@@ -270,6 +270,8 @@ reject case-construction "an enum value is written Direction.north, or .north wh
 { let d: Direction(.north) return 0 }'
 reject optional-case-construction "an enum value is written Int?.absent, or .absent where the context names its type; Int?(.absent) is not Range" \
     '{ let n: Int?(.absent) return 0 }'
+reject optional-value-construction "an enum is not constructed: write Int?.present(value), or bind the value directly to infer Int?" \
+    '{ let n: Int?(5) return 0 }'
 # A switch expression's arms yield one type, or diverge.
 reject empty-arm-in-expression "'{}' does nothing, so it is not an arm of a switch expression" \
     'function f(let b: Bool): Int { return switch b { .true: 1, .false: {} } }

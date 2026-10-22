@@ -30,7 +30,7 @@ function level(let s: Shade): Int {
     x: a = b + 1
     switch x { .true: return 2, .false: {} }
     let direct: a = b
-    let typed: Bool(a = b)
+    let typed: (a = b)
     state held: a + 1 = b
     switch !direct || !typed || held { .true: return 3, .false: {} }
     let member: Box(size: 4)
@@ -47,7 +47,7 @@ function level(let s: Shade): Int {
     switch !(a = 3 && b = 3) || (a = 4 || b = 4) { .true: return 9, .false: {} }
     switch a < b = true { .true: return 10, .false: {} }
     // Switch subjects, payload bindings, and arm bodies next to `=`.
-    let maybe: Int?(3)
+    let maybe: Int?.present(3)
     switch maybe { .present(let m): switch (m = a) { .false: return 11, .true: {} }, .absent: return 12 }
     switch maybe { .present(let m): x: m = 3, default: return 13 }
     switch x { .false: return 14, .true: {} }

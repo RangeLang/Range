@@ -93,7 +93,7 @@ function half(let f: Fraction): Bool {
     switch loose.equals(other: LooseFraction(numerator: 2, denominator: 4)) { .false: return 20, .true: {} }
     switch classify(p: Point(x: 0, y: 0)) != 0 || classify(p: Point(x: 1, y: 1)) != 1 || classify(p: a) != 2 { .true: return 14, .false: {} }
     switch !half(f: half2) || half(f: Fraction(numerator: 2, denominator: 3)) { .true: return 15, .false: {} }
-    let maybe: Point?(a)
+    let maybe: Point?.present(a)
     switch maybe != a || maybe = .absent { .true: return 16, .false: {} }
     switch !Pair<Point>(first: a, second: Point(x: 1, y: 2)).same() || Pair<Int>(first: 1, second: 2).same() { .true: return 18, .false: {} }
     switch !Pair<Fraction>(first: half1, second: half2).same() { .true: return 19, .false: {} }

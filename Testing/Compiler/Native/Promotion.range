@@ -27,7 +27,7 @@ function describe(let maybe: Int?): Int {
     switch describe(maybe: find(xs: xs, wanted: 9)) != 9 { .true: return 1, .false: {} }
     switch describe(maybe: find(xs: xs, wanted: 4)) != -1 { .true: return 2, .false: {} }
     switch describe(maybe: 12) != 12 { .true: return 3, .false: {} }
-    let x: Int?(5)
+    let x: Int?.present(5)
     switch x != 5 || x = 6 || x = .absent { .true: return 4, .false: {} }
     state y: Int?.absent
     y: 7

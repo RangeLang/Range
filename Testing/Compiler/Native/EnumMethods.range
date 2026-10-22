@@ -117,7 +117,7 @@ construct Walker {
     w.step()
     switch w.current() != .east { .true: return 8, .false: {} }
     switch !d.isStart() || Direction.west.isStart() { .true: return 9, .false: {} }
-    let maybe: Int?(4)
+    let maybe: Int?.present(4)
     let none: Int?.absent
     switch !maybe.isPresent() || none.isPresent() { .true: return 10, .false: {} }
     let lit: Light.on(.green)

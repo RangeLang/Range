@@ -49,7 +49,7 @@ function kind(let s: String): Int {
     let n: Named(name: joined + "?")
     switch n.name.count != 7 { .true: return 9, .false: {} }
     switch kind(s: "yes") != 1 || kind(s: "n" + "o") != 0 || kind(s: "maybe") != -1 { .true: return 10, .false: {} }
-    let maybe: String?("z")
+    let maybe: String?.present("z")
     switch maybe != "z" { .true: return 11, .false: {} }
     @print("\(joined) \(words.read(at: 0)) \(n.name)")
     return 42

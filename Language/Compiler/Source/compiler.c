@@ -2869,14 +2869,21 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
                       written,optional,name,name,written,optional,name);
             return type;
         }
-        char t[160]; describeType(t,sizeof(t),type);
-        if (count != 1 || arguments[0]->name) {
-            typeError(typer,at,"%s is constructed from one unlabeled value, such as %s(.%s)",t,declaration->name,
-                declaration->itemCount ? declaration->items[0]->name : "case");
-            return type;
+        // An enum value is always a case. `Int?(5)` was a second spelling of
+        // `Int?.present(5)`, and `Int?(maybe)` of letting the type be inferred.
+        char t[160];
+        {
+            const char *written = at->typeName ? at->typeName : at->kind == RangeNodeCall && at->a && at->a->name ? at->a->name : declaration->name;
+            const char *optional = (at->flags & RangeFlagOptional) || (at->kind == RangeNodeCall && at->a && (at->a->flags & RangeFlagOptional)) ? "?" : "";
+            snprintf(t,sizeof(t),"%s%s",written,optional);
         }
-        char what[200]; snprintf(what,sizeof(what),"construction of %s",t);
-        coerce(typer,arguments[0]->a,type,typeOf(typer,scope,arguments[0]->a,type,context),what);
+        RangeNode *present = NULL;
+        if (optionalWrapped(typer,type,&present))
+            typeError(typer,at,"an enum is not constructed: write %s.%s(value), or bind the value directly to infer %s",
+                      t,present->name,t);
+        else
+            typeError(typer,at,"an enum is not constructed: write %s.%s, or bind a value of %s directly",t,
+                      declaration->itemCount ? declaration->items[0]->name : "case",t);
         return type;
     }
     size_t inputs = 0;
