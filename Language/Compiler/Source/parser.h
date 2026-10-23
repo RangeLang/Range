@@ -21,6 +21,8 @@ typedef struct {
     int functionTypes;    /* a function type may be written here: a parameter's type */
     int closureStatement; /* the next statement is a closure body's: it may be one comparison */
     size_t previousEnd;   /* end of last consumed token, excluding trivia */
+    RangeNode *bindings;  /* where a case test's `let` puts its name: a switch arm's or a for filter's */
+    int negated;          /* inside the operand of `!`, where nothing binds */
 } RangeParser;
 
 RangeNode *rangeParseUnit(RangeArena *arena, const char *path,

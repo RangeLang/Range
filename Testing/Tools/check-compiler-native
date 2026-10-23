@@ -57,6 +57,7 @@ run switch-expressions 42 "" Testing/Compiler/Native/SwitchExpressions.range
 run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
 run subjects 42 "" Testing/Compiler/Native/Subjects.range
+run case-tests 42 "" Testing/Compiler/Native/CaseTests.range
 run logic 42 "" Testing/Compiler/Native/Logic.range
 printf '%s\n' "touched 3" "touched 4" | cmp -s - "$work_root/stdout" || fail "logic short-circuit printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
@@ -190,7 +191,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
-                   bytes control evaluation identity-references subjects closures collections generic-methods; do
+                   bytes control evaluation identity-references subjects case-tests closures collections generic-methods; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -376,6 +377,61 @@ reject non-exhaustive-expression "switch over Light must be exhaustive: '.green'
     'enum Light { case red, green }
 function f(let l: Light): Int { return switch l { .red: 1 } }
 { return f(l: .red) }'
+# A case read off a value is a Bool; its `let` binds only where an arm or
+# a for filter receives the name, and an enum's cases and members never
+# share a name.
+reject case-member-clash "'on' is a case of Power, so Power declares no function of that name" \
+    'enum Power { case on, off  function on(): Bool { return true } }
+{ return 0 }'
+reject binding-outside "'let x' binds a name only in a switch arm's condition or a 'for' filter" \
+    'function f(let o: Int?): Bool { let b: o.present(let x) return b }
+{ return 0 }'
+reject binding-negated "nothing can be bound under '!'" \
+    'function f(let o: Int?): Int { switch { !o.present(let x): return 1, default: return 0 } }
+{ return 0 }'
+reject binding-operand "'let x' binds a name only in a case test that '&' or '|' joins into the condition" \
+    'function g(let b: Bool): Bool { return b }
+function f(let o: Int?): Int { switch { g(b: o.present(let x)): return x, default: return 0 } }
+{ return 0 }'
+reject binding-call "'let x' binds a payload field only in a case test" \
+    'function g(let a: Int): Bool { return true }
+function f(let o: Int?): Int { switch { g(a: let x): return 1, default: return 0 } }
+{ return 0 }'
+reject binding-one-side "'y' is bound on one side of '|' only; both sides bind the same names" \
+    'function f(let o: Int?, let p: Int?): Int { switch { o.present(let x) | p.present(let y): return 1, default: return 0 } }
+{ return 0 }'
+reject binding-types "both sides of '|' bind 'x' with one type; the left side binds Int<bits: 64, signed: true>, this side String" \
+    'function f(let o: Int?, let p: String?): Int { switch { o.present(let x) | p.present(let x): return 1, default: return 0 } }
+{ return 0 }'
+reject binding-before "'x' is read before the case test that binds it" \
+    'function f(let o: Int?): Int { switch { x > 0 & o.present(let x): return x, default: return 0 } }
+{ return 0 }'
+reject binding-twice "'x' is bound twice in this condition" \
+    'function f(let o: Int?, let p: Int?): Int { switch { o.present(let x) & p.present(let x): return x, default: return 0 } }
+{ return 0 }'
+# Case tests run at compile time too, in conditions and as plain Bools.
+paired='macro paired(): Enum {
+    let on: #cases.first(where: { c in c.name = "on" })
+    let off: #cases.first(where: { c in c.name = "off" })
+    let both: on.present & off.present
+    switch {
+        on.present(let c) & c.name != "on": @diagnostic("\(#name) misnames on"),
+        both: @warning("\(#name) has on and off"),
+        default: @diagnostic("\(#name) needs on and off")
+    }
+}'
+run macro-case-tests 0 "" "$(case_file macro-case-tests "$paired
+@paired
+enum Light { case on, off }
+{ return 0 }")"
+grep -Fq "warning[macro]: Light has on and off" "$work_root/log" || fail "a compile-time case test did not hold"
+reject macro-case-missing "Half needs on and off" "$paired
+@paired
+enum Half { case on }
+{ return 0 }"
+reject case-test-not-enum "Int<bits: 64, signed: true> has no member 'present'" \
+    'function f(let o: Int): Int { switch { o.present: return 1, default: return 0 } }
+{ return 0 }'
 reject for-non-iterable "'for … in' cannot iterate Int<bits: 64, signed: true>: it declares no @iteration function" \
     '{ let n: 5 for x in n { } return 0 }'
 reject two-iterations "construct 'Twice' declares 2 @iteration functions; a type declares exactly one" \
@@ -846,4 +902,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=59 rejections=167 closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=61 rejections=178 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

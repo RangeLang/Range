@@ -469,6 +469,34 @@ static RangeNode *parseString(RangeParser *parser)
     return node;
 }
 
+/* A case test's argument that is not a value: `let name` binds the payload
+ * field to name, in the arm or filter that receives it; `_` ignores it.
+ * Returns NULL for any other argument, a value the field must equal. */
+static RangeNode *parseArgumentPattern(RangeParser *parser)
+{
+    if (parserAt(parser, "_") && (rangeTokenIs(parserPeek(parser), ",") || rangeTokenIs(parserPeek(parser), ")"))) {
+        RangeNode *pattern = parserNode(parser, RangeNodePattern);
+        pattern->integer = RangePatternAny;
+        parserAdvance(parser);
+        return pattern;
+    }
+    if (!parserAt(parser, "let")) return NULL;
+    RangeToken at = parser->current;
+    RangeNode *pattern = parserNode(parser, RangeNodePattern);
+    parserAdvance(parser);
+    RangeNode *binding = parserNode(parser, RangeNodeLet);
+    binding->name = parserExpectName(parser);
+    pattern->integer = RangePatternBind;
+    pattern->a = binding;
+    if (parser->failed) return pattern;
+    if (parser->negated)
+        parserFail(parser, &at, "nothing can be bound under '!'");
+    else if (!parser->bindings)
+        parserFail(parser, &at, "'let %s' binds a name only in a switch arm's condition or a 'for' filter", binding->name);
+    else rangeNodeAppend(parser->arena, parser->bindings, binding);
+    return pattern;
+}
+
 static void parseArgumentList(RangeParser *parser, RangeNode *owner)
 {
     int outerGenericDepth = parser->genericDepth;
@@ -481,7 +509,8 @@ static void parseArgumentList(RangeParser *parser, RangeNode *owner)
             argument->name = parserExpectName(parser);
             parserExpect(parser, ":");
         }
-        argument->a = parseExpression(parser, 0);
+        argument->a = parseArgumentPattern(parser);
+        if (!argument->a) argument->a = parseExpression(parser, 0);
         rangeNodeAppend(parser->arena, owner, argument);
         parseSeparator(parser, ")", "arguments");
     }
@@ -598,10 +627,14 @@ static RangeNode *parseClosure(RangeParser *parser)
     }
     parserExpect(parser, "in");
     if (parser->failed) return closure;
-    /* The body is its own statements, even inside a switch's subject. */
-    int outerCondition = parser->conditionDepth, outerGeneric = parser->genericDepth;
+    /* The body is its own statements, even inside a switch's subject; a
+     * condition's bindings do not reach into it. */
+    int outerCondition = parser->conditionDepth, outerGeneric = parser->genericDepth, outerNegated = parser->negated;
+    RangeNode *outerBindings = parser->bindings;
     parser->conditionDepth = 0;
     parser->genericDepth = 0;
+    parser->bindings = NULL;
+    parser->negated = 0;
     RangeParser start = *parser;
     RangeNode *body = parseClosureBody(parser);
     if (parserAt(&start, "switch")) {
@@ -624,6 +657,8 @@ static RangeNode *parseClosure(RangeParser *parser)
     parserExpect(parser, "}");
     parser->conditionDepth = outerCondition;
     parser->genericDepth = outerGeneric;
+    parser->bindings = outerBindings;
+    parser->negated = outerNegated;
     return closure;
 }
 
@@ -800,8 +835,11 @@ static RangeNode *parseUnary(RangeParser *parser)
         RangeNode *node = parserNode(parser, RangeNodeUnary);
         node->name = rangeArenaIntern(parser->arena, parser->current.text,
                                       parser->current.length);
+        int negation = parserAt(parser, "!");
         parserAdvance(parser);
+        parser->negated += negation;
         node->a = parseUnary(parser);
+        parser->negated -= negation;
         return node;
     }
     return parsePostfix(parser);
@@ -1254,6 +1292,206 @@ static void parseLabel(RangeParser *parser, RangeNode *entry, size_t subjects)
     free(items.items);
 }
 
+/* ---- conditions ------------------------------------------------------
+ * A switch arm's condition, and a for filter, may bind names through case
+ * tests, `phase.failed(let reason)`. A name is bound only where the result
+ * reaches the arm: in a case test that `&` and `|` join into the condition,
+ * not inside another expression's operand. It is visible to the right of
+ * its test, through `&`, and in the body; both sides of `|` bind the same
+ * names, the right side's bindings standing for the left's. */
+
+typedef struct { RangeNode **lets; size_t count, capacity; } Bound;
+
+static RangeNode *boundNamed(const Bound *bound, const char *name)
+{
+    for (size_t i = 0; i < bound->count; ++i) if (!strcmp(bound->lets[i]->name, name)) return bound->lets[i];
+    return NULL;
+}
+
+static void boundAdd(Bound *bound, RangeNode *let)
+{
+    if (bound->count == bound->capacity) {
+        bound->capacity = bound->capacity ? bound->capacity * 2 : 8;
+        bound->lets = realloc(bound->lets, bound->capacity * sizeof(*bound->lets));
+    }
+    bound->lets[bound->count++] = let;
+}
+
+static int bindingsName(const RangeNode *bindings, const char *name)
+{
+    for (size_t i = 0; bindings && i < bindings->itemCount; ++i) if (!strcmp(bindings->items[i]->name, name)) return 1;
+    return 0;
+}
+
+static void bindingsRemove(RangeNode *bindings, const RangeNode *let)
+{
+    for (size_t i = 0; i < bindings->itemCount; ++i)
+        if (bindings->items[i] == let) {
+            memmove(bindings->items + i, bindings->items + i + 1, (bindings->itemCount - i - 1) * sizeof(*bindings->items));
+            --bindings->itemCount;
+            return;
+        }
+}
+
+/* `joined`: the node's value is joined into the condition by `&` and `|`
+ * only. `visible` holds the names bound to its left; `made` collects what it
+ * binds. */
+static void scanCondition(RangeParser *parser, RangeNode *node, int joined, Bound *visible, Bound *made, RangeNode *bindings)
+{
+    if (!node || parser->failed) return;
+    switch (node->kind) {
+    case RangeNodeBinary:
+        if (!strcmp(node->name, "&")) {
+            scanCondition(parser, node->a, joined, visible, made, bindings);
+            scanCondition(parser, node->b, joined, visible, made, bindings);
+            return;
+        }
+        if (!strcmp(node->name, "|")) {
+            Bound left = {0}, right = {0};
+            size_t mark = visible->count;
+            scanCondition(parser, node->a, joined, visible, &left, bindings);
+            visible->count = mark;
+            scanCondition(parser, node->b, joined, visible, &right, bindings);
+            visible->count = mark;
+            for (size_t i = 0; i < right.count && !parser->failed; ++i) {
+                RangeNode *first = boundNamed(&left, right.lets[i]->name);
+                if (!first) {
+                    parserFailAt(parser, right.lets[i], "'%s' is bound on one side of '|' only; both sides bind the same names",
+                                 right.lets[i]->name);
+                    break;
+                }
+                right.lets[i]->resolvedDeclaration = first;
+                bindingsRemove(bindings, right.lets[i]);
+            }
+            for (size_t i = 0; i < left.count && !parser->failed; ++i)
+                if (!boundNamed(&right, left.lets[i]->name))
+                    parserFailAt(parser, left.lets[i], "'%s' is bound on one side of '|' only; both sides bind the same names",
+                                 left.lets[i]->name);
+            for (size_t i = 0; i < left.count; ++i) { boundAdd(made, left.lets[i]); boundAdd(visible, left.lets[i]); }
+            free(left.lets);
+            free(right.lets);
+            return;
+        }
+        break;
+    case RangeNodePattern:
+        if (node->integer != RangePatternBind) return;
+        if (!joined) {
+            parserFailAt(parser, node->a, "'let %s' binds a name only in a case test that '&' or '|' joins into the condition",
+                         node->a->name);
+            return;
+        }
+        if (boundNamed(visible, node->a->name) || boundNamed(made, node->a->name)) {
+            parserFailAt(parser, node->a, "'%s' is bound twice in this condition", node->a->name);
+            return;
+        }
+        boundAdd(made, node->a);
+        return;
+    case RangeNodeCall: {
+        // A case test's arguments are patterns; what they bind is visible
+        // after the test, not to the other arguments.
+        scanCondition(parser, node->a, 0, visible, made, bindings);
+        Bound own = {0};
+        for (size_t i = 0; i < node->itemCount && !parser->failed; ++i) {
+            RangeNode *value = node->items[i]->a;
+            int pattern = value && (value->kind == RangeNodePattern
+                || (value->kind == RangeNodeCall && value->a && value->a->kind == RangeNodeCase));
+            size_t mark = visible->count;
+            for (size_t k = 0; k < own.count; ++k) boundAdd(visible, own.lets[k]);
+            Bound inner = {0};
+            scanCondition(parser, value, pattern && joined, visible, &inner, bindings);
+            visible->count = mark;
+            for (size_t k = 0; k < inner.count; ++k) boundAdd(&own, inner.lets[k]);
+            free(inner.lets);
+        }
+        for (size_t k = 0; k < own.count; ++k) { boundAdd(made, own.lets[k]); boundAdd(visible, own.lets[k]); }
+        free(own.lets);
+        return;
+    }
+    case RangeNodeName:
+        if (bindingsName(bindings, node->name) && !boundNamed(visible, node->name))
+            parserFailAt(parser, node, "'%s' is read before the case test that binds it", node->name);
+        return;
+    case RangeNodeClosure: case RangeNodeSwitch:
+        return; /* their own names */
+    default: break;
+    }
+    scanCondition(parser, node->a, 0, visible, made, bindings);
+    scanCondition(parser, node->b, 0, visible, made, bindings);
+    scanCondition(parser, node->c, 0, visible, made, bindings);
+    for (size_t i = 0; i < node->itemCount; ++i) scanCondition(parser, node->items[i], 0, visible, made, bindings);
+}
+
+/* A condition whose case tests may bind names into `bindings`, the arm's
+ * or the filter's. */
+static RangeNode *parseCondition(RangeParser *parser, int level, RangeNode *bindings)
+{
+    RangeNode *outer = parser->bindings;
+    int negated = parser->negated;
+    parser->bindings = bindings;
+    parser->negated = 0;
+    RangeNode *condition = parseExpression(parser, level);
+    parser->bindings = outer;
+    parser->negated = negated;
+    return condition;
+}
+
+/* Checks where a condition binds; the first `earlier` bindings, a for
+ * pattern's, are bound before it. */
+static void checkCondition(RangeParser *parser, RangeNode *condition, RangeNode *bindings, size_t earlier)
+{
+    Bound visible = {0}, made = {0};
+    for (size_t i = 0; i < earlier && i < bindings->itemCount; ++i) boundAdd(&visible, bindings->items[i]);
+    scanCondition(parser, condition, 1, &visible, &made, bindings);
+    free(visible.lets);
+    free(made.lets);
+}
+
+/* `switch { condition: body, … }`: each arm's label is a Bool condition,
+ * or `default`, which comes last. The arms are tried in order and the first
+ * whose condition holds runs. The switch has no subjects (its c is an empty
+ * list); each arm has one row, whose b is the condition and c the names its
+ * case tests bind, which the arm's body sees. */
+static RangeNode *parseConditionSwitch(RangeParser *parser, RangeNode *node, int value)
+{
+    node->c = parserNode(parser, RangeNodeBlock);
+    node->c->name = "subjects";
+    int outerCondition = parser->conditionDepth, outerGeneric = parser->genericDepth;
+    parser->conditionDepth = 0;
+    parser->genericDepth = 0;
+    parserExpect(parser, "{");
+    while (!parser->failed && !parserAt(parser, "}") && !parserAtKind(parser, RangeTokenEnd)) {
+        RangeNode *entry = parserNode(parser, RangeNodeSwitchCase);
+        if (parserAt(parser, "default") && rangeTokenIs(parserPeek(parser), ":")) {
+            parserAdvance(parser);
+            entry->flags |= RangeFlagLiteral; /* marks the default arm */
+        } else {
+            RangeNode *row = parserNode(parser, RangeNodePattern);
+            row->integer = RangePatternRow;
+            row->c = parserNode(parser, RangeNodeBlock);
+            row->c->name = "bindings";
+            row->b = parseCondition(parser, 0, row->c);
+            checkCondition(parser, row->b, row->c, 0);
+            entry->c = row->c;
+            rangeNodeAppend(parser->arena, entry, row);
+        }
+        parserExpect(parser, ":");
+        parseArm(parser, entry, value);
+        rangeNodeAppend(parser->arena, node, entry);
+        if (parser->failed || parserAt(parser, "}")) break;
+        if (!parserAt(parser, ",")) {
+            parserFail(parser, &parser->current, "expected ',' between switch arms or '}', found '%.*s'",
+                       (int)parser->current.length, parser->current.text);
+            break;
+        }
+        parserAdvance(parser);
+        if (parserAt(parser, "}")) parserFail(parser, &parser->current, "no ',' after the last switch arm");
+    }
+    parserExpect(parser, "}");
+    parser->conditionDepth = outerCondition;
+    parser->genericDepth = outerGeneric;
+    return node;
+}
+
 /* `switch subject { label: body, … }`: arms are separated by `,`, with none
  * after the last. A label is `default`, which comes last, or rows joined by
  * `|`, each binding the same names (see parseLabel). As a statement the
@@ -1267,6 +1505,7 @@ static RangeNode *parseSwitch(RangeParser *parser, int value)
     RangeNode *node = parserNode(parser, RangeNodeSwitch);
     if (value) node->flags |= RangeFlagValue;
     parserExpect(parser, "switch");
+    if (parserAt(parser, "{")) return parseConditionSwitch(parser, node, value);
     parser->conditionDepth += 1;
     node->a = parseExpression(parser, 0);
     if (parserAt(parser, ",")) {
@@ -1408,13 +1647,17 @@ static RangeNode *parseFor(RangeParser *parser)
     parserExpect(parser, "in");
     parser->conditionDepth += 1;
     /* The sequence ends at `&`: what follows is the condition, its own
-     * comparisons joined by `&`; an or is parenthesized. */
+     * comparisons joined by `&`; an or is parenthesized. Its case tests bind
+     * names for the body, after the pattern's. */
     RangeNode *sequence = parseExpression(parser, RANGE_COMPARISON_LEVEL);
-    RangeNode *condition = NULL;
+    RangeNode *condition = NULL, *bindings = pattern ? pattern->c : parserNode(parser, RangeNodeBlock);
+    bindings->name = "bindings";
+    size_t earlier = bindings->itemCount;
     while (!parser->failed && parserAt(parser, "&")) {
         parserAdvance(parser);
-        condition = joinConditions(parser, condition, parseExpression(parser, RANGE_COMPARISON_LEVEL));
+        condition = joinConditions(parser, condition, parseCondition(parser, RANGE_COMPARISON_LEVEL, bindings));
     }
+    if (condition) checkCondition(parser, condition, bindings, earlier);
     if (parserAt(parser, "where"))
         parserFail(parser, &parser->current, "Range has no 'where'; filter with '&', e.g. for x in xs & x > 3 { … }");
     else if (parserAt(parser, "|"))
@@ -1466,6 +1709,7 @@ static RangeNode *parseFor(RangeParser *parser)
         if (!pattern) {
             pattern = forNode(parser, node, RangeNodePattern, NULL);
             pattern->integer = RangePatternAny;
+            pattern->c = bindings;
         }
         run = forSwitch(parser, node, forNode(parser, node, RangeNodeName, element), pattern, condition, body,
                         forNode(parser, node, RangeNodeBlock, NULL));

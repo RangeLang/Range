@@ -54,6 +54,8 @@ typedef enum {
     RangeNodeBreak,
     RangeNodeContinue,
     RangeNodeFunctionType,   /* (A, B) -> R: items are the parameter types, a the result */
+    RangeNodeCaseTest,       /* phase.failed(let reason): a Bool, whether the value a holds the case
+                              * its pattern b names; b's `let` arguments bind the payload fields */
     RangeNodeKindCount
 } RangeNodeKind;
 

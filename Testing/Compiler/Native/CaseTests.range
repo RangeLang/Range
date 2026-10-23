@@ -1,0 +1,154 @@
+// A case read off a value is a Bool test: `phase.loading`, and with its
+// payload's patterns, `phase.failed(let reason)`. A switch's arms are
+// conditions, tried in order; the first that holds runs.
+enum Phase {
+    case loading
+    case loaded(Int)
+    case failed(reason: String, code: Int)
+}
+
+enum Light { case on, off }
+
+enum Pair {
+    case pair(Light, Light)
+    case none
+}
+
+function describe(let phase: Phase): Int {
+    switch {
+        phase.loading: return 1,
+        phase.loaded(let n) & n > 10: return n,
+        phase.loaded(let n): return n + 100,
+        phase.failed(reason: let r, code: _): return r.count + 1000,
+        default: return -1
+    }
+}
+
+// Two subjects; bindings flow right through `&`; both sides of `|` bind the
+// same names.
+function combine(let a: Phase, let b: Phase): Int {
+    return switch {
+        a.loaded(let x) & b.loaded(let y): x + y,
+        a.loaded(let x) | b.loaded(let x): x,
+        default: 0
+    }
+}
+
+// Inside the parentheses, an expression is a value the field must equal,
+// `_` ignores a field, and `.case` tests it.
+function lights(let p: Pair): Int {
+    switch {
+        p.pair(_, Light.on): return 1,
+        p.pair(.off, .off): return 2,
+        p.pair(.on, .off): return 3,
+        p.none: return 4,
+        default: return -1
+    }
+}
+
+// A guard narrows its arm.
+function guarded(let o: Int?, let limit: Int): Int {
+    switch {
+        o.present(let v) & v > limit: return 2,
+        o.present: return 1,
+        o.absent: return 0,
+        default: return -1
+    }
+}
+
+// Every combination of two optionals.
+function both(let a: Int?, let b: Int?): Int {
+    switch {
+        a.present(let x) & b.present(let y): return x * y,
+        a.present(let x) & b.absent: return x,
+        a.absent & b.present(let y): return y,
+        a.absent & b.absent: return 0,
+        default: return -1
+    }
+}
+
+// A failed test after a binding that holds a reference ends that binding.
+function longer(let a: Phase, let limit: Int): Int {
+    switch {
+        a.failed(reason: let r, code: let c) & r.count > limit & c > 0: return r.count,
+        a.failed(reason: let r, code: 0) | a.failed(reason: let r, code: 1): return 0 - r.count,
+        default: return 0
+    }
+}
+
+// Inside an enum's own functions a bare case name tests the receiver.
+enum Message {
+    case text(String)
+    case pair(String, String)
+    case empty
+
+    function length(): Int {
+        switch {
+            text(let s): return s.count,
+            pair(let a, let b): return a.count + b.count,
+            empty: return 0,
+            default: return -1
+        }
+    }
+
+    function blank(): Bool { return empty }
+}
+
+{
+    let phase: Phase.loaded(5)
+    let busy: phase.loading
+    switch { busy: return 1, default: {} }
+    switch { !phase.loaded: return 2, default: {} }
+    switch { describe(phase: Phase.loading) != 1: return 3, default: {} }
+    switch { describe(phase: Phase.loaded(20)) != 20: return 4, default: {} }
+    switch { describe(phase: Phase.loaded(2)) != 102: return 5, default: {} }
+    switch { describe(phase: Phase.failed(reason: "slow", code: 9)) != 1004: return 6, default: {} }
+    switch { combine(a: Phase.loaded(1), b: Phase.loaded(2)) != 3: return 7, default: {} }
+    switch { combine(a: Phase.loading, b: Phase.loaded(4)) != 4: return 8, default: {} }
+    switch { combine(a: Phase.loading, b: Phase.loading) != 0: return 9, default: {} }
+    switch { lights(p: Pair.pair(.off, .on)) != 1: return 10, default: {} }
+    switch { lights(p: Pair.pair(.off, .off)) != 2: return 11, default: {} }
+    switch { lights(p: Pair.pair(.on, .off)) != 3: return 12, default: {} }
+    switch { lights(p: Pair.none) != 4: return 13, default: {} }
+    switch { guarded(o: 5, limit: 3) != 2 | guarded(o: 2, limit: 3) != 1 | guarded(o: .absent, limit: 3) != 0: return 14, default: {} }
+    switch { both(a: 6, b: 7) != 42 | both(a: 3, b: .absent) != 3 | both(a: .absent, b: 4) != 4 | both(a: .absent, b: .absent) != 0: return 15, default: {} }
+    switch { longer(a: Phase.failed(reason: "abcdef", code: 1), limit: 3) != 6: return 16, default: {} }
+    switch { longer(a: Phase.failed(reason: "ab", code: 1), limit: 3) != -2: return 17, default: {} }
+    switch { longer(a: Phase.loading, limit: 3) != 0: return 18, default: {} }
+
+    // A for filter reads cases too, and binds for the body.
+    state messages: Array<Message>()
+    messages.append(value: Message.text("hello"))
+    messages.append(value: Message.pair("ab", "cde"))
+    messages.append(value: Message.empty)
+    messages.append(value: Message.text("x"))
+    state total: 0
+    for m in messages & m.text(let s) & s.count > 1 { total: total + s.count }
+    switch { total != 5: return 19, default: {} }
+    state lengths: 0
+    for m in messages & !m.empty { lengths: lengths + m.length() }
+    switch { lengths != 11: return 20, default: {} }
+    switch { !Message.empty.blank() | Message.text("a").blank(): return 21, default: {} }
+
+    // Nested switches, as statements and as values.
+    let maybe: Int?.present(4)
+    let doubled: switch {
+        maybe.present(let x): switch { x > 3: x * 2, default: x },
+        maybe.absent: 0,
+        default: -1
+    }
+    switch { doubled != 8: return 22, default: {} }
+    state reached: 0
+    switch {
+        maybe.present(let x): {
+            switch {
+                x = 4 & phase.loaded(let y) & y = 5: reached: x + y,
+                default: reached: 1
+            }
+        },
+        maybe.absent: {},
+        default: {}
+    }
+    switch { reached != 9: return 23, default: {} }
+    return 42
+}

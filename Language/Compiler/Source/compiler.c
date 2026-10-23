@@ -861,6 +861,10 @@ static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind k
 }
 
 static RangeGraphValue metaExpression(MetaEval *, MetaScope *, RangeNode *);
+static int metaHoldsCase(MetaEval *, RangeGraphValue, const char *);
+static RangeGraphValue metaCaseTest(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue);
+static RangeNode *metaPatternCase(MetaEval *, RangeNode *, RangeNode *);
+static void becomeCaseTest(RangeArena *, RangeNode *, RangeNode *, const char *, RangeNode *);
 static int metaStatement(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue *);
 static const char *metaText(MetaEval *, MetaScope *, RangeNode *, RangeNode *);
 static RangeGraphValue metaExpect(MetaEval *, MetaScope *, RangeNode *, RangeNode *);
@@ -1359,6 +1363,12 @@ static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *cal
         else if (member != SIZE_MAX) copy = eval->self->values[member];
         else copy = metaExpression(eval,scope,callee->a);
         if (local && !local->mutable) copy = local->value;
+        if (metaHoldsCase(eval,*place,callee->name)) {
+            // `phase.failed(let reason)`: a case test with its payload's patterns.
+            RangeGraphValue subject = *place;
+            becomeCaseTest(eval->vm->arena,call,callee->a,callee->name,call);
+            return metaCaseTest(eval,scope,call,subject);
+        }
         if (place->kind != RangeGraphInstance)
             fail(eval->vm,call,"compile-time method calls need a construct value; '%s' is called on a %s",callee->name,
                  place->kind == RangeGraphCase ? "enum value" : place->kind == RangeGraphNode ? "declaration" : "value without functions");
@@ -1624,6 +1634,70 @@ static RangeNode *metaTypePath(MetaEval *eval, MetaScope *scope, RangeNode *path
     return metaTypeEnum(eval,eval->function ? eval->function : from,path->name,path->flags,path);
 }
 
+/* ---- case tests ----
+ * `phase.loading` and `phase.failed(let reason)` read a case off a value: a
+ * Bool, true when the value holds that case. Inside the parentheses each
+ * argument is a pattern for its payload field: `let x` binds it, `_` ignores
+ * it, `.case(…)` tests it in turn, and any other expression is a value the
+ * field must equal, by its type's `=`. Inside an enum's own functions a bare
+ * case name tests the receiver. Once the subject is known to hold an enum
+ * with that case, the member access or call becomes a RangeNodeCaseTest: a
+ * the subject, b the case pattern. */
+
+static RangeNode *casePattern(RangeArena *arena, RangeNode *at, const char *name, RangeNode *call);
+
+/* An argument of a case test, as the pattern it is. */
+static RangeNode *argumentPattern(RangeArena *arena, RangeNode *value)
+{
+    if (value->kind == RangeNodePattern) return value;
+    if (value->kind == RangeNodeCase) return casePattern(arena,value,value->name,NULL);
+    if (value->kind == RangeNodeCall && value->a && value->a->kind == RangeNodeCase)
+        return casePattern(arena,value,value->a->name,value);
+    RangeNode *pattern = rangeNodeCreate(arena,RangeNodePattern,value->path,value->line,value->column);
+    pattern->integer = RangePatternValue;
+    pattern->a = value;
+    return pattern;
+}
+
+static RangeNode *casePattern(RangeArena *arena, RangeNode *at, const char *name, RangeNode *call)
+{
+    RangeNode *pattern = rangeNodeCreate(arena,RangeNodePattern,at->path,at->line,at->column);
+    pattern->integer = RangePatternCase;
+    pattern->name = name;
+    if (!call) return pattern;
+    pattern->flags |= RangeFlagApplication;
+    for (size_t i = 0; i < call->itemCount; ++i) {
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,call->items[i]->path,call->items[i]->line,call->items[i]->column);
+        argument->name = call->items[i]->name;
+        argument->a = argumentPattern(arena,call->items[i]->a);
+        rangeNodeAppend(arena,pattern,argument);
+    }
+    return pattern;
+}
+
+/* The member access `subject.name`, the call `subject.name(…)`, or the
+ * bare `name` or `name(…)` (subject flagged implicit: the receiver) becomes
+ * the case test it is. */
+static void becomeCaseTest(RangeArena *arena, RangeNode *node, RangeNode *subject, const char *name, RangeNode *call)
+{
+    RangeNode *pattern = casePattern(arena,node,name,call);
+    node->kind = RangeNodeCaseTest;
+    node->a = subject;
+    node->b = pattern;
+    node->c = NULL;
+    node->name = name;
+    node->itemCount = 0;
+    node->resolvedDeclaration = NULL;
+}
+
+/* The receiver a bare case name tests, inside an enum's own functions. */
+static RangeNode *receiverSubject(RangeArena *arena, RangeNode *at)
+{
+    RangeNode *subject = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
+    subject->flags |= RangeFlagImplicit;
+    return subject;
+}
+
 /* A label row as a coverage vector of `width` columns, one per subject: a
  * row pattern's items, or the one pattern; NULL, the default, is wild. */
 static void patternRow(RangeNode *row, RangeNode **vector, size_t width)
@@ -1717,6 +1791,34 @@ static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeG
     }
     default: fail(eval->vm,pattern,"unsupported compile-time pattern");
     }
+}
+
+/* Whether a compile-time value holds a case: a case value of an enum that
+ * declares it, or a Bool, whose cases are true and false. */
+static int metaHoldsCase(MetaEval *eval, RangeGraphValue value, const char *name)
+{
+    RangeNode *type = metaValueEnum(eval,value);
+    return type && metaCaseNamed(type,name);
+}
+
+/* A case test at compile time: its bindings join `scope`, replacing what
+ * an earlier test of the condition bound under the same names. */
+static RangeGraphValue metaCaseTest(MetaEval *eval, MetaScope *scope, RangeNode *test, RangeGraphValue subject)
+{
+    RangeNode *type = metaValueEnum(eval,subject);
+    if (!type) fail(eval->vm,test,"'%s' reads a case off an enum value; this value is not one",test->name);
+    (void)metaPatternCase(eval,type,test->b);
+    MetaScope bound = {.parent=scope,.application=scope->application};
+    int matched = metaMatch(eval,&bound,test->b,subject);
+    for (MetaLocal *local = bound.locals, *next; matched && local; local = next) {
+        next = local->next;
+        MetaLocal *existing = NULL;
+        for (MetaLocal *other = scope->locals; other && !existing; other = other->next)
+            if (same(other->name,local->name)) existing = other;
+        if (existing) existing->value = local->value;
+        else { local->next = scope->locals; scope->locals = local; }
+    }
+    return metaScalar(eval,test,RangeNodeBool,matched);
 }
 
 /* Exhaustiveness and reachability, as the type checker decides them for
@@ -1848,6 +1950,25 @@ static int metaMatchRow(MetaEval *eval, MetaScope *into, RangeNode *row, RangeGr
     return 1;
 }
 
+/* A compile-time switch over conditions runs the first arm whose condition
+ * holds; until the compiler reads the conditions' structure, it ends with a
+ * default. */
+static RangeNode *metaConditionArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
+{
+    for (size_t i = 0; i + 1 < node->itemCount; ++i)
+        if (node->items[i]->flags & RangeFlagLiteral) fail(eval->vm,node->items[i],"'default' must be the last arm of a switch");
+    if (!node->itemCount || !(node->items[node->itemCount - 1]->flags & RangeFlagLiteral))
+        fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
+    for (size_t i = 0; i < node->itemCount; ++i) {
+        RangeNode *entry = node->items[i];
+        *arm = (MetaScope){.parent=scope,.application=scope->application};
+        if (entry->flags & RangeFlagLiteral) return entry;
+        RangeNode *condition = entry->items[0]->b;
+        if (metaBoolean(eval,metaExpression(eval,arm,condition),condition)) return entry;
+    }
+    fail(eval->vm,node,"compile-time switch has no arm for this value");
+}
+
 /* The arm a compile-time switch runs, its bindings in *arm. A subject's type
  * is the enum its value is a case of; as in compiled code, every row must
  * match something the arms above do not, a default comes last, and the arms
@@ -1857,6 +1978,7 @@ static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, Met
 {
     RangeArena *arena = eval->vm->arena;
     size_t width = node->c ? node->c->itemCount : 1;
+    if (!width) return metaConditionArm(eval,scope,node,arm);
     RangeGraphValue *subjects = rangeArenaAllocate(arena,width * sizeof(*subjects));
     RangeNode **types = rangeArenaAllocate(arena,width * sizeof(*types));
     for (size_t k = 0; k < width; ++k) {
@@ -1993,12 +2115,21 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
             rangeNodeAppend(eval->vm->arena,eval->vm->emitted,emitNode(eval,scope,node->b->items[i],1));
         }
         return (RangeGraphValue){0};
+    case RangeNodeCaseTest: {
+        if (node->a->flags & RangeFlagImplicit) fail(eval->vm,node,"compile-time enum methods are not implemented");
+        return metaCaseTest(eval,scope,node,metaExpression(eval,scope,node->a));
+    }
     case RangeNodeMemberAccess: {
         // `Light.red` and `Int?.absent` are cases.
         RangeNode *enumeration = metaTypePath(eval,scope,node->a);
         if (enumeration && metaCaseNamed(enumeration,node->name))
             return metaConstructCase(eval,scope,enumeration,node->name,NULL,node);
         RangeGraphValue receiver = metaExpression(eval,scope,node->a);
+        if (metaHoldsCase(eval,receiver,node->name)) {
+            // `phase.loading`: whether the value holds the case.
+            becomeCaseTest(eval->vm->arena,node,node->a,node->name,NULL);
+            return metaCaseTest(eval,scope,node,receiver);
+        }
         if (receiver.kind == RangeGraphInstance) {
             size_t member = metaMemberIndex(receiver,node->name);
             if (member == SIZE_MAX) {
@@ -2589,6 +2720,28 @@ static void diagnoseUnusedBindings(SourceReport *report, RangeNode *arm)
     }
 }
 
+/* Inside an enum's own functions, a bare name that is one of its cases and
+ * declares nothing nearer: a case test of the receiver. */
+static int receiverCaseName(SourceScope *scope, const char *name)
+{
+    int function = 0;
+    for (; scope; scope = scope->parent) {
+        RangeNode *owner = scope->owner;
+        if (!owner) continue;
+        for (size_t i = 0; owner->kind != RangeNodeEnum && i < owner->itemCount; ++i)
+            if (sourceMatches(owner->items[i],name,0)) return 0;
+        if (owner->kind == RangeNodeFunction) function = 1;
+        if (owner->kind == RangeNodeConstruct) return 0;
+        if (owner->kind == RangeNodeEnum) {
+            if (!function) return 0;
+            for (size_t i = 0; i < owner->itemCount; ++i)
+                if (owner->items[i]->kind == RangeNodeEnumCase && same(owner->items[i]->name,name)) return 1;
+            return 0;
+        }
+    }
+    return 0;
+}
+
 static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *node, int metadata)
 {
     if (!node) return;
@@ -2657,6 +2810,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         break;
     }
     case RangeNodeName:
+        if (!(node->flags & RangeFlagMacroType) && receiverCaseName(scope,node->name)) break; /* tests the receiver */
         (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 0);
         break;
     case RangeNodeMemberAccess:
@@ -2898,6 +3052,18 @@ static int scopeDeclaration(const RangeNode *node)
 
 static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
 {
+    // `phase.loading` reads a case off a value, so no member of the enum
+    // (a function, or a nested type, reported below) has a case's name.
+    for (size_t i = 0; construct->kind == RangeNodeEnum && i < construct->itemCount; ++i) {
+        RangeNode *item = construct->items[i];
+        if (item->kind != RangeNodeFunction || !item->name) continue;
+        for (size_t j = 0; j < construct->itemCount; ++j)
+            if (construct->items[j]->kind == RangeNodeEnumCase && same(construct->items[j]->name,item->name)) {
+                sourceDiagnostic(report,item->emittedBy ? item->emittedBy : item,0,"duplicate",
+                    "'%s' is a case of %s, so %s declares no function of that name",item->name,construct->name,construct->name);
+                break;
+            }
+    }
     for (size_t i = 0; i < construct->itemCount; ++i) {
         RangeNode *item = construct->items[i];
         if (!scopeDeclaration(item) || !item->name) continue;
@@ -4460,6 +4626,44 @@ static RangeNode *typeClosureCall(Typer *typer, SourceScope *scope, RangeNode *c
     return type->a;
 }
 
+static void typePattern(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+
+/* Inside an enum's own functions, a bare name that is one of its cases
+ * tests the receiver; the enum declares no member of that name. */
+static int receiverCase(Typer *typer, RangeNode *context, const char *name)
+{
+    return typer->function && typer->function->typeName && isEnum(context) && enumCase(context->resolvedDeclaration,name);
+}
+
+/* A name bound on the right of `|` stands for the left side's: same type. */
+static void typeSharedBindings(Typer *typer, RangeNode *pattern)
+{
+    if (!pattern) return;
+    if (pattern->integer == RangePatternBind && pattern->a->resolvedDeclaration) {
+        RangeNode *first = pattern->a->resolvedDeclaration;
+        if (first->type && pattern->a->type && first->type != pattern->a->type) {
+            char f[160], o[160]; describeType(f,sizeof(f),first->type); describeType(o,sizeof(o),pattern->a->type);
+            typeError(typer,pattern->a,"both sides of '|' bind '%s' with one type; the left side binds %s, this side %s",
+                      pattern->a->name,f,o);
+        }
+        return;
+    }
+    for (size_t i = 0; i < pattern->itemCount; ++i) typeSharedBindings(typer,pattern->items[i]->a);
+}
+
+static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test, RangeNode *context)
+{
+    RangeNode *subject = test->a, *type;
+    if (subject->flags & RangeFlagImplicit) {
+        subject->resolvedDeclaration = methodReceiver(typer->report,typer->function);
+        subject->type = type = context;
+    } else type = typeOf(typer,scope,subject,NULL,context);
+    if (!type) return NULL;
+    typePattern(typer,scope,test->b,type,context);
+    typeSharedBindings(typer,test->b);
+    return typer->booleanType;
+}
+
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
 {
     RangeNode *callee = call->a, *function = NULL, *receiver = NULL;
@@ -4501,6 +4705,10 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     if (callee->kind == RangeNodeName) {
         // `where(element)` calls the closure a function-typed parameter holds.
         RangeNode *value = sourceLookup(typer->report,scope,callee->name,0);
+        if (!value && receiverCase(typer,context,callee->name)) {
+            becomeCaseTest(typer->report->arena,call,receiverSubject(typer->report->arena,callee),callee->name,call);
+            return typeCaseTest(typer,scope,call,context);
+        }
         if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(value->type))
             return typeClosureCall(typer,scope,call,value,context);
         function = lookupFunction(typer->report,scope,callee->name);
@@ -4524,6 +4732,11 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         receiver = typeOf(typer,scope,callee->a,NULL,context);
         if (!receiver) return NULL;
         if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,callee,"type parameter %s has no functions",receiver->name); return NULL; }
+        if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
+            // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
+            becomeCaseTest(typer->report->arena,call,callee->a,callee->name,call);
+            return typeCaseTest(typer,scope,call,context);
+        }
         // A member with no name is one `for … in` resolved by its @iteration role.
         function = callee->name ? findCalledFunction(receiver->resolvedDeclaration,callee->name,call) : callee->resolvedDeclaration;
         if (!function) {
@@ -4657,6 +4870,11 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     case RangeNodeName: {
         RangeNode *declaration = sourceLookup(typer->report,scope,expr->name,0);
         expr->resolvedDeclaration = declaration;
+        if (!declaration && receiverCase(typer,context,expr->name)) {
+            becomeCaseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
+            type = typeCaseTest(typer,scope,expr,context);
+            break;
+        }
         if (!declaration) break;
         if (rangeNodeDeclaresValue(declaration->kind) || declaration->kind == RangeNodeParameter) {
             if (declaration->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
@@ -4729,6 +4947,12 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         if (!receiver) break;
         if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,expr,"type parameter %s has no members",receiver->name); break; }
         RangeNode *declaration = receiver->resolvedDeclaration;
+        if (isEnum(receiver) && enumCase(declaration,expr->name)) {
+            // `phase.loading`: whether phase holds the case.
+            becomeCaseTest(typer->report->arena,expr,expr->a,expr->name,NULL);
+            type = typeCaseTest(typer,scope,expr,context);
+            break;
+        }
         RangeNode *member = findMember(declaration,expr->name);
         expr->resolvedDeclaration = member;
         if (member) {
@@ -4740,6 +4964,15 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     }
     case RangeNodeCall:
         type = typeCall(typer,scope,expr,expected,context);
+        break;
+    case RangeNodeCaseTest:
+        type = typeCaseTest(typer,scope,expr,context);
+        break;
+    case RangeNodePattern:
+        // A case test's pattern argument anywhere else.
+        if (expr->integer == RangePatternBind)
+            typeError(typer,expr,"'let %s' binds a payload field only in a case test",expr->a->name);
+        else typeError(typer,expr,"'_' stands for a payload field only in a case test");
         break;
     case RangeNodeSwitch:
         type = typeSwitch(typer,scope,expr,expected,context,typer->output);
@@ -5309,6 +5542,14 @@ static void typeRow(Typer *typer, SourceScope *scope, RangeNode *row, RangeNode 
     for (size_t k = 0; k < width && k < row->itemCount; ++k) typePattern(typer,scope,row->items[k],types[k],context);
 }
 
+/* `switch { condition: body, … }` ends with a default until the compiler
+ * reads the conditions' structure. */
+static void typeConditionCoverage(Typer *typer, RangeNode *node)
+{
+    if (!node->itemCount || !(node->items[node->itemCount - 1]->flags & RangeFlagLiteral))
+        typeError(typer,node,"switch must be exhaustive; add a default");
+}
+
 /* A switch statement, or, with RangeFlagValue, a switch expression: its type
  * is the one its arms yield, each typed with `expected` (or, without one,
  * with the first value's type) as context, as any value is. An arm that does
@@ -5370,6 +5611,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         typeError(typer,node,"no arm of this switch expression yields a value");
     node->type = type;
     if (!typed || typer->report->errors != errors) return type;
+    if (!width) { typeConditionCoverage(typer,node); return type; }
     // Each row must match something the earlier ones do not; together they
     // must match every value, or every combination of the subjects' values.
     // A row with a condition covers nothing for the rows after it.
@@ -7776,6 +8018,7 @@ static int nativeValueGeneric(Native *native, RangeNode *expr)
 }
 
 static RangeNode *nativeSwitch(Native *, RangeNode *);
+static RangeNode *nativeCaseTest(Native *, RangeNode *);
 
 static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
 {
@@ -7886,6 +8129,8 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         return nativeCall(native,expr);
     case RangeNodeSwitch:
         return nativeSwitch(native,expr);
+    case RangeNodeCaseTest:
+        return nativeCaseTest(native,expr);
     default:
         nativeMissing(native,expr,"native %s expressions are not implemented",rangeNodeKindName(expr->kind));
         return NULL;
@@ -8339,6 +8584,61 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
     }
 }
 
+/* Copies a match's bindings into the slots of the names they bind. A slot
+ * that a case test fills may hold an earlier value of the arm (zero when
+ * none): that value ends first. */
+static void nativeBindMatch(Native *native, NativeMatch *match, int replace)
+{
+    for (size_t b = 0; b < match->bindCount; ++b) {
+        NativeBind *bind = &match->binds[b];
+        RangeNode *target = bind->binding->resolvedDeclaration ? bind->binding->resolvedDeclaration : bind->binding;
+        NativeSlot *slot = nativeSlotOf(native,target);
+        if (!slot) continue;
+        int32_t offset = slot->offset;
+        if (replace && !bind->type->scalarBits && nativeSharesSlots(bind->type)) {
+            nativeFrameAddress(native,0,offset);
+            nativeRelease(native,bind->type);
+        }
+        nativePlaceLoad(native,bind->place,bind->type);
+        if (bind->type->scalarBits) nativeStore(native,0,offset);
+        else { nativeFrameAddress(native,1,offset); nativeCopyValue(native,1,0,bind->type,1); }
+        if (target != bind->binding) {
+            NativeSlot alias = {.declaration=bind->binding,.offset=offset,.type=bind->type,.alias=1};
+            NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,alias);
+        }
+    }
+}
+
+/* `phase.failed(let reason)`: x0 = 1 when the subject holds the case and
+ * its payload matches, its bindings copied into their slots; else 0. The
+ * subject's temporaries end here. */
+static RangeNode *nativeCaseTest(Native *native, RangeNode *test)
+{
+    size_t temps = native->tempCount;
+    RangeNode *type = nativeExpression(native,test->a);
+    if (!type) return NULL;
+    int kind = nativeKind(native,type,test->a);
+    if (kind == NativeNone) return NULL;
+    NativePlace place = {.slot=nativeReserve(native,8,8),.value=kind == NativeScalar};
+    nativeStore(native,0,place.slot);
+    NativeMatch match = {0};
+    nativeMatch(native,&match,test->b,place,type);
+    nativeBindMatch(native,&match,1);
+    nativeConstant(native,0,1);
+    size_t done = nativeEmit(native,armB(0));
+    for (size_t f = 0; f < match.failCount; ++f) nativeBranchHere(native,match.fails[f].at,match.fails[f].base);
+    nativeConstant(native,0,0);
+    nativeBranchHere(native,done,armB(0));
+    free(match.fails); free(match.binds);
+    if (native->tempCount != temps) {
+        nativeEmit(native,armPush(0));
+        nativeReleaseTemps(native,temps);
+        nativeEmit(native,armPop(0));
+    }
+    native->resultTemp = -1;
+    return nativeType(native,test->type);
+}
+
 /* A switch statement, or a switch expression (RangeFlagValue): each arm that
  * yields leaves the value in one frame slot, a scalar or the aggregate itself
  * holding its own references, which the expression then is, as a temporary.
@@ -8373,7 +8673,14 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
         for (size_t j = 0; entry->c && j < entry->c->itemCount; ++j) {
             RangeNode *binding = entry->c->items[j], *bindingType = nativeType(native,binding->type);
             int bindingKind = nativeKind(native,bindingType,binding);
-            if (bindingKind != NativeNone) nativeNewSlot(native,binding,bindingType,bindingKind);
+            if (bindingKind == NativeNone) continue;
+            int32_t offset = nativeNewSlot(native,binding,bindingType,bindingKind);
+            // A condition's case tests fill the slot, and a failed one leaves
+            // it empty: it starts empty, so ending it is always safe.
+            if (bindingKind == NativeAggregate && nativeSharesSlots(bindingType)) {
+                nativeFrameAddress(native,0,offset);
+                nativeZero(native,0,bindingType->size);
+            }
         }
         size_t bound = native->slotCount;
         NativeJump *bodies = NULL;
@@ -8384,20 +8691,7 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
             NativeMatch match = {0};
             patternRow(pattern,patterns,width);
             for (size_t k = 0; k < width; ++k) nativeMatch(native,&match,patterns[k],places[k],types[k]);
-            for (size_t b = 0; b < match.bindCount; ++b) {
-                NativeBind *bind = &match.binds[b];
-                RangeNode *target = bind->binding->resolvedDeclaration ? bind->binding->resolvedDeclaration : bind->binding;
-                NativeSlot *slot = nativeSlotOf(native,target);
-                if (!slot) continue;
-                int32_t offset = slot->offset;
-                nativePlaceLoad(native,bind->place,bind->type);
-                if (bind->type->scalarBits) nativeStore(native,0,offset);
-                else { nativeFrameAddress(native,1,offset); nativeCopyValue(native,1,0,bind->type,1); }
-                if (target != bind->binding) {
-                    NativeSlot alias = {.declaration=bind->binding,.offset=offset,.type=bind->type,.alias=1};
-                    NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,alias);
-                }
-            }
+            nativeBindMatch(native,&match,0);
             if (pattern->b) {
                 nativeCondition(native,pattern->b);
                 NativeJump body = {.at=nativeEmit(native,armCbnz(0,0)),.base=armCbnz(0,0)};
