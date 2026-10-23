@@ -124,13 +124,12 @@ static void validateLanguage(const char *source, const char *expected, size_t co
 #define EFFECT "@builtin macro diagnostic(let message: TextValue) "
 #define POLICY \
     "macro assess(): Construct { " \
-    "let chosen: #members.first(named: \"payload\") " \
-    "let rule: #generics.first(named: \"ceiling\") " \
-    "switch chosen { .absent: @diagnostic(\"missing payload\"), .present: {} } " \
-    "switch rule { .absent: @diagnostic(\"missing ceiling\"), .present: {} } " \
-    "switch chosen { .present(let payload): switch rule { " \
-    ".present(let ceiling): switch accepts(limit: ceiling.value, candidate: payload.value) { .false: @diagnostic(\"source policy rejected\"), .true: {} }, " \
-    ".absent: {} }, .absent: {} } } " \
+    "switch #members.first(named: \"payload\"), #generics.first(named: \"ceiling\") { " \
+    ".absent & _: @diagnostic(\"missing payload\"), " \
+    "_ & .absent: @diagnostic(\"missing ceiling\"), " \
+    ".present(let payload) & .present(let ceiling) & !accepts(limit: ceiling.value, candidate: payload.value): " \
+    "@diagnostic(\"source policy rejected\"), " \
+    ".present & .present: {} } } " \
     "function accepts(let candidate: SomeNumber, let limit: SomeNumber): SomeTruth { " \
     "state remaining: candidate state consumed: 0 " \
     "while remaining > 0 { remaining: remaining - 1 consumed: consumed + 1 } " \
@@ -148,6 +147,8 @@ int main(void)
     validateInteger("@integer construct Wide<let bits: 128, let signed: true> { let value: 0 }",1);
     validateInteger("@integer construct Narrow<let bits: 8, let signed: true> { let value: 128 }",0);
     validateInteger("@integer construct Negative<let bits: 8, let signed: true> { let value: -128 }",1);
+    validateLanguage("@integer construct Empty<let bits: 0, let signed: true> { let value: 0 }","Integer bits must be positive",0);
+    validateLanguage("@integer construct Unsized<let signed: true> { let value: 0 }","Construct must specify value, bits and signed",0);
     validateInteger("@integer construct Unsigned<let bits: 8, let signed: false> { let value: -1 }",0);
     validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 7 }",NULL,2);
     validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 8 }","source policy rejected",0);

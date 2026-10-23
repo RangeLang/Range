@@ -1,31 +1,15 @@
 @literal("[0-9]+")
 macro integer(): Construct {
-  let value: #members.first(named: "value")
-  let bits: #generics.first(named: "bits")
-  let signed: #generics.first(named: "signed")
-
-  switch value { .absent: @diagnostic("Construct must specify value"), .present: {} }
-  switch bits { .absent: @diagnostic("Construct must specify bits"), .present: {} }
-  switch signed { .absent: @diagnostic("Construct must specify signed"), .present: {} }
-
   // The law runs per specialization and per supplied literal, so value and
-  // bits are the specialized ones here. Each is present: a missing one
-  // ended the run above.
-  switch value {
-    .present(let stored): switch bits {
-      .present(let width): switch signed {
-        .present(let sign): switch width.value <= 0 {
-          .true: @diagnostic("Integer bits must be positive"),
-          .false: switch integerValueFits(value: stored.value, bits: width.value, signed: sign.value) {
-            .false: @diagnostic("Integer value does not fit the declared bits and signedness"),
-            .true: {}
-          }
-        },
-        .absent: {}
-      },
-      .absent: {}
-    },
-    .absent: {}
+  // bits are the specialized ones here. Rows with a condition never make the
+  // switch exhaustive, so the third arm accepts every value that passed.
+  switch #members.first(named: "value"), #generics.first(named: "bits"), #generics.first(named: "signed") {
+    .present(let v) & .present(let b) & .present(let s) & b.value <= 0:
+      @diagnostic("Integer bits must be positive"),
+    .present(let v) & .present(let b) & .present(let s) & !integerValueFits(value: v.value, bits: b.value, signed: s.value):
+      @diagnostic("Integer value does not fit the declared bits and signedness"),
+    .present & .present & .present: {},
+    default: @diagnostic("Construct must specify value, bits and signed")
   }
 
   // Layout and arithmetic: the construct is a scalar exactly bits wide, signed

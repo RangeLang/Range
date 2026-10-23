@@ -28,24 +28,18 @@ macro equatable(): Construct {
         .absent: {}
     }
 
-    switch equals {
-        .present(let equals) & written != .absent: {
+    switch equals, written {
+        .present(let equals) & .present: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
             }
             switch equals.parameters.first() {
-                .present(let other): {
-                    switch other.name != "other" {
-                        .true: @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
-                        .false: {}
-                    }
-                    switch other.type != equals.receiver {
-                        .true: @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
-                        .false: {}
-                    }
-                },
-                .absent: {}
+                .present(let other) & other.name != "other":
+                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+                .present(let other) & other.type != equals.receiver:
+                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+                default: {}
             }
             switch equals.output != Bool {
                 .true: @diagnostic("\(#name).equals must return Bool"),
@@ -89,24 +83,18 @@ macro equatable(): Enum {
         .absent: {}
     }
 
-    switch equals {
-        .present(let equals) & written != .absent: {
+    switch equals, written {
+        .present(let equals) & .present: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
             }
             switch equals.parameters.first() {
-                .present(let other): {
-                    switch other.name != "other" {
-                        .true: @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
-                        .false: {}
-                    }
-                    switch other.type != equals.receiver {
-                        .true: @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
-                        .false: {}
-                    }
-                },
-                .absent: {}
+                .present(let other) & other.name != "other":
+                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+                .present(let other) & other.type != equals.receiver:
+                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+                default: {}
             }
             switch equals.output != Bool {
                 .true: @diagnostic("\(#name).equals must return Bool"),

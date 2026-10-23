@@ -11,7 +11,8 @@
 // Otherwise the element is matched against pattern (a name, `_`, or a case
 // pattern after a leading dot, as in `for .group(let items) in shapes`), the
 // condition filters (it never ends the loop), the body runs for a match, and
-// the position advances by one, also on `continue`. C writes the loop as switches and finds the function by
-// this role; it never names the function, its parameter, or the type.
+// the position advances by one, also on `continue`. C writes the loop as
+// switches and finds the function by this role; it never names the function,
+// its parameter, or the type.
 @builtin
 macro iteration(): Function
