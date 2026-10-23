@@ -34,18 +34,18 @@ function length(let line: Line): Int {
 {
     state p: Point(x: 1, y: 2)
     p.shift(by: 10)
-    switch p.x != 11 { .true: return 1, .false: {} }
-    switch p.y != 3 { .true: return 2, .false: {} }
+    switch { p.x != 11: return 1, default: {} }
+    switch { p.y != 3: return 2, default: {} }
     p.y: 20
     let m: mirror(p: p)
-    switch m.x != 20 { .true: return 3, .false: {} }
-    switch m.y != 11 { .true: return 4, .false: {} }
-    switch m.sum() != 34 { .true: return 5, .false: {} }
+    switch { m.x != 20: return 3, default: {} }
+    switch { m.y != 11: return 4, default: {} }
+    switch { m.sum() != 34: return 5, default: {} }
     state line: Line(to: Point(x: 4, y: 6))
     line.from.x: 1
-    switch length(line: line) != 16 { .true: return 6, .false: {} }
+    switch { length(line: line) != 16: return 6, default: {} }
     let copy: line
     line.to.y: 100
-    switch copy.to.y != 6 { .true: return 7, .false: {} }
+    switch { copy.to.y != 6: return 7, default: {} }
     return 42
 }

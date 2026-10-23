@@ -1,17 +1,21 @@
 @literal("[0-9]+")
 macro integer(): Construct {
   // The law runs per specialization and per supplied literal, so value and
-  // bits are the specialized ones here. Rows with a condition never make the
-  // switch exhaustive, so the third arm accepts every value that passed.
-  switch #members.first(where: { member in member.name = "value" }),
-         #generics.first(where: { generic in generic.name = "bits" }),
-         #generics.first(where: { generic in generic.name = "signed" }) {
-    .present & .present(let b) & .present & b.value <= 0:
-      @diagnostic("Integer bits must be positive"),
-    .present(let v) & .present(let b) & .present(let s) & !integerValueFits(value: v.value, bits: b.value, signed: s.value):
-      @diagnostic("Integer value does not fit the declared bits and signedness"),
-    .present & .present & .present: {},
-    default: @diagnostic("Construct must specify value, bits and signed")
+  // bits are the specialized ones here. An arm with a guard covers nothing
+  // for the arms after it, so the third arm accepts every value that passed.
+  let value: #members.first(where: { member in member.name = "value" })
+  let bits: #generics.first(where: { generic in generic.name = "bits" })
+  let signed: #generics.first(where: { generic in generic.name = "signed" })
+  switch {
+      value.present & bits.present(let b) & signed.present & b.value <= 0:
+          @diagnostic("Integer bits must be positive"),
+
+      value.present(let v) & bits.present(let b) & signed.present(let s) &
+      !integerValueFits(value: v.value, bits: b.value, signed: s.value):
+          @diagnostic("Integer value does not fit the declared bits and signedness"),
+
+      value.present & bits.present & signed.present: {},
+      default: @diagnostic("Construct must specify value, bits and signed")
   }
 
   // Layout and arithmetic: the construct is a scalar exactly bits wide, signed
@@ -49,17 +53,18 @@ macro integer(): Construct {
 
 // Bounds are language rules. C evaluates the arithmetic and control flow.
 function integerValueFits(let value: Int, let bits: Int, let signed: Bool): Bool {
-  switch bits <= 0 { .true: return false, .false: {} }
+  switch { bits <= 0: return false, default: {} }
   state remaining: value
   state available: bits
-  switch signed {
-    .true: {
+  switch {
+    signed: {
       available: available - 1
       // -1 - value maps negatives to their required magnitude bits without
       // negating the minimum signed integer or computing overflowing powers.
-      switch remaining < 0 { .true: remaining: -1 - remaining, .false: {} }
+      switch { remaining < 0: remaining: -1 - remaining, default: {} }
     },
-    .false: switch remaining < 0 { .true: return false, .false: {} }
+
+    default: switch { remaining < 0: return false, default: {} }
   }
   while remaining > 0 & available > 0 {
     remaining: remaining / 2

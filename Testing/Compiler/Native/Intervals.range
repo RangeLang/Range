@@ -12,44 +12,44 @@ construct Countdown {
 
     @iteration
     function next(let step: Int): Int? {
-        switch step < from { .true: return from - step, .false: {} }
+        switch { step < from: return from - step, default: {} }
         return .absent
     }
 }
 
 {
-    switch sum(n: 10) != 45 { .true: return 1, .false: {} }
+    switch { sum(n: 10) != 45: return 1, default: {} }
 
     // An empty interval runs no iteration.
     state empty: 0
     for _ in 5..<5 { empty: empty + 1 }
     for _ in 7..<3 { empty: empty + 1 }
-    switch empty != 0 { .true: return 2, .false: {} }
+    switch { empty != 0: return 2, default: {} }
 
     // An interval is a value: iterating it twice visits it twice.
     let r: 2..<5
     state twice: 0
     for i in r { twice: twice + i }
     for i in r { twice: twice + i }
-    switch twice != 18 { .true: return 3, .false: {} }
-    switch r.lower != 2 | r.upper != 5 { .true: return 4, .false: {} }
+    switch { twice != 18: return 3, default: {} }
+    switch { r.lower != 2 | r.upper != 5: return 4, default: {} }
 
     // Precedence as in Swift: arithmetic binds tighter, comparison looser.
     state wide: 0
     for i in 1 + 1..<2 * 3 & i % 2 = 0 { wide: wide + i }
-    switch wide != 6 { .true: return 5, .false: {} }
+    switch { wide != 6: return 5, default: {} }
 
     // continue still advances the position; break leaves the loop.
     state odd: 0
     for i in 0..<100 {
-        switch i % 2 = 0 { .true: continue, .false: {} }
-        switch i > 9 { .true: break, .false: {} }
+        switch { i % 2 = 0: continue, default: {} }
+        switch { i > 9: break, default: {} }
         odd: odd + i
     }
-    switch odd != 25 { .true: return 6, .false: {} }
+    switch { odd != 25: return 6, default: {} }
 
     state down: 0
     for k in Countdown(from: 4) { down: down * 10 + k }
-    switch down != 4321 { .true: return 7, .false: {} }
+    switch { down != 4321: return 7, default: {} }
     return 42
 }

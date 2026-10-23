@@ -7,22 +7,22 @@ enum Token {
 }
 
 function first(let xs: Array<Int>): Int? {
-    switch xs.count > 0 { .false: return .absent, .true: {} }
+    switch { xs.count <= 0: return .absent, default: {} }
     return .present(xs.read(at: 0))
 }
 
 function double(let maybe: Int?): Int {
-    let n: switch maybe { .present(let n): n, .absent: { return -1 } }
+    let n: switch { maybe.present(let n): n, maybe.absent: { return -1 } }
     return n * 2
 }
 
 function unwrap(let maybe: Int?): Int {
-    let value: switch maybe { .present(let value): value, .absent: { return 0 } }
+    let value: switch { maybe.present(let value): value, maybe.absent: { return 0 } }
     return value
 }
 
 function number(let t: Token): Int {
-    let n: switch t { .value(let n): n, default: { return -1 } }
+    let n: switch { t.value(let n): n, default: { return -1 } }
     let twice: n + n
     return twice
 }
@@ -30,18 +30,18 @@ function number(let t: Token): Int {
 function filtered(let xs: Array<Int>): Int {
     state total: 0
     for x in xs {
-        switch x != 2 { .false: continue, .true: {} }
-        switch x < 4 { .false: break, .true: {} }
+        switch { x = 2: continue, default: {} }
+        switch { x >= 4: break, default: {} }
         total: total + x
     }
     return total
 }
 
 function strict(let n: Int): Int {
-    switch n > 0 { .false: @diagnostic("n must be positive"), .true: {} }
-    switch n {
-    1: {
-        switch n = 1 { .false: return 0, .true: {} }
+    switch { n <= 0: @diagnostic("n must be positive"), default: {} }
+    switch {
+    n = 1: {
+        switch { n != 1: return 0, default: {} }
         return 10
     },
     default: return n
@@ -52,7 +52,7 @@ function strict(let n: Int): Int {
 function longest(let groups: Array<Array<Int>>): Int {
     state best: 0
     for group in groups {
-        switch group.count > best { .false: continue, .true: {} }
+        switch { group.count <= best: continue, default: {} }
         best: group.count
     }
     return best
@@ -60,23 +60,23 @@ function longest(let groups: Array<Array<Int>>): Int {
 
 {
     state xs: Array<Int>()
-    switch first(xs: xs) { .present: return 1, .absent: {} }
+    switch { first(xs: xs).present: return 1, default: {} }
     xs.append(value: 1)
     xs.append(value: 2)
     xs.append(value: 3)
     xs.append(value: 4)
     xs.append(value: 5)
-    let f: switch first(xs: xs) { .present(let f): f, .absent: { return 2 } }
-    switch f != 1 { .true: return 3, .false: {} }
-    switch double(maybe: .present(4)) != 8 | double(maybe: .absent) != -1 { .true: return 4, .false: {} }
-    switch unwrap(maybe: .present(7)) != 7 | unwrap(maybe: .absent) != 0 { .true: return 5, .false: {} }
-    switch number(t: .value(number: 6)) != 12 | number(t: .end) != -1 { .true: return 6, .false: {} }
-    switch filtered(xs: xs) != 4 { .true: return 7, .false: {} }
-    switch strict(n: 1) != 10 | strict(n: 3) != 3 { .true: return 8, .false: {} }
+    let f: switch { first(xs: xs).present(let f): f, default: { return 2 } }
+    switch { f != 1: return 3, default: {} }
+    switch { double(maybe: .present(4)) != 8 | double(maybe: .absent) != -1: return 4, default: {} }
+    switch { unwrap(maybe: .present(7)) != 7 | unwrap(maybe: .absent) != 0: return 5, default: {} }
+    switch { number(t: .value(number: 6)) != 12 | number(t: .end) != -1: return 6, default: {} }
+    switch { filtered(xs: xs) != 4: return 7, default: {} }
+    switch { strict(n: 1) != 10 | strict(n: 3) != 3: return 8, default: {} }
     state groups: Array<Array<Int>>()
     groups.append(value: xs)
     state empty: Array<Int>()
     groups.append(value: empty)
-    switch longest(groups: groups) != 5 { .true: return 9, .false: {} }
+    switch { longest(groups: groups) != 5: return 9, default: {} }
     return 42
 }

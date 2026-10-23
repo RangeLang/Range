@@ -14,10 +14,10 @@ construct Light {
     let shade: Color.Shade
 
     function next(): Color {
-        switch color {
-        .red: return .green,
-        .green: return Color.amber,
-        .amber: return .red
+        switch {
+        color.red: return .green,
+        color.green: return Color.amber,
+        color.amber: return .red
         }
     }
 
@@ -31,10 +31,10 @@ construct Holder {
 }
 
 function name(let c: Light.Color): Int {
-    switch c {
-    .red: return 1,
-    .amber: return 2,
-    .green: return 3
+    switch {
+    c.red: return 1,
+    c.amber: return 2,
+    c.green: return 3
     }
 }
 
@@ -45,14 +45,14 @@ function bright(let s: Light.Color.Shade): Bool {
 function lights(): Int {
     state light: Light(shade: .bright)
     light.advance()
-    switch name(c: light.color) != 3 { .true: return 1, .false: {} }
+    switch { name(c: light.color) != 3: return 1, default: {} }
     light.advance()
-    switch light.color != Light.Color.amber { .true: return 2, .false: {} }
+    switch { light.color != Light.Color.amber: return 2, default: {} }
     let h: Holder(inner: .green)
-    switch name(c: h.inner) != 3 { .true: return 3, .false: {} }
-    switch bright(s: light.shade) { .false: return 4, .true: {} }
+    switch { name(c: h.inner) != 3: return 3, default: {} }
+    switch { !bright(s: light.shade): return 4, default: {} }
     let c: Light.Color.amber
-    switch name(c: c) != 2 { .true: return 5, .false: {} }
+    switch { name(c: c) != 2: return 5, default: {} }
     return 42
 }
 
@@ -78,19 +78,19 @@ enum Statement {
 }
 
 function evaluate(let e: Expr): Int {
-    switch e {
-    .number(let n): return n,
-    .add(let pair): return evaluate(e: pair.left) + evaluate(e: pair.right),
-    .negate(let inner): return -evaluate(e: inner),
-    .scaled(by: .double, let inner): return 2 * evaluate(e: inner),
-    .scaled(by: .triple, let inner): return 3 * evaluate(e: inner)
+    switch {
+    e.number(let n): return n,
+    e.add(let pair): return evaluate(e: pair.left) + evaluate(e: pair.right),
+    e.negate(let inner): return -evaluate(e: inner),
+    e.scaled(by: .double, let inner): return 2 * evaluate(e: inner),
+    e.scaled(by: .triple, let inner): return 3 * evaluate(e: inner)
     }
 }
 
 function run(let s: Statement): Int {
-    switch s {
-    .print(let e): return evaluate(e: e),
-    .block(let statements): {
+    switch {
+    s.print(let e): return evaluate(e: e),
+    s.block(let statements): {
         state total: 0
         state i: 0
         while i < statements.count {
@@ -105,23 +105,23 @@ function run(let s: Statement): Int {
 function expressions(): Int {
     let one: Expr.number(1)
     let sum: Expr.add(Pair(left: one, right: .negate(.number(5))))
-    switch evaluate(e: sum) != -4 { .true: return 1, .false: {} }
+    switch { evaluate(e: sum) != -4: return 1, default: {} }
     let f: Expr.Factor.triple
     let scaled: Expr.scaled(by: f, of: sum)
-    switch evaluate(e: scaled) != -12 { .true: return 2, .false: {} }
-    switch evaluate(e: .scaled(by: Expr.Factor.double, of: .number(21))) != 42 { .true: return 3, .false: {} }
+    switch { evaluate(e: scaled) != -12: return 2, default: {} }
+    switch { evaluate(e: .scaled(by: Expr.Factor.double, of: .number(21))) != 42: return 3, default: {} }
     state body: Array<Statement>()
     body.append(value: .print(scaled))
     body.append(value: .print(.number(50)))
     state inner: Array<Statement>()
     inner.append(value: .print(one))
     body.append(value: .block(inner))
-    switch run(s: .block(body)) != 39 { .true: return 4, .false: {} }
+    switch { run(s: .block(body)) != 39: return 4, default: {} }
     return 42
 }
 
 {
-    switch lights() != 42 { .true: return 1, .false: {} }
-    switch expressions() != 42 { .true: return 2, .false: {} }
+    switch { lights() != 42: return 1, default: {} }
+    switch { expressions() != 42: return 2, default: {} }
     return 42
 }

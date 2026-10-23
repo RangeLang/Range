@@ -8,52 +8,52 @@ construct Person {
     state mentor: Int?
 }
 function find(let xs: Array<Int>, let wanted: Int): Int? {
-    for x in xs { switch x = wanted { .true: return x, .false: {} } }
+    for x in xs { switch { x = wanted: return x, default: {} } }
     return .absent
 }
 function small(let n: Int): Int<bits: 8>? {
-    switch n > 100 { .true: return .absent, .false: {} }
+    switch { n > 100: return .absent, default: {} }
     return 5
 }
 function heading(let up: Bool): Direction? {
-    switch up { .true: return .north, .false: {} }
+    switch { up: return .north, default: {} }
     return .absent
 }
 function describe(let maybe: Int?): Int {
-    let value: switch maybe { .present(let value): value, .absent: { return -1 } }
+    let value: switch { maybe.present(let value): value, maybe.absent: { return -1 } }
     return value
 }
 {
     state xs: Array<Int>()
     xs.append(value: 3) xs.append(value: 9)
-    switch describe(maybe: find(xs: xs, wanted: 9)) != 9 { .true: return 1, .false: {} }
-    switch describe(maybe: find(xs: xs, wanted: 4)) != -1 { .true: return 2, .false: {} }
-    switch describe(maybe: 12) != 12 { .true: return 3, .false: {} }
+    switch { describe(maybe: find(xs: xs, wanted: 9)) != 9: return 1, default: {} }
+    switch { describe(maybe: find(xs: xs, wanted: 4)) != -1: return 2, default: {} }
+    switch { describe(maybe: 12) != 12: return 3, default: {} }
     let x: Int?.present(5)
-    switch x != 5 | x = 6 | x = .absent { .true: return 4, .false: {} }
+    switch { x != 5 | x = 6 | x = .absent: return 4, default: {} }
     state y: Int?.absent
     y: 7
-    switch describe(maybe: y) != 7 { .true: return 5, .false: {} }
+    switch { describe(maybe: y) != 7: return 5, default: {} }
     state p: Person(age: 30, manager: 2)
-    switch p.manager != 2 { .true: return 6, .false: {} }
+    switch { p.manager != 2: return 6, default: {} }
     p.manager: .absent
-    switch p.manager != .absent { .true: return 7, .false: {} }
-    let s: switch small(n: 1) { .present(let s): s, .absent: { return 8 } }
-    switch s != 5 { .true: return 9, .false: {} }
-    switch heading(up: true) != .north | heading(up: false) != .absent { .true: return 10, .false: {} }
+    switch { p.manager != .absent: return 7, default: {} }
+    let s: switch { small(n: 1).present(let s): s, default: { return 8 } }
+    switch { s != 5: return 9, default: {} }
+    switch { heading(up: true) != .north | heading(up: false) != .absent: return 10, default: {} }
     state names: Array<String?>()
     names.append(value: "Ada")
     names.append(value: .absent)
     state count: 0
     for .present in names { count: count + 1 }
-    switch count != 1 { .true: return 11, .false: {} }
+    switch { count != 1: return 11, default: {} }
     // A binding of T? with no value starts absent, locals and members alike.
     state z: Int?
-    switch z != .absent { .true: return 12, .false: {} }
+    switch { z != .absent: return 12, default: {} }
     z: 4
-    switch z != 4 { .true: return 13, .false: {} }
-    switch p.mentor != .absent { .true: return 14, .false: {} }
+    switch { z != 4: return 13, default: {} }
+    switch { p.mentor != .absent: return 14, default: {} }
     let q: Person(age: 1, mentor: 9)
-    switch q.mentor != 9 { .true: return 15, .false: {} }
+    switch { q.mentor != 9: return 15, default: {} }
     return 42
 }

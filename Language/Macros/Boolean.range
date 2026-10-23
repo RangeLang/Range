@@ -1,9 +1,11 @@
 @literal("true|false")
 macro boolean(): Enum {
-  switch #cases.first(where: { entry in entry.name = "false" }), #cases.first(where: { entry in entry.name = "true" }) {
-    .present & .present: {},
-    .absent & _: @diagnostic("Enum must declare case false"),
-    _ & .absent: @diagnostic("Enum must declare case true")
+  let no: #cases.first(where: { entry in entry.name = "false" })
+  let yes: #cases.first(where: { entry in entry.name = "true" })
+  switch {
+    no.present & yes.present: {},
+    no.absent: @diagnostic("Enum must declare case false"),
+    yes.absent: @diagnostic("Enum must declare case true")
   }
 
   // Layout: an enum without payloads is its tag, so the tag is the storage.
@@ -17,7 +19,7 @@ macro boolean(): Enum {
   // `a & b` writes no closure that could delay b, so these two stay C
   // control-flow primitives. They are declared here so the operators exist only on this
   // type, and C writes the branch. No other type may declare `&` or `|`:
-  // they also join the patterns and conditions of a switch label.
+  // they also join the case tests of a switch arm's condition.
   #graph {
     extension #name {
       @builtin function !(): #name

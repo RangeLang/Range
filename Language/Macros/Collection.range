@@ -34,7 +34,7 @@ macro collection(): Construct {
             // `for element in collection { }` calls this at positions 0, 1, 2, …
             @iteration
             function element(let at: Int): Element? {
-                switch at < count { .true: return read(at: at), .false: {} }
+                switch { at < count: return read(at: at), default: {} }
                 return .absent
             }
 
@@ -43,9 +43,9 @@ macro collection(): Construct {
             // is storage, not value, so it never takes part. The @equatable
             // on this extension makes `=` call this.
             function equals(let other: #name): Bool {
-                switch count != other.count { .true: return false, .false: {} }
+                switch { count != other.count: return false, default: {} }
                 for index in 0..<count {
-                    switch read(at: index) != other.read(at: index) { .true: return false, .false: {} }
+                    switch { read(at: index) != other.read(at: index): return false, default: {} }
                 }
                 return true
             }
@@ -54,15 +54,13 @@ macro collection(): Construct {
             // @insertion, and C finds it by that role, not by its name.
             @insertion
             function append(let value: Element) {
-                switch count = capacity {
-                    .true: {
-                        switch capacity = 0 {
-                            .true: capacity: 1,
-                            .false: capacity: capacity * 2
-                        }
+                switch {
+                    count = capacity: {
+                        switch { capacity = 0: capacity: 1, default: capacity: capacity * 2 }
                         resize(to: capacity)
                     },
-                    .false: {}
+
+                    default: {}
                 }
                 write(at: count, value: value)
                 count: count + 1
@@ -71,7 +69,7 @@ macro collection(): Construct {
             // The first element, or absence when there is none. A function, not
             // a property: `derived` members are not compiled yet.
             function first(): Element? {
-                switch count > 0 { .true: return read(at: 0), .false: {} }
+                switch { count > 0: return read(at: 0), default: {} }
                 return .absent
             }
 
@@ -83,7 +81,7 @@ macro collection(): Construct {
                 state index: 0
                 while index < count {
                     let element: read(at: index)
-                    switch where(element) { .true: result.append(value: element), .false: {} }
+                    switch { where(element): result.append(value: element), default: {} }
                     index: index + 1
                 }
                 return result
@@ -94,7 +92,7 @@ macro collection(): Construct {
                 state index: 0
                 while index < count {
                     let element: read(at: index)
-                    switch where(element) { .true: return element, .false: {} }
+                    switch { where(element): return element, default: {} }
                     index: index + 1
                 }
                 return .absent
@@ -102,7 +100,7 @@ macro collection(): Construct {
 
             // Whether any element makes `where` true.
             function contains(let where: (Element) -> Bool): Bool {
-                return switch first(where: where) { .present: true, .absent: false }
+                return first(where: where).present
             }
 
             // Each element transformed, in order, as an Array of the results.

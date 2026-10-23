@@ -1,5 +1,5 @@
 // = on enums with payloads is structural: equal cases, then equal fields,
-// recursively. A value pattern of such a type compares with =.
+// recursively. A case test's value argument of such a type compares with =.
 enum Token {
     case value(number: Int)
     case pair(Int, Int)
@@ -12,24 +12,24 @@ enum Tree {
 }
 enum Wrapper { case token(Token), none }
 function classify(let t: Token): Int {
-    switch t {
-    .pair(1, 2): return 12,
-    .end: return 0,
+    switch {
+    t.pair(1, 2): return 12,
+    t.end: return 0,
     default: return -1
     }
 }
 {
     let a: Token.value(number: 7)
-    switch a != .value(number: 7) { .true: return 1, .false: {} }
-    switch a = .value(number: 8) { .true: return 2, .false: {} }
-    switch a = .end | Token.end != .end { .true: return 3, .false: {} }
-    switch Token.pair(1, 2) = .pair(2, 1) { .true: return 4, .false: {} }
-    switch (Token.flag(true) = .flag(true)) { .false: return 5, .true: {} }
+    switch { a != .value(number: 7): return 1, default: {} }
+    switch { a = .value(number: 8): return 2, default: {} }
+    switch { a = .end | Token.end != .end: return 3, default: {} }
+    switch { Token.pair(1, 2) = .pair(2, 1): return 4, default: {} }
+    switch { !((Token.flag(true) = .flag(true))): return 5, default: {} }
     let t: Tree.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3)))
     let u: Tree.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3)))
-    switch t != u { .true: return 6, .false: {} }
-    switch t = .node(left: .leaf(value: 1), right: .leaf(value: 5)) { .true: return 7, .false: {} }
-    switch Wrapper.token(.pair(3, 4)) != .token(.pair(3, 4)) { .true: return 8, .false: {} }
-    switch classify(t: .pair(1, 2)) != 12 | classify(t: .pair(2, 2)) != -1 { .true: return 9, .false: {} }
+    switch { t != u: return 6, default: {} }
+    switch { t = .node(left: .leaf(value: 1), right: .leaf(value: 5)): return 7, default: {} }
+    switch { Wrapper.token(.pair(3, 4)) != .token(.pair(3, 4)): return 8, default: {} }
+    switch { classify(t: .pair(1, 2)) != 12 | classify(t: .pair(2, 2)) != -1: return 9, default: {} }
     return 42
 }

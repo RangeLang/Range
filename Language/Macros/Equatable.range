@@ -1,8 +1,8 @@
 // `a = b` calls the function named `=` that a's type declares, with b as its
 // one argument. The operator symbol is that function's name, so the
 // compiler finds it by the symbol itself; no role or hidden contract selects
-// it. `a != b` is `!(a = b)` through the same function, and a switch value
-// pattern compares with it too. An optional operand is promoted first, so
+// it. `a != b` is `!(a = b)` through the same function, and a case test's
+// value argument compares with it too. An optional operand is promoted first, so
 // `maybe = 5` compares two Int? values. The other operators (`+`, `<`, …)
 // work the same way, but any type may declare those; `=` comes only from here.
 //
@@ -22,26 +22,32 @@ macro equatable(): Construct {
     let equals: #functions.first { candidate in candidate.name = "equals" }
     let declared: #functions.first { candidate in candidate.name = "=" }
 
-    // Every combination is a row, so the compiler checks that each is handled.
-    switch declared, equals, written {
+    // The arms test every combination of the three, so the compiler checks
+    // that each is handled.
+    switch {
         // One way to define equality: a type does not write `=` itself.
-        .present & _ & _:
+        declared.present:
             @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-        .absent & .present(let equals) & .present: {
-            switch equals.parameters.count != 1 {
-                .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
-                .false: {}
-            }
-            switch equals.parameters.first() {
-                .present(let other) & other.name != "other":
-                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
-                .present(let other) & other.type != equals.receiver:
-                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+
+        declared.absent & equals.present(let equals) & written.present: {
+            switch {
+                equals.parameters.count != 1:
+                    @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 default: {}
             }
-            switch equals.output != Bool {
-                .true: @diagnostic("\(#name).equals must return Bool"),
-                .false: {}
+            let parameter: equals.parameters.first()
+            switch {
+                parameter.present(let other) & other.name != "other":
+                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+
+                parameter.present(let other) & other.type != equals.receiver:
+                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+
+                default: {}
+            }
+            switch {
+                equals.output != Bool: @diagnostic("\(#name).equals must return Bool"),
+                default: {}
             }
             #graph {
                 extension #name {
@@ -49,7 +55,8 @@ macro equatable(): Construct {
                 }
             }
         },
-        .absent & .absent & .present: {
+
+        declared.absent & equals.absent & written.present: {
             @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
             // C primitive: compares every stored member in order, each with its
             // own type's `=`. It becomes Range code once macros can iterate members.
@@ -60,8 +67,9 @@ macro equatable(): Construct {
                 }
             }
         },
+
         // Without @equatable written, an equals is an ordinary function.
-        .absent & _ & .absent: {
+        declared.absent & written.absent: {
             #graph {
                 extension #name {
                     @builtin
@@ -81,26 +89,32 @@ macro equatable(): Enum {
     let equals: #functions.first { candidate in candidate.name = "equals" }
     let declared: #functions.first { candidate in candidate.name = "=" }
 
-    // Every combination is a row, so the compiler checks that each is handled.
-    switch declared, equals, written {
+    // The arms test every combination of the three, so the compiler checks
+    // that each is handled.
+    switch {
         // One way to define equality: a type does not write `=` itself.
-        .present & _ & _:
+        declared.present:
             @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-        .absent & .present(let equals) & .present: {
-            switch equals.parameters.count != 1 {
-                .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
-                .false: {}
-            }
-            switch equals.parameters.first() {
-                .present(let other) & other.name != "other":
-                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
-                .present(let other) & other.type != equals.receiver:
-                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+
+        declared.absent & equals.present(let equals) & written.present: {
+            switch {
+                equals.parameters.count != 1:
+                    @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 default: {}
             }
-            switch equals.output != Bool {
-                .true: @diagnostic("\(#name).equals must return Bool"),
-                .false: {}
+            let parameter: equals.parameters.first()
+            switch {
+                parameter.present(let other) & other.name != "other":
+                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+
+                parameter.present(let other) & other.type != equals.receiver:
+                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+
+                default: {}
+            }
+            switch {
+                equals.output != Bool: @diagnostic("\(#name).equals must return Bool"),
+                default: {}
             }
             #graph {
                 extension #name {
@@ -108,7 +122,8 @@ macro equatable(): Enum {
                 }
             }
         },
-        .absent & .absent & .present: {
+
+        declared.absent & equals.absent & written.present: {
             @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
             // C primitive: compares the tags, then the current case's payload
             // fields. It becomes Range code once macros can iterate members.
@@ -119,8 +134,9 @@ macro equatable(): Enum {
                 }
             }
         },
+
         // Without @equatable written, an equals is an ordinary function.
-        .absent & _ & .absent: {
+        declared.absent & written.absent: {
             #graph {
                 extension #name {
                     @builtin

@@ -6,7 +6,7 @@ function count(let xs: Array<Int>, let where: (Int) -> Bool): Int {
     state found: 0
     state index: 0
     while index < xs.count {
-        switch where(xs.read(at: index)) { .true: found: found + 1, .false: {} }
+        switch { where(xs.read(at: index)): found: found + 1, default: {} }
         index: index + 1
     }
     return found
@@ -54,7 +54,7 @@ construct Box<T> {
         state found: 0
         state index: 0
         while index < items.count {
-            switch where(items.read(at: index)) { .true: found: found + 1, .false: {} }
+            switch { where(items.read(at: index)): found: found + 1, default: {} }
             index: index + 1
         }
         return found
@@ -69,64 +69,64 @@ construct Box<T> {
     xs.append(value: 6)
     // Labeled and trailing; a closure reads the caller's let.
     let limit: 4
-    switch count(xs: xs, where: { x in x > limit }) != 2 { .true: return 1, .false: {} }
-    // A switch's subject takes no trailing closure, as in Swift.
+    switch { count(xs: xs, where: { x in x > limit }) != 2: return 1, default: {} }
+    // A trailing closure after the call's other arguments.
     let small: count(xs: xs) { x in x < limit }
-    switch small != 2 { .true: return 2, .false: {} }
+    switch { small != 2: return 2, default: {} }
     let eights: countBoth(xs: xs) { x in x = 8 }
-    switch eights != 2 { .true: return 3, .false: {} }
-    switch combine(a: 6, b: 7, with: { a, b in a * b }) != 42 { .true: return 4, .false: {} }
+    switch { eights != 2: return 3, default: {} }
+    switch { combine(a: 6, b: 7, with: { a, b in a * b }) != 42: return 4, default: {} }
     // A closure changes a state of its caller.
     state seen: 0
     let big: count(xs: xs) { x in
         seen: seen + x
         return x > 5
     }
-    switch seen != 18 | big != 2 { .true: return 5, .false: {} }
+    switch { seen != 18 | big != 2: return 5, default: {} }
     // `return` returns from the closure only; a switch is its expression.
     let sign: count(xs: xs) { x in
-        switch x < 2 { .true: return false, .false: {} }
-        return switch x { 3: true, 8: true, default: false }
+        switch { x < 2: return false, default: {} }
+        return switch { x = 3: true, x = 8: true, default: false }
     }
-    switch sign != 2 { .true: return 6, .false: {} }
+    switch { sign != 2: return 6, default: {} }
     // A closure that returns Void, with `return` and a loop of its own.
     state calls: 0
     repeat(times: 5) { i in
-        switch i = 3 { .true: return, .false: {} }
+        switch { i = 3: return, default: {} }
         calls: calls + 1
     }
-    switch calls != 4 { .true: return 7, .false: {} }
+    switch { calls != 4: return 7, default: {} }
     state found: 0
     repeat(times: 3) { i in
         state j: 0
         while j < 10 {
-            switch j = i { .true: break, .false: {} }
+            switch { j = i: break, default: {} }
             j: j + 1
         }
         found: found + j
     }
-    switch found != 3 { .true: return 8, .false: {} }
+    switch { found != 3: return 8, default: {} }
     // Nested closures: the inner one reads the outer one's parameter.
     state pairs: 0
     repeat(times: 3) { i in
         repeat(times: 3) { j in
-            switch i < j { .true: pairs: pairs + 1, .false: {} }
+            switch { i < j: pairs: pairs + 1, default: {} }
         }
     }
-    switch pairs != 3 { .true: return 9, .false: {} }
+    switch { pairs != 3: return 9, default: {} }
     // A return inside a switch expression's arm, inside an operand.
-    let lifted: combine(a: 1, b: 2) { a, b in 100 + switch a { 1: { return 7 }, default: b } }
-    switch lifted != 7 { .true: return 10, .false: {} }
+    let lifted: combine(a: 1, b: 2) { a, b in 100 + switch { a = 1: { return 7 }, default: b } }
+    switch { lifted != 7: return 10, default: {} }
     state c: Counter()
     c.add(value: 4)
     c.add(value: 9)
     c.absorb()
-    switch c.total != 13 { .true: return 11, .false: {} }
+    switch { c.total != 13: return 11, default: {} }
     state box: Box<String>()
     box.items.append(value: "a")
     box.items.append(value: "bb")
     let long: box.matching { s in s.count > 1 }
-    switch long != 1 { .true: return 12, .false: {} }
+    switch { long != 1: return 12, default: {} }
     @print("calls: \(calls), pairs: \(pairs)")
     return 42
 }

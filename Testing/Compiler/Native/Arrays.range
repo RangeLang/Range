@@ -10,23 +10,23 @@ function total(let xs: Array<Int>): Int {
 
 {
     state xs: Array<Int>()
-    switch xs.isEmpty() { .false: return 1, .true: {} }
+    switch { !xs.isEmpty(): return 1, default: {} }
     state i: 1
     while i <= 100 {
         xs.append(value: i)
         i: i + 1
     }
-    switch xs.count != 100 { .true: return 2, .false: {} }
-    switch xs.capacity != 128 { .true: return 3, .false: {} }
-    switch xs.read(at: 41) != 42 { .true: return 4, .false: {} }
-    switch total(xs: xs) != 5050 { .true: return 5, .false: {} }
+    switch { xs.count != 100: return 2, default: {} }
+    switch { xs.capacity != 128: return 3, default: {} }
+    switch { xs.read(at: 41) != 42: return 4, default: {} }
+    switch { total(xs: xs) != 5050: return 5, default: {} }
     // first() is Range code over count and read(at:), returning Element?.
-    switch xs.first() { .present(1): {}, default: return 7 }
+    switch { xs.first().present(1): {}, default: return 7 }
     state none: Array<Int>()
-    switch none.first() { .absent: {}, .present: return 8 }
+    switch { none.first().absent: {}, default: return 8 }
     state bytes: Array<Int<bits: 8>>()
     bytes.append(value: -128)
     bytes.append(value: 127)
-    switch (bytes.read(at: 0) + bytes.read(at: 1)) != -1 { .true: return 6, .false: {} }
+    switch { (bytes.read(at: 0) + bytes.read(at: 1)) != -1: return 6, default: {} }
     return 42
 }

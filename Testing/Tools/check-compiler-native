@@ -37,7 +37,7 @@ run aggregates 42 "" Testing/Compiler/Native/Aggregates.range
 run arrays 42 "" Testing/Compiler/Native/Arrays.range
 run copy-on-write 42 "" Testing/Compiler/Native/CopyOnWrite.range
 run lifetimes 42 "" Testing/Compiler/Native/Lifetimes.range
-run output 134 "Output.range:22:16: count is 5, expected at most 3" Testing/Compiler/Native/Output.range
+run output 134 "Output.range:21:28: count is 5, expected at most 3" Testing/Compiler/Native/Output.range
 printf '%s\n' "Hello from Range!" "hello, world" "count: 5, last: 25, empty: false, capacity: 8" \
     "-128 4294967295 -9223372036854775808 0 true" "done" | cmp -s - "$work_root/stdout" \
     || fail "@print wrote: $(cat "$work_root/stdout")"
@@ -75,9 +75,9 @@ grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable
     "$work_root/log" || fail "@equatable extension without equals was not warned"
 grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
     || fail "a second application of @equatable was not noted"
-grep -Fq "ExtensionTypes.range:28:1: warning[macro]: Written writes @equatable" "$work_root/log" \
+grep -Fq "ExtensionTypes.range:29:1: warning[macro]: Written writes @equatable" "$work_root/log" \
     || fail "#macros does not list an application written through an extension"
-grep -Fq "ExtensionTypes.range:31:1: warning[macro]: Defaulted has only the default @equatable" "$work_root/log" \
+grep -Fq "ExtensionTypes.range:32:1: warning[macro]: Defaulted has only the default @equatable" "$work_root/log" \
     || fail "#macros lists a @defaults application"
 ! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no equals" "$work_root/log" \
     || fail "@equatable on an extension missed the equals beside it"
@@ -100,23 +100,24 @@ run value-generics 42 "" Testing/Compiler/Native/ValueGenerics.range
 run macro-applications 42 "" Testing/Compiler/Native/MacroApplications.range
 run promotion 42 "" Testing/Compiler/Native/Promotion.range
 # A name a pattern binds and nothing reads is a warning, in native code and
-# in macros alike; a read in any row's condition or the body uses it.
+# in macros alike; a read in the arm's condition or body uses it.
 run unused-bindings 1 "" "$(case_file unused-bindings 'enum Pair { case one(Int), two(Int, Int) }
 function f(let p: Pair): Int {
-    switch p { .one(let v): return 1, .two(let a, let b) & a > 2: return a, .two: return 0 }
+    switch { p.one(let v): return 1, p.two(let a, let b) & a > 2: return a, p.two: return 0 }
 }
 function g(let o: Int?, let p: Int?): Int {
-    switch o, p { .present(let x) & _ & x > 0 | _ & .present(let x): return 1, default: return 0 }
+    switch { o.present(let x) & x > 0 | p.present(let x): return 1, default: return 0 }
 }
 macro checked(): Enum {
-    switch #cases.first(where: { c in c.name = "on" }) { .present(let c): {}, .absent: @diagnostic("\(#name) has no case on") }
+    let on: #cases.first(where: { c in c.name = "on" })
+    switch { on.present(let c): {}, on.absent: @diagnostic("\(#name) has no case on") }
 }
 @checked
 enum Light { case on, off }
 { return f(p: .one(1)) + g(o: .absent, p: .absent) }')"
-for unused in "3:25: warning[unused]: 'v' is bound but never used; write the pattern without 'let v'" \
+for unused in "3:24: warning[unused]: 'v' is bound but never used; write the pattern without 'let v'" \
     "3:55: warning[unused]: 'b' is bound but never used; write the pattern without 'let b'" \
-    "9:71: warning[unused]: 'c' is bound but never used; write the pattern without 'let c'"; do
+    "10:29: warning[unused]: 'c' is bound but never used; write the pattern without 'let c'"; do
     grep -Fq "unused-bindings.range:$unused" "$work_root/log" || fail "unused binding was not warned: $unused"
 done
 ! grep -Eq "'(a|x)' is bound but never used" "$work_root/log" || fail "a binding read in a condition or body was warned"
@@ -135,7 +136,7 @@ run compile-time-closures 0 "" "$(case_file compile-time-closures 'function coun
     state found: 0
     state index: 0
     while index < cases.count {
-        switch where(cases.read(at: index)) { .true: found: found + 1, .false: {} }
+        switch { where(cases.read(at: index)): found: found + 1, default: {} }
         index: index + 1
     }
     return found
@@ -144,7 +145,7 @@ macro counted(): Enum {
     state seen: 0
     let others: count(cases: #cases) { c in
         seen: seen + 1
-        switch c.name = "on" { .true: return false, .false: {} }
+        switch { c.name = "on": return false, default: {} }
         return true
     }
     @warning("\(#name) has \(others) other cases of \(seen)")
@@ -157,9 +158,9 @@ grep -Fq "compile-time-closures.range:19:1: warning[macro]: Light has 2 other ca
 # Array's functions take closures at compile time too, on reflection lists.
 run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro checked(): Enum {
     let wanted: "on"
-    switch #cases.first(where: { c in c.name = wanted }) {
-        .present(let c): @warning("\(#name) has \(c.name)"),
-        .absent: @diagnostic("\(#name) has no case on")
+    switch {
+        #cases.first(where: { c in c.name = wanted }).present(let c): @warning("\(#name) has \(c.name)"),
+        default: @diagnostic("\(#name) has no case on")
     }
     state seen: 0
     let others: #cases.filter { c in
@@ -168,13 +169,13 @@ run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro c
     }
     let total: #cases.reduce(initial: 0) { sum, c in sum + 1 }
     let names: #cases.map { c in c.name }
-    switch names.first() {
-        .present(let n): @warning("\(#name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
-        .absent: {}
+    switch {
+        names.first().present(let n): @warning("\(#name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
+        default: {}
     }
-    switch #cases.contains(where: { c in #cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }) {
-        .true: @warning("\(#name) dims"),
-        .false: {}
+    switch {
+        #cases.contains(where: { c in #cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }): @warning("\(#name) dims"),
+        default: {}
     }
 }
 @checked
@@ -221,7 +222,7 @@ function divide(let a: Int, let b: Int): Int { return a / b }
 { return divide(a: min(), b: -1) }')"
 run narrow-negation 134 "result of '-' does not fit Int<bits: 8, signed: true>" "$(case_file narrow-negation \
     'function flip(let a: Int<bits: 8>): Int<bits: 8> { return -a }
-{ switch flip(a: -127) != 127 { .true: return 1, .false: {} } let z: flip(a: -128) return 0 }')"
+{ switch { flip(a: -127) != 127: return 1, default: {} } let z: flip(a: -128) return 0 }')"
 run constant-overflow 134 "result of '+' does not fit Int<bits: 64, signed: true>" "$(case_file constant-overflow \
     '{ return 9223372036854775807 + 1 }')"
 run constant-division 134 "division by zero in '/'" "$(case_file constant-division '{ return 4 / 0 }')"
@@ -230,7 +231,7 @@ run large-frame 39 "" "$(case_file large-frame "$locals")"
 
 # The law rejects a literal at compile time; nothing is written.
 source="$(case_file literal-law 'function id(let a: Int<bits: 8>): Int<bits: 8> { return a }
-{ switch id(a: -129) = 0 { .true: return 1, .false: {} } return 0 }')"
+{ switch { id(a: -129) = 0: return 1, default: {} } return 0 }')"
 status=0
 "$compiler" -o "$work_root/literal-law" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" || status=$?
 [[ "$status" == 65 && ! -e "$work_root/literal-law" ]] || fail "literal law violation compiled"
@@ -245,56 +246,56 @@ reject() {
     [[ "$status" == 65 && ! -e "$work_root/$1" ]] || fail "$1 compiled"
     grep -Fq "$2" "$work_root/log" || fail "$1 reported wrongly: $(grep 'error\[' "$work_root/log")"
 }
-reject non-exhaustive "switch over Direction must be exhaustive: '.west' is not handled" \
+reject non-exhaustive "switch must be exhaustive: 'd.west' is not handled; add an arm for it or a default" \
     'enum Direction { case north, east, south, west }
-function f(let d: Direction): Int { switch d { .north | .south: return 1, .east: return 2 } }
+function f(let d: Direction): Int { switch { d.north | d.south: return 1, d.east: return 2 } }
 { return f(d: .east) }'
-reject integer-default "switch over Int<bits: 64, signed: true> must be exhaustive; add a default" \
-    'function f(let n: Int): Int { switch n { 0: return 1, < 0: return 2 } }
+reject integer-default "switch must be exhaustive; add a default" \
+    'function f(let n: Int): Int { switch { n = 0: return 1, n < 0: return 2 } }
 { return f(n: 1) }'
 reject unknown-case "Direction has no case 'up'" \
     'enum Direction { case north, south }
-function f(let d: Direction): Int { switch d { .north: return 1, .up: return 2, default: return 3 } }
+function f(let d: Direction): Int { switch { d.north: return 1, d.up: return 2, default: return 3 } }
 { return f(d: .north) }'
 reject unknown-case-value "Direction has no case 'up'" \
     'enum Direction { case north, south }
 { let d: Direction.up return 0 }'
-reject duplicate-case "this pattern is already handled by earlier arms" \
+reject duplicate-case "this condition is already handled by earlier arms" \
     'enum Direction { case north, south }
-function f(let d: Direction): Int { switch d { .north: return 1, .south | .north: return 2 } }
+function f(let d: Direction): Int { switch { d.north: return 1, d.south | d.north: return 2 } }
 { return f(d: .north) }'
 reject unreachable-default "'default' is never reached" \
-    'function f(let b: Bool): Int { switch b { .true: return 1, .false: return 0, default: return 2 } }
+    'function f(let b: Bool): Int { switch { b.true: return 1, b.false: return 0, default: return 2 } }
 { return f(b: true) }'
 reject duplicate-declaration "'north' is declared more than once in Direction" \
     'enum Direction { case north, south, north }
 { return 0 }'
 reject binding-outside "no declaration for 'n' in the loaded sources" \
     'enum Token { case value(Int), end }
-function f(let t: Token): Int { switch t { .value(let n): return n, .end: return 0 } return n }
+function f(let t: Token): Int { switch { t.value(let n): return n, t.end: return 0 } return n }
 { return f(t: .end) }'
 reject binding-outside-arm "no declaration for 'n' in the loaded sources" \
-    'function f(let o: Int?): Int { switch o { .present(let n): return n, .absent: {} } return n }
+    'function f(let o: Int?): Int { switch { o.present(let n): return n, o.absent: {} } return n }
 { return f(o: .absent) }'
-reject unshared-binding "'b' must be bound by every row of this arm" \
+reject unshared-binding "'b' is bound on one side of '|' only; both sides bind the same names" \
     'enum Pair { case one(Int), two(Int, Int) }
-function f(let p: Pair): Int { switch p { .one(let a) | .two(let a, let b): return a } }
+function f(let p: Pair): Int { switch { p.one(let a) | p.two(let a, let b): return a } }
 { return f(p: .one(1)) }'
 reject missing-payload "case 'value' carries a payload" \
     'enum Token { case value(Int), end }
 { let t: Token.value return 0 }'
-reject case-of-integer "'.present' matches an enum case, but the subject is Int<bits: 64, signed: true>" \
-    '{ let n: 3 switch n { .present(let m): return m, default: {} } return 0 }'
+reject case-of-integer "Int<bits: 64, signed: true> has no function 'present'" \
+    '{ let n: 3 switch { n.present(let m): return m, default: {} } return 0 }'
 reject break-outside "'break' is only allowed inside a loop" \
     '{ break return 0 }'
 reject continue-outside "'continue' is only allowed inside a loop" \
-    'function f(let b: Bool): Int { switch b { .true: continue, .false: return 0 } }
+    'function f(let b: Bool): Int { switch { b: continue, default: return 0 } }
 { return f(b: true) }'
 reject arm-falls-through "an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic" \
-    'function f(let n: Int): Int { let m: switch n > 0 { .true: n, .false: { @print("no") } } return m }
+    'function f(let n: Int): Int { let m: switch { n > 0: n, default: { @print("no") } } return m }
 { return f(n: 1) }'
 reject binding-in-other-arm "no declaration for 'v' in the loaded sources" \
-    'function f(let o: Int?): Int { let w: switch o { .present(let v): v, .absent: { return v } } return w }
+    'function f(let o: Int?): Int { let w: switch { o.present(let v): v, o.absent: { return v } } return w }
 { return f(o: .absent) }'
 # switch is the only selector: if, else, and guard are not Range, and arms
 # take no `case`.
@@ -316,17 +317,21 @@ reject removed-guard-let "Range has no 'guard let'; use a switch expression whos
 reject removed-guard-case "Range has no 'guard case'; use switch" \
     'function f(let o: Int?): Int { guard case .present(let n): o else { return 0 } return n }
 { return f(o: .absent) }'
-reject removed-case-arm "switch arms take no 'case'; the pattern is the arm's label" \
-    'function f(let n: Int): Int { switch n { case 0: return 1 default: return 0 } }
+# The subject forms are gone: each arm is a condition.
+reject removed-subject "expected '{' after 'switch', found 'n'" \
+    'function f(let n: Int): Int { switch n { 0: return 1, default: return 0 } }
 { return f(n: 0) }'
-reject removed-for-case "'for' takes no 'case'; write the case pattern after 'for'" \
+reject removed-subjects "expected '{' after 'switch', found 'a'" \
+    'function f(let a: Int, let b: Int): Int { switch a, b { default: return 0 } }
+{ return f(a: 0, b: 1) }'
+reject removed-for-case "expected 'in', found '.'" \
     '{ state xs: Array<Int?>() for case .present(let x) in xs { } return 0 }'
 # Arms are separated by commas, with none after the last; so are arguments.
 reject trailing-arm-comma "no ',' after the last switch arm" \
-    'function f(let b: Bool): Int { switch b { .true: return 1, .false: return 0, } }
+    'function f(let b: Bool): Int { switch { b: return 1, default: return 0, } }
 { return f(b: true) }'
-reject missing-arm-comma "expected ',' between switch arms or '}', found '.'" \
-    'function f(let b: Bool): Int { switch b { .true: { return 1 } .false: { return 0 } } }
+reject missing-arm-comma "expected ',' between switch arms or '}', found 'default'" \
+    'function f(let b: Bool): Int { switch { b: { return 1 } default: { return 0 } } }
 { return f(b: true) }'
 reject trailing-argument-comma "no ',' after the last of the arguments" \
     'function f(let a: Int, let b: Int): Int { return a }
@@ -334,23 +339,11 @@ reject trailing-argument-comma "no ',' after the last of the arguments" \
 reject missing-argument-comma "expected ',' between arguments or ')', found 'b'" \
     'function f(let a: Int, let b: Int): Int { return a }
 { return f(a: 1 b: 2) }'
-# A label is a case with a leading dot, a literal, _, let, or a relation.
-reject bare-name-label "a bare name is not a label: write .north for a case of the subject's type, or '= north' to compare with a value" \
-    'enum Direction { case north, south }
-function f(let d: Direction): Int { switch d { north: return 1, default: return 0 } }
-{ return f(d: .north) }'
-reject type-name-label "a label does not start with a name: write .case for a case of the subject's type" \
-    'enum Direction { case north, south }
-function f(let d: Direction): Int { switch d { Direction.north: return 1, default: return 0 } }
-{ return f(d: .north) }'
-reject bool-literal-label "a Bool case is written .true; a label without a dot is a literal to compare" \
-    'function f(let b: Bool): Int { switch b { true: return 1, false: return 0 } }
-{ return f(b: true) }'
 reject declaration-arm "'let' is not an arm body by itself; write the arm as a block, { let … }" \
-    'function f(let b: Bool): Int { switch b { .true: let x: 1, .false: {} } return 0 }
+    'function f(let b: Bool): Int { switch { b: let x: 1, default: {} } return 0 }
 { return f(b: true) }'
 reject default-not-last "'default' must be the last arm of a switch" \
-    'function f(let n: Int): Int { switch n { default: return 0, 1: return 1 } }
+    'function f(let n: Int): Int { switch { default: return 0, n = 1: return 1 } }
 { return f(n: 1) }'
 # An enum value has one spelling: Type.case, or .case in context.
 reject case-construction "an enum value is written Direction.north, or .north where the context names its type; Direction(.north) is not Range" \
@@ -362,20 +355,20 @@ reject optional-value-construction "an enum is not constructed: write Int?.prese
     '{ let n: Int?(5) return 0 }'
 # A switch expression's arms yield one type, or diverge.
 reject empty-arm-in-expression "'{}' does nothing, so it is not an arm of a switch expression" \
-    'function f(let b: Bool): Int { return switch b { .true: 1, .false: {} } }
+    'function f(let b: Bool): Int { return switch { b: 1, default: {} } }
 { return f(b: true) }'
 reject mismatched-arms "the arms of a switch expression yield one type; this arm yields Bool, an earlier one Int<bits: 64, signed: true>" \
-    'function f(let b: Bool): Int { let v: switch b { .true: 1, .false: false } return 0 }
+    'function f(let b: Bool): Int { let v: switch { b: 1, default: false } return 0 }
 { return f(b: true) }'
 reject assignment-in-expression "an assignment yields no value; an arm of a switch expression yields its value or diverges" \
-    'function f(let b: Bool): Int { state x: 0 let v: switch b { .true: x: 1, .false: 2 } return v }
+    'function f(let b: Bool): Int { state x: 0 let v: switch { b: x: 1, default: 2 } return v }
 { return f(b: true) }'
 reject no-arm-yields "no arm of this switch expression yields a value" \
-    'function f(let b: Bool): Int { let v: switch b { .true: { return 1 }, .false: { return 2 } } return 0 }
+    'function f(let b: Bool): Int { let v: switch { b: { return 1 }, default: { return 2 } } return 0 }
 { return f(b: true) }'
-reject non-exhaustive-expression "switch over Light must be exhaustive: '.green' is not handled" \
+reject non-exhaustive-expression "switch must be exhaustive: 'l.green' is not handled; add an arm for it or a default" \
     'enum Light { case red, green }
-function f(let l: Light): Int { return switch l { .red: 1 } }
+function f(let l: Light): Int { return switch { l.red: 1 } }
 { return f(l: .red) }'
 # A case read off a value is a Bool; its `let` binds only where an arm or
 # a for filter receives the name, and an enum's cases and members never
@@ -527,19 +520,19 @@ raw='construct Raw { @many state slots: Int }
 construct Bag { let items: Raw }'
 reject uncomparable-field "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare" \
     "$raw
-{ let a: Bag(items: Raw()) switch a = a { .true: return 1, .false: {} } return 0 }"
+{ let a: Bag(items: Raw()) switch { a = a: return 1, default: {} } return 0 }"
 reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case 'at' is Bag, and field 'items' is Raw" \
     "$raw
 enum Place { case at(Bag), nowhere }
-function f(let p: Place): Int { switch p { .nowhere: return 0, default: return 1 } }
-{ let p: Place.nowhere switch p = .nowhere { .true: return 1, .false: {} } return 0 }"
+function f(let p: Place): Int { switch { p.nowhere: return 0, default: return 1 } }
+{ let p: Place.nowhere switch { p = .nowhere: return 1, default: {} } return 0 }"
 reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Pair<Value: Bag>)" \
     "$raw
 construct Pair<Value> { let first: Value  let second: Value  function same(): Bool { return first = second } }
-{ let a: Bag(items: Raw()) switch Pair<Bag>(first: a, second: a).same() { .true: return 1, .false: {} } return 0 }"
+{ let a: Bag(items: Raw()) switch { Pair<Bag>(first: a, second: a).same(): return 1, default: {} } return 0 }"
 reject uncomparable-element "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Array<Element: Bag>)" \
     "$raw
-{ state xs: Array<Bag>() switch xs = xs { .true: return 1, .false: {} } return 0 }"
+{ state xs: Array<Bag>() switch { xs = xs: return 1, default: {} } return 0 }"
 # Demand-driven: an Array's equals, and its element's '=', exist only when
 # such arrays are compared, so an array of an uncomparable type compiles.
 run uncompared-element 7 "" "$(case_file uncompared-element "$raw
@@ -568,7 +561,7 @@ enum Bad { case one, two  function equals(let other: Bool): Bool { return true }
 # One way to define equality: a type never writes '=' itself.
 reject user-equality "Own declares '=' itself; apply @equatable and declare 'function equals(let other: Own): Bool' instead" \
     'construct Own { let n: Int  function =(let other: Own): Bool { return true } }
-{ switch Own(n: 1) = Own(n: 2) { .true: return 1, .false: {} } return 0 }'
+{ switch { Own(n: 1) = Own(n: 2): return 1, default: {} } return 0 }'
 reject user-equality-extension "Own declares '=' itself; apply @equatable and declare 'function equals(let other: Own): Bool' instead" \
     'enum Own { case one, two }
 extension Own { function =(let other: Own): Bool { return true } }
@@ -579,13 +572,13 @@ reject top-level-equality "'=' must be declared on the type it compares, in the 
 # Every other operator is the function its left operand's type declares.
 reject undeclared-operator "'<' is not declared on Point" \
     'construct Point { let x: Int }
-{ switch Point(x: 1) < Point(x: 2) { .true: return 1, .false: {} } return 0 }'
+{ switch { Point(x: 1) < Point(x: 2): return 1, default: {} } return 0 }'
 reject undeclared-prefix "'-' is not declared on Point" \
     'construct Point { let x: Int }
 { let p: -Point(x: 1) return 0 }'
 reject undeclared-relation "'<' is not declared on Point" \
     'construct Point { let x: Int }
-function f(let p: Point): Int { switch p { < Point(x: 0): return 1, default: return 0 } }
+function f(let p: Point): Int { switch { p < Point(x: 0): return 1, default: return 0 } }
 { return f(p: Point(x: 1)) }'
 reject mixed-widths "operator '+' requires matching types; found Int<bits: 8, signed: true> and Int<bits: 64, signed: true>" \
     'function f(let a: Int<bits: 8>, let b: Int): Int<bits: 8> { return a + b }
@@ -611,93 +604,65 @@ reject duplicate-function "ambiguous: g is declared twice with the same signatur
 function g(let y: Int<bits: 8>): Int { return 2 }
 function g(let x: Int<bits: 8>): Int { return 3 }
 { return g(x: 1) }'
-# Range has no self: members are bare names, and an enum's name is its value
-# only as a subject inside its own functions.
+# Range has no self: members are bare names, and a bare case name tests the
+# current value only inside its own enum's functions.
 reject self-rejected "Range has no self; use member names, or the enum's name as a switch subject" \
     'construct Counter { let n: Int  function get(): Int { return self.n } }
 { return 0 }'
-reject subject-outside-enum "'Direction' names a type; as a subject it is the current value only inside Direction's own functions" \
+reject case-outside-enum "no declaration for 'north' in the loaded sources" \
     'enum Direction { case north, south }
-function f(): Int { switch Direction { .north: return 1, default: return 0 } }
+function f(): Int { switch { north: return 1, default: return 0 } }
 { return f() }'
-reject subject-other-enum "'Light' names a type; as a subject it is the current value only inside Light's own functions" \
+reject case-other-enum "no declaration for 'on' in the loaded sources" \
     'enum Light { case on, off
-    enum Color { case red  function f(): Int { switch Light { .on: return 1, default: return 0 } } } }
+    enum Color { case red  function f(): Int { switch { on: return 1, default: return 0 } } } }
 { return 0 }'
 # Equality is a single `=`; `==` is never an alternative spelling.
-reject double-equals "double-equals.range:1:21: use '=' for equality" \
-    '{ let a: 1 switch a == 1 { .true: return 1, .false: {} } return 0 }'
-reject double-equals-pattern "double-equals-pattern.range:1:42: use '=' for equality" \
-    'function f(let n: Int): Int { switch n { == 1: return 1, default: return 0 } }
-{ return f(n: 1) }'
-# A label row is one pattern per subject joined by `&`, then its conditions.
+reject double-equals "double-equals.range:1:23: use '=' for equality" \
+    '{ let a: 1 switch { a == 1: return 1, default: {} } return 0 }'
+# Case tests on several subjects are checked as a table of their combinations;
+# a guard narrows its arm, which then covers nothing after it.
 power='enum Power { case on, off }'
-reject row-width "this switch has 2 subjects, so a row is 2 patterns joined by '&', one per subject in order; this row has 1" \
+reject combinations "switch must be exhaustive: 'p.on & q.off' is not handled; add an arm for it or a default" \
     "$power
-enum Direction { case north, south }
-function f(let d: Direction, let p: Power): Int { switch d, p { .north | .south & .on: return 1, default: return 0 } }
-{ return f(d: .north, p: .on) }"
-reject row-width-single "this switch has one subject, so a row is one pattern; this row has 2" \
-    "$power
-function f(let p: Power): Int { switch p { .on & .off: return 1, default: return 0 } }
-{ return f(p: .on) }"
-reject condition-first "a row's conditions come after its patterns" \
-    "$power
-function f(let p: Power, let q: Power, let ready: Bool): Int { switch p, q { .on & ready & .off: return 1, default: return 0 } }
-{ return f(p: .on, q: .on, ready: true) }"
-reject condition-only "this row has no pattern; a condition follows its row's patterns" \
-    'function f(let n: Int): Int { switch n { n > 3: return 1, default: return 0 } }
-{ return f(n: 1) }'
-reject combinations "switch over Power, Power must be exhaustive: '.on & .off' is not handled; add that combination or a default" \
-    "$power
-function f(let p: Power, let q: Power): Int { switch p, q { .on & .on: return 1, .off & _: return 0 } }
+function f(let p: Power, let q: Power): Int { switch { p.on & q.on: return 1, p.off: return 0 } }
 { return f(p: .on, q: .on) }"
-reject guarded-combinations "switch over Power, Power must be exhaustive: '.on & .on', '.on & .off' are not handled; add those combinations" \
+reject guarded-combinations "switch must be exhaustive: 'p.on & q.off' is not handled; add an arm for it or a default" \
     "$power
-function f(let p: Power, let q: Power, let ready: Bool): Int { switch p, q { .on & _ & ready: return 1, .off & _: return 0 } }
+function f(let p: Power, let q: Power, let ready: Bool): Int { switch { p.on & ready & q.off: return 1, p.on & q.on: return 2, p.off: return 0 } }
 { return f(p: .on, q: .on, ready: true) }"
-reject handled-row "this row is already handled by earlier arms" \
+reject handled-row "this condition is already handled by earlier arms" \
     "$power
-function f(let p: Power, let q: Power): Int { switch p, q { _ & .on: return 1, .off & .on: return 2, default: return 0 } }
+function f(let p: Power, let q: Power): Int { switch { q.on: return 1, p.off & q.on: return 2, default: return 0 } }
 { return f(p: .on, q: .on) }"
 reject unreachable-default-rows "'default' is never reached: the arms above match every value" \
     "$power
-function f(let p: Power, let q: Power): Int { switch p, q { .on & _: return 1, .off & _: return 2, default: return 0 } }
+function f(let p: Power, let q: Power): Int { switch { p.on: return 1, p.off: return 2, default: return 0 } }
 { return f(p: .on, q: .on) }"
-reject bound-twice-row "'x' is bound twice in one row" \
-    'function f(let a: Int?, let b: Int?): Int { switch a, b { .present(let x) & .present(let x): return x, default: return 0 } }
-{ return f(a: .absent, b: .absent) }'
-reject shared-binding-type "a binding shared by the rows of an arm requires Int<bits: 64, signed: true>; found String" \
-    'enum Token { case number(Int), word(String) }
-function f(let t: Token): Int { switch t { .number(let v) | .word(let v): return 1 } }
-{ return f(t: .number(1)) }'
 reject condition-other-arm "no declaration for 'x' in the loaded sources" \
-    'function f(let o: Int?): Int { switch o { .present(let x): return x, .absent & x > 0: return 1, .absent: return 0 } }
+    'function f(let o: Int?): Int { switch { o.present(let x): return x, o.absent & x > 0: return 1, o.absent: return 0 } }
 { return f(o: .absent) }'
 reject condition-type "condition requires Bool; found Int<bits: 64, signed: true>" \
-    'function f(let o: Int?): Int { switch o { .present(let x) & x + 1: return x, default: return 0 } }
-{ return f(o: .absent) }'
-reject subject-trailing-comma "no ',' after the last subject of a switch" \
-    'function f(let a: Bool): Int { switch a, { .true: return 1, .false: return 0 } }
-{ return f(a: true) }'
-# `where` is not Range: a condition joins its row with `&`.
-reject where-arm "Range has no 'where'; join a condition to the row with '&', e.g. .present(let x) & x > 3: …" \
-    'function f(let o: Int?): Int { switch o { .present(let x) where x > 3: return x, default: return 0 } }
+    'function f(let n: Int): Int { switch { n + 1: return n, default: return 0 } }
+{ return f(n: 1) }'
+# `where` is not Range: a condition joins its parts with `&`.
+reject where-arm "expected ':', found 'where'" \
+    'function f(let o: Int?): Int { switch { o.present(let x) where x > 3: return x, default: return 0 } }
 { return f(o: .absent) }'
 reject where-for "Range has no 'where'; filter with '&', e.g. for x in xs & x > 3 { … }" \
     '{ state n: 0  for x in 0..<5 where x > 2 { n: n + x } return n }'
 reject for-or "a for-in condition joins comparisons with '&'; parenthesize an or" \
     '{ state n: 0  for x in 0..<5 & x > 3 | x < 1 { n: n + x } return n }'
 # One symbol per gate: `&` and `|`; `&&` and `||` are not Range.
-reject double-and "double-and.range:1:24: Range has no '&&'; use '&' for and" \
-    '{ let a: true switch a && true { .true: return 1, .false: {} } return 0 }'
-reject double-or "double-or.range:1:24: Range has no '||'; use '|' for or" \
-    '{ let a: true switch a || true { .true: return 1, .false: {} } return 0 }'
-# `&` and `|` are reserved for Bool logic and switch patterns.
-reject declared-and "'&' is reserved for Bool logic and switch patterns; Flags cannot declare it" \
+reject double-and "double-and.range:1:26: Range has no '&&'; use '&' for and" \
+    '{ let a: true switch { a && true: return 1, default: {} } return 0 }'
+reject double-or "double-or.range:1:26: Range has no '||'; use '|' for or" \
+    '{ let a: true switch { a || true: return 1, default: {} } return 0 }'
+# `&` and `|` are reserved for Bool logic.
+reject declared-and "'&' is reserved for Bool logic; Flags cannot declare it" \
     'construct Flags { let bits: Int  function &(let other: Flags): Flags { return Flags(bits: bits) } }
 { return 0 }'
-reject declared-builtin-or "'|' is reserved for Bool logic and switch patterns; Mode cannot declare it" \
+reject declared-builtin-or "'|' is reserved for Bool logic; Mode cannot declare it" \
     'enum Mode { case a, b }
 extension Mode { @builtin function |(let other: Mode): Mode }
 { return 0 }'
@@ -705,15 +670,15 @@ extension Mode { @builtin function |(let other: Mode): Mode }
 reject comparison-statement "comparison-statement.range:1:25: a comparison is not a statement; did you mean 'count: …' to assign?" \
     '{ state count: 0  count = count + 1 return count }'
 reject comparison-arm "a comparison is not a statement; did you mean 'm: …' to assign?" \
-    'function f(let n: Int): Int { state m: n  switch n { 0: m < 1, default: {} } return m }
+    'function f(let n: Int): Int { state m: n  switch { n = 0: m < 1, default: {} } return m }
 { return f(n: 1) }'
 # Equality code is emitted on demand: only for the types a program compares
 # (here Point), never for types it only declares or constructs.
 text_size() { size -m "$1" | awk '/Section __text:/ { print $3 }'; }
 base='construct Point { let x: Int  let y: Int }
 function make(let n: Int): Point { return Point(x: n, y: n) }'
-compare='{ let p: make(n: 1) let q: make(n: 2) switch p = q { .true: return 1, .false: {} } return 0 }'
-ignore='{ let p: make(n: 1) let q: make(n: 2) switch p.x = q.x { .true: return 1, .false: {} } return 0 }'
+compare='{ let p: make(n: 1) let q: make(n: 2) switch { p = q: return 1, default: {} } return 0 }'
+ignore='{ let p: make(n: 1) let q: make(n: 2) switch { p.x = q.x: return 1, default: {} } return 0 }'
 unused='construct Unused { let a: Int  let b: Point }
 enum Shape { case dot(Point), line(Point, Point), none }
 @equatable
@@ -739,11 +704,11 @@ loose_size="$(text_size "$work_root/demand-loose")"; ignored_size="$(text_size "
 # Generic functions: a body is checked per instantiation, which the error names.
 reject generic-operation "'+' is not declared on Bool; in sum<T: Bool>, specialized at" \
     'function sum<T>(let a: T, let b: T): T { return a + b }
-{ switch sum(a: true, b: false) { .true: return 1, .false: {} } return sum(a: 1, b: 2) }'
+{ switch { sum(a: true, b: false): return 1, default: {} } return sum(a: 1, b: 2) }'
 reject generic-equality "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare; in same<T: Bag>" \
     "$raw
 function same<T>(let a: T, let b: T): Bool { return a = b }
-{ let b: Bag(items: Raw()) switch same(a: b, b: b) { .true: return 1, .false: {} } return 0 }"
+{ let b: Bag(items: Raw()) switch { same(a: b, b: b): return 1, default: {} } return 0 }"
 reject generic-uninferred "cannot infer type parameter Value of 'nothing'; write it, as in nothing<…>(…)" \
     'function nothing<Value>(): Value? { return .absent }
 { let x: nothing() return 0 }'
@@ -901,7 +866,7 @@ reject type-mismatch "argument 'value' of 'f' requires Bool; found Int<bits: 64,
     'function f(let value: Bool): Int { return 1 }
 { return f(value: 3) }'
 reject undefined-unreached "no declaration for 'missing' in the loaded sources" \
-    '{ switch false { .true: return missing(value: 1), .false: {} } return 0 }'
+    '{ switch { false: return missing(value: 1), default: {} } return 0 }'
 reject unknown-reference "no declaration for 'missing' in the loaded sources" '{ let user: missing return 0 }'
 reject union-type "union types are not part of Range; declare an enum with one case per alternative" \
     'function f(let value: Int | Bool): Int { return 1 }
@@ -924,7 +889,7 @@ core=("${full[@]}")
 # A macro reads a reflection element's name as its own field; compiled code
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
-    '{ state xs: Array<Int>() xs.append(value: 3) switch xs.first(named: "a") { .absent: return 0, .present(let v): return v } }'
+    '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
 # @defaults written through an extension reaches every declaration of its
 # kind. The language's Enum already writes @defaults, so this grammar kind is
 # the project's own, without one.
@@ -946,4 +911,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=61 rejections=187 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=61 rejections=177 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

@@ -9,9 +9,9 @@
 
 /* Binary operator precedence, loosest first: `|` (or), `&` (and), the
  * comparisons, `..<`, then arithmetic; the prefix `!` and `-` bind tightest.
- * Parentheses only override it. Switch labels join patterns and conditions
- * with the same `&` and `|`, in the same order. As in Swift, `..<` forms an
- * interval below arithmetic and above comparison, and does not chain. */
+ * Parentheses only override it. A switch arm's condition joins its case
+ * tests with the same `&` and `|`. `..<` forms an interval below arithmetic
+ * and above comparison, and does not chain. */
 static const char *const RANGE_PRECEDENCE[][7] = {
     {"|", NULL},
     {"&", NULL},
@@ -22,8 +22,8 @@ static const char *const RANGE_PRECEDENCE[][7] = {
 };
 #define RANGE_PRECEDENCE_LEVELS \
     ((int)(sizeof(RANGE_PRECEDENCE) / sizeof(RANGE_PRECEDENCE[0])))
-/* The level of the comparisons, of `..<`, and of arithmetic: a pattern's
- * value is arithmetic, and a condition in a switch label a comparison. */
+/* The level of the comparisons, of `..<`, and of arithmetic: each part of
+ * a for filter's condition is a comparison. */
 #define RANGE_COMPARISON_LEVEL 2
 #define RANGE_INTERVAL_LEVEL 3
 #define RANGE_ARITHMETIC_LEVEL 4
@@ -557,7 +557,22 @@ static int startsGenericArguments(RangeParser *parser)
     RangeParser probe = *parser;
     parserAdvance(&probe);
     if (parserAt(&probe, ">")) return 1;
-    if (probe.current.kind == RangeTokenName && rangeTokenIs(parserPeek(&probe), ":")) return 1;
+    if (probe.current.kind == RangeTokenName && rangeTokenIs(parserPeek(&probe), ":")) {
+        // `f<size: 3>(…)` and `Int<bits: 8>.max`; a switch arm's `at < count:`
+        // is a comparison: its `<` closes no list before the arm's body.
+        int depth = 1;
+        while (depth > 0) {
+            if (parserAt(&probe, "<")) ++depth;
+            else if (parserAt(&probe, ">")) --depth;
+            else if (parserAt(&probe, "{") || parserAt(&probe, "}") || parserAt(&probe, "return")
+                     || parserAt(&probe, "break") || parserAt(&probe, "continue") || parserAt(&probe, "@")
+                     || probe.current.kind == RangeTokenEnd) return 0;
+            parserAdvance(&probe);
+            if (probe.failed) return 0;
+        }
+        return parserAt(&probe, "(") || parserAt(&probe, ".") || parserAt(&probe, ">") || parserAt(&probe, ",")
+            || parserAt(&probe, ")") || parserAt(&probe, "?");
+    }
     // Positional arguments, as in `Array<Int>()`: as in Swift, `<` opens a
     // generic list when a matching `>` follows with only type-like tokens
     // inside and `(` or `.` after it; otherwise it is a comparison.
@@ -874,98 +889,6 @@ static RangeNode *parseExpression(RangeParser *parser, int level)
     return left;
 }
 
-/* ---- patterns -------------------------------------------------------- */
-
-static const char *const RANGE_RELATIONS[] = {"<", ">", "<=", ">=", "=", "!=", NULL};
-
-/* An arm's label, and each payload sub-pattern of a case:
- *   _                 any value
- *   let name          any value, bound to name: a Let collected into `bindings`
- *   .case, .case(…)   a case of the subject's type; one sub-pattern per payload field
- *   200, -1, "quit"   a literal, compared with `=`
- *   < 0, = limit      the subject type's operator applied with the operand
- * A label never starts with a name: `.name` is a case, and `= name` compares
- * with a value. */
-static RangeNode *parsePattern(RangeParser *parser, RangeNode *bindings)
-{
-    if (parser->failed) return NULL;
-    RangeNode *pattern = parserNode(parser, RangeNodePattern);
-    if (parserAt(parser, "_")) {
-        parserAdvance(parser);
-        pattern->integer = RangePatternAny;
-        return pattern;
-    }
-    if (parserAt(parser, "let")) {
-        parserAdvance(parser);
-        RangeNode *binding = parserNode(parser, RangeNodeLet);
-        binding->name = parserExpectName(parser);
-        pattern->integer = RangePatternBind;
-        pattern->a = binding;
-        rangeNodeAppend(parser->arena, bindings, binding);
-        return pattern;
-    }
-    for (size_t i = 0; RANGE_RELATIONS[i]; ++i)
-        if (parserAt(parser, RANGE_RELATIONS[i])) {
-            pattern->integer = RangePatternRelation;
-            pattern->name = RANGE_RELATIONS[i];
-            parserAdvance(parser);
-            pattern->a = parseExpression(parser, RANGE_ARITHMETIC_LEVEL);
-            return pattern;
-        }
-    if (parserAt(parser, ".")) {
-        pattern->integer = RangePatternCase;
-        parserAdvance(parser);
-        pattern->name = parserExpectName(parser);
-        if (parserAt(parser, "(")) {
-            pattern->flags |= RangeFlagApplication;
-            parserAdvance(parser);
-            while (!parser->failed && !parserAt(parser, ")")) {
-                RangeNode *argument = parserNode(parser, RangeNodeArgument);
-                if (parser->current.kind == RangeTokenName && rangeTokenIs(parserPeek(parser), ":")) {
-                    argument->name = parserExpectName(parser);
-                    parserExpect(parser, ":");
-                }
-                argument->a = parsePattern(parser, bindings);
-                rangeNodeAppend(parser->arena, pattern, argument);
-                parseSeparator(parser, ")", "payload patterns");
-            }
-            parserExpect(parser, ")");
-        }
-        return pattern;
-    }
-    const RangeToken *token = &parser->current;
-    if (parserAt(parser, "true") || parserAt(parser, "false")) {
-        parserFail(parser, token, "a Bool case is written .%.*s; a label without a dot is a literal to compare",
-                   (int)token->length, token->text);
-        return NULL;
-    }
-    if (token->kind == RangeTokenName) {
-        if (rangeTokenIs(parserPeek(parser), "."))
-            parserFail(parser, token, "a label does not start with a name: write .case for a case of the subject's type, "
-                       "without the type, or '= %.*s…' to compare with a value", (int)token->length, token->text);
-        else
-            parserFail(parser, token, "a bare name is not a label: write .%.*s for a case of the subject's type, "
-                       "or '= %.*s' to compare with a value", (int)token->length, token->text, (int)token->length, token->text);
-        return NULL;
-    }
-    if (token->kind == RangeTokenInteger || token->kind == RangeTokenString) {
-        pattern->integer = RangePatternValue;
-        pattern->a = parsePrimary(parser);
-        return pattern;
-    }
-    if (parserAt(parser, "-") && parserPeek(parser)->kind == RangeTokenInteger) {
-        pattern->integer = RangePatternValue;
-        pattern->a = parserNode(parser, RangeNodeUnary);
-        pattern->a->name = "-";
-        parserAdvance(parser);
-        pattern->a->a = parsePrimary(parser);
-        return pattern;
-    }
-    parserFail(parser, token, "expected a switch label: .case, a literal, _, let name, or a relation such as < 0 or = value; found '%.*s'",
-               (int)token->length, token->text);
-    return NULL;
-}
-
 /* ---- statements ------------------------------------------------------ */
 
 /* A comparison computes a Bool and changes nothing, so it is not a statement:
@@ -1059,237 +982,6 @@ static void parseArm(RangeParser *parser, RangeNode *entry, int value)
     RangeNode *statement = parserNode(parser, RangeNodeExpressionStatement);
     statement->a = expression;
     rangeNodeAppend(parser->arena, body, statement);
-}
-
-/* ---- switch labels ---------------------------------------------------
- * A label is boolean algebra over patterns and conditions, with the
- * precedence of expressions: `&` binds tighter than `|`, and parentheses
- * group. It is read once into its rows, the alternatives `|` joins after
- * `&` is distributed over them:
- *
- *   .on & .on | .off & .off            two rows
- *   (.north | .south) & .on            two rows: .north & .on, .south & .on
- *   (.a & .x | .b & .y) & ready        two rows, each ending in the condition
- *
- * Each item of a row is a pattern (it starts with `.`, `_`, `let`, a number or
- * string literal, or a relation such as `< 0` or `= x`) or a condition
- * (anything else: a name, `!`, `true`, or a parenthesized expression). A row is one pattern per
- * subject, in order, then its conditions. Every row is parsed again from its
- * items' source, so rows share no nodes: each has its own bindings, and its
- * conditions see only them. */
-
-typedef struct { RangeParser at; int condition; } LabelItem;
-typedef struct { size_t *items; size_t count; } LabelRow;
-typedef struct { LabelRow *rows; size_t count; } LabelRows;
-typedef struct { LabelItem *items; size_t count, capacity; } LabelItems;
-
-#define RANGE_LABEL_ROWS 256
-
-static int startsPattern(RangeParser *parser)
-{
-    if (parser->failed) return 0;
-    static const char *const starts[] = {".", "_", "let", "<", ">", "<=", ">=", "=", "!=", NULL};
-    for (size_t i = 0; starts[i]; ++i) if (parserAt(parser, starts[i])) return 1;
-    if (parser->current.kind == RangeTokenInteger || parser->current.kind == RangeTokenString) return 1;
-    return parserAt(parser, "-") && parserPeek(parser)->kind == RangeTokenInteger;
-}
-
-static void labelRowsFree(LabelRows *rows)
-{
-    for (size_t i = 0; i < rows->count; ++i) free(rows->rows[i].items);
-    free(rows->rows);
-    rows->rows = NULL;
-    rows->count = 0;
-}
-
-static LabelRows parseLabelOr(RangeParser *parser, LabelItems *items);
-
-static LabelRows parseLabelUnit(RangeParser *parser, LabelItems *items)
-{
-    LabelRows result = {0};
-    if (parser->failed) return result;
-    if (parserAt(parser, "(")) {
-        RangeParser probe = *parser;
-        parserAdvance(&probe);
-        if (startsPattern(&probe)) {
-            /* A group of patterns, as in (.north | .south) & .on. */
-            parserAdvance(parser);
-            result = parseLabelOr(parser, items);
-            parserExpect(parser, ")");
-            return result;
-        }
-    }
-    LabelItem item = {.at=*parser, .condition=!startsPattern(parser)};
-    if (item.condition) {
-        if (parserAt(parser, "where")) {
-            parserFail(parser, &parser->current, "Range has no 'where'; join a condition to the row with '&', "
-                       "e.g. .present(let x) & x > 3: …");
-            return result;
-        }
-        (void)parseExpression(parser, RANGE_COMPARISON_LEVEL);
-    } else {
-        RangeNode *bindings = parserNode(parser, RangeNodeBlock);
-        (void)parsePattern(parser, bindings);
-    }
-    if (parser->failed) return result;
-    if (items->count == items->capacity) {
-        items->capacity = items->capacity ? items->capacity * 2 : 8;
-        items->items = realloc(items->items, items->capacity * sizeof(*items->items));
-    }
-    items->items[items->count] = item;
-    result.rows = malloc(sizeof(*result.rows));
-    result.rows[0].items = malloc(sizeof(size_t));
-    result.rows[0].items[0] = items->count++;
-    result.rows[0].count = 1;
-    result.count = 1;
-    return result;
-}
-
-static LabelRows parseLabelAnd(RangeParser *parser, LabelItems *items)
-{
-    LabelRows left = parseLabelUnit(parser, items);
-    while (!parser->failed && parserAt(parser, "&")) {
-        RangeToken at = parser->current;
-        parserAdvance(parser);
-        LabelRows right = parseLabelUnit(parser, items);
-        if (left.count * right.count > RANGE_LABEL_ROWS) {
-            parserFail(parser, &at, "this label has more than %d rows; split it into several arms", RANGE_LABEL_ROWS);
-            labelRowsFree(&right);
-            break;
-        }
-        /* `&` distributes: every left row continues with every right row. */
-        LabelRows product = {.rows=malloc((left.count * right.count + 1) * sizeof(*product.rows))};
-        for (size_t i = 0; i < left.count; ++i)
-            for (size_t j = 0; j < right.count; ++j) {
-                LabelRow *row = &product.rows[product.count++];
-                row->count = left.rows[i].count + right.rows[j].count;
-                row->items = malloc(row->count * sizeof(size_t));
-                memcpy(row->items, left.rows[i].items, left.rows[i].count * sizeof(size_t));
-                memcpy(row->items + left.rows[i].count, right.rows[j].items, right.rows[j].count * sizeof(size_t));
-            }
-        labelRowsFree(&left);
-        labelRowsFree(&right);
-        left = product;
-    }
-    return left;
-}
-
-static LabelRows parseLabelOr(RangeParser *parser, LabelItems *items)
-{
-    LabelRows rows = parseLabelAnd(parser, items);
-    while (!parser->failed && parserAt(parser, "|")) {
-        RangeToken at = parser->current;
-        parserAdvance(parser);
-        LabelRows more = parseLabelAnd(parser, items);
-        if (rows.count + more.count > RANGE_LABEL_ROWS) {
-            parserFail(parser, &at, "this label has more than %d rows; split it into several arms", RANGE_LABEL_ROWS);
-            labelRowsFree(&more);
-            break;
-        }
-        rows.rows = realloc(rows.rows, (rows.count + more.count) * sizeof(*rows.rows));
-        memcpy(rows.rows + rows.count, more.rows, more.count * sizeof(*more.rows));
-        rows.count += more.count;
-        free(more.rows);
-    }
-    return rows;
-}
-
-/* Parses the item again from where it starts, into fresh nodes. */
-static RangeNode *parseLabelItem(RangeParser *parser, const LabelItem *item, RangeNode *bindings)
-{
-    RangeParser again = item->at;
-    RangeNode *node = item->condition ? parseExpression(&again, RANGE_COMPARISON_LEVEL) : parsePattern(&again, bindings);
-    if (again.failed && !parser->failed) {
-        snprintf(parser->error, sizeof(parser->error), "%s", again.error);
-        parser->failed = 1;
-    }
-    return parser->failed ? NULL : node;
-}
-
-/* Conditions joined by `&`, the Bool operator. */
-static RangeNode *joinConditions(RangeParser *parser, RangeNode *left, RangeNode *right)
-{
-    if (!left || !right) return right ? right : left;
-    RangeNode *both = rangeNodeCreate(parser->arena, RangeNodeBinary, right->path, right->line, right->column);
-    both->name = "&";
-    both->a = left;
-    both->b = right;
-    return both;
-}
-
-/* One row of a label: a pattern per subject, joined by `&` in subject order,
- * then the row's conditions; a switch over one subject has the pattern
- * itself as its row. Its b is the row's condition, c its bindings. */
-static RangeNode *parseLabelRow(RangeParser *parser, const LabelItems *items, const LabelRow *row, size_t subjects)
-{
-    const RangeToken *first = &items->items[row->items[0]].at.current;
-    RangeNode *bindings = rangeNodeCreate(parser->arena, RangeNodeBlock, parser->path, first->line, first->column);
-    bindings->name = "bindings";
-    RangeNode *patterns = rangeNodeCreate(parser->arena, RangeNodePattern, parser->path, first->line, first->column);
-    patterns->integer = RangePatternRow;
-    RangeNode *condition = NULL;
-    for (size_t i = 0; i < row->count && !parser->failed; ++i) {
-        const LabelItem *item = &items->items[row->items[i]];
-        if (!item->condition && condition) {
-            parserFail(parser, &item->at.current, "a row's conditions come after its patterns; "
-                       "write the patterns, one per subject, then '&' and the condition");
-            return NULL;
-        }
-        RangeNode *node = parseLabelItem(parser, item, bindings);
-        if (!node) return NULL;
-        if (item->condition) condition = joinConditions(parser, condition, node);
-        else rangeNodeAppend(parser->arena, patterns, node);
-    }
-    if (parser->failed) return NULL;
-    if (patterns->itemCount != subjects) {
-        const LabelItem *item = &items->items[row->items[0]];
-        if (!patterns->itemCount && item->condition && condition && condition->kind == RangeNodeBool)
-            parserFail(parser, first, "a Bool case is written .%s; a label without a dot is a literal to compare",
-                       condition->integer ? "true" : "false");
-        else if (!patterns->itemCount && item->condition && condition && condition->kind == RangeNodeName)
-            parserFail(parser, first, "a bare name is not a label: write .%s for a case of the subject's type, "
-                       "or '= %s' to compare with a value", condition->name, condition->name);
-        else if (!patterns->itemCount && item->condition && condition
-                 && (condition->kind == RangeNodeMemberAccess || condition->kind == RangeNodeCall)) {
-            const RangeNode *path = condition;
-            while (path->a && (path->kind == RangeNodeMemberAccess || path->kind == RangeNodeCall)) path = path->a;
-            parserFail(parser, first, "a label does not start with a name: write .case for a case of the subject's type, "
-                       "without the type, or '= %s…' to compare with a value", path->kind == RangeNodeName ? path->name : "");
-        }
-        else if (!patterns->itemCount)
-            parserFail(parser, first, "this row has no pattern; a condition follows its row's patterns, e.g. .present(let x) & x > 3");
-        else if (subjects == 1)
-            parserFail(parser, first, "this switch has one subject, so a row is one pattern; this row has %zu "
-                       "('&' joins the patterns of several subjects)", patterns->itemCount);
-        else
-            parserFail(parser, first, "this switch has %zu subjects, so a row is %zu patterns joined by '&', one per subject "
-                       "in order; this row has %zu ('&' binds tighter than '|': group the alternatives of one subject "
-                       "in parentheses, e.g. (.a | .b) & _; '_' matches any value)", subjects, subjects, patterns->itemCount);
-        return NULL;
-    }
-    RangeNode *result = subjects == 1 ? patterns->items[0] : patterns;
-    result->b = condition;
-    result->c = bindings;
-    return result;
-}
-
-/* An arm's label: its rows, appended to the arm, the first one's bindings
- * the arm's (its c). */
-static void parseLabel(RangeParser *parser, RangeNode *entry, size_t subjects)
-{
-    LabelItems items = {0};
-    LabelRows rows = parseLabelOr(parser, &items);
-    if (!parser->failed && parserAt(parser, "where"))
-        parserFail(parser, &parser->current, "Range has no 'where'; join a condition to the row with '&', "
-                   "e.g. .present(let x) & x > 3: …");
-    for (size_t i = 0; i < rows.count && !parser->failed; ++i) {
-        RangeNode *row = parseLabelRow(parser, &items, &rows.rows[i], subjects);
-        if (!row) break;
-        if (!entry->c) entry->c = row->c;
-        rangeNodeAppend(parser->arena, entry, row);
-    }
-    labelRowsFree(&rows);
-    free(items.items);
 }
 
 /* ---- conditions ------------------------------------------------------
@@ -1494,69 +1186,30 @@ static RangeNode *parseConditionSwitch(RangeParser *parser, RangeNode *node, int
     return node;
 }
 
-/* `switch subject { label: body, … }`: arms are separated by `,`, with none
- * after the last. A label is `default`, which comes last, or rows joined by
- * `|`, each binding the same names (see parseLabel). As a statement the
- * switch runs its arm; as an expression (RangeFlagValue) it is the value its
- * arm yields.
- *
- * `switch a, b { … }` has several subjects, a list, not a tuple: they are the
- * switch's c, and its a is NULL. */
+/* `switch { condition: body, … }`, a statement, or with `value` an
+ * expression (RangeFlagValue), the value its arm yields. */
 static RangeNode *parseSwitch(RangeParser *parser, int value)
 {
     RangeNode *node = parserNode(parser, RangeNodeSwitch);
     if (value) node->flags |= RangeFlagValue;
     parserExpect(parser, "switch");
-    if (parserAt(parser, "{")) return parseConditionSwitch(parser, node, value);
-    parser->conditionDepth += 1;
-    node->a = parseExpression(parser, 0);
-    if (parserAt(parser, ",")) {
-        RangeNode *subjects = parserNode(parser, RangeNodeBlock);
-        subjects->name = "subjects";
-        rangeNodeAppend(parser->arena, subjects, node->a);
-        while (!parser->failed && parserAt(parser, ",")) {
-            parserAdvance(parser);
-            if (parserAt(parser, "{")) {
-                parserFail(parser, &parser->current, "no ',' after the last subject of a switch");
-                break;
-            }
-            rangeNodeAppend(parser->arena, subjects, parseExpression(parser, 0));
-        }
-        node->a = NULL;
-        node->c = subjects;
+    if (!parser->failed && !parserAt(parser, "{")) {
+        parserFail(parser, &parser->current, "expected '{' after 'switch', found '%.*s'; related: each arm of a switch "
+                   "is a condition, as in switch { phase.loading: … }", (int)parser->current.length, parser->current.text);
+        return node;
     }
-    size_t subjects = node->c ? node->c->itemCount : 1;
-    parser->conditionDepth -= 1;
-    int outerCondition = parser->conditionDepth, outerGeneric = parser->genericDepth;
-    parser->conditionDepth = 0;
-    parser->genericDepth = 0;
-    parserExpect(parser, "{");
-    while (!parser->failed && !parserAt(parser, "}") && !parserAtKind(parser, RangeTokenEnd)) {
-        RangeNode *entry = parserNode(parser, RangeNodeSwitchCase);
-        if (parserAt(parser, "case")) {
-            parserFail(parser, &parser->current, "switch arms take no 'case'; the pattern is the arm's label, e.g. .east | .west: …");
-            break;
-        }
-        if (parserAt(parser, "default") && rangeTokenIs(parserPeek(parser), ":")) {
-            parserAdvance(parser);
-            entry->flags |= RangeFlagLiteral; /* marks the default arm */
-        } else parseLabel(parser, entry, subjects);
-        parserExpect(parser, ":");
-        parseArm(parser, entry, value);
-        rangeNodeAppend(parser->arena, node, entry);
-        if (parser->failed || parserAt(parser, "}")) break;
-        if (!parserAt(parser, ",")) {
-            parserFail(parser, &parser->current, "expected ',' between switch arms or '}', found '%.*s'",
-                       (int)parser->current.length, parser->current.text);
-            break;
-        }
-        parserAdvance(parser);
-        if (parserAt(parser, "}")) parserFail(parser, &parser->current, "no ',' after the last switch arm");
-    }
-    parserExpect(parser, "}");
-    parser->conditionDepth = outerCondition;
-    parser->genericDepth = outerGeneric;
-    return node;
+    return parseConditionSwitch(parser, node, value);
+}
+
+/* Conditions joined by `&`, the Bool operator. */
+static RangeNode *joinConditions(RangeParser *parser, RangeNode *left, RangeNode *right)
+{
+    if (!left || !right) return right ? right : left;
+    RangeNode *both = rangeNodeCreate(parser->arena, RangeNodeBinary, right->path, right->line, right->column);
+    both->name = "&";
+    both->a = left;
+    both->b = right;
+    return both;
 }
 
 static RangeNode *forNode(RangeParser *parser, RangeNode *at, RangeNodeKind kind, const char *name)
@@ -1627,21 +1280,65 @@ static RangeNode *forSwitch(RangeParser *parser, RangeNode *at, RangeNode *subje
  * sequence's type once that type is known. The element binding is a let, so a
  * loop variable cannot be assigned; the position advances before the body, so
  * `continue` advances it too. */
+/* `.case` or `.case(arguments)`, whose `let` arguments bind into `bindings`. */
+static RangeNode *parseCasePattern(RangeParser *parser, RangeNode *bindings)
+{
+    RangeNode *outer = parser->bindings;
+    int negated = parser->negated;
+    parser->bindings = bindings;
+    parser->negated = 0;
+    RangeNode *test = parsePrimary(parser);
+    if (!parser->failed && parserAt(parser, "(")) {
+        RangeNode *call = parserNode(parser, RangeNodeCall);
+        call->a = test;
+        parseArgumentList(parser, call);
+        test = call;
+    }
+    parser->bindings = outer;
+    parser->negated = negated;
+    return test;
+}
+
+/* The pattern a case test's argument is: `let x` and `_` are already, a
+ * `.case(…)` tests the field in turn, and any other expression is a value
+ * the field must equal. */
+static RangeNode *forPattern(RangeParser *parser, RangeNode *value)
+{
+    if (value->kind == RangeNodePattern) return value;
+    RangeNode *pattern = rangeNodeCreate(parser->arena, RangeNodePattern, value->path, value->line, value->column);
+    RangeNode *test = value->kind == RangeNodeCall ? value->a : value;
+    if (test->kind != RangeNodeCase) {
+        pattern->integer = RangePatternValue;
+        pattern->a = value;
+        return pattern;
+    }
+    pattern->integer = RangePatternCase;
+    pattern->name = test->name;
+    if (value->kind != RangeNodeCall) return pattern;
+    pattern->flags |= RangeFlagApplication;
+    for (size_t i = 0; i < value->itemCount; ++i) {
+        RangeNode *argument = value->items[i];
+        argument->a = forPattern(parser, argument->a);
+        rangeNodeAppend(parser->arena, pattern, argument);
+    }
+    return pattern;
+}
+
 static RangeNode *parseFor(RangeParser *parser)
 {
     RangeNode *node = parserNode(parser, RangeNodeFor);
     parserExpect(parser, "for");
     RangeNode *pattern = NULL;
     const char *element = "for element";
-    if (parserAt(parser, "case")) {
-        parserFail(parser, &parser->current, "'for' takes no 'case'; write the case pattern after 'for', e.g. for .group(let items) in shapes");
-        return node;
-    }
     if (parserAt(parser, ".")) {
+        // `for .group(let items) in shapes`: the case each element must
+        // hold, its arguments the payload's patterns, as in a case test.
         RangeNode *bindings = parserNode(parser, RangeNodeBlock);
         bindings->name = "bindings";
-        pattern = parsePattern(parser, bindings);
-        if (!pattern) return node;
+        RangeNode *test = parseCasePattern(parser, bindings);
+        if (parser->failed) return node;
+        checkCondition(parser, test, bindings, 0);
+        pattern = forPattern(parser, test);
         pattern->c = bindings;
     } else if (parserAt(parser, "_")) {
         parserAdvance(parser);

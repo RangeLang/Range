@@ -18,38 +18,38 @@ construct Lexer {
 }
 
 function weigh(let t: Token): Int {
-    switch t {
-    .value(let number) & number > 100: return 100,
-    .value(let number): return number,
-    .pair(let a, let b): return a + b,
-    .word(text: _, let count): return count,
-    .end: return 0
+    switch {
+    t.value(let number) & number > 100: return 100,
+    t.value(let number): return number,
+    t.pair(let a, let b): return a + b,
+    t.word(text: _, let count): return count,
+    t.end: return 0
     }
 }
 
 function make(let n: Int): Token {
-    switch n = 0 { .true: return .end, .false: {} }
-    switch n < 0 { .true: return Token.pair(n, 3), .false: {} }
+    switch { n = 0: return .end, default: {} }
+    switch { n < 0: return Token.pair(n, 3), default: {} }
     return .value(number: n)
 }
 
 {
     let t: Token.value(number: 7)
-    switch weigh(t: t) != 7 { .true: return 1, .false: {} }
-    switch weigh(t: .value(number: 700)) != 100 { .true: return 2, .false: {} }
-    switch weigh(t: .pair(4, -2)) != 2 { .true: return 3, .false: {} }
-    switch weigh(t: Token.word(text: "hi", count: 5)) != 5 { .true: return 4, .false: {} }
-    switch weigh(t: make(n: 0)) != 0 { .true: return 5, .false: {} }
-    switch weigh(t: make(n: -10)) != -7 { .true: return 6, .false: {} }
+    switch { weigh(t: t) != 7: return 1, default: {} }
+    switch { weigh(t: .value(number: 700)) != 100: return 2, default: {} }
+    switch { weigh(t: .pair(4, -2)) != 2: return 3, default: {} }
+    switch { weigh(t: Token.word(text: "hi", count: 5)) != 5: return 4, default: {} }
+    switch { weigh(t: make(n: 0)) != 0: return 5, default: {} }
+    switch { weigh(t: make(n: -10)) != -7: return 6, default: {} }
     state lexer: Lexer()
     lexer.push(token: make(n: 9))
     lexer.push(token: .word(text: "x", count: 2))
-    switch weigh(t: lexer.last) != 2 { .true: return 7, .false: {} }
-    switch weigh(t: lexer.seen.read(at: 0)) != 9 { .true: return 8, .false: {} }
-    switch lexer.seen.read(at: 0) {
-        .value(let n): switch n != 9 { .true: return 9, .false: {} },
+    switch { weigh(t: lexer.last) != 2: return 7, default: {} }
+    switch { weigh(t: lexer.seen.read(at: 0)) != 9: return 8, default: {} }
+    switch {
+        lexer.seen.read(at: 0).value(let n): switch { n != 9: return 9, default: {} },
         default: return 10
     }
-    switch t { .end: return 11, default: switch t { .value(number: 7): {}, default: return 12 } }
+    switch { t.end: return 11, default: switch { t.value(number: 7): {}, default: return 12 } }
     return 42
 }

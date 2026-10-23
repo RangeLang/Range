@@ -3,7 +3,7 @@
 construct Picker {
     let first: Bool
     function choose<U>(let a: U, let b: U): U {
-        return switch first { .true: a, .false: b }
+        return switch { first: a, default: b }
     }
 }
 
@@ -19,10 +19,10 @@ construct Box<T> {
 
 {
     let picker: Picker(first: false)
-    switch picker.choose(a: 1, b: 2) != 2 { .true: return 1, .false: {} }
-    switch picker.choose(a: "x", b: "yy").count != 2 { .true: return 2, .false: {} }
+    switch { picker.choose(a: 1, b: 2) != 2: return 1, default: {} }
+    switch { picker.choose(a: "x", b: "yy").count != 2: return 2, default: {} }
     let box: Box<Int>(item: 5)
-    switch box.pick(other: "s", mine: true) { .false: return 3, .true: {} }
-    switch box.same<Bool>(other: true) { .false: return 4, .true: {} }
+    switch { !box.pick(other: "s", mine: true): return 3, default: {} }
+    switch { !(box.same<Bool>(other: true)): return 4, default: {} }
     return 42
 }

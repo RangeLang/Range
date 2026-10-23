@@ -1,8 +1,9 @@
 // Generic kinds apply @generic, so @generic names any of them: a value
 // generic such as <let bits: 64> is a Let; <Element> is a TypeParameter.
 macro generic(): Construct {
-  switch #members.first(where: { member in member.name = "name" }) {
-    .absent: @diagnostic("Generic kind must declare name"),
-    .present: {}
+  let name: #members.first(where: { member in member.name = "name" })
+  switch {
+    name.absent: @diagnostic("Generic kind must declare name"),
+    name.present: {}
   }
 }

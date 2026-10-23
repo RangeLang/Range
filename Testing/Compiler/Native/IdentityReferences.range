@@ -13,21 +13,21 @@ construct RequiredUser {
     let original: User()
     let user: original
     let required: RequiredUser(user: user)
-    switch required.user.score != 42 { .true: return 1, .false: {} }
+    switch { required.user.score != 42: return 1, default: {} }
     state number: Int(42)
     let snapshot: number
     number: 9
-    switch snapshot != 42 { .true: return 2, .false: {} }
+    switch { snapshot != 42: return 2, default: {} }
     let User: Int(42)
     let selected: User
-    switch selected != 42 { .true: return 3, .false: {} }
-    switch true {
-        .true: {
+    switch { selected != 42: return 3, default: {} }
+    switch {
+        true: {
             let number: Int(7)
             let nested: number
-            switch nested != 7 { .true: return 4, .false: {} }
+            switch { nested != 7: return 4, default: {} }
         },
-        .false: {}
+        default: {}
     }
     return snapshot
 }

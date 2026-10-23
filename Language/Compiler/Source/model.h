@@ -82,18 +82,19 @@ enum {
                                     * in its condition, so it names what it names outside the condition */
 };
 
-/* Pattern forms. A case pattern's items are arguments (label, sub-pattern).
- * A row of a switch label is one pattern per subject: in a switch over one
- * subject the pattern itself, over several a row pattern. A row's b is its
- * condition, if it has one, and c the block of its bindings. */
+/* Pattern forms: a case test's pattern and its arguments, and the rows of
+ * a switch's arms. A case pattern's items are arguments (label,
+ * sub-pattern). An arm's row is its pattern: in a switch over conditions a
+ * row with no items, in the switch a for loop lowers to the pattern of its
+ * one subject. A row's b is its condition, if it has one, and c the block
+ * of its bindings. */
 enum {
     RangePatternAny,      /* _ */
     RangePatternBind,     /* let name: a is the Let it declares */
-    RangePatternCase,     /* .name(…) or Type.name(…): a is the type path, if written */
-    RangePatternValue,    /* a literal compared for equality: a */
-    RangePatternRelation, /* < 0 or = limit: name is the operator, a the operand */
+    RangePatternCase,     /* .name(…): a case, with one sub-pattern per payload field */
+    RangePatternValue,    /* a value compared for equality, by its type's `=`: a */
     RangePatternPresent,  /* for-in lowering: the payload of the @optional declaration's payload case */
-    RangePatternRow       /* a row over several subjects: items are one pattern per subject, in order */
+    RangePatternRow       /* a row of a switch over conditions: no items, b its condition */
 };
 
 typedef struct RangeNode RangeNode;

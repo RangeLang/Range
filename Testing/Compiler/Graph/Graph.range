@@ -1,21 +1,23 @@
 macro example(): Construct {
     let ignored: "#graph is only text here"
-    switch #members.first() {
-        .present: {
+    let first: #members.first()
+    switch {
+        first.present: {
             #graph {
                 // Keep the emitted declarations, including nested code.
                 construct Message {
                     let text: "hello"
                     function show() {
-                        switch true {
-                            .true: @diagnostic(text),
-                            .false: {}
+                        switch {
+                            true: @diagnostic(text),
+                            default: {}
                         }
                     }
                 }
             }
         },
-        .absent: {}
+
+        first.absent: {}
     }
     #graph {}
 }

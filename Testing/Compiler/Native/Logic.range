@@ -14,26 +14,26 @@ function touched(let count: Int, let result: Bool): Bool {
 }
 
 {
-    switch gate(ready: true, blocked: false, forced: false) { .false: return 1, .true: {} }
-    switch gate(ready: true, blocked: true, forced: false) { .true: return 2, .false: {} }
-    switch gate(ready: false, blocked: true, forced: true) { .false: return 3, .true: {} }
+    switch { !gate(ready: true, blocked: false, forced: false): return 1, default: {} }
+    switch { gate(ready: true, blocked: true, forced: false): return 2, default: {} }
+    switch { !gate(ready: false, blocked: true, forced: true): return 3, default: {} }
     // `|` is looser than `&`: true | false & false is true | (false & false).
-    switch true | false & false { .false: return 4, .true: {} }
-    switch (true | false) & false { .true: return 5, .false: {} }
+    switch { !(true | false & false): return 4, default: {} }
+    switch { (true | false) & false: return 5, default: {} }
     // Comparisons bind tighter than `&`: (a = b) & (c < d).
     let a: 2
     let b: 2
     let c: 1
     let d: 3
-    switch a = b & c < d { .false: return 6, .true: {} }
+    switch { !(a = b & c < d): return 6, default: {} }
     // Arithmetic binds tighter than comparisons, `!` tighter than all.
-    switch a + 1 = d & !(c * 2 > d) { .false: return 7, .true: {} }
-    switch !(a = c) & a * c = b | false { .false: return 8, .true: {} }
+    switch { !(a + 1 = d & !(c * 2 > d)): return 7, default: {} }
+    switch { !(!(a = c) & a * c = b | false): return 8, default: {} }
     // Short circuit: the right operand runs only when the left one does not
     // decide the result.
-    switch false & touched(count: 1, result: true) { .true: return 9, .false: {} }
-    switch true | touched(count: 2, result: false) { .false: return 10, .true: {} }
-    switch true & touched(count: 3, result: true) { .false: return 11, .true: {} }
-    switch false | touched(count: 4, result: true) { .false: return 12, .true: {} }
+    switch { false & touched(count: 1, result: true): return 9, default: {} }
+    switch { !(true | touched(count: 2, result: false)): return 10, default: {} }
+    switch { !(true & touched(count: 3, result: true)): return 11, default: {} }
+    switch { !(false | touched(count: 4, result: true)): return 12, default: {} }
     return 42
 }

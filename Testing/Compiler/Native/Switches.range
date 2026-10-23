@@ -1,63 +1,57 @@
-// switch: exhaustive, several patterns per arm, guards, no fallthrough.
-// Bool is an enum, so true and false cover it without a default.
+// switch: exhaustive, several alternatives per arm, guards, no fallthrough.
+// Bool is an enum, so its true and false cases cover it without a default.
 enum Direction {
     case north, east, south, west
 }
 
 function horizontal(let d: Direction): Bool {
-    switch d {
-    .east | .west: return true,
-    .north | .south: return false
+    switch {
+    d.east | d.west: return true,
+    d.north | d.south: return false
     }
 }
 
 function score(let d: Direction): Int {
     state total: 0
-    switch d {
-    .north: total: 1,
-    .east: total: 2,
+    switch {
+    d.north: total: 1,
+    d.east: total: 2,
     default: total: 10
     }
     return total
 }
 
 function classify(let n: Int): Int {
-    switch n {
-    0: return 100,
-    1 | 2 | 3: return 200,
-    < 0: return 300,
-    let big & big > 1000: return big,
+    switch {
+    n = 0: return 100,
+    n = 1 | n = 2 | n = 3: return 200,
+    n < 0: return 300,
+    n > 1000: return n,
     default: return 400
     }
 }
 
 function flip(let b: Bool): Int {
-    switch b {
-    .true: return 1,
-    .false: return 0
-    }
+    switch { b: return 1, default: return 0 }
 }
 
 function both(let a: Bool, let b: Bool): Int {
     state result: 0
-    switch a & b {
-    .true: result: 2,
-    .false: result: 1
-    }
+    switch { a & b: result: 2, default: result: 1 }
     return result
 }
 
 {
-    switch horizontal(d: .east) { .false: return 1, .true: {} }
-    switch horizontal(d: .south) { .true: return 2, .false: {} }
-    switch score(d: .east) != 2 { .true: return 3, .false: {} }
-    switch score(d: .west) != 10 { .true: return 4, .false: {} }
-    switch classify(n: 0) != 100 { .true: return 5, .false: {} }
-    switch classify(n: 2) != 200 { .true: return 6, .false: {} }
-    switch classify(n: -5) != 300 { .true: return 7, .false: {} }
-    switch classify(n: 5000) != 5000 { .true: return 8, .false: {} }
-    switch classify(n: 50) != 400 { .true: return 9, .false: {} }
-    switch flip(b: true) != 1 | flip(b: 1 > 2) != 0 { .true: return 10, .false: {} }
-    switch both(a: true, b: !false) != 2 | both(a: true, b: false) != 1 { .true: return 11, .false: {} }
+    switch { !horizontal(d: .east): return 1, default: {} }
+    switch { horizontal(d: .south): return 2, default: {} }
+    switch { score(d: .east) != 2: return 3, default: {} }
+    switch { score(d: .west) != 10: return 4, default: {} }
+    switch { classify(n: 0) != 100: return 5, default: {} }
+    switch { classify(n: 2) != 200: return 6, default: {} }
+    switch { classify(n: -5) != 300: return 7, default: {} }
+    switch { classify(n: 5000) != 5000: return 8, default: {} }
+    switch { classify(n: 50) != 400: return 9, default: {} }
+    switch { flip(b: true) != 1 | flip(b: 1 > 2) != 0: return 10, default: {} }
+    switch { both(a: true, b: !false) != 2 | both(a: true, b: false) != 1: return 11, default: {} }
     return 42
 }

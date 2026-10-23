@@ -13,10 +13,7 @@ function sumTo(let n: Int): Int {
 }
 
 function fib(let n: Int): Int {
-    switch n < 2 {
-        .true: return n,
-        .false: {}
-    }
+    switch { n < 2: return n, default: {} }
     return fib(n: n - 1) + fib(n: n - 2)
 }
 
@@ -33,14 +30,14 @@ function down(let a: Int<bits: 8, signed: false>): Int<bits: 8, signed: false> {
 }
 
 {
-    switch (square(x: 6) + sumTo(n: 4)) != 46 { .true: return 1, .false: {} }
-    switch fib(n: 20) != 6765 { .true: return 2, .false: {} }
-    switch check(n: 0) { .true: return 3, .false: {} }
-    switch check(n: 2) { .false: return 4, .true: {} }
-    switch (17 % 5 + -3 * -2) != 8 { .true: return 5, .false: {} }
+    switch { (square(x: 6) + sumTo(n: 4)) != 46: return 1, default: {} }
+    switch { fib(n: 20) != 6765: return 2, default: {} }
+    switch { check(n: 0): return 3, default: {} }
+    switch { !check(n: 2): return 4, default: {} }
+    switch { (17 % 5 + -3 * -2) != 8: return 5, default: {} }
     let r: step(x: 20)
-    switch r != 120 { .true: return 6, .false: {} }
+    switch { r != 120: return 6, default: {} }
     let z: down(a: 255)
-    switch z != 254 { .true: return 7, .false: {} }
+    switch { z != 254: return 7, default: {} }
     return 42
 }

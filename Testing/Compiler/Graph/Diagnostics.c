@@ -69,7 +69,7 @@ int main(void)
     // first and filter are Range functions on the reflection list's
     // collection; C builds that collection, and reports so.
     source = "construct Construct {} macro inspect(): Construct { "
-        "switch #members.first(where: { member in member.name = \"payload\" }) { .present: {}, .absent: {} } }";
+        "let payload: #members.first(where: { member in member.name = \"payload\" }) switch { payload.present: {}, payload.absent: {} } }";
     report = collect(&arena,source,"construct Bag { function filter(let named: Bag): Bag { return named } "
         "function first(): Bag { return Bag } function isTarget(): Bag { return Bag } }");
     assert(!report.errors);

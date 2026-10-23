@@ -23,7 +23,7 @@ function mutate(let store: Store): Envelope {
     changed.values.append(value: 4294967297)
     changed.values.append(value: 5)
     let replaced: changed.replace(index: 1, value: 42)
-    switch replaced != 42 { .true: return Envelope(store: store), .false: {} }
+    switch { replaced != 42: return Envelope(store: store), default: {} }
     return Envelope(store: changed)
 }
 
@@ -36,7 +36,7 @@ function identity(let value: Int): Int { return value }
 function early(let value: Int): Int {
     state index: 0
     while index < 4 {
-        switch index = value { .true: return index, .false: {} }
+        switch { index = value: return index, default: {} }
         index: index + 1
     }
     return 9
@@ -46,23 +46,23 @@ function early(let value: Int): Int {
     state original: 7
     let copied: original
     original: 8
-    switch copied != 7 { .true: return 16, .false: {} }
+    switch { copied != 7: return 16, default: {} }
     let store: Store()
     let result: choose(store: store)
-    let nested: switch result { .success(let nested): nested, default: { return 1 } }
-    switch store.revision != 0 | nested.store.revision != 1 { .true: return 2, .false: {} }
-    switch nested.store.values.read(at: 0) != 4294967297 | nested.store.values.read(at: 1) != 42 { .true: return 3, .false: {} }
-    switch store.values.count != 0 { .true: return 4, .false: {} }
+    let nested: switch { result.success(let nested): nested, default: { return 1 } }
+    switch { store.revision != 0 | nested.store.revision != 1: return 2, default: {} }
+    switch { nested.store.values.read(at: 0) != 4294967297 | nested.store.values.read(at: 1) != 42: return 3, default: {} }
+    switch { store.values.count != 0: return 4, default: {} }
     state total: 0
     state index: 0
     while index < 4 {
         total: total + early(value: index)
         index: index + 1
     }
-    switch total != 6 { .true: return 7, .false: {} }
+    switch { total != 6: return 7, default: {} }
     // The right side would read outside the storage; it never runs.
-    switch false & store.values.read(at: 999) = 0 { .true: return 8, .false: {} }
-    switch (true | store.values.read(at: 999) = 0) { .false: return 9, .true: {} }
-    switch identity(value: 42) != 42 { .true: return 11, .false: {} }
+    switch { false & store.values.read(at: 999) = 0: return 8, default: {} }
+    switch { !((true | store.values.read(at: 999) = 0)): return 9, default: {} }
+    switch { identity(value: 42) != 42: return 11, default: {} }
     return nested.store.values.read(at: 1)
 }

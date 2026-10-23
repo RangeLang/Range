@@ -18,31 +18,31 @@ enum Tree {
 }
 
 function size(let s: Shape): Int {
-    switch s {
-    .circle(let n) | .square(let n): return n,
-    .group(let xs) & xs.count > 2: return 1000,
-    .group(let xs): {
+    switch {
+    s.circle(let n) | s.square(let n): return n,
+    s.group(let xs) & xs.count > 2: return 1000,
+    s.group(let xs): {
         state copy: xs
         copy.append(value: 1)
         return copy.count
     },
-    .nothing: return 0
+    s.nothing: return 0
     }
 }
 
 function shallow(let t: Tree): Int {
-    switch t {
-    .node(.leaf(let a), .leaf(let b)): return a * b,
-    .node(.node(_, _), _) | .node(_, .node(_, _)): return -1,
-    .leaf(let v): return v
+    switch {
+    t.node(.leaf(let a), .leaf(let b)): return a * b,
+    t.node(.node(_, _), _) | t.node(_, .node(_, _)): return -1,
+    t.leaf(let v): return v
     }
 }
 
 function pick(let e: Either<Int, Bool>): Int {
-    switch e {
-    .left(let n): return n,
-    .right(.true): return 1,
-    .right(.false): return 0
+    switch {
+    e.left(let n): return n,
+    e.right(.true): return 1,
+    e.right(.false): return 0
     }
 }
 
@@ -52,19 +52,19 @@ function pick(let e: Either<Int, Bool>): Int {
         state xs: Array<Int>()
         xs.append(value: 1)
         let g: Shape.group(xs)
-        switch size(s: g) != 2 { .true: return 1, .false: {} }
-        switch xs.count != 1 { .true: return 2, .false: {} }
+        switch { size(s: g) != 2: return 1, default: {} }
+        switch { xs.count != 1: return 2, default: {} }
         xs.append(value: 2)
         xs.append(value: 3)
-        switch size(s: .group(xs)) != 1000 { .true: return 3, .false: {} }
-        switch size(s: g) != 2 { .true: return 4, .false: {} }
+        switch { size(s: .group(xs)) != 1000: return 3, default: {} }
+        switch { size(s: g) != 2: return 4, default: {} }
         round: round + 1
     }
-    switch size(s: .circle(radius: 4)) + size(s: .square(side: 5)) != 9 { .true: return 5, .false: {} }
-    switch shallow(t: .node(left: .leaf(value: 6), right: .leaf(value: 7))) != 42 { .true: return 6, .false: {} }
-    switch shallow(t: .node(left: .leaf(value: 6), right: .node(left: .leaf(value: 1), right: .leaf(value: 2)))) != -1 { .true: return 7, .false: {} }
-    switch pick(e: .left(9)) + pick(e: .right(true)) != 10 { .true: return 8, .false: {} }
+    switch { size(s: .circle(radius: 4)) + size(s: .square(side: 5)) != 9: return 5, default: {} }
+    switch { shallow(t: .node(left: .leaf(value: 6), right: .leaf(value: 7))) != 42: return 6, default: {} }
+    switch { shallow(t: .node(left: .leaf(value: 6), right: .node(left: .leaf(value: 1), right: .leaf(value: 2)))) != -1: return 7, default: {} }
+    switch { pick(e: .left(9)) + pick(e: .right(true)) != 10: return 8, default: {} }
     let either: Either<Int, Bool>.right(false)
-    switch pick(e: either) != 0 { .true: return 9, .false: {} }
+    switch { pick(e: either) != 0: return 9, default: {} }
     return 42
 }

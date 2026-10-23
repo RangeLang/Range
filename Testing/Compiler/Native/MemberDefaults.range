@@ -30,20 +30,21 @@ enum Shape { case square(Frame), none }
 
 {
     let square: Frame(width: 3)
-    switch square.height != 3 | square.area != 9 | square.label != "frame" { .true: return 1, .false: {} }
+    switch { square.height != 3 | square.area != 9 | square.label != "frame": return 1, default: {} }
     let tall: Frame(width: 2, height: 5)
-    switch tall.area != 10 { .true: return 2, .false: {} }
+    switch { tall.area != 10: return 2, default: {} }
     let given: Frame(width: 2, height: 5, area: 1)
-    switch given.area != 1 { .true: return 3, .false: {} }
+    switch { given.area != 1: return 3, default: {} }
     let n: Narrow(side: 20)
-    switch n.double != 40 | n.sum != 8 | !n.flag { .true: return 4, .false: {} }
+    switch { n.double != 40 | n.sum != 8 | !n.flag: return 4, default: {} }
     let o: Outer()
-    switch o.inner.twice != 6 | o.total != 9 | o.count != 1 { .true: return 5, .false: {} }
+    switch { o.inner.twice != 6 | o.total != 9 | o.count != 1: return 5, default: {} }
     let p: Outer(base: 5)
-    switch p.inner.n != 5 | p.total != 15 { .true: return 6, .false: {} }
-    switch Shape.square(Frame(width: 4)) {
-    .square(let f): switch f.area != 16 { .true: return 7, .false: {} },
-    .none: return 8
+    switch { p.inner.n != 5 | p.total != 15: return 6, default: {} }
+    let shape: Shape.square(Frame(width: 4))
+    switch {
+    shape.square(let f): switch { f.area != 16: return 7, default: {} },
+    shape.none: return 8
     }
     return 42
 }

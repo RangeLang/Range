@@ -7,13 +7,10 @@ function wide(let value: Int<bits: 64>): Int { return value }
 
 {
     let box: Box()
-    switch box.value != 3 { .true: return 1, .false: {} }
+    switch { box.value != 3: return 1, default: {} }
     let holder: Holder()
-    switch holder.value != 3 { .true: return 2, .false: {} }
-    switch false {
-        .true: { let unused: Int<bits: 32>(value: 3) },
-        .false: {}
-    }
-    switch wide(value: 3) != 3 { .true: return 3, .false: {} }
+    switch { holder.value != 3: return 2, default: {} }
+    switch { false: { let unused: Int<bits: 32>(value: 3) }, default: {} }
+    switch { wide(value: 3) != 3: return 3, default: {} }
     return 42
 }

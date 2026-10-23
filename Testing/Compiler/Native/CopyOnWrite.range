@@ -30,30 +30,30 @@ function mutateCopy(let xs: Array<Int>): Int {
     state a: filled(n: 3)
     state b: a
     b.append(value: 10)
-    switch a.count != 3 { .true: return 1, .false: {} }
-    switch b.count != 4 { .true: return 2, .false: {} }
+    switch { a.count != 3: return 1, default: {} }
+    switch { b.count != 4: return 2, default: {} }
     a.write(at: 0, value: 50)
-    switch b.read(at: 0) != 0 { .true: return 3, .false: {} }
-    switch a.read(at: 0) != 50 { .true: return 4, .false: {} }
-    switch mutateCopy(xs: a) != 4 { .true: return 5, .false: {} }
-    switch a.count != 3 { .true: return 6, .false: {} }
+    switch { b.read(at: 0) != 0: return 3, default: {} }
+    switch { a.read(at: 0) != 50: return 4, default: {} }
+    switch { mutateCopy(xs: a) != 4: return 5, default: {} }
+    switch { a.count != 3: return 6, default: {} }
 
     state bag: Bag()
     bag.add(value: 1)
     state snap: bag.snapshot()
     bag.add(value: 2)
-    switch snap.count != 1 { .true: return 7, .false: {} }
+    switch { snap.count != 1: return 7, default: {} }
     snap.write(at: 0, value: 7)
-    switch bag.items.read(at: 0) != 1 { .true: return 8, .false: {} }
+    switch { bag.items.read(at: 0) != 1: return 8, default: {} }
 
     state grid: Array<Array<Int>>()
     grid.append(value: filled(n: 2))
     state other: grid
     state row: other.read(at: 0)
     row.write(at: 1, value: 42)
-    switch grid.read(at: 0).read(at: 1) != 1 { .true: return 9, .false: {} }
+    switch { grid.read(at: 0).read(at: 1) != 1: return 9, default: {} }
     other.write(at: 0, value: row)
-    switch grid.read(at: 0).read(at: 1) != 1 { .true: return 10, .false: {} }
-    switch other.read(at: 0).read(at: 1) != 42 { .true: return 11, .false: {} }
+    switch { grid.read(at: 0).read(at: 1) != 1: return 10, default: {} }
+    switch { other.read(at: 0).read(at: 1) != 42: return 11, default: {} }
     return 42
 }

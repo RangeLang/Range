@@ -12,31 +12,31 @@ construct Heading {
 }
 
 function turn(let d: Direction): Direction {
-    switch d = .north { .true: return .east, .false: {} }
-    switch d = Direction.east { .true: return .south, .false: {} }
-    switch .south = d { .true: return Direction.west, .false: {} }
+    switch { d = .north: return .east, default: {} }
+    switch { d = Direction.east: return .south, default: {} }
+    switch { .south = d: return Direction.west, default: {} }
     return .north
 }
 
 {
     let a: Direction.north
     let b: turn(d: a)
-    switch b != .east { .true: return 1, .false: {} }
-    switch a = b { .true: return 2, .false: {} }
+    switch { b != .east: return 1, default: {} }
+    switch { a = b: return 2, default: {} }
     state h: Heading(fallback: .west)
     h.facing: turn(d: h.facing)
-    switch h.facing != Direction.east | h.fallback != .west { .true: return 3, .false: {} }
+    switch { h.facing != Direction.east | h.fallback != .west: return 3, default: {} }
     let copy: h
     h.facing: .south
-    switch copy.facing != .east { .true: return 4, .false: {} }
+    switch { copy.facing != .east: return 4, default: {} }
     state xs: Array<Direction>()
     xs.append(value: .south)
     xs.append(value: turn(d: .south))
     xs.append(value: turn(d: xs.read(at: 1)))
-    switch xs.read(at: 1) != .west | xs.read(at: 2) != .north { .true: return 5, .false: {} }
+    switch { xs.read(at: 1) != .west | xs.read(at: 2) != .north: return 5, default: {} }
     state d: Direction.west
     d: turn(d: d)
-    switch d != .north { .true: return 6, .false: {} }
+    switch { d != .north: return 6, default: {} }
     @print("\(a) \(b) \(xs.read(at: 1)) \(h.fallback)")
     return 42
 }

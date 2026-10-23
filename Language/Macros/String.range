@@ -2,9 +2,10 @@
 // including escapes and \( ) interpolation; this pattern only picks the construct.
 @literal("\".*\"")
 macro string(): Construct {
-  switch #members.first(where: { member in member.name = "value" }) {
-    .absent: @diagnostic("Construct must specify value"),
-    .present: {}
+  let value: #members.first(where: { member in member.name = "value" })
+  switch {
+    value.absent: @diagnostic("Construct must specify value"),
+    value.present: {}
   }
 
   // Layout: UTF-8 bytes held by C, as an address, a byte count, and the

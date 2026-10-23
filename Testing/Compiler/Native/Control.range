@@ -1,18 +1,18 @@
-// A switch over an enum covers its cases; one over an integer uses relations,
-// values, and a default.
+// A switch whose conditions test every case of an enum needs no default;
+// one that compares integers ends with a default.
 enum Direction { case north, south }
 
 function classify(let direction: Direction): Int {
-    switch direction {
-    .north: return 40,
-    .south: return 9
+    switch {
+    direction.north: return 40,
+    direction.south: return 9
     }
 }
 
 function small(let value: Int): Int {
-    switch value {
-    < 0: return 8,
-    0: return 2,
+    switch {
+    value < 0: return 8,
+    value = 0: return 2,
     default: return 5
     }
 }
@@ -21,6 +21,6 @@ function small(let value: Int): Int {
     let direction: Direction.north
     state values: Array<Int>()
     values.append(value: 10)
-    switch values.count != 1 | small(value: -1) != 8 | small(value: 3) != 5 { .true: return 1, .false: {} }
+    switch { values.count != 1 | small(value: -1) != 8 | small(value: 3) != 5: return 1, default: {} }
     return classify(direction: direction) + small(value: 0)
 }

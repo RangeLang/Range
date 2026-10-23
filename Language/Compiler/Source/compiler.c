@@ -1962,11 +1962,9 @@ static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeG
         if (which < 0) fail(eval->vm,pattern,"the compile-time Bool has no case '%s'",pattern->name);
         return which == (value.node->integer != 0);
     }
-    case RangePatternValue: case RangePatternRelation: {
+    case RangePatternValue: {
         RangeGraphValue operand = metaExpect(eval,into,pattern->a,metaValueEnum(eval,value));
-        int result = metaRelation(eval,pattern->integer == RangePatternValue ? "=" : pattern->name,value,operand,pattern);
-        if (result < 0) fail(eval->vm,pattern,"unsupported compile-time relation '%s'",pattern->name);
-        return result;
+        return metaRelation(eval,"=",value,operand,pattern);
     }
     default: fail(eval->vm,pattern,"unsupported compile-time pattern");
     }
@@ -2116,18 +2114,6 @@ static int metaUsefulRow(void *eval, RangeNode ***rows, size_t count, RangeNode 
     return metaUseful(eval,rows,count,q,types,width);
 }
 
-/* Whether a row matches the subjects' values; its bindings join `into`. */
-static int metaMatchRow(MetaEval *eval, MetaScope *into, RangeNode *row, RangeGraphValue *subjects, RangeNode **types, size_t width)
-{
-    RangeNode **patterns = rangeArenaAllocate(eval->vm->arena,width * sizeof(*patterns));
-    patternRow(row,patterns,width);
-    for (size_t k = 0; k < width; ++k) {
-        if (patterns[k] && patterns[k]->integer == RangePatternCase && !types[k])
-            fail(eval->vm,patterns[k],"a compile-time case pattern matches an enum value; this value is not one");
-        if (patterns[k] && !metaMatch(eval,into,patterns[k],subjects[k])) return 0;
-    }
-    return 1;
-}
 
 /* A compile-time switch over conditions: its stable subjects, each
  * evaluated once to learn which names are case tests and of which enum. */
@@ -2207,81 +2193,13 @@ static RangeNode *metaConditionArm(MetaEval *eval, MetaScope *scope, RangeNode *
     fail(eval->vm,node,"compile-time switch has no arm for this value");
 }
 
-/* The arm a compile-time switch runs, its bindings in *arm. A subject's type
- * is the enum its value is a case of; as in compiled code, every row must
- * match something the arms above do not, a default comes last, and the arms
- * together match every value, or every combination of the subjects' values
- * when there are several. */
+/* The arm a compile-time switch runs, its bindings in *arm. Only a switch
+ * over conditions is written in source; `for` loops do not run at compile
+ * time. */
 static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
 {
-    RangeArena *arena = eval->vm->arena;
-    size_t width = node->c ? node->c->itemCount : 1;
-    if (!width) return metaConditionArm(eval,scope,node,arm);
-    RangeGraphValue *subjects = rangeArenaAllocate(arena,width * sizeof(*subjects));
-    RangeNode **types = rangeArenaAllocate(arena,width * sizeof(*types));
-    for (size_t k = 0; k < width; ++k) {
-        subjects[k] = metaExpression(eval,scope,node->c ? node->c->items[k] : node->a);
-        types[k] = metaValueEnum(eval,subjects[k]);
-    }
-    size_t capacity = 1;
-    for (size_t i = 0; i < node->itemCount; ++i) capacity += node->items[i]->itemCount + 1;
-    RangeNode ***rows = rangeArenaAllocate(arena,capacity * sizeof(*rows));
-    size_t count = 0;
-    for (size_t i = 0; i < node->itemCount; ++i) {
-        RangeNode *entry = node->items[i];
-        int fallback = (entry->flags & RangeFlagLiteral) != 0;
-        if (fallback && i + 1 != node->itemCount) fail(eval->vm,entry,"'default' must be the last arm of a switch");
-        size_t patterns = fallback ? 1 : entry->itemCount;
-        for (size_t j = 0; j < patterns; ++j) {
-            RangeNode *pattern = fallback ? NULL : entry->items[j];
-            RangeNode **row = rangeArenaAllocate(arena,width * sizeof(*row));
-            patternRow(pattern,row,width);
-            for (size_t k = 0; k < width; ++k)
-                if (row[k] && row[k]->integer == RangePatternCase && !types[k])
-                    fail(eval->vm,row[k],"a compile-time case pattern matches an enum value; this value is not one");
-            if (!metaUseful(eval,rows,count,row,types,width)) {
-                if (pattern) fail(eval->vm,pattern,"this %s is already handled by earlier arms",width > 1 ? "row" : "pattern");
-                fail(eval->vm,entry,"'default' is never reached: the arms above match every value");
-            }
-            if (!pattern || !pattern->b) rows[count++] = row;
-        }
-    }
-    RangeNode **wild = rangeArenaAllocate(arena,width * sizeof(*wild));
-    patternRow(NULL,wild,width);
-    if (metaUseful(eval,rows,count,wild,types,width)) {
-        char missing[256] = "";
-        size_t length = 0;
-        if (width > 1) {
-            if (patternMissing(arena,metaUsefulRow,eval,rows,count,types,types,width,NULL,missing,sizeof(missing))) {
-                int many = strchr(missing,',') != NULL;
-                fail(eval->vm,node,"compile-time switch over %zu subjects must be exhaustive: %s %s not handled; add %s or a default",
-                     width,missing,many ? "are" : "is",many ? "those combinations" : "that combination");
-            }
-            fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
-        }
-        RangeNode *type = types[0];
-        for (size_t i = 0; type && i < type->itemCount; ++i) {
-            RangeNode *entry = type->items[i];
-            if (entry->kind != RangeNodeEnumCase || !metaUsefulCase(eval,rows,count,wild,types,1,entry)) continue;
-            if (length + strlen(entry->name) + 8 < sizeof(missing))
-                length += (size_t)snprintf(missing + length,sizeof(missing) - length,"%s'.%s'",length ? ", " : "",entry->name);
-        }
-        if (length) fail(eval->vm,node,"compile-time switch over %s must be exhaustive: %s %s not handled; add %s or a default",
-                         type->name,missing,strchr(missing,',') ? "are" : "is",strchr(missing,',') ? "those cases" : "that case");
-        fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
-    }
-    for (size_t i = 0; i < node->itemCount; ++i) {
-        RangeNode *entry = node->items[i];
-        *arm = (MetaScope){.parent=scope,.application=scope->application};
-        if (entry->flags & RangeFlagLiteral) return entry;
-        for (size_t j = 0; j < entry->itemCount; ++j) {
-            *arm = (MetaScope){.parent=scope,.application=scope->application};
-            RangeNode *row = entry->items[j];
-            if (metaMatchRow(eval,arm,row,subjects,types,width)
-                && (!row->b || metaBoolean(eval,metaExpression(eval,arm,row->b),row->b))) return entry;
-        }
-    }
-    fail(eval->vm,node,"compile-time switch has no arm for this value");
+    if (node->c && node->c->itemCount) fail(eval->vm,node,"compile-time 'for' loops are not implemented");
+    return metaConditionArm(eval,scope,node,arm);
 }
 
 static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNode *node)
@@ -2380,7 +2298,8 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
                 fail(eval->vm,node,"'%s' holds @many storage and is not a value",node->name);
             return receiver.values[member];
         }
-        if (receiver.kind == RangeGraphCase || receiver.kind == RangeGraphSlots || receiver.kind == RangeGraphNodes)
+        if (receiver.kind == RangeGraphCase) fail(eval->vm,node,"%s has no case '%s'",receiver.declaration->name,node->name);
+        if (receiver.kind == RangeGraphSlots || receiver.kind == RangeGraphNodes)
             fail(eval->vm,node,"this compile-time value has no member '%s'",node->name);
         if (!scope->application && receiver.kind != RangeGraphNode) fail(eval->vm,node,"graph reflection requires a macro context");
         RangeMacroApplication none = {0};
@@ -2784,9 +2703,9 @@ static int sourceMatches(RangeNode *node, const char *name, int kind)
 
 /* A method's receiver: an implicit let of the method, made on first use and
  * never found by name. Range has no `self`: members are reached by their bare
- * names, and inside an enum's own functions the enum's name as a switch
- * subject is the current value. The type checker
- * gives it the method's receiver specialization. */
+ * names, and inside an enum's own functions a bare case name tests the
+ * current value. The type checker gives it the method's receiver
+ * specialization. */
 static RangeNode *methodReceiver(SourceReport *report, RangeNode *function)
 {
     if (!function->receiver) {
@@ -5214,7 +5133,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
             if (member->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
             else { SourceScope declarationScope = {.owner=declaration}; type = declaredType(typer,&declarationScope,member,receiver); }
         } else if (findFunction(declaration,expr->name)) typeError(typer,expr,"'%s.%s' is a function; call it",declaration->name,expr->name);
-        else { char t[160]; describeType(t,sizeof(t),receiver); typeError(typer,expr,"%s has no member '%s'",t,expr->name); }
+        else { char t[160]; describeType(t,sizeof(t),receiver); typeError(typer,expr,"%s has no %s '%s'",t,isEnum(receiver) ? "case" : "member",expr->name); }
         break;
     }
     case RangeNodeCall:
@@ -5535,13 +5454,12 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
 }
 
 /* ---- patterns ----
- * Matching follows Swift: a switch covers every value of its subject, by its
- * cases or a default, and runs exactly one arm; a pattern that no earlier
- * pattern leaves anything for is an error. Coverage is the usefulness of a
- * pattern vector over the rows before it (Maranget's algorithm): an enum case
- * splits a column into its payload fields; literals, relations, and rows with
- * a condition cover nothing for the rows after them. A switch over several
- * subjects has one column per subject. */
+ * A switch covers every combination of its case tests' subjects, by its
+ * arms or a default, and runs exactly one arm; an arm that no earlier arm
+ * leaves anything for is an error. Coverage is the usefulness of a pattern
+ * vector over the rows before it (Maranget's algorithm), one column per
+ * subject: an enum case splits a column into its payload fields; values and
+ * rows with a guard cover nothing for the rows after them. */
 
 static int patternWild(const RangeNode *pattern)
 {
@@ -5716,51 +5634,9 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
         if (actual == type) noteEquality(typer,type,pattern);
         return;
     }
-    case RangePatternRelation: {
-        // `< 0:` calls the subject type's `<` with the operand, as `subject < 0` does.
-        if (!type) return;
-        if (same(pattern->name,"=") || same(pattern->name,"!=")) {
-            expectType(typer,pattern->a,type,typeOf(typer,scope,pattern->a,type,context),"pattern");
-            noteEquality(typer,type,pattern);
-            return;
-        }
-        RangeNode *function = type->kind == RangeNodeSpecialization ? operatorFunction(type->resolvedDeclaration,pattern->name,1) : NULL;
-        if (!function) { typeError(typer,pattern,"'%s' is not declared on %s",pattern->name,t); return; }
-        pattern->resolvedDeclaration = function;
-        SourceScope ownerScope = {.owner=type->resolvedDeclaration};
-        SourceScope functionScope = {.owner=function,.parent=&ownerScope};
-        RangeNode *parameter = declaredType(typer,&functionScope,function->items[0],type);
-        char what[160]; snprintf(what,sizeof(what),"the operand of pattern '%s'",pattern->name);
-        coerce(typer,pattern->a,parameter,typeOf(typer,scope,pattern->a,parameter,context),what);
-        RangeNode *output = function->b;
-        if (!output || resolveTypeReference(typer,&functionScope,output->name,output->generics,output->flags,type,output) != typer->booleanType)
-            typeError(typer,pattern,"relational pattern '%s' needs %s's '%s' to return Bool",pattern->name,t,pattern->name);
-        return;
-    }
     }
 }
 
-/* Inside an enum's own functions, its extensions' included, the enum's name as
- * a switch subject is the current value; the innermost enum's name, bare even
- * when it is generic. Elsewhere the name is the type. */
-static RangeNode *typeSubject(Typer *typer, SourceScope *scope, RangeNode *subject, RangeNode *context)
-{
-    if (subject && subject->kind == RangeNodeName && !subject->generics) {
-        RangeNode *declaration = sourceLookup(typer->report,scope,subject->name,0);
-        if (declaration && (declaration->kind == RangeNodeEnum || declaration->kind == RangeNodeConstruct)) {
-            RangeNode *function = typer->function;
-            if (function && function->typeName && isEnum(context) && context->resolvedDeclaration == declaration) {
-                subject->resolvedDeclaration = methodReceiver(typer->report,function);
-                subject->type = context;
-                return context;
-            }
-            typeError(typer,subject,"'%s' names a type; as a subject it is the current value only inside %s's own functions",
-                      subject->name,subject->name);
-            return NULL;
-        }
-    }
-    return typeOf(typer,scope,subject,NULL,context);
-}
 
 /* The type a switch expression has, from its arms' values: the first arm's,
  * or the optional one arm's value promotes the others to. */
@@ -5839,17 +5715,17 @@ static void typeConditionCoverage(Typer *typer, RangeNode *node)
 /* A switch statement, or, with RangeFlagValue, a switch expression: its type
  * is the one its arms yield, each typed with `expected` (or, without one,
  * with the first value's type) as context, as any value is. An arm that does
- * not yield is a block that must diverge. A switch over several subjects
- * matches their combinations: each row has one pattern per subject. */
+ * not yield is a block that must diverge. A switch over conditions has no
+ * subjects; the switch a for loop lowers to has one. */
 static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *expected, RangeNode *context, RangeNode *output)
 {
     size_t errors = typer->report->errors;
     RangeArena *arena = typer->report->arena;
     size_t width = node->c ? node->c->itemCount : 1;
-    RangeNode **types = rangeArenaAllocate(arena,width * sizeof(*types));
+    RangeNode **types = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*types));
     int typed = 1;
     for (size_t k = 0; k < width; ++k) {
-        types[k] = typeSubject(typer,scope,node->c ? node->c->items[k] : node->a,context);
+        types[k] = typeOf(typer,scope,node->c ? node->c->items[k] : node->a,NULL,context);
         typed &= types[k] != NULL;
     }
     int value = (node->flags & RangeFlagValue) != 0;
@@ -5859,25 +5735,9 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount)
             typeError(typer,entry,"'default' must be the last arm of a switch");
         for (size_t j = 0; j < entry->itemCount; ++j) {
+            // The parser checked where the row binds; its condition sees its bindings.
             RangeNode *row = entry->items[j], *bindings = row->c;
             typeRow(typer,scope,row,types,width,context);
-            for (size_t k = 0; bindings && k < bindings->itemCount; ++k)
-                for (size_t m = 0; m < k; ++m)
-                    if (same(bindings->items[m]->name,bindings->items[k]->name))
-                        typeError(typer,bindings->items[k],"'%s' is bound twice in one row",bindings->items[k]->name);
-            // Every row of an arm binds the same names, with the same types.
-            if (j) {
-                for (size_t k = 0; bindings && k < bindings->itemCount; ++k) {
-                    RangeNode *binding = bindings->items[k], *first = bindingNamed(entry->c,binding->name);
-                    if (!first) { typeError(typer,binding,"'%s' must be bound by every row of this arm",binding->name); continue; }
-                    binding->resolvedDeclaration = first;
-                    expectType(typer,binding,first->type,binding->type,"a binding shared by the rows of an arm");
-                }
-                for (size_t k = 0; entry->c && k < entry->c->itemCount; ++k)
-                    if (!bindingNamed(bindings,entry->c->items[k]->name))
-                        typeError(typer,row,"this row must also bind '%s'",entry->c->items[k]->name);
-            }
-            // A row's condition sees that row's bindings.
             if (row->b) {
                 SourceScope bound = {.owner=bindings ? bindings : entry,.parent=scope};
                 expectType(typer,row->b,typer->booleanType,typeOf(typer,&bound,row->b,typer->booleanType,context),"condition");
@@ -5914,7 +5774,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
             patternRow(pattern,row,width);
             // A default the compiler wrote for a lowering may be unreachable.
             if (!useful(typer,rows,count,row,types,width) && !(entry->flags & RangeFlagImplicit)) {
-                if (pattern) typeError(typer,pattern,"this %s is already handled by earlier arms",width > 1 ? "row" : "pattern");
+                if (pattern) typeError(typer,pattern,"this pattern is already handled by earlier arms");
                 else typeError(typer,entry,"'default' is never reached: the arms above match every value");
             }
             if (!pattern || !pattern->b) rows[count++] = row;
@@ -5929,16 +5789,6 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         used += (size_t)snprintf(t + used,sizeof(t) > used ? sizeof(t) - used : 0,"%s%s",k ? ", " : "",one);
     }
     char missing[512] = "";
-    if (width > 1) {
-        RangeNode **cases = rangeArenaAllocate(arena,width * sizeof(*cases));
-        for (size_t k = 0; k < width; ++k) cases[k] = isEnum(types[k]) ? types[k]->resolvedDeclaration : NULL;
-        if (patternMissing(arena,typerUseful,typer,rows,count,types,cases,width,NULL,missing,sizeof(missing))) {
-            int many = strchr(missing,',') != NULL;
-            typeError(typer,node,"switch over %s must be exhaustive: %s %s not handled; add %s or a default",t,missing,
-                      many ? "are" : "is",many ? "those combinations" : "that combination");
-        } else typeError(typer,node,"switch over %s must be exhaustive; add a default",t);
-        return type;
-    }
     RangeNode *subject = types[0];
     size_t length = 0;
     if (isEnum(subject))
@@ -5977,7 +5827,7 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     // the patterns and conditions of a switch label: no other type declares them.
     if (function->typeName && (same(function->name,"&") || same(function->name,"|"))
         && (!(function->flags & RangeFlagBuiltin) || !context || context->resolvedDeclaration != typer->boolean))
-        typeError(typer,function,"'%s' is reserved for Bool logic and switch patterns; %s cannot declare it",
+        typeError(typer,function,"'%s' is reserved for Bool logic; %s cannot declare it",
                   function->name,function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
@@ -8830,39 +8680,15 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
         }
         return;
     }
-    case RangePatternValue: case RangePatternRelation: {
-        // `0:`, `"yes":`, or `= limits.max:` compare with `=`; `< 0:` calls
-        // the subject type's `<` with the operand.
-        const char *op = pattern->integer == RangePatternValue ? "=" : pattern->name;
-        RangeNode *function = pattern->integer == RangePatternRelation ? pattern->resolvedDeclaration : NULL;
+    case RangePatternValue: {
+        // A value the field must equal, by its type's `=`.
         nativePlaceLoad(native,place,type);
         nativeEmit(native,armPush(0));
         nativeExpression(native,pattern->a);
         nativeEmit(native,armMov(1,0));
         nativeEmit(native,armPop(0));
-        if (same(op,"=") || same(op,"!=")) {
-            if (!nativeEquals(native,type,pattern)) return;
-            uint32_t fails = same(op,"=") ? armCbz(0,0) : armCbnz(0,0);
-            nativeFail(match,nativeEmit(native,fails),fails);
-            return;
-        }
-        if (function && !(function->flags & RangeFlagBuiltin)) {
-            // The receiver is an address: a scalar is passed through the stack.
-            if (type->scalarBits) { nativeEmit(native,armPush(0)); nativeEmit(native,armAddImm(0,31,0)); }
-            nativeCallFunction(native,function,type);
-            if (type->scalarBits) nativeEmit(native,armAddImm(31,31,16));
-            native->resultTemp = -1;
-            nativeFail(match,nativeEmit(native,armCbz(0,0)),armCbz(0,0));
-            return;
-        }
-        int pass = nativeRelation(op,type->scalarSigned);
-        if (!type->scalarBits || pass < 0) {
-            char name[160]; describeType(name,sizeof(name),type);
-            nativeMissing(native,pattern,"no C primitive implements builtin operator '%s' on %s",op,name);
-            return;
-        }
-        nativeEmit(native,armCmp(0,1));
-        nativeFail(match,nativeEmit(native,armBcond(pass ^ 1,0)),armBcond(pass ^ 1,0));
+        if (!nativeEquals(native,type,pattern)) return;
+        nativeFail(match,nativeEmit(native,armCbz(0,0)),armCbz(0,0));
         return;
     }
     default:
