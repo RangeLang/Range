@@ -466,6 +466,70 @@ reject macro-case-unreachable "this condition is already handled by earlier arms
 enum Light { case on, off }
 { return 0 }'
 
+# A test of a stable optional's present case, with no pattern, narrows it to
+# the payload: right of the test in its `&` chain and in the arm's body.
+run narrowing 42 "" Testing/Compiler/Native/Narrowing.range
+optional='Optional<Wrapped: Int<bits: 64, signed: true>>'
+reject narrowing-shadow "narrowing-shadow.range:1:55: error[type]: 'x' is already narrowed to the payload here; related: a test of an optional value for its present case narrows that value" \
+    'function f(let x: Int?): Int { switch { x.present(let x): return x, default: return 0 } }
+{ return f(x: 1) }'
+# A state can change in the arm, and a call is computed again: neither narrows.
+reject narrowing-state "'+' is not declared on $optional" \
+    '{ state s: Int?.absent  s: 3  switch { s.present: return s + 1, default: return 0 } }'
+reject narrowing-call "'+' is not declared on $optional" \
+    'function g(): Int? { return 3 }
+{ switch { g().present: return g() + 1, default: return 0 } }'
+# Under `!`, on one side of `|`, and left of the test, nothing is narrowed.
+reject narrowing-negated "'+' is not declared on $optional" \
+    'function f(let x: Int?): Int { switch { !(!x.present): return x + 1, default: return 0 } }
+{ return f(x: 1) }'
+reject narrowing-one-side "'+' is not declared on $optional" \
+    'function f(let x: Int?, let y: Int?): Int { switch { x.present | y.present: return x + 1, default: return 0 } }
+{ return f(x: 1, y: 2) }'
+reject narrowing-left "'>' is not declared on $optional" \
+    'function f(let x: Int?): Int { switch { x > 0 & x.present: return 1, default: return 0 } }
+{ return f(x: 1) }'
+reject narrowing-after-switch "'+' is not declared on $optional" \
+    'function f(let x: Int?): Int { switch { x.present: {}, default: return 0 } return x + 1 }
+{ return f(x: 1) }'
+# Only the enum applying @optional narrows; other enums bind their payloads.
+reject narrowing-other-enum "'+' is not declared on Box" \
+    'enum Box { case empty
+    case full(Int) }
+function f(let b: Box): Int { switch { b.full: return b + 1, default: return 0 } }
+{ return f(b: .full(1)) }'
+# At compile time too: a macro's lets narrow through `&`, through `|` when
+# both sides narrow, and in the arm's body.
+run macro-narrowing 0 "" "$(case_file macro-narrowing 'macro named(): Enum {
+    let on: #cases.first(where: { c in c.name = "on" })
+    let off: #cases.first(where: { c in c.name = "off" })
+    switch {
+        on.present & on.name != "on": @diagnostic("\(#name) misnames on"),
+        on.present & off.present | on.present & on.name = "on": @warning("\(#name) has \(on.name)"),
+        default: @diagnostic("\(#name) has no case on")
+    }
+}
+@named
+enum Light { case on, off }
+{ return 0 }')"
+grep -Fq "warning[macro]: Light has on" "$work_root/log" || fail "a compile-time narrowing did not hold"
+reject macro-narrowing-shadow "'on' is already narrowed to the payload here" \
+    'macro named(): Enum {
+    let on: #cases.first(where: { c in c.name = "on" })
+    switch { on.present(let on): @warning("\(on.name)"), default: {} }
+}
+@named
+enum Light { case on, off }
+{ return 0 }'
+reject macro-narrowing-state "Optional has no case 'name'" \
+    'macro named(): Enum {
+    state on: #cases.first(where: { c in c.name = "on" })
+    switch { on.present: @warning("\(on.name)"), default: {} }
+}
+@named
+enum Light { case on, off }
+{ return 0 }'
+
 reject case-test-not-enum "Int<bits: 64, signed: true> has no member 'present'" \
     'function f(let o: Int): Int { switch { o.present: return 1, default: return 0 } }
 { return 0 }'
@@ -918,4 +982,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=61 rejections=178 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=63 rejections=188 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

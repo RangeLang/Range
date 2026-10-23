@@ -78,8 +78,10 @@ enum {
                                     * switch arm: a default the compiler wrote for a lowering;
                                     * binding: one a lowering wrote, not a pattern's `let`;
                                     * name: the receiver a bare case name tests */
-    RangeFlagEarlier = 1 << 16     /* name: read to the left of the case test that binds the same name
+    RangeFlagEarlier = 1 << 16,    /* name: read to the left of the case test that binds the same name
                                     * in its condition, so it names what it names outside the condition */
+    RangeFlagNarrowed = 1 << 17    /* member access: the payload of the optional value a, which a test of
+                                    * its present case narrowed; resolvedDeclaration is the payload field */
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of

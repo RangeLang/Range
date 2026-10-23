@@ -1,0 +1,73 @@
+// A test of a stable optional value for its present case, with no pattern,
+// narrows the value to its payload: to the right in the same `&` chain, in
+// the arm's body, and in a for loop's body after its filter.
+enum Shape {
+    case circle(radius: Int)
+    case group(Array<Int>)
+}
+construct Person {
+    let age: Int
+    let manager: Person?
+    let shape: Shape?
+}
+function boss(let p: Person): Person? { return p.manager }
+function twice(let maybe: Int?): Int {
+    switch { maybe.present: return maybe * 2, default: return 0 }
+}
+function largest(let a: Int?, let b: Int?): Int {
+    let best: switch {
+        a.present & b.present & a > b: a,
+        a.present & b.present: b,
+        a.present: a,
+        b.present: b,
+        default: 0
+    }
+    return best
+}
+function chain(let p: Person): Int {
+    // A member path narrows, and a path through a narrowed value narrows in turn.
+    switch {
+        p.manager.present & p.manager.manager.present: return p.manager.manager.age,
+        p.manager.present: return p.manager.age,
+        default: return 0
+    }
+}
+function radius(let p: Person): Int {
+    // The payload is an enum: its cases are tested on the narrowed value.
+    switch { p.shape.present & p.shape.circle(let r): return r, default: return -1 }
+}
+function either(let a: Int?, let b: Int?): Int {
+    // Both sides of `|` narrow a, so the body reads a's payload.
+    switch { a.present & b.absent | a.present & a > 10: return a, default: return -1 }
+}
+{
+    switch { twice(maybe: 21) != 42: return 1, default: {} }
+    switch { twice(maybe: .absent) != 0: return 2, default: {} }
+    switch { largest(a: 3, b: 9) != 9: return 3, default: {} }
+    switch { largest(a: 9, b: .absent) != 9: return 4, default: {} }
+    switch { largest(a: .absent, b: .absent) != 0: return 5, default: {} }
+    let top: Person(age: 70, manager: .absent, shape: .absent)
+    let middle: Person(age: 50, manager: top, shape: .circle(radius: 4))
+    let low: Person(age: 20, manager: middle, shape: .group(Array<Int>()))
+    switch { chain(p: low) != 70: return 6, default: {} }
+    switch { chain(p: middle) != 70: return 7, default: {} }
+    switch { chain(p: top) != 0: return 8, default: {} }
+    switch { radius(p: middle) != 4: return 9, default: {} }
+    switch { radius(p: low) != -1: return 10, default: {} }
+    switch { either(a: 5, b: .absent) != 5: return 11, default: {} }
+    switch { either(a: 12, b: 1) != 12: return 12, default: {} }
+    switch { either(a: 5, b: 1) != -1: return 13, default: {} }
+    // A for filter narrows the element for the body.
+    state names: Array<String?>()
+    names.append(value: "Ada")
+    names.append(value: .absent)
+    names.append(value: "Grace")
+    state letters: 0
+    for name in names & name.present { letters: letters + name.count }
+    switch { letters != 8: return 14, default: {} }
+    // A let local narrows; a narrowed payload is passed on as its own type.
+    let found: boss(p: low)
+    switch { found.present & found.age = 50: {}, default: return 15 }
+    switch { found.present: switch { chain(p: found) != 70: return 16, default: {} }, default: return 17 }
+    return 42
+}

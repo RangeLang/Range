@@ -774,6 +774,10 @@ typedef struct MetaLocal {
     const char *name;
     RangeGraphValue value;
     int mutable;
+    /* A narrowing, not a name: the value at path holds the payload of its
+     * optional's case `narrowed`, and value is that payload. */
+    RangeNode *path;
+    const char *narrowed;
     struct MetaLocal *next;
 } MetaLocal;
 typedef struct MetaScope {
@@ -794,6 +798,8 @@ typedef struct {
     RangeNode *output;   /* the enum it returns, if any */
     RangeNode *condition, *conditionShape; int conditionKnown;
     RangeGraphValue *self;    /* the receiver of the running method */
+    int narrowing;            /* evaluating a condition's `&` and `|` chain, whose case tests narrow */
+    RangeNode *narrowingTest; /* the term of that chain being evaluated */
     RangeGraphValue *pending; /* a first argument already evaluated, for C's own calls */
     /* Emitted copies by original, so a node quoted code reaches twice (a
      * for-in's binding is in its pattern and its scope) stays one node. */
@@ -1978,6 +1984,95 @@ static int metaHoldsCase(MetaEval *eval, RangeGraphValue value, const char *name
     return type && metaCaseNamed(type,name);
 }
 
+/* Narrowing at compile time, as in compiled code: a test of a stable
+ * optional value for its present case, with no pattern, narrows the value
+ * to its payload to the right of the test in the same `&` chain and in the
+ * arm's body. Stable is a let, a parameter, a #reflection value, or a member
+ * path of one; a state is not. The optional is the enum applying @optional. */
+static int metaPresentCase(const RangeNode *type, const char *name)
+{
+    if (!type || !appliesBuiltin(type,"optional")) return 0;
+    const RangeNode *payload = NULL;
+    size_t payloads = 0;
+    for (size_t i = 0; i < type->itemCount; ++i) {
+        const RangeNode *entry = type->items[i];
+        if (entry->kind != RangeNodeEnumCase || !entry->itemCount) continue;
+        payloads += entry->itemCount == 1 ? 1 : 2;
+        payload = entry;
+    }
+    return payloads == 1 && same(payload->name,name);
+}
+
+static int metaNarrowable(MetaEval *eval, MetaScope *scope, const RangeNode *path)
+{
+    if (!path || path->generics) return 0;
+    if (path->kind == RangeNodeEnvironment) return 1;
+    if (path->kind == RangeNodeMemberAccess) return metaNarrowable(eval,scope,path->a);
+    if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit)) return 0;
+    for (MetaScope *outer = scope; outer; outer = outer->parent)
+        for (MetaLocal *local = outer->locals; local; local = local->next)
+            if (!local->path && same(local->name,path->name)) return !local->mutable;
+    size_t member = eval->self && eval->self->kind == RangeGraphInstance ? metaMemberIndex(*eval->self,path->name) : SIZE_MAX;
+    return member != SIZE_MAX && eval->self->declaration->items[member]->kind == RangeNodeLet;
+}
+
+/* The payload a narrowed path reads, unless a name declared inside the
+ * narrowing hides the path's root. */
+static int metaNarrowed(MetaScope *scope, const RangeNode *node, RangeGraphValue *value)
+{
+    const RangeNode *root = node;
+    while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+    if (!root) return 0;
+    for (; scope; scope = scope->parent)
+        for (MetaLocal *local = scope->locals; local; local = local->next) {
+            if (local->path && samePath(local->path,node)) { *value = local->value; return 1; }
+            if (!local->path && root->kind == RangeNodeName && same(local->name,root->name)) return 0;
+        }
+    return 0;
+}
+
+/* The paths and cases both sides of every `|` in a condition test with no
+ * pattern: what a `|` may narrow beyond it. */
+typedef struct { RangeNode *paths[32]; const char *names[32]; size_t count; } MetaNarrowings;
+
+static void metaNarrowings(RangeNode *node, MetaNarrowings *out)
+{
+    if (!node) return;
+    if (node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"))) {
+        if (same(node->name,"&")) { metaNarrowings(node->a,out); metaNarrowings(node->b,out); return; }
+        MetaNarrowings left = {0}, right = {0};
+        metaNarrowings(node->a,&left);
+        metaNarrowings(node->b,&right);
+        for (size_t i = 0; i < left.count; ++i)
+            for (size_t k = 0; k < right.count; ++k)
+                if (out->count < 32 && samePath(left.paths[i],right.paths[k]) && same(left.names[i],right.names[k])) {
+                    out->paths[out->count] = left.paths[i];
+                    out->names[out->count++] = left.names[i];
+                    break;
+                }
+        return;
+    }
+    int test = (node->kind == RangeNodeMemberAccess && !(node->flags & RangeFlagNarrowed))
+        || (node->kind == RangeNodeCaseTest && node->b && !(node->b->flags & RangeFlagApplication));
+    if (test && node->a && out->count < 32) {
+        out->paths[out->count] = node->a;
+        out->names[out->count++] = node->name;
+    }
+}
+
+/* Ends the narrowings added to scope since `before`, except those `kept` holds. */
+static void metaEndNarrowings(MetaScope *scope, MetaLocal *before, const MetaNarrowings *kept)
+{
+    for (MetaLocal **link = &scope->locals; *link && *link != before;) {
+        MetaLocal *local = *link;
+        int keep = !local->path;
+        for (size_t i = 0; kept && i < kept->count && !keep; ++i)
+            keep = samePath(kept->paths[i],local->path) && same(kept->names[i],local->narrowed);
+        if (keep) link = &local->next;
+        else *link = local->next;
+    }
+}
+
 /* A case test at compile time: its bindings join `scope`, replacing what
  * an earlier test of the condition bound under the same names. */
 static RangeGraphValue metaCaseTest(MetaEval *eval, MetaScope *scope, RangeNode *test, RangeGraphValue subject)
@@ -1985,6 +2080,12 @@ static RangeGraphValue metaCaseTest(MetaEval *eval, MetaScope *scope, RangeNode 
     RangeNode *type = metaValueEnum(eval,subject);
     if (!type) fail(eval->vm,test,"'%s' reads a case off an enum value; this value is not one",test->name);
     (void)metaPatternCase(eval,type,test->b);
+    RangeNode *pattern = test->b;
+    int narrows = metaNarrowable(eval,scope,test->a) && metaPresentCase(type,test->name);
+    RangeNode *binding = narrows && (pattern->flags & RangeFlagApplication) && pattern->itemCount == 1 ? pattern->items[0]->a : NULL;
+    if (binding && binding->integer == RangePatternBind && test->a->kind == RangeNodeName && same(binding->a->name,test->a->name))
+        fail(eval->vm,binding->a,"'%s' is already narrowed to the payload here; related: a test of an optional "
+             "value for its present case narrows that value",test->a->name);
     MetaScope bound = {.parent=scope,.application=scope->application};
     int matched = metaMatch(eval,&bound,test->b,subject);
     for (MetaLocal *local = bound.locals, *next; matched && local; local = next) {
@@ -1994,6 +2095,11 @@ static RangeGraphValue metaCaseTest(MetaEval *eval, MetaScope *scope, RangeNode 
             if (same(other->name,local->name)) existing = other;
         if (existing) existing->value = local->value;
         else { local->next = scope->locals; scope->locals = local; }
+    }
+    if (matched && narrows && eval->narrowingTest == test && !(pattern->flags & RangeFlagApplication)) {
+        MetaLocal *local = rangeArenaAllocate(eval->vm->arena,sizeof(*local));
+        *local = (MetaLocal){.value=subject.values[0],.path=test->a,.narrowed=test->name,.next=scope->locals};
+        scope->locals = local;
     }
     return metaScalar(eval,test,RangeNodeBool,matched);
 }
@@ -2188,7 +2294,11 @@ static RangeNode *metaConditionArm(MetaEval *eval, MetaScope *scope, RangeNode *
         *arm = (MetaScope){.parent=scope,.application=scope->application};
         if (entry->flags & RangeFlagLiteral) return entry;
         RangeNode *condition = entry->items[0]->b;
-        if (metaBoolean(eval,metaExpression(eval,arm,condition),condition)) return entry;
+        int narrowing = eval->narrowing;
+        eval->narrowing = 1; /* what the condition narrows holds in the arm's body */
+        int holds = metaBoolean(eval,metaExpression(eval,arm,condition),condition);
+        eval->narrowing = narrowing;
+        if (holds) return entry;
     }
     fail(eval->vm,node,"compile-time switch has no arm for this value");
 }
@@ -2202,7 +2312,41 @@ static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, Met
     return metaConditionArm(eval,scope,node,arm);
 }
 
+static RangeGraphValue metaEvaluate(MetaEval *, MetaScope *, RangeNode *);
+
+/* A compile-time expression's value. Reads of a narrowed value read its
+ * payload; a case test narrows beyond itself only through `&` and `|`. */
 static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNode *node)
+{
+    if (!node) return (RangeGraphValue){0};
+    RangeGraphValue value;
+    if ((node->kind == RangeNodeName || node->kind == RangeNodeMemberAccess || node->kind == RangeNodeEnvironment)
+        && !(node->flags & RangeFlagNarrowed) && metaNarrowed(scope,node,&value)) return value;
+    int spine = eval->narrowing;
+    RangeNode *test = eval->narrowingTest;
+    int logic = node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"));
+    eval->narrowing = spine && logic;
+    eval->narrowingTest = spine && !logic ? node : NULL;
+    if (spine && logic && same(node->name,"|")) {
+        // Each side's narrowing holds within it; what both narrow holds beyond.
+        metaStep(eval,node);
+        MetaLocal *before = scope->locals;
+        int holds = metaBoolean(eval,metaExpression(eval,scope,node->a),node);
+        if (!holds) {
+            metaEndNarrowings(scope,before,NULL);
+            holds = metaBoolean(eval,metaExpression(eval,scope,node->b),node);
+        }
+        MetaNarrowings both = {0};
+        metaNarrowings(node,&both);
+        metaEndNarrowings(scope,before,&both);
+        value = metaScalar(eval,node,RangeNodeBool,holds);
+    } else value = metaEvaluate(eval,scope,node);
+    eval->narrowing = spine;
+    eval->narrowingTest = test;
+    return value;
+}
+
+static RangeGraphValue metaEvaluate(MetaEval *eval, MetaScope *scope, RangeNode *node)
 {
     RangeNode *expected = eval->expected;
     eval->expected = NULL;
@@ -2276,6 +2420,13 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         return metaCaseTest(eval,scope,node,metaExpression(eval,scope,node->a));
     }
     case RangeNodeMemberAccess: {
+        if (node->flags & RangeFlagNarrowed) {
+            // A narrowed optional's payload, as compiled code reads it.
+            RangeGraphValue optional = metaExpression(eval,scope,node->a);
+            for (size_t i = 0; optional.kind == RangeGraphCase && i < optional.node->itemCount; ++i)
+                if (optional.node->items[i] == node->resolvedDeclaration) return optional.values[i];
+            fail(eval->vm,node,"this narrowed value holds no payload");
+        }
         // `Light.red` and `Int?.absent` are cases.
         RangeNode *enumeration = metaTypePath(eval,scope,node->a);
         if (enumeration && metaCaseNamed(enumeration,node->name))
@@ -3394,6 +3545,10 @@ typedef struct {
     RangeNode *closureSite;     /* the argument being typed for a function-typed parameter */
     int inferring; RangeNode *inferred; /* a closure whose result its returns decide */
     int closures; /* closure bodies being typed in the function being typed */
+    /* Values narrowed to their optional's payload where they are read now;
+     * the function being typed sees those from narrowedFloor on. */
+    struct { RangeNode *path, *entry, *field, *type; } *narrowed;
+    size_t narrowedCount, narrowedCapacity, narrowedFloor;
 } Typer;
 
 static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
@@ -4823,9 +4978,100 @@ static void typeSharedBindings(Typer *typer, RangeNode *pattern)
     for (size_t i = 0; i < pattern->itemCount; ++i) typeSharedBindings(typer,pattern->items[i]->a);
 }
 
+/* ---- narrowing ----
+ * A test of a stable optional value for its present case, with no pattern,
+ * as in `manager.present`, narrows the value: to the right of the test in
+ * the same `&` chain, and in the arm's body or the loop's, the value is the
+ * payload of the present case, read with no check. A stable value is a let,
+ * a parameter, a #reflection value, or a member path of one; a state can
+ * change and a call is computed again, so neither narrows. A test under `!`
+ * or on one side of `|` narrows nothing beyond it, unless both sides of the
+ * `|` narrow the same value. The optional is the enum applying @optional. */
+
+static int narrowablePath(const RangeNode *path)
+{
+    if (!path || path->generics) return 0;
+    if (path->kind == RangeNodeEnvironment) return 1;
+    if (path->kind == RangeNodeMemberAccess) {
+        const RangeNode *member = path->resolvedDeclaration;
+        return ((path->flags & RangeFlagNarrowed) || (member && rangeNodeDeclaresValue(member->kind))) && narrowablePath(path->a);
+    }
+    if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit) || !path->resolvedDeclaration) return 0;
+    const RangeNode *declaration = path->resolvedDeclaration;
+    return declaration->kind == RangeNodeLet || (declaration->kind == RangeNodeParameter && !(declaration->flags & RangeFlagBinding));
+}
+
+static int sameNarrowedPath(const RangeNode *a, const RangeNode *b)
+{
+    if (!a || !b || a->kind != b->kind || (a->flags & RangeFlagNarrowed) != (b->flags & RangeFlagNarrowed)) return 0;
+    if (a->kind == RangeNodeName) return a->resolvedDeclaration && a->resolvedDeclaration == b->resolvedDeclaration;
+    if (a->kind == RangeNodeEnvironment) return same(a->name,b->name);
+    return a->kind == RangeNodeMemberAccess && a->resolvedDeclaration == b->resolvedDeclaration && sameNarrowedPath(a->a,b->a);
+}
+
+static void pushNarrowed(Typer *typer, RangeNode *path, RangeNode *entry, RangeNode *type)
+{
+    if (typer->narrowedCount == typer->narrowedCapacity) {
+        typer->narrowedCapacity = typer->narrowedCapacity ? typer->narrowedCapacity * 2 : 16;
+        void *grown = rangeArenaAllocate(typer->report->arena,typer->narrowedCapacity * sizeof(*typer->narrowed));
+        if (typer->narrowedCount) memcpy(grown,typer->narrowed,typer->narrowedCount * sizeof(*typer->narrowed));
+        typer->narrowed = grown;
+    }
+    typer->narrowed[typer->narrowedCount].path = path;
+    typer->narrowed[typer->narrowedCount].entry = entry;
+    typer->narrowed[typer->narrowedCount].field = entry->items[0];
+    typer->narrowed[typer->narrowedCount++].type = type;
+}
+
+/* A read of a narrowed value becomes the read of its payload, in place. */
+static RangeNode *narrowedRead(Typer *typer, RangeNode *expr, RangeNode *type)
+{
+    if (!type || (expr->kind != RangeNodeName && expr->kind != RangeNodeMemberAccess && expr->kind != RangeNodeEnvironment)) return type;
+    for (size_t i = typer->narrowedCount; i-- > typer->narrowedFloor;) {
+        if (!sameNarrowedPath(typer->narrowed[i].path,expr)) continue;
+        RangeArena *arena = typer->report->arena;
+        RangeNode *value = rangeArenaAllocate(arena,sizeof(*value));
+        *value = *expr;
+        value->type = type;
+        RangeNode *read = rangeNodeCreate(arena,RangeNodeMemberAccess,expr->path,expr->line,expr->column);
+        read->a = value;
+        read->name = typer->narrowed[i].entry->name;
+        read->flags = RangeFlagNarrowed;
+        read->resolvedDeclaration = typer->narrowed[i].field;
+        read->type = typer->narrowed[i].type;
+        *expr = *read;
+        return expr->type;
+    }
+    return type;
+}
+
+static RangeNode *typeOperator(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
+
+/* `a | b` narrows what both sides narrow; each side's narrowing holds
+ * only within it. */
+static RangeNode *typeEither(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context)
+{
+    size_t mark = typer->narrowedCount;
+    RangeNode *left = typeOf(typer,scope,expr->a,NULL,context);
+    size_t leftCount = typer->narrowedCount - mark;
+    RangeNode **paths = rangeArenaAllocate(typer->report->arena,(leftCount ? leftCount : 1) * sizeof(*paths));
+    for (size_t i = 0; i < leftCount; ++i) paths[i] = typer->narrowed[mark + i].path;
+    typer->narrowedCount = mark;
+    RangeNode *type = left ? typeOperator(typer,scope,expr,left,NULL,context) : (typeOf(typer,scope,expr->b,NULL,context), NULL);
+    size_t end = typer->narrowedCount, kept = mark;
+    for (size_t i = mark; i < end; ++i) {
+        int both = 0;
+        for (size_t k = 0; k < leftCount && !both; ++k) both = sameNarrowedPath(paths[k],typer->narrowed[i].path);
+        if (both) typer->narrowed[kept++] = typer->narrowed[i];
+    }
+    typer->narrowedCount = kept;
+    return type;
+}
+
 static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test, RangeNode *context)
 {
     RangeNode *subject = test->a, *type;
+    size_t mark = typer->narrowedCount;
     if (subject->flags & RangeFlagImplicit) {
         subject->resolvedDeclaration = methodReceiver(typer->report,typer->function);
         subject->type = type = context;
@@ -4833,6 +5079,15 @@ static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test
     if (!type) return NULL;
     typePattern(typer,scope,test->b,type,context);
     typeSharedBindings(typer,test->b);
+    typer->narrowedCount = mark;
+    RangeNode *present = NULL, *payload = optionalWrapped(typer,type,&present), *pattern = test->b;
+    if (payload && pattern->resolvedDeclaration == present && narrowablePath(subject)) {
+        RangeNode *bound = pattern->itemCount == 1 ? pattern->items[0]->a : NULL;
+        if (!(pattern->flags & RangeFlagApplication)) pushNarrowed(typer,subject,present,payload);
+        else if (subject->kind == RangeNodeName && bound && bound->integer == RangePatternBind && same(bound->a->name,subject->name))
+            typeError(typer,bound->a,"'%s' is already narrowed to the payload here; related: a test of an optional "
+                      "value for its present case narrows that value",subject->name);
+    }
     return typer->booleanType;
 }
 
@@ -5030,8 +5285,27 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
 }
 
 static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
+static RangeNode *typeExpression(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 
+/* An expression's type. A case test's narrowing holds beyond it only
+ * through `&` and `|`; reads of a narrowed value read its payload. */
 static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
+{
+    if (!expr) return NULL;
+    if (expr->flags & RangeFlagNarrowed) return expr->type; /* already read through its narrowing */
+    size_t mark = typer->narrowedCount;
+    int logic = expr->kind == RangeNodeBinary && (same(expr->name,"&") || same(expr->name,"|"));
+    RangeNode *type;
+    if (logic && same(expr->name,"|")) {
+        type = typeEither(typer,scope,expr,context);
+        expr->type = type;
+    } else type = typeExpression(typer,scope,expr,expected,context);
+    if (!logic && expr->kind != RangeNodeCaseTest) typer->narrowedCount = mark;
+    type = narrowedRead(typer,expr,type);
+    return type;
+}
+
+static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
 {
     if (!expr) return NULL;
     RangeNode *type = NULL;
@@ -5319,7 +5593,17 @@ static void typeEffect(Typer *typer, SourceScope *scope, RangeNode *attribute, R
     }
 }
 
+static void typeStatementOnly(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+
+/* A statement's case tests narrow nothing beyond it. */
 static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
+{
+    size_t mark = typer->narrowedCount;
+    typeStatementOnly(typer,scope,node,context,output);
+    typer->narrowedCount = mark;
+}
+
+static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
 {
     if (!node) return;
     switch (node->kind) {
@@ -5730,6 +6014,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     RangeNode *type = NULL;
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
+        size_t narrowed = typer->narrowedCount; /* what the arm's condition narrows holds in its body */
         if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount)
             typeError(typer,entry,"'default' must be the last arm of a switch");
         for (size_t j = 0; j < entry->itemCount; ++j) {
@@ -5745,9 +6030,11 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         if (entry->a) {
             RangeNode *actual = typeOf(typer,&body,entry->a,expected ? expected : type,context);
             type = armsType(typer,node,type,entry->a,actual);
+            typer->narrowedCount = narrowed;
             continue;
         }
         typeBlock(typer,&body,entry->b,context,output);
+        typer->narrowedCount = narrowed;
         if (value && !exits(entry->b,typer->loops > 0))
             typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic");
     }
@@ -5831,6 +6118,8 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
     int loops = typer->loops, inferring = typer->inferring, closures = typer->closures;
     RangeNode *outer = typer->function, *outerOutput = typer->output, *inferred = typer->inferred, *site = typer->closureSite;
+    size_t floor = typer->narrowedFloor, narrowed = typer->narrowedCount;
+    typer->narrowedFloor = narrowed;
     typer->loops = 0;
     typer->inferring = 0;
     typer->closures = 0;
@@ -5843,6 +6132,7 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     typer->output = output;
     if (function->a) typeBlock(typer,&scope,function->a,context,output);
     typer->loops = loops;
+    typer->narrowedFloor = floor; typer->narrowedCount = narrowed;
     typer->output = outerOutput;
     typer->function = outer;
     typer->inferring = inferring; typer->inferred = inferred; typer->closureSite = site; typer->closures = closures;
@@ -8023,6 +8313,30 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
         }
         nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name);
         return NULL;
+    }
+    if (expr->kind == RangeNodeMemberAccess && (expr->flags & RangeFlagNarrowed)) {
+        // A narrowed optional's payload: its field, read with no check.
+        int innerSlot = 0;
+        RangeNode *optional = nativeAddress(native,expr->a,&innerSlot);
+        if (!optional) return NULL;
+        RangeNode *declaration = optional->resolvedDeclaration;
+        size_t k = 0, found = SIZE_MAX;
+        for (size_t i = 0; declaration && i < declaration->itemCount && found == SIZE_MAX; ++i) {
+            RangeNode *entry = declaration->items[i];
+            if (entry->kind != RangeNodeEnumCase) continue;
+            for (size_t j = 0; j < entry->itemCount; ++j, ++k) if (entry->items[j] == expr->resolvedDeclaration) { found = k; break; }
+        }
+        if (found == SIZE_MAX || !optional->memberOffsets || optional->memberOffsets[found] == SIZE_MAX) {
+            nativeMissing(native,expr,"native access to the narrowed payload is not implemented");
+            return NULL;
+        }
+        nativeAddOffset(native,0,0,optional->memberOffsets[found]);
+        if (optional->memberBoxed && optional->memberBoxed[found]) {
+            // The field holds its block; the value starts after the block's header.
+            nativeEmit(native,armLdr(0,0,0));
+            nativeEmit(native,armAddImm(0,0,16));
+        }
+        return optional->memberTypes[found];
     }
     if (expr->kind == RangeNodeMemberAccess && !(expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase)) {
         int innerSlot = 0;

@@ -66,11 +66,11 @@ function both(let a: Int?, let b: Int?): Int {
     }
 }
 
-// Left of the test that binds it, a name is what it names outside: the
-// parameter is tested, and the arm's body reads the payload.
+// A test of the parameter's present case narrows it: the arm's body reads
+// the payload.
 function unwrapped(let value: Int?): Int {
     switch {
-        value.present(let value): return value,
+        value.present: return value,
         value.absent: return 0
     }
 }

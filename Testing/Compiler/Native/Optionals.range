@@ -38,7 +38,7 @@ function describe(let maybe: Int?): Int {
     switch { describe(maybe: worker.manager) != 1: return 5, default: {} }
     let found: find(xs: xs, wanted: 5)
     switch {
-        found.present(let found): switch { found != 0: return 6, default: {} },
+        found.present: switch { found != 0: return 6, default: {} },
         found.absent: return 7
     }
     state names: Array<String?>()

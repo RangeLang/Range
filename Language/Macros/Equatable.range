@@ -29,7 +29,7 @@ macro equatable(): Construct {
         declared.present:
             @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
 
-        declared.absent & equals.present(let equals) & written.present: {
+        declared.absent & equals.present & written.present: {
             switch {
                 equals.parameters.count != 1:
                     @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
@@ -37,10 +37,10 @@ macro equatable(): Construct {
             }
             let parameter: equals.parameters.first()
             switch {
-                parameter.present(let other) & other.name != "other":
-                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+                parameter.present & parameter.name != "other":
+                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(parameter.name)'"),
 
-                parameter.present(let other) & other.type != equals.receiver:
+                parameter.present & parameter.type != equals.receiver:
                     @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
 
                 default: {}
@@ -96,7 +96,7 @@ macro equatable(): Enum {
         declared.present:
             @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
 
-        declared.absent & equals.present(let equals) & written.present: {
+        declared.absent & equals.present & written.present: {
             switch {
                 equals.parameters.count != 1:
                     @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
@@ -104,10 +104,10 @@ macro equatable(): Enum {
             }
             let parameter: equals.parameters.first()
             switch {
-                parameter.present(let other) & other.name != "other":
-                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(other.name)'"),
+                parameter.present & parameter.name != "other":
+                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(parameter.name)'"),
 
-                parameter.present(let other) & other.type != equals.receiver:
+                parameter.present & parameter.type != equals.receiver:
                     @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
 
                 default: {}

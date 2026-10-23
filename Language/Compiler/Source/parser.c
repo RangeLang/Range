@@ -1069,7 +1069,7 @@ static void scanCondition(RangeParser *parser, RangeNode *node, int joined, Boun
     }
     case RangeNodeName:
         // Left of the test that binds it, a name is what it names outside:
-        // `equals.present(let equals)` tests the outer equals.
+        // in `limit > 0 & bound.present(let limit)` the first limit is the outer one.
         if (bindingsName(bindings, node->name) && !boundNamed(visible, node->name)) node->flags |= RangeFlagEarlier;
         return;
     case RangeNodeClosure: case RangeNodeSwitch:

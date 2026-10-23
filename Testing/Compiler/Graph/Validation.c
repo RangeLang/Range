@@ -128,7 +128,7 @@ static void validateLanguage(const char *source, const char *expected, size_t co
     "let ceiling: #generics.first(where: { g in g.name = \"ceiling\" }) " \
     "switch { payload.absent: @diagnostic(\"missing payload\"), " \
     "ceiling.absent: @diagnostic(\"missing ceiling\"), " \
-    "payload.present(let payload) & ceiling.present(let ceiling) & !accepts(limit: ceiling.value, candidate: payload.value): " \
+    "payload.present & ceiling.present & !accepts(limit: ceiling.value, candidate: payload.value): " \
     "@diagnostic(\"source policy rejected\"), " \
     "payload.present & ceiling.present: {} } } " \
     "function accepts(let candidate: SomeNumber, let limit: SomeNumber): SomeTruth { " \
