@@ -190,19 +190,10 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
     }
     if (parserAt(parser, "<")) *generics = parseGenericArguments(parser, 1);
     if (parserAt(parser, "?")) { parserAdvance(parser); *flags |= RangeFlagOptional; }
-    /* Retain every alternative. Execution may reject a union, but must never
-     * silently interpret it as only its first alternative. */
-    while (parserAt(parser, "|")) {
-        if (*generics) {
-            parserFail(parser, &parser->current, "specialized union types are not supported by the compiler parser");
-            return name;
-        }
-        parserAdvance(parser);
-        const char *alternative = parserExpectName(parser);
-        size_t length = strlen(name) + strlen(alternative) + 2;
-        char *combined = rangeArenaAllocate(parser->arena, length);
-        snprintf(combined, length, "%s|%s", name, alternative);
-        name = combined;
+    /* A value of one of several types is an enum with a case per alternative. */
+    if (parserAt(parser, "|")) {
+        parserFail(parser, &parser->current, "union types are not part of Range; declare an enum with one case per alternative");
+        return name;
     }
     return name;
 }

@@ -644,7 +644,7 @@ reject type-mismatch "argument 'value' of 'f' requires Bool; found Int<bits: 64,
 reject undefined-unreached "no declaration for 'missing' in the loaded sources" \
     '{ switch false { .true: return missing(value: 1), .false: {} } return 0 }'
 reject unknown-reference "no declaration for 'missing' in the loaded sources" '{ let user: missing return 0 }'
-reject union-type "union type resolution is not implemented" \
+reject union-type "union types are not part of Range; declare an enum with one case per alternative" \
     'function f(let value: Int | Bool): Int { return 1 }
 { return f(value: 3) }'
 reject defaults-different "@defaults is applied to 'Construct' twice with different arguments, at" \

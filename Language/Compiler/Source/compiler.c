@@ -621,7 +621,7 @@ static int enclosing(RangeNode *within, RangeNode *node, RangeNode **chain, size
 static RangeNode *namedDeclaration(Resolver *vm, RangeNode *from, const char *name, int flags,
                                    RangeNode *at, const char *what)
 {
-    if (!name || !*name || strchr(name,'|') || (flags & (RangeFlagMacroType | RangeFlagMany))) return NULL;
+    if (!name || !*name || (flags & (RangeFlagMacroType | RangeFlagMany))) return NULL;
     RangeNode *found = NULL;
     if (flags & RangeFlagOptional) {
         for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
@@ -2417,14 +2417,6 @@ static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
                                   RangeNode *at, const char *name, int kind)
 {
     if (!name || !*name) return NULL;
-    const char *separator = strchr(name,'|');
-    if (separator) {
-        const char *left = rangeArenaIntern(report->arena,name,(size_t)(separator-name));
-        (void)sourceReference(report,scope,at,left,kind);
-        (void)sourceReference(report,scope,at,separator+1,kind);
-        sourceDiagnostic(report,at,0,"not-implemented","union type resolution is not implemented");
-        return NULL;
-    }
     if (kind != 1 && strchr(name,'.')) {
         RangeNode *nested = dottedLookup(report,scope,name,kind);
         if (!nested) sourceDiagnostic(report,at,0,"undeclared","no declaration for '%s' in the loaded sources",name);
@@ -3255,7 +3247,7 @@ static int parametric(const RangeNode *);
 static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const char *name,
                                        RangeNode *generics, int flags, RangeNode *context, RangeNode *at)
 {
-    if (!name || !*name || strchr(name,'|')) return NULL; /* unions are reported already */
+    if (!name || !*name) return NULL;
     if (flags & RangeFlagMacroType) return NULL; /* macro types are not typed in this step */
     if (flags & RangeFlagOptional) {
         // `T?` is the construct applying @optional, specialized with T.
