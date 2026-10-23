@@ -22,14 +22,12 @@ macro equatable(): Construct {
     let equals: #functions.first(named: "equals")
     let declared: #functions.first(named: "=")
 
-    // One way to define equality: a type does not write `=` itself.
-    switch declared {
-        .present: @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-        .absent: {}
-    }
-
-    switch equals, written {
-        .present(let equals) & .present: {
+    // Every combination is a row, so the compiler checks that each is handled.
+    switch declared, equals, written {
+        // One way to define equality: a type does not write `=` itself.
+        .present & _ & _:
+            @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
+        .absent & .present(let equals) & .present: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
@@ -51,14 +49,19 @@ macro equatable(): Construct {
                 }
             }
         },
-        default: {
-            // Without @equatable written, an equals is an ordinary function.
-            switch written {
-                .present: @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used"),
-                .absent: {}
-            }
+        .absent & .absent & .present: {
+            @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
             // C primitive: compares every stored member in order, each with its
             // own type's `=`. It becomes Range code once macros can iterate members.
+            #graph {
+                extension #name {
+                    @builtin
+                    function =(let other: #name): Bool
+                }
+            }
+        },
+        // Without @equatable written, an equals is an ordinary function.
+        .absent & _ & .absent: {
             #graph {
                 extension #name {
                     @builtin
@@ -78,13 +81,12 @@ macro equatable(): Enum {
     let equals: #functions.first(named: "equals")
     let declared: #functions.first(named: "=")
 
-    switch declared {
-        .present: @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-        .absent: {}
-    }
-
-    switch equals, written {
-        .present(let equals) & .present: {
+    // Every combination is a row, so the compiler checks that each is handled.
+    switch declared, equals, written {
+        // One way to define equality: a type does not write `=` itself.
+        .present & _ & _:
+            @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
+        .absent & .present(let equals) & .present: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
@@ -106,13 +108,19 @@ macro equatable(): Enum {
                 }
             }
         },
-        default: {
-            switch written {
-                .present: @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used"),
-                .absent: {}
-            }
+        .absent & .absent & .present: {
+            @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
             // C primitive: compares the tags, then the current case's payload
             // fields. It becomes Range code once macros can iterate members.
+            #graph {
+                extension #name {
+                    @builtin
+                    function =(let other: #name): Bool
+                }
+            }
+        },
+        // Without @equatable written, an equals is an ordinary function.
+        .absent & _ & .absent: {
             #graph {
                 extension #name {
                     @builtin
