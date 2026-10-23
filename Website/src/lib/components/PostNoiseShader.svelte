@@ -253,7 +253,7 @@
       color = mix(color, paletteGrain, 0.055);
       color += (grain - 0.5) * (0.008 + color * 0.008);
 
-      gl_FragColor = vec4(color, cardEdgeAlpha);
+      gl_FragColor = vec4(color * cardEdgeAlpha, cardEdgeAlpha);
     }
   `;
 

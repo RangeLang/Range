@@ -414,7 +414,7 @@
         alpha = capsuleAlpha;
       }
 
-      gl_FragColor = vec4(color, alpha);
+      gl_FragColor = vec4(color * alpha, alpha);
     }
   `;
 
