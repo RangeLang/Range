@@ -75,9 +75,38 @@ macro collection(): Construct {
                 return .absent
             }
 
-            // The elements named `named`, in order, as a new collection.
-            // Selecting by any predicate needs closures, which are not typed
-            // or compiled yet; a name is what reflection elements share.
+            // The elements for which `where` is true, in order, as a new
+            // collection. Like every function that takes a closure, it is
+            // compiled inline where it is called.
+            function filter(let where: (Element) -> Bool): #name {
+                state result: #name()
+                state index: 0
+                while index < count {
+                    let element: read(at: index)
+                    switch where(element) { .true: result.append(value: element), .false: {} }
+                    index: index + 1
+                }
+                return result
+            }
+
+            // The first element for which `where` is true, or absence.
+            function first(let where: (Element) -> Bool): Element? {
+                state index: 0
+                while index < count {
+                    let element: read(at: index)
+                    switch where(element) { .true: return element, .false: {} }
+                    index: index + 1
+                }
+                return .absent
+            }
+
+            // Whether any element makes `where` true.
+            function contains(let where: (Element) -> Bool): Bool {
+                return switch first(where: where) { .present: true, .absent: false }
+            }
+
+            // The elements named `named`, in order, as a new collection: a
+            // name is what reflection elements share.
             function filter(let named: String): #name {
                 state result: #name()
                 state index: 0
@@ -103,6 +132,29 @@ macro collection(): Construct {
             // type parameters to require one, so C reads the reflective
             // field. It runs at compile time only.
             @builtin function name(let of: Element): String?
+
+            // Each element transformed, in order, as an Array of the results.
+            function map<Result>(let transform: (Element) -> Result): Array<Result> {
+                state result: Array<Result>()
+                state index: 0
+                while index < count {
+                    result.append(value: transform(read(at: index)))
+                    index: index + 1
+                }
+                return result
+            }
+
+            // `initial` combined with each element in order, as in
+            // combine(combine(initial, first), second).
+            function reduce<Result>(let initial: Result, let combine: (Result, Element) -> Result): Result {
+                state result: initial
+                state index: 0
+                while index < count {
+                    result: combine(result, read(at: index))
+                    index: index + 1
+                }
+                return result
+            }
         }
     }
 

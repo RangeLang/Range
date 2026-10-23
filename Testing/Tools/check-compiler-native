@@ -126,6 +126,8 @@ run closures 42 "" Testing/Compiler/Native/Closures.range
 [[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"
 grep -Fq "warning[C-implementation]: a closure is compiled by C inline, where the call it is passed to is made" "$work_root/log" \
     || fail "closures are not reported as C's"
+run collections 42 "" Testing/Compiler/Native/Collections.range
+[[ "$(cat "$work_root/stdout")" == "new read 3" ]] || fail "collections printed: $(cat "$work_root/stdout")"
 # Macros run closures at compile time: a Range function's closure parameter
 # holds one, which sees and changes the macro's own values.
 run compile-time-closures 0 "" "$(case_file compile-time-closures 'function count(let cases: Array<EnumCase>, let where: (EnumCase) -> Bool): Int {
@@ -151,6 +153,36 @@ enum Light { case on, off, dim }
 { return 0 }')"
 grep -Fq "compile-time-closures.range:19:1: warning[macro]: Light has 2 other cases of 3" "$work_root/log" \
     || fail "a compile-time closure did not run: $(grep 'error\[' "$work_root/log")"
+# Array's functions take closures at compile time too, on reflection lists.
+run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro checked(): Enum {
+    let wanted: "on"
+    switch #cases.first(where: { c in c.name = wanted }) {
+        .present(let c): @warning("\(#name) has \(c.name)"),
+        .absent: @diagnostic("\(#name) has no case on")
+    }
+    state seen: 0
+    let others: #cases.filter { c in
+        seen: seen + 1
+        return c.name != "on"
+    }
+    let total: #cases.reduce(initial: 0) { sum, c in sum + 1 }
+    let names: #cases.map { c in c.name }
+    switch names.first() {
+        .present(let n): @warning("\(#name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
+        .absent: {}
+    }
+    switch #cases.contains(where: { c in #cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }) {
+        .true: @warning("\(#name) dims"),
+        .false: {}
+    }
+}
+@checked
+enum Light { case on, off, dim }
+{ return 0 }')"
+for expected in "warning[macro]: Light has on" "warning[macro]: Light has 2 other cases of 3, 3 in all, first on" \
+    "warning[macro]: Light dims"; do
+    grep -Fq "compile-time-collections.range:23:1: $expected" "$work_root/log" || fail "compile-time collections did not report: $expected"
+done
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
     || fail "strings printed: $(cat "$work_root/stdout")"
@@ -158,7 +190,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
-                   bytes control evaluation identity-references subjects closures generic-methods; do
+                   bytes control evaluation identity-references subjects closures collections generic-methods; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -814,4 +846,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=57 rejections=167 closures=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=59 rejections=167 closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

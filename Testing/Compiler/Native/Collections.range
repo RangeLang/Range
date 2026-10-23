@@ -1,0 +1,48 @@
+// Array's filter, first, contains, map, and reduce: Range code on
+// @collection that takes closures.
+construct Message {
+    let unread: Bool
+    let size: Int
+    let subject: String
+}
+
+{
+    state xs: Array<Int>()
+    xs.append(value: 3)
+    xs.append(value: 8)
+    xs.append(value: 1)
+    xs.append(value: 6)
+    let big: xs.filter(where: { x in x > 4 })
+    switch big.count != 2 | big.read(at: 1) != 6 { .true: return 1, .false: {} }
+    let none: xs.filter { x in x > 100 }.isEmpty()
+    switch none { .false: return 2, .true: {} }
+    switch xs.first(where: { x in x > 5 }) { .present(8): {}, default: return 3 }
+    switch xs.first(where: { x in x > 50 }) { .absent: {}, .present: return 4 }
+    switch xs.contains(where: { x in x = 6 }) { .true: {}, .false: return 5 }
+    let doubled: xs.map { x in x * 2 }
+    switch doubled.read(at: 1) != 16 { .true: return 6, .false: {} }
+    let flags: xs.map(transform: { x in x > 2 })
+    switch flags.read(at: 2) { .false: {}, .true: return 7 }
+    let sum: xs.reduce(initial: 0, combine: { total, x in total + x })
+    switch sum != 18 { .true: return 8, .false: {} }
+    let largest: xs.reduce(initial: 0) { best, x in switch x > best { .true: x, .false: best } }
+    switch largest != 8 { .true: return 9, .false: {} }
+    // Nested: the inner closure reads the outer one's parameter.
+    state ys: Array<Int>()
+    ys.append(value: 6)
+    ys.append(value: 3)
+    let common: xs.filter { x in ys.contains { y in y = x } }
+    switch common.count != 2 { .true: return 10, .false: {} }
+    state mail: Array<Message>()
+    mail.append(value: Message(unread: true, size: 10, subject: "hello"))
+    mail.append(value: Message(unread: false, size: 20, subject: "old"))
+    mail.append(value: Message(unread: true, size: 30, subject: "news"))
+    let unread: mail.filter { m in m.unread }
+    let bytes: unread.reduce(initial: 0) { total, m in total + m.size }
+    switch bytes != 40 { .true: return 11, .false: {} }
+    let subjects: mail.map { m in m.subject }
+    switch subjects.read(at: 2) = "news" { .false: return 12, .true: {} }
+    let labels: mail.map { m in switch m.unread { .true: "new", .false: "read" } }
+    @print("\(labels.read(at: 0)) \(labels.read(at: 1)) \(subjects.count)")
+    return 42
+}

@@ -73,6 +73,9 @@ assert "'?' sugar resolves to the enum applying @optional, and 'for … in' unwr
 assert "is hard-coded in C" not in active, active
 assert "'#cases' is a reflection list: C builds the collection its grammar field declares" in active, active
 assert "builtin function 'name(of:)' reads a declaration's reflective name in C" in active, active
+# Array's filter, first, contains, map, and reduce take closures: function
+# types and inlining them are C's, and C says so.
+assert "function types are C's: a parameter typed (A) -> R takes a closure" in active, active
 assert 'uses in this source' in active, active
 
 first, second = folder/'First.range', folder/'Second.range'
