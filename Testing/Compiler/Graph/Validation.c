@@ -32,6 +32,33 @@ static void validate(const char *source, const char *expected, size_t count)
     rangeArenaDestroy(&arena);
 }
 
+/* Textual edits, pairs of from and to ending in NULL, applied to every
+ * language source as it loads, so a test can vary the language itself. */
+static const char *const *languageEdits;
+
+static char *editOnce(char *text, size_t *size, const char *languageFrom, const char *languageTo)
+{
+    size_t from = strlen(languageFrom), to = strlen(languageTo), count = 0;
+    for (char *at = strstr(text,languageFrom); at; at = strstr(at + from,languageFrom)) ++count;
+    if (!count) return text;
+    char *edited = malloc(*size + count * to + 1), *out = edited, *in = text;
+    assert(edited);
+    for (char *at; (at = strstr(in,languageFrom)); in = at + from) {
+        memcpy(out,in,(size_t)(at - in)); out += at - in;
+        memcpy(out,languageTo,to); out += to;
+    }
+    strcpy(out,in);
+    *size = strlen(edited);
+    free(text);
+    return edited;
+}
+
+static char *editLanguage(char *text, size_t *size)
+{
+    for (size_t i = 0; languageEdits && languageEdits[i]; i += 2) text = editOnce(text,size,languageEdits[i],languageEdits[i + 1]);
+    return text;
+}
+
 /* The language sources, as relative paths so their declarations are the
  * language's. Reflection lists are Array values and `first` returns an
  * Optional, so macros that reflect need them. */
@@ -49,6 +76,7 @@ static size_t loadLanguage(RangeArena *arena, RangeNode **units, size_t capacity
             char path[512]; snprintf(path,sizeof(path),"%s/%s",directories[d],entry->d_name);
             size_t size; char *text = readFile(path,&size);
             assert(text && count < capacity);
+            text = editLanguage(text,&size);
             units[count] = rangeParseUnit(arena,rangeArenaIntern(arena,path,strlen(path)),text,size,error,sizeof(error));
             free(text);
             if (!units[count]) fprintf(stderr,"%s\n",error);
@@ -252,6 +280,20 @@ int main(void)
     validateLanguage("macro probe(): Function { switch #body { .present(let b): switch b.members.count = 2 { "
                      ".true: {}, .false: @diagnostic(\"members\") }, .absent: {} } } "
                      "@probe function work(): Int { let a: 1 let b: 2 return a + b }",NULL,1);
+    // C builds reflection lists through the collection's @insertion function,
+    // found by that role: renamed, it still builds them, under its own label.
+    languageEdits = (const char *const[]){"function append(let value: Element)","function add(let element: Element)",
+                                          "result.append(value:","result.add(element:",
+                                          "write(at: count, value: value)","write(at: count, value: element)",NULL};
+    validateLanguage(LIGHT "macro probe(): Enum { "
+                     "switch #cases.count = 3 { .true: {}, .false: @diagnostic(\"count\") } "
+                     "switch #cases.first(named: \"green\") { .present: {}, .absent: @diagnostic(\"missing green\") } } "
+                     "@probe extension Light {}",NULL,2);
+    // Without the role, C has no function to build them with.
+    languageEdits = (const char *const[]){"@insertion\n","",NULL};
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",
+                     "which declares no @insertion function to build it with",0);
+    languageEdits = NULL;
     // Without the grammar, a reflection list has no Range type to be.
     validate("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
              "reflection field 'members' has no Range type",0);

@@ -1,0 +1,12 @@
+// C primitive: C builds a reflection list, such as `#cases` or `#members`, by
+// constructing the collection its grammar field declares and calling that
+// collection's one function applying @insertion once per declaration, in order.
+//
+// Law, checked in C because macro bodies cannot inspect a function's types
+// yet: a type declares at most one @insertion function, and it takes one
+// element and adds it. The element is one parameter of the type the type's
+// @iteration function yields, when it declares one. C finds the function by
+// this role and passes the element under the function's own parameter label;
+// it never names the function, its parameter, or the type.
+@builtin
+macro insertion(): Function

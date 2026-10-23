@@ -303,6 +303,26 @@ reject iteration-signature "@iteration function 'next' of 'Bad' must take one In
 reject iteration-not-method "@iteration function 'next' must be a method of the type it iterates" \
     '@iteration function next(let at: Int): Int? { return .absent }
 { return 0 }'
+# C builds reflection lists through the one @insertion function a collection
+# declares; the law is checked in C like @iteration's.
+reject two-insertions "construct 'Twice' declares 2 @insertion functions; a type declares at most one" \
+    'construct Twice {
+    @insertion function add(let value: Int) { }
+    @insertion function put(let value: Int) { }
+}
+{ return 0 }'
+reject insertion-element "@insertion function 'add' of 'Bag' must take one Int<bits: 64, signed: true>, the element its @iteration function yields" \
+    'construct Bag {
+    @iteration function element(let at: Int): Int? { return .absent }
+    @insertion function add(let value: Bool) { }
+}
+{ return 0 }'
+reject insertion-parameters "@insertion function 'add' of 'Pair' must take one element" \
+    'construct Pair { @insertion function add(let first: Int, let second: Int) { } }
+{ return 0 }'
+reject insertion-not-method "@insertion function 'add' must be a method of the type it adds to" \
+    '@insertion function add(let value: Int) { }
+{ return 0 }'
 reject interval-loop-variable "cannot assign to let 'i'" \
     '{ for i in 0..<3 { i: 2 } return 0 }'
 reject interval-chain "'..<' does not chain; parenthesize one interval" \

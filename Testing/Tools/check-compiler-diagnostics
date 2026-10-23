@@ -45,12 +45,17 @@ for provided in ('@many storage is a C heap block', "builtin function 'resize' i
                  "builtin member 'count' is the byte count the bytes primitive holds", "builtin function 'byte' reads one byte",
                  "'for … in' calls the function applying @iteration at positions 0, 1, 2",
                  "the @iteration law (one per type, one Int parameter, an optional result) is checked in C",
+                 "C builds each reflection list by calling the function applying @insertion on its collection",
+                 "the @insertion law (at most one per type, one parameter of the element its @iteration function yields) is checked in C",
                  "'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C",
                  "a value of T where T? is expected"):
     assert provided in active, active
 # for … in finds its function by the @iteration role, never by a macro's name.
 assert '@collection' not in active and 'by its name' not in active, active
 assert "no C primitive is implemented for builtin macro 'iteration'" not in active, active
+assert "no C primitive is implemented for builtin macro 'insertion'" not in active, active
+# Reflection lists are built through the @insertion role, never by a name.
+assert 'append(value:)' not in active, active
 assert "no C primitive is implemented for builtin macro 'interval'" not in active, active
 # Array<Element> declares a type parameter, so Array<Member> resolves;
 # @boolean and @string declare Bool and String the way @integer declares Int;

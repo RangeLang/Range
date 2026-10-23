@@ -50,6 +50,9 @@ macro collection(): Construct {
                 return true
             }
 
+            // C builds reflection lists through this function: it applies
+            // @insertion, and C finds it by that role, not by its name.
+            @insertion
             function append(let value: Element) {
                 switch count = capacity {
                     .true: {

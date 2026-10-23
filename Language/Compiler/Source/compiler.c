@@ -359,6 +359,14 @@ static int macroBuiltin(RangeNode *node, const char *name)
     return 0;
 }
 
+/* A role marks the function C calls for a construct: @iteration for `for … in`
+ * and @insertion for building reflection lists. Applying one has no
+ * compile-time effect. */
+static int roleMacro(RangeNode *node)
+{
+    return macroBuiltin(node,"iteration") || macroBuiltin(node,"insertion");
+}
+
 static void registerLiteralRules(Resolver *vm)
 {
     RangeNode *builtin = NULL;
@@ -1088,10 +1096,26 @@ static RangeNode *metaFunction(RangeNode *declaration, const char *name, RangeNo
     return NULL;
 }
 
+/* The function a construct or enum declares with @insertion, which C calls to
+ * build a reflection list; *count is how many it declares. The role, not a
+ * name, selects it. */
+static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
+{
+    RangeNode *found = NULL;
+    *count = 0;
+    if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum))
+        for (size_t i = 0; i < declaration->itemCount; ++i)
+            if (declaration->items[i]->kind == RangeNodeFunction && appliesBuiltin(declaration->items[i],"insertion")) {
+                found = declaration->items[i];
+                ++*count;
+            }
+    return found;
+}
+
 /* A reflection field holds declarations; as a Range value it is the type its
  * grammar declaration gives it. A list, such as Enum.cases: Array<EnumCase>,
  * becomes that collection, built as Range would build it: constructed, then
- * each declaration appended in order with the collection's append. An
+ * each declaration added in order with the collection's @insertion function. An
  * optional field, such as Function.output, is a case of the optional. */
 static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char *name, RangeGraphValue value, RangeNode *at)
 {
@@ -1111,12 +1135,21 @@ static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char 
     RangeNode *collection = member->typeName ? namedDeclaration(eval->vm,grammar,member->typeName,0,member,"reflection type") : NULL;
     if (!collection || collection->kind != RangeNodeConstruct)
         fail(eval->vm,at,"reflection field %s.%s holds declarations; its type must be a collection construct",grammar->name,name);
+    // The collection's own applications run first: they may emit the
+    // @insertion function, as @collection does for Array.
+    metaPrepare(eval,collection);
+    size_t insertions = 0;
+    RangeNode *append = insertionFunction(collection,&insertions);
+    if (insertions != 1 || append->itemCount != 1)
+        fail(eval->vm,at,"reflection field %s.%s is %s, which %s to build it with%s",grammar->name,name,collection->name,
+             insertions > 1 ? "declares more than one @insertion function"
+             : insertions ? "declares an @insertion function that does not take one element"
+             : "declares no @insertion function",
+             eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
     RangeGraphValue result = metaConstruct(eval,NULL,collection,NULL,0,at);
-    RangeNode argument = {.kind=RangeNodeArgument,.name="value",.path=at->path,.line=at->line,.column=at->column};
+    // The element goes under the insertion function's own parameter label.
+    RangeNode argument = {.kind=RangeNodeArgument,.name=append->items[0]->name,.path=at->path,.line=at->line,.column=at->column};
     RangeNode call = {.kind=RangeNodeCall,.items=(RangeNode *[]){&argument},.itemCount=1,.path=at->path,.line=at->line,.column=at->column};
-    RangeNode *append = metaFunction(collection,"append",&call);
-    if (!append) fail(eval->vm,at,"reflection field %s.%s is %s, which has no append(value:) to build it with%s",grammar->name,name,
-                      collection->name,eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
     for (size_t i = 0; i < value.count; ++i) {
         RangeGraphValue element = graphNode(value.nodes[i]);
         eval->pending = &element;
@@ -1172,7 +1205,12 @@ static RangeGraphValue metaBuiltin(MetaEval *eval, RangeNode *function, RangeGra
  * place when the method changes it. */
 static RangeGraphValue metaInvoke(MetaEval *eval, MetaScope *scope, RangeNode *function, RangeNode *call, RangeGraphValue *self)
 {
-    if (function->generics || (function->c && function->c->itemCount && !(function->flags & RangeFlagBuiltin)))
+    // A role (@iteration, @insertion) has no compile-time effect, so a
+    // function applying one runs like any other.
+    int effects = 0;
+    for (size_t i = 0; function->c && i < function->c->itemCount; ++i)
+        effects += !roleMacro(function->c->items[i]->resolvedDeclaration);
+    if (function->generics || (effects && !(function->flags & RangeFlagBuiltin)))
         fail(eval->vm,call,"unsupported compile-time function declaration '%s'",function->name);
     if (call->itemCount != function->itemCount)
         fail(eval->vm,call,"compile-time call argument count differs from '%s'",function->name);
@@ -1971,10 +2009,11 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     if (!app) fail(vm,attribute,"macro application was not resolved");
     RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
     // @many marks layout, @optional the `?` sugar's enum, @interval the `..<`
-    // sugar's construct, and @iteration the function `for … in` calls;
-    // applying any of them has no compile-time effect.
+    // sugar's construct, @iteration the function `for … in` calls, and
+    // @insertion the function C builds reflection lists with; applying any of
+    // them has no compile-time effect.
     if (macroBuiltin(app->declaration,"many") || macroBuiltin(app->declaration,"optional")
-        || macroBuiltin(app->declaration,"interval") || macroBuiltin(app->declaration,"iteration")) return emitted;
+        || macroBuiltin(app->declaration,"interval") || roleMacro(app->declaration)) return emitted;
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
         if (same(app->declaration->c->items[j]->name,"builtin")) {
             if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
@@ -2344,6 +2383,10 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             sourceDiagnostic(report,node,1,"C-implementation","'for … in' calls the function applying @iteration at positions 0, 1, 2, … until it returns absence; C writes the loop");
             sourceDiagnostic(report,node,1,"C-implementation","the @iteration law (one per type, one Int parameter, an optional result) is checked in C");
         }
+        else if (macroBuiltin(node,"insertion")) {
+            sourceDiagnostic(report,node,1,"C-implementation","C builds each reflection list by calling the function applying @insertion on its collection once per declaration");
+            sourceDiagnostic(report,node,1,"C-implementation","the @insertion law (at most one per type, one parameter of the element its @iteration function yields) is checked in C");
+        }
         else if (macroBuiltin(node,"interval"))
             sourceDiagnostic(report,node,1,"C-implementation","'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C");
         else if (macroBuiltin(node,"defaults"))
@@ -2387,11 +2430,11 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     case RangeNodeMemberAccess:
         /* Runtime member access is typed later. */
         if (scope && scope->meta && reflectionList(report->arena,node->name))
-            sourceDiagnostic(report,node,1,"C-implementation","'.%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's append(value:) for each declaration",node->name);
+            sourceDiagnostic(report,node,1,"C-implementation","'.%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's @insertion function for each declaration",node->name);
         break;
     case RangeNodeEnvironment:
         if (reflectionList(report->arena,node->name))
-            sourceDiagnostic(report,node,1,"C-implementation","'#%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's append(value:) for each declaration",node->name);
+            sourceDiagnostic(report,node,1,"C-implementation","'#%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's @insertion function for each declaration",node->name);
         break;
     case RangeNodeAttribute: {
         if (same(node->name,"builtin") || same(node->name,"extern")) {
@@ -4348,6 +4391,28 @@ static void checkIteration(Typer *typer, RangeNode *declaration)
             function->name,declaration->name);
 }
 
+/* The @insertion law, checked in C: a type declares at most one such function,
+ * and it takes one element and adds it. When the type also declares an
+ * @iteration function, the element is the type that function yields. */
+static void checkInsertion(Typer *typer, RangeNode *declaration)
+{
+    size_t count = 0;
+    RangeNode *function = insertionFunction(declaration,&count);
+    if (count > 1) {
+        typeError(typer,declaration,"%s '%s' declares %zu @insertion functions; a type declares at most one",
+            rangeNodeKindName(declaration->kind),declaration->name,count);
+        return;
+    }
+    if (!function) return;
+    RangeNode *iteration = iterationFunction(declaration,&count);
+    RangeNode *element = count == 1 && iteration->type ? optionalWrapped(typer,iteration->type,NULL) : NULL;
+    if (function->itemCount != 1 || (element && function->items[0]->type != element)) {
+        char t[160] = "one element";
+        if (element) { char e[140]; describeType(e,sizeof(e),element); snprintf(t,sizeof(t),"one %s, the element its @iteration function yields",e); }
+        typeError(typer,function,"@insertion function '%s' of '%s' must take %s",function->name,declaration->name,t);
+    }
+}
+
 /* `@print(…)` and `@diagnostic(…)` in runtime code: one message, a String or
  * an interpolated literal whose parts are integers, booleans, or strings. */
 static void typeEffect(Typer *typer, SourceScope *scope, RangeNode *attribute, RangeNode *context)
@@ -4951,6 +5016,7 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
     for (size_t i = 0; i < declaration->itemCount; ++i)
         if (declaration->items[i]->kind == RangeNodeFunction) typeFunction(typer,&scope,declaration->items[i],context);
     checkIteration(typer,declaration);
+    checkInsertion(typer,declaration);
     checkOverloads(typer,declaration);
 }
 
@@ -5015,6 +5081,7 @@ static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declarat
     }
     checkMemberDefaults(typer,declaration);
     checkIteration(typer,declaration);
+    checkInsertion(typer,declaration);
     checkOverloads(typer,declaration);
 }
 
@@ -5480,6 +5547,8 @@ static Typer *typeCheck(SourceReport *report)
                 typeFunction(typer,&unit,item,NULL);
                 if (appliesBuiltin(item,"iteration"))
                     typeError(typer,item,"@iteration function '%s' must be a method of the type it iterates",item->name);
+                if (appliesBuiltin(item,"insertion"))
+                    typeError(typer,item,"@insertion function '%s' must be a method of the type it adds to",item->name);
                 if (same(item->name,"="))
                     typeError(typer,item,"'=' must be declared on the type it compares, in the type or an extension of it");
                 else if (operatorName(item->name))
