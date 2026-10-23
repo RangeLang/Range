@@ -73,6 +73,23 @@ function measure(let s: Shape, let limit: Int): Int {
     }
 }
 
+// A relational pattern's operand stops at `&`, `|`, `:`, and `,`; a
+// parenthesized operand may hold more.
+function bounded(let n: Int, let limit: Int, let open: Bool): Int {
+    return switch n {
+        < limit + 1 & open: 1,
+        = limit * 2 | = limit * 3: 2,
+        default: 0
+    }
+}
+
+function agrees(let flag: Bool, let a: Bool, let b: Bool): Int {
+    return switch flag {
+        = (a & b): 1,
+        default: 0
+    }
+}
+
 // Exhaustive over combinations without a default.
 function both(let a: Bool, let b: Bool): Int {
     return switch a, b {
@@ -103,6 +120,10 @@ function both(let a: Bool, let b: Bool): Int {
     xs.append(value: 3)
     switch measure(s: .group(xs), limit: 50) != 1000 | measure(s: .circle(4), limit: 50) != 0 { .true: return 11, .false: {} }
     switch both(a: true, b: true) != 3 | both(a: true, b: false) != 2 | both(a: false, b: true) != 0 { .true: return 12, .false: {} }
+    switch bounded(n: 3, limit: 3, open: true) != 1 | bounded(n: 3, limit: 3, open: false) != 0 { .true: return 16, .false: {} }
+    switch bounded(n: 6, limit: 3, open: false) != 2 | bounded(n: 9, limit: 3, open: true) != 2 { .true: return 17, .false: {} }
+    switch agrees(flag: true, a: true, b: true) != 1 | agrees(flag: true, a: true, b: false) != 0 { .true: return 18, .false: {} }
+    switch agrees(flag: false, a: true, b: false) != 1 { .true: return 19, .false: {} }
     // A for-in condition filters; it never ends the loop.
     state shapes: Array<Shape>()
     shapes.append(value: .group(xs))

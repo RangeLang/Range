@@ -1096,6 +1096,8 @@ static RangeNode *metaFunction(RangeNode *declaration, const char *name, RangeNo
     return NULL;
 }
 
+static RangeNode *iterationFunction(const RangeNode *, size_t *);
+
 /* The function a construct or enum declares with @insertion, which C calls to
  * build a reflection list; *count is how many it declares. The role, not a
  * name, selects it. */
@@ -1115,7 +1117,8 @@ static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
 /* A reflection field holds declarations; as a Range value it is the type its
  * grammar declaration gives it. A list, such as Enum.cases: Array<EnumCase>,
  * becomes that collection, built as Range would build it: constructed, then
- * each declaration added in order with the collection's @insertion function. An
+ * each declaration added in order with the collection's @insertion function.
+ * The collection must declare @iteration as well, so the list can be read. An
  * optional field, such as Function.output, is a case of the optional. */
 static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char *name, RangeGraphValue value, RangeNode *at)
 {
@@ -1145,6 +1148,14 @@ static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char 
              insertions > 1 ? "declares more than one @insertion function"
              : insertions ? "declares an @insertion function that does not take one element"
              : "declares no @insertion function",
+             eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
+    // A reflection list is a collection a macro both builds and iterates.
+    size_t iterations = 0;
+    (void)iterationFunction(collection,&iterations);
+    if (iterations != 1)
+        fail(eval->vm,at,"reflection field %s.%s is %s, which %s; a reflection list's collection declares both @iteration and @insertion%s",
+             grammar->name,name,collection->name,
+             iterations ? "declares more than one @iteration function" : "declares no @iteration function",
              eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
     RangeGraphValue result = metaConstruct(eval,NULL,collection,NULL,0,at);
     // The element goes under the insertion function's own parameter label.

@@ -311,6 +311,10 @@ int main(void)
     languageEdits = (const char *const[]){"@insertion\n","",NULL};
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",
                      "which declares no @insertion function to build it with",0);
+    // A reflection list is also read: its collection declares @iteration too.
+    languageEdits = (const char *const[]){"@iteration\n","",NULL};
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",
+                     "which declares no @iteration function; a reflection list's collection declares both @iteration and @insertion",0);
     languageEdits = NULL;
     // Without the grammar, a reflection list has no Range type to be.
     validate("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
