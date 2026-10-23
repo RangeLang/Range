@@ -1682,7 +1682,7 @@ test("runs one synchronized shader across the visible post cards", async () => {
   expect(shader).not.toContain("localCornerRadius");
   expect(shader).not.toContain("roundedDistance");
   expect(shader).toContain("cardEdgeAlpha = smoothstep(0.0, 1.0");
-  expect(shader).toContain("vec4(color, cardEdgeAlpha)");
+  expect(shader).toContain("vec4(color * cardEdgeAlpha, cardEdgeAlpha)");
   expect(shader).toContain('document.addEventListener("visibilitychange"');
   expect(shader).toContain("1000 / Math.max(1, maxFps)");
   expect(shader).toContain("lastMeasurement === -Infinity");
