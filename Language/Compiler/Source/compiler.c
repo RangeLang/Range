@@ -2810,9 +2810,7 @@ static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
     }
     RangeNode *declaration = sourceLookup(report,scope,name,kind);
     if (!declaration) {
-        if (kind == 0 && same(name,"self"))
-            sourceDiagnostic(report,at,0,"undeclared","Range has no self; use member names, or the enum's name as a switch subject");
-        else if (kind != 1 && rangeGraphType(report->arena,name))
+        if (kind != 1 && rangeGraphType(report->arena,name))
             sourceDiagnostic(report,at,0,"undeclared","'%s' has a C graph shape but no Range declaration",name);
         else sourceDiagnostic(report,at,0,"undeclared","no declaration for %s'%s' in the loaded sources",kind == 1 ? "macro " : "",name);
     }

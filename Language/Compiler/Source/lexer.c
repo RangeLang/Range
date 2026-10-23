@@ -183,16 +183,10 @@ int rangeLexerNext(RangeLexer *lexer, RangeToken *token)
             token->kind = RangeTokenSymbol;
             for (size_t step = 0; step < width; ++step) advance(lexer);
             token->length = width;
-            /* Equality is a single `=`; `==`, `&&`, and `||` are lexed whole
-             * so the diagnostic points at them, and never accepted. */
-            if (rangeTokenIs(token, "==")) {
-                rangeLexerFail(lexer, token, "use '=' for equality");
-                return 0;
-            }
-            /* One symbol per gate: `&` is and, `|` is or. */
-            if (rangeTokenIs(token, "&&") || rangeTokenIs(token, "||")) {
-                rangeLexerFail(lexer, token, "Range has no '%.*s'; use '%c' for %s", (int)width, token->text,
-                               token->text[0], token->text[0] == '&' ? "and" : "or");
+            /* `==`, `&&`, and `||` are no Range symbols; they are lexed
+             * whole so the diagnostic points at them, and never accepted. */
+            if (rangeTokenIs(token, "==") || rangeTokenIs(token, "&&") || rangeTokenIs(token, "||")) {
+                rangeLexerFail(lexer, token, "unexpected '%.*s'", (int)width, token->text);
                 return 0;
             }
             return 1;

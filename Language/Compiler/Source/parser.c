@@ -153,7 +153,6 @@ static int parseDeclaration(RangeParser *parser, RangeNode *owner);
 static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes);
 static RangeNode *parseEnum(RangeParser *parser, RangeNode *attributes);
 static RangeNode *parseSwitch(RangeParser *parser, int value);
-static int rejectSelector(RangeParser *parser);
 
 /* ---- types ---------------------------------------------------------- */
 
@@ -244,9 +243,9 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
     }
     if (parserAt(parser, "<")) *generics = parseGenericArguments(parser, 1);
     if (parserAt(parser, "?")) { parserAdvance(parser); *flags |= RangeFlagOptional; }
-    /* A value of one of several types is an enum with a case per alternative. */
     if (parserAt(parser, "|")) {
-        parserFail(parser, &parser->current, "union types are not part of Range; declare an enum with one case per alternative");
+        parserFail(parser, &parser->current, "a type is a single name, not several joined by '|'; "
+                   "related: an enum's cases are its alternatives");
         return name;
     }
     /* A parameter typed `Element -> Bool` means a function type without its
@@ -289,9 +288,8 @@ static int atTypePosition(RangeParser *parser)
 {
     if (parser->current.kind == RangeTokenName) {
         if (parserAt(parser,"true") || parserAt(parser,"false")) return 0;
-        // `let x: switch c { … }` is a value; a removed selector is reported there.
-        static const char *const selectors[] = {"switch", "if", "guard", "else", NULL};
-        for (size_t i = 0; selectors[i]; ++i) if (parserAt(parser, selectors[i])) return 0;
+        // `let x: switch { … }` is a value.
+        if (parserAt(parser, "switch")) return 0;
         // `let s: bag.snapshot()` and `let n: a + 1` are expressions; a `<`
         // after the name stays a generic list, as in `Array<Int>`.
         static const char *const expression[] = {".", "+", "-", "*", "/", "%", "=", "!=", "<=", ">=", "&", "|", ">", NULL};
@@ -770,7 +768,6 @@ static RangeNode *parsePrimary(RangeParser *parser)
         parser->genericDepth = outerGenericDepth;
         return inner;
     }
-    if (rejectSelector(parser)) return NULL;
     if (parserAt(parser, "switch")) return parseSwitch(parser, 1);
     if (token.kind == RangeTokenName) {
         RangeNode *node = parserNode(parser, RangeNodeName);
@@ -891,47 +888,17 @@ static RangeNode *parseExpression(RangeParser *parser, int level)
 
 /* ---- statements ------------------------------------------------------ */
 
-/* A comparison computes a Bool and changes nothing, so it is not a statement:
- * `count = count + 1` on its own line is a mistaken assignment. */
+/* A comparison computes a Bool and changes nothing, so it is not a
+ * statement: its result would be unused. */
 static void rejectComparisonStatement(RangeParser *parser, const RangeNode *expression)
 {
     static const char *const comparisons[] = {"=", "!=", "<", ">", "<=", ">=", NULL};
     if (parser->failed || !expression || expression->kind != RangeNodeBinary) return;
     for (size_t i = 0; comparisons[i]; ++i) {
         if (strcmp(expression->name, comparisons[i]) != 0) continue;
-        const RangeNode *left = expression->a;
-        if (left && left->kind == RangeNodeName)
-            parserFailAt(parser, expression, "a comparison is not a statement; did you mean '%s: …' to assign?", left->name);
-        else
-            parserFailAt(parser, expression, "a comparison is not a statement; did you mean 'name: …' to assign?");
+        parserFailAt(parser, expression, "the result of this comparison is unused; related: assigning a value is written name: value");
         return;
     }
-}
-
-/* `switch` is the only selector: if, else, and guard are not Range. */
-static int rejectSelector(RangeParser *parser)
-{
-    if (parser->failed || parser->current.kind != RangeTokenName) return 0;
-    const char *message = NULL;
-    if (parserAt(parser, "if")) {
-        const RangeToken *ahead = parserPeek(parser);
-        message = rangeTokenIs(ahead, "let")
-            ? "Range has no 'if let'; use switch, e.g. switch value { .present(let x): …, .absent: {} }"
-            : rangeTokenIs(ahead, "case")
-            ? "Range has no 'if case'; use switch, e.g. switch value { .case(let x): …, default: {} }"
-            : "Range has no 'if'; use switch, e.g. switch c { .true: …, .false: {} }";
-    } else if (parserAt(parser, "guard")) {
-        const RangeToken *ahead = parserPeek(parser);
-        message = rangeTokenIs(ahead, "let")
-            ? "Range has no 'guard let'; use a switch expression whose other arm diverges, e.g. let x: switch value { .present(let x): x, .absent: { return } }"
-            : rangeTokenIs(ahead, "case")
-            ? "Range has no 'guard case'; use switch, e.g. let x: switch value { .case(let x): x, default: { return } }"
-            : "Range has no 'guard'; use switch, e.g. switch c { .false: return, .true: {} }";
-    } else if (parserAt(parser, "else")) {
-        message = "Range has no 'else'; use switch, whose arms handle each case, e.g. switch c { .true: …, .false: … }";
-    } else return 0;
-    parserFail(parser, &parser->current, "%s", message);
-    return 1;
 }
 
 /* One arm's body. In a statement switch: a block (`{}` does nothing), or one
@@ -1357,9 +1324,7 @@ static RangeNode *parseFor(RangeParser *parser)
         condition = joinConditions(parser, condition, parseCondition(parser, RANGE_COMPARISON_LEVEL, bindings));
     }
     if (condition) checkCondition(parser, condition, bindings, earlier);
-    if (parserAt(parser, "where"))
-        parserFail(parser, &parser->current, "Range has no 'where'; filter with '&', e.g. for x in xs & x > 3 { … }");
-    else if (parserAt(parser, "|"))
+    if (parserAt(parser, "|"))
         parserFail(parser, &parser->current, "a for-in condition joins comparisons with '&'; parenthesize an or, e.g. for x in xs & (x < 0 | x > 9)");
     parser->conditionDepth -= 1;
     RangeNode *body = parseBlock(parser);
@@ -1495,7 +1460,6 @@ static RangeNode *parseStatement(RangeParser *parser)
         }
         return node;
     }
-    if (rejectSelector(parser)) return NULL;
     if (parserAt(parser, "switch")) return parseSwitch(parser, 0);
     if (parserAt(parser, "extension")) {
         parserFail(parser, &parser->current, "extension is a top-level declaration");
