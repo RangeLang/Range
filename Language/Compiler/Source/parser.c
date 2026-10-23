@@ -1220,11 +1220,12 @@ static RangeNode *forSwitch(RangeParser *parser, RangeNode *at, RangeNode *subje
     return node;
 }
 
-/* `for pattern in sequence & condition { body }` calls the function the
+/* `for element in sequence & condition { body }` calls the function the
  * sequence's type declares with @iteration, at positions 0, 1, 2, … until it
- * returns absence. A pattern is a name, `_`, or, after a leading dot, a case
- * pattern: `for .group(let items) in shapes & items.count > 3 { … }`. The
- * condition filters the elements; it never ends the loop.
+ * returns absence. The element is a name or `_`. The condition filters the
+ * elements, and its case tests bind names for the body:
+ * `for s in shapes & s.group(let items) & items.count > 3 { … }`. It never
+ * ends the loop.
  * The loop is written in ordinary nodes; the names it adds contain a space,
  * so source cannot name them:
  *
@@ -1234,96 +1235,40 @@ static RangeNode *forSwitch(RangeParser *parser, RangeNode *at, RangeNode *subje
  *       switch <for sequence>.<@iteration>(<position>: <for index>) {
  *           <present>(let element): {
  *               <for index>: <for index> + 1
- *               switch element { pattern & condition: body, default: {} }
+ *               switch { condition: body, default: {} }
  *           },
  *           default: break
  *       }
  *   }
  *
  * <present> is the payload case of the optional the function returns; the
- * inner switch is written only for a case pattern or a condition. The parser
+ * inner switch is written only for a condition. The parser
  * knows no member or case names: the call's member and label are left empty,
  * and the type checker fills them from the @iteration function of the
  * sequence's type once that type is known. The element binding is a let, so a
  * loop variable cannot be assigned; the position advances before the body, so
  * `continue` advances it too. */
-/* `.case` or `.case(arguments)`, whose `let` arguments bind into `bindings`. */
-static RangeNode *parseCasePattern(RangeParser *parser, RangeNode *bindings)
-{
-    RangeNode *outer = parser->bindings;
-    int negated = parser->negated;
-    parser->bindings = bindings;
-    parser->negated = 0;
-    RangeNode *test = parsePrimary(parser);
-    if (!parser->failed && parserAt(parser, "(")) {
-        RangeNode *call = parserNode(parser, RangeNodeCall);
-        call->a = test;
-        parseArgumentList(parser, call);
-        test = call;
-    }
-    parser->bindings = outer;
-    parser->negated = negated;
-    return test;
-}
-
-/* The pattern a case test's argument is: `let x` and `_` are already, a
- * `.case(…)` tests the field in turn, and any other expression is a value
- * the field must equal. */
-static RangeNode *forPattern(RangeParser *parser, RangeNode *value)
-{
-    if (value->kind == RangeNodePattern) return value;
-    RangeNode *pattern = rangeNodeCreate(parser->arena, RangeNodePattern, value->path, value->line, value->column);
-    RangeNode *test = value->kind == RangeNodeCall ? value->a : value;
-    if (test->kind != RangeNodeCase) {
-        pattern->integer = RangePatternValue;
-        pattern->a = value;
-        return pattern;
-    }
-    pattern->integer = RangePatternCase;
-    pattern->name = test->name;
-    if (value->kind != RangeNodeCall) return pattern;
-    pattern->flags |= RangeFlagApplication;
-    for (size_t i = 0; i < value->itemCount; ++i) {
-        RangeNode *argument = value->items[i];
-        argument->a = forPattern(parser, argument->a);
-        rangeNodeAppend(parser->arena, pattern, argument);
-    }
-    return pattern;
-}
-
 static RangeNode *parseFor(RangeParser *parser)
 {
     RangeNode *node = parserNode(parser, RangeNodeFor);
     parserExpect(parser, "for");
-    RangeNode *pattern = NULL;
     const char *element = "for element";
-    if (parserAt(parser, ".")) {
-        // `for .group(let items) in shapes`: the case each element must
-        // hold, its arguments the payload's patterns, as in a case test.
-        RangeNode *bindings = parserNode(parser, RangeNodeBlock);
-        bindings->name = "bindings";
-        RangeNode *test = parseCasePattern(parser, bindings);
-        if (parser->failed) return node;
-        checkCondition(parser, test, bindings, 0);
-        pattern = forPattern(parser, test);
-        pattern->c = bindings;
-    } else if (parserAt(parser, "_")) {
+    if (parserAt(parser, "_")) {
         parserAdvance(parser);
     } else element = parserExpectName(parser);
     parserExpect(parser, "in");
     parser->conditionDepth += 1;
     /* The sequence ends at `&`: what follows is the condition, its own
      * comparisons joined by `&`; an or is parenthesized. Its case tests bind
-     * names for the body, after the pattern's. */
+     * names for the body. */
     RangeNode *sequence = parseExpression(parser, RANGE_COMPARISON_LEVEL);
-    RangeNode *condition = NULL, *bindings = pattern ? pattern->c : parserNode(parser, RangeNodeBlock);
+    RangeNode *condition = NULL, *bindings = parserNode(parser, RangeNodeBlock);
     bindings->name = "bindings";
-    size_t earlier = bindings->itemCount;
     while (!parser->failed && parserAt(parser, "&")) {
         parserAdvance(parser);
         condition = joinConditions(parser, condition, parseCondition(parser, RANGE_COMPARISON_LEVEL, bindings));
     }
-    if (condition) checkCondition(parser, condition, bindings, earlier);
+    if (condition) checkCondition(parser, condition, bindings, 0);
     if (parserAt(parser, "|"))
         parserFail(parser, &parser->current, "a for-in condition joins comparisons with '&'; parenthesize an or, e.g. for x in xs & (x < 0 | x > 9)");
     parser->conditionDepth -= 1;
@@ -1368,13 +1313,11 @@ static RangeNode *parseFor(RangeParser *parser)
     rangeNodeAppend(parser->arena, found, step);
 
     RangeNode *run = body;
-    if (pattern || condition) {
-        /* Only the elements that match the pattern and the condition run the body. */
-        if (!pattern) {
-            pattern = forNode(parser, node, RangeNodePattern, NULL);
-            pattern->integer = RangePatternAny;
-            pattern->c = bindings;
-        }
+    if (condition) {
+        /* Only the elements that meet the condition run the body. */
+        RangeNode *pattern = forNode(parser, node, RangeNodePattern, NULL);
+        pattern->integer = RangePatternAny;
+        pattern->c = bindings;
         run = forSwitch(parser, node, forNode(parser, node, RangeNodeName, element), pattern, condition, body,
                         forNode(parser, node, RangeNodeBlock, NULL));
     }

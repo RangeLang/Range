@@ -163,15 +163,15 @@ function partial(let xs: Array<Int>): Int {
     state ys: Array<Int>()
     for i in 1..<12 { ys.append(value: i) }
     switch { partial(xs: ys) != 1 + 2 + 4 + 5 + 6 + 7 + 8: return 19, default: {} }
-    // for with a case pattern and a guard.
+    // for with a case test and a filter in its condition.
     state shapes: Array<Shape>()
     shapes.append(value: .group(made(n: 2)))
     shapes.append(value: .nothing)
     shapes.append(value: .group(made(n: 5)))
     shapes.append(value: .circle(radius: 1))
     state counted: 0
-    for .group(let items) in shapes & items.count > 3 { counted: counted + items.count }
-    for .group in shapes { counted: counted + 100 }
+    for s in shapes & s.group(let items) & items.count > 3 { counted: counted + items.count }
+    for s in shapes & s.group { counted: counted + 100 }
     switch { counted != 205: return 20, default: {} }
     return 42
 }

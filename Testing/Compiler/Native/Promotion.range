@@ -45,7 +45,7 @@ function describe(let maybe: Int?): Int {
     names.append(value: "Ada")
     names.append(value: .absent)
     state count: 0
-    for .present in names { count: count + 1 }
+    for name in names & name.present { count: count + 1 }
     switch { count != 1: return 11, default: {} }
     // A binding of T? with no value starts absent, locals and members alike.
     state z: Int?

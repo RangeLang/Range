@@ -653,6 +653,13 @@ reject where-for "expected '{', found 'where'" \
     '{ state n: 0  for x in 0..<5 where x > 2 { n: n + x } return n }'
 reject for-or "a for-in condition joins comparisons with '&'; parenthesize an or" \
     '{ state n: 0  for x in 0..<5 & x > 3 | x < 1 { n: n + x } return n }'
+# A for names its element; a case test belongs in its condition.
+reject for-dot-case "for-dot-case.range:3:9: expected a name, found '.'" \
+    'enum Shape { case circle(radius: Int) case nothing }
+function f(let shapes: Array<Shape>): Int { state n: 0
+    for .circle(let r) in shapes { n: n + r }
+    return n }
+{ return f(shapes: Array<Shape>()) }'
 # One symbol per gate: `&` and `|`; `&&` and `||` are no Range symbols.
 reject double-and "double-and.range:1:26: unexpected '&&'" \
     '{ let a: true switch { a && true: return 1, default: {} } return 0 }'
@@ -911,4 +918,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=61 rejections=177 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=61 rejections=178 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

@@ -129,7 +129,7 @@ function both(let a: Bool, let b: Bool): Int {
     shapes.append(value: .group(Array<Int>()))
     shapes.append(value: .group(xs))
     state counted: 0
-    for .group(let items) in shapes & items.count > 2 & counted < 100 { counted: counted + items.count }
+    for s in shapes & s.group(let items) & items.count > 2 & counted < 100 { counted: counted + items.count }
     switch { counted != 6: return 13, default: {} }
     state odd: 0
     for x in xs & (x = 1 | x = 3) { odd: odd + x }
