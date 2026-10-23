@@ -1211,12 +1211,12 @@ static RangeNode *forInteger(RangeParser *parser, RangeNode *at, long long value
 /* The one switch `for` lowers to: `switch subject { pattern & condition: body,
  * default: otherwise }`, its default written by the compiler. */
 static RangeNode *forSwitch(RangeParser *parser, RangeNode *at, RangeNode *subject, RangeNode *pattern,
-                            RangeNode *guard, RangeNode *body, RangeNode *otherwise)
+                            RangeNode *condition, RangeNode *body, RangeNode *otherwise)
 {
     RangeNode *node = forNode(parser, at, RangeNodeSwitch, NULL);
     node->a = subject;
     RangeNode *entry = forNode(parser, at, RangeNodeSwitchCase, NULL);
-    pattern->b = guard;
+    pattern->b = condition;
     entry->c = pattern->c;
     rangeNodeAppend(parser->arena, entry, pattern);
     entry->b = body;
@@ -1279,10 +1279,10 @@ static RangeNode *parseFor(RangeParser *parser)
     /* The sequence ends at `&`: what follows is the condition, its own
      * comparisons joined by `&`; an or is parenthesized. */
     RangeNode *sequence = parseExpression(parser, RANGE_COMPARISON_LEVEL);
-    RangeNode *where = NULL;
+    RangeNode *condition = NULL;
     while (!parser->failed && parserAt(parser, "&")) {
         parserAdvance(parser);
-        where = joinConditions(parser, where, parseExpression(parser, RANGE_COMPARISON_LEVEL));
+        condition = joinConditions(parser, condition, parseExpression(parser, RANGE_COMPARISON_LEVEL));
     }
     if (parserAt(parser, "where"))
         parserFail(parser, &parser->current, "Range has no 'where'; filter with '&', e.g. for x in xs & x > 3 { … }");
@@ -1329,13 +1329,13 @@ static RangeNode *parseFor(RangeParser *parser)
     rangeNodeAppend(parser->arena, found, step);
 
     RangeNode *run = body;
-    if (pattern || where) {
-        /* Only the elements that match the pattern and the guard run the body. */
+    if (pattern || condition) {
+        /* Only the elements that match the pattern and the condition run the body. */
         if (!pattern) {
             pattern = forNode(parser, node, RangeNodePattern, NULL);
             pattern->integer = RangePatternAny;
         }
-        run = forSwitch(parser, node, forNode(parser, node, RangeNodeName, element), pattern, where, body,
+        run = forSwitch(parser, node, forNode(parser, node, RangeNodeName, element), pattern, condition, body,
                         forNode(parser, node, RangeNodeBlock, NULL));
     }
     rangeNodeAppend(parser->arena, found, run);

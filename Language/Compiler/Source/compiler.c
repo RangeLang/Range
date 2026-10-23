@@ -4680,8 +4680,9 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
  * cases or a default, and runs exactly one arm; a pattern that no earlier
  * pattern leaves anything for is an error. Coverage is the usefulness of a
  * pattern vector over the rows before it (Maranget's algorithm): an enum case
- * splits a column into its payload fields; literals, relations, and guarded
- * patterns cover nothing for the rows after them. */
+ * splits a column into its payload fields; literals, relations, and rows with
+ * a condition cover nothing for the rows after them. A switch over several
+ * subjects has one column per subject. */
 
 static int patternWild(const RangeNode *pattern)
 {
@@ -7770,7 +7771,7 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
                 nativeCondition(native,pattern->b);
                 NativeJump body = {.at=nativeEmit(native,armCbnz(0,0)),.base=armCbnz(0,0)};
                 NATIVE_PUSH(bodies,bodyCount,bodyCapacity,body);
-                nativeReleaseSlots(native,scope); /* the guard failed: its bindings end */
+                nativeReleaseSlots(native,scope); /* the condition failed: its bindings end */
                 nativeFail(&match,nativeEmit(native,armB(0)),armB(0));
             } else {
                 NativeJump body = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
