@@ -159,7 +159,7 @@ function partial(let xs: Array<Int>): Int {
     // Optional promotion across arms, and Type?.case.
     switch lookup(found: true) != Int?.present(5) | lookup(found: false) != .absent { .true: return 13, .false: {} }
     let none: Int?.absent
-    switch none { .present(let n): return 14, .absent: {} }
+    switch none { .present: return 14, .absent: {} }
     let chosen: pick(left: false, a: xs, b: made(n: 3))
     switch chosen.count != 3 | pick(left: true, a: made(n: 2), b: xs).count != 2 { .true: return 15, .false: {} }
     let text: switch chosen.count { 3: "three", default: "other" }
@@ -177,7 +177,7 @@ function partial(let xs: Array<Int>): Int {
     shapes.append(value: .circle(radius: 1))
     state counted: 0
     for .group(let items) in shapes & items.count > 3 { counted: counted + items.count }
-    for .group(let items) in shapes { counted: counted + 100 }
+    for .group in shapes { counted: counted + 100 }
     switch counted != 205 { .true: return 20, .false: {} }
     return 42
 }

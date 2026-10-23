@@ -23,7 +23,7 @@ function total(let xs: Array<Int>): Int {
     // first() is Range code over count and read(at:), returning Element?.
     switch xs.first() { .present(1): {}, default: return 7 }
     state none: Array<Int>()
-    switch none.first() { .absent: {}, .present(let v): return 8 }
+    switch none.first() { .absent: {}, .present: return 8 }
     state bytes: Array<Int<bits: 8>>()
     bytes.append(value: -128)
     bytes.append(value: 127)

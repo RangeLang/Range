@@ -58,7 +58,7 @@ function single(let o: Int?): Int {
     return switch o {
         .present(let x) & x > 3 & x < 10: 1,
         .present(let x) & (x = 0 | x = 1): 2,
-        .present(let x): 3,
+        .present: 3,
         .absent: 4
     }
 }

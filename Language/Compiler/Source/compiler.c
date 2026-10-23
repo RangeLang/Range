@@ -2453,6 +2453,48 @@ static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *no
     diagnoseType(report,scope,node->a); /* an explicit macro result type */
 }
 
+static RangeNode *bindingNamed(const RangeNode *bindings, const char *name)
+{
+    for (size_t i = 0; bindings && i < bindings->itemCount; ++i)
+        if (same(bindings->items[i]->name,name)) return bindings->items[i];
+    return NULL;
+}
+
+/* Whether a name is read anywhere in the tree, quoted #graph code and
+ * interpolations included. A read of a nested binding that shadows the name
+ * counts too, so the check never warns about a name that is used. */
+static int nameRead(const RangeNode *node, const char *name)
+{
+    if (!node) return 0;
+    if (node->kind == RangeNodeName && same(node->name,name)) return 1;
+    // `let copy: xs` keeps a bare right-hand name in the type position.
+    if (rangeNodeDeclaresValue(node->kind) && same(node->typeName,name)) return 1;
+    if (nameRead(node->a,name) || nameRead(node->b,name) || nameRead(node->c,name)
+        || nameRead(node->generics,name) || nameRead(node->annotations,name)) return 1;
+    for (size_t i = 0; i < node->itemCount; ++i) if (nameRead(node->items[i],name)) return 1;
+    return 0;
+}
+
+/* A name a pattern binds is read by some row's condition or by the arm's
+ * body; every row of an arm binds the same names, so a read in any of them
+ * uses the name. Native code and macros alike. */
+static void diagnoseUnusedBindings(SourceReport *report, RangeNode *arm)
+{
+    for (size_t i = 0; i < arm->itemCount; ++i) {
+        RangeNode *bindings = arm->items[i]->c;
+        for (size_t k = 0; bindings && k < bindings->itemCount; ++k) {
+            if (bindings->items[k]->flags & RangeFlagImplicit) continue;
+            const char *name = bindings->items[k]->name;
+            int seen = 0, used = nameRead(arm->a,name) || nameRead(arm->b,name);
+            for (size_t j = 0; j < i && !seen; ++j) seen = bindingNamed(arm->items[j]->c,name) != NULL;
+            for (size_t j = 0; j < arm->itemCount && !used; ++j) used = nameRead(arm->items[j]->b,name);
+            if (!seen && !used)
+                sourceDiagnostic(report,bindings->items[k],1,"unused",
+                    "'%s' is bound but never used; write the pattern without 'let %s'",name,name);
+        }
+    }
+}
+
 static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *node, int metadata)
 {
     if (!node) return;
@@ -2594,6 +2636,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         SourceScope bound = {.owner=node->c ? node->c : node,.parent=scope,.meta=scope && scope->meta};
         diagnoseSourceNode(report,&bound,node->a,metadata);
         diagnoseSourceNode(report,&bound,node->b,metadata);
+        diagnoseUnusedBindings(report,node);
         return;
     }
     case RangeNodePattern:
@@ -4772,13 +4815,6 @@ static int useful(Typer *typer, RangeNode ***rows, size_t count, RangeNode **q, 
     }
     for (size_t r = 0; r < count; ++r) if (patternWild(rows[r][0])) rest[n++] = rows[r] + 1;
     return useful(typer,rest,n,q + 1,types + 1,width - 1);
-}
-
-static RangeNode *bindingNamed(const RangeNode *bindings, const char *name)
-{
-    for (size_t i = 0; bindings && i < bindings->itemCount; ++i)
-        if (same(bindings->items[i]->name,name)) return bindings->items[i];
-    return NULL;
 }
 
 static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, RangeNode *type, RangeNode *context)

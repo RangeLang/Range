@@ -30,7 +30,7 @@ function describe(let maybe: Int?): Int {
         .present(let index): switch index != 1 { .true: return 1, .false: {} },
         .absent: return 2
     }
-    switch find(xs: xs, wanted: 4) { .present(let index): return 3, .absent: {} }
+    switch find(xs: xs, wanted: 4) { .present: return 3, .absent: {} }
     let boss: Person(age: 40, manager: .absent)
     let worker: Person(age: 30, manager: .present(1))
     switch describe(maybe: boss.manager) != -1 { .true: return 4, .false: {} }
@@ -44,7 +44,7 @@ function describe(let maybe: Int?): Int {
     names.append(value: .present("Ada"))
     names.append(value: .absent)
     switch names.read(at: 1) {
-    .present(let name): return 8,
+    .present: return 8,
     .absent: return 42
     }
 }

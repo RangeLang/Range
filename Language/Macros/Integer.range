@@ -4,7 +4,7 @@ macro integer(): Construct {
   // bits are the specialized ones here. Rows with a condition never make the
   // switch exhaustive, so the third arm accepts every value that passed.
   switch #members.first(named: "value"), #generics.first(named: "bits"), #generics.first(named: "signed") {
-    .present(let v) & .present(let b) & .present(let s) & b.value <= 0:
+    .present & .present(let b) & .present & b.value <= 0:
       @diagnostic("Integer bits must be positive"),
     .present(let v) & .present(let b) & .present(let s) & !integerValueFits(value: v.value, bits: b.value, signed: s.value):
       @diagnostic("Integer value does not fit the declared bits and signedness"),

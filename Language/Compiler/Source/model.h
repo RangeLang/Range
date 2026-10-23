@@ -70,7 +70,8 @@ enum {
     RangeFlagMutationKnown = 1 << 12,
     RangeFlagValue = 1 << 13,      /* switch: an expression; an arm yields its a, or its block diverges */
     RangeFlagImplicit = 1 << 15    /* attribute: applied by its grammar declaration's @defaults, not written;
-                                    * switch arm: a default the compiler wrote for a lowering */
+                                    * switch arm: a default the compiler wrote for a lowering;
+                                    * binding: one a lowering wrote, not a pattern's `let` */
 };
 
 /* Pattern forms. A case pattern's items are arguments (label, sub-pattern).

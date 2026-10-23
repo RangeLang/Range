@@ -1305,6 +1305,7 @@ static RangeNode *parseFor(RangeParser *parser)
     bound->c = forNode(parser, node, RangeNodeBlock, "bindings");
     RangeNode *value = forNode(parser, node, RangeNodeLet, NULL);
     value->name = element;
+    value->flags |= RangeFlagImplicit; /* the loop names it; no pattern writes `let` */
     rangeNodeAppend(parser->arena, bound->c, value);
     bound->a = value;
     RangeNode *found = forNode(parser, node, RangeNodeBlock, NULL);

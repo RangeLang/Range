@@ -60,7 +60,7 @@ function longest(let groups: Array<Array<Int>>): Int {
 
 {
     state xs: Array<Int>()
-    switch first(xs: xs) { .present(let f): return 1, .absent: {} }
+    switch first(xs: xs) { .present: return 1, .absent: {} }
     xs.append(value: 1)
     xs.append(value: 2)
     xs.append(value: 3)
