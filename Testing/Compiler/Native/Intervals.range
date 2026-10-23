@@ -32,7 +32,7 @@ construct Countdown {
     for i in r { twice: twice + i }
     for i in r { twice: twice + i }
     switch twice != 18 { .true: return 3, .false: {} }
-    switch r.lower != 2 || r.upper != 5 { .true: return 4, .false: {} }
+    switch r.lower != 2 | r.upper != 5 { .true: return 4, .false: {} }
 
     // Precedence as in Swift: arithmetic binds tighter, comparison looser.
     state wide: 0

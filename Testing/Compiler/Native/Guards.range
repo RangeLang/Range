@@ -68,11 +68,11 @@ function longest(let groups: Array<Array<Int>>): Int {
     xs.append(value: 5)
     let f: switch first(xs: xs) { .present(let f): f, .absent: { return 2 } }
     switch f != 1 { .true: return 3, .false: {} }
-    switch double(maybe: .present(4)) != 8 || double(maybe: .absent) != -1 { .true: return 4, .false: {} }
-    switch unwrap(maybe: .present(7)) != 7 || unwrap(maybe: .absent) != 0 { .true: return 5, .false: {} }
-    switch number(t: .value(number: 6)) != 12 || number(t: .end) != -1 { .true: return 6, .false: {} }
+    switch double(maybe: .present(4)) != 8 | double(maybe: .absent) != -1 { .true: return 4, .false: {} }
+    switch unwrap(maybe: .present(7)) != 7 | unwrap(maybe: .absent) != 0 { .true: return 5, .false: {} }
+    switch number(t: .value(number: 6)) != 12 | number(t: .end) != -1 { .true: return 6, .false: {} }
     switch filtered(xs: xs) != 4 { .true: return 7, .false: {} }
-    switch strict(n: 1) != 10 || strict(n: 3) != 3 { .true: return 8, .false: {} }
+    switch strict(n: 1) != 10 | strict(n: 3) != 3 { .true: return 8, .false: {} }
     state groups: Array<Array<Int>>()
     groups.append(value: xs)
     state empty: Array<Int>()

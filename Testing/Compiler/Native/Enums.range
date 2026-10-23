@@ -25,7 +25,7 @@ function turn(let d: Direction): Direction {
     switch a = b { .true: return 2, .false: {} }
     state h: Heading(fallback: .west)
     h.facing: turn(d: h.facing)
-    switch h.facing != Direction.east || h.fallback != .west { .true: return 3, .false: {} }
+    switch h.facing != Direction.east | h.fallback != .west { .true: return 3, .false: {} }
     let copy: h
     h.facing: .south
     switch copy.facing != .east { .true: return 4, .false: {} }
@@ -33,7 +33,7 @@ function turn(let d: Direction): Direction {
     xs.append(value: .south)
     xs.append(value: turn(d: .south))
     xs.append(value: turn(d: xs.read(at: 1)))
-    switch xs.read(at: 1) != .west || xs.read(at: 2) != .north { .true: return 5, .false: {} }
+    switch xs.read(at: 1) != .west | xs.read(at: 2) != .north { .true: return 5, .false: {} }
     state d: Direction.west
     d: turn(d: d)
     switch d != .north { .true: return 6, .false: {} }

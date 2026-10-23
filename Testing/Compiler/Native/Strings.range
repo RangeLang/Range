@@ -10,7 +10,7 @@ function vowels(let s: String): Int {
     state i: 0
     while i < s.count {
         let b: s.byte(at: i)
-        switch b = 97 || b = 101 || b = 105 || b = 111 || b = 117 { .true: found: found + 1, .false: {} }
+        switch b = 97 | b = 101 | b = 105 | b = 111 | b = 117 { .true: found: found + 1, .false: {} }
         i: i + 1
     }
     return found
@@ -26,11 +26,11 @@ function kind(let s: String): Int {
     let s: String("hi")
     @print("local: \(s)")
     let empty: String()
-    switch empty.count != 0 || empty != "" { .true: return 1, .false: {} }
-    switch s.count != 2 || s != "hi" || s = "ho" { .true: return 2, .false: {} }
+    switch empty.count != 0 | empty != "" { .true: return 1, .false: {} }
+    switch s.count != 2 | s != "hi" | s = "ho" { .true: return 2, .false: {} }
     let g: greet(name: "world")
     @print(g)
-    switch g.count != 12 || g != "hello, world" { .true: return 3, .false: {} }
+    switch g.count != 12 | g != "hello, world" { .true: return 3, .false: {} }
     switch vowels(s: g) != 3 { .true: return 4, .false: {} }
     switch s.byte(at: 0) != 104 { .true: return 5, .false: {} }
     state words: Array<String>()
@@ -41,14 +41,14 @@ function kind(let s: String): Int {
         words.append(value: joined + "!")
         round: round + 1
     }
-    switch joined != "ababab" || words.read(at: 1) != "abab!" { .true: return 6, .false: {} }
+    switch joined != "ababab" | words.read(at: 1) != "abab!" { .true: return 6, .false: {} }
     state total: 0
     for w in words { total: total + w.count }
     switch total != 3 + 5 + 7 { .true: return 7, .false: {} }
-    switch Token.word("a" + "b") != .word("ab") || Token.word("x") = .end { .true: return 8, .false: {} }
+    switch Token.word("a" + "b") != .word("ab") | Token.word("x") = .end { .true: return 8, .false: {} }
     let n: Named(name: joined + "?")
     switch n.name.count != 7 { .true: return 9, .false: {} }
-    switch kind(s: "yes") != 1 || kind(s: "n" + "o") != 0 || kind(s: "maybe") != -1 { .true: return 10, .false: {} }
+    switch kind(s: "yes") != 1 | kind(s: "n" + "o") != 0 | kind(s: "maybe") != -1 { .true: return 10, .false: {} }
     let maybe: String?.present("z")
     switch maybe != "z" { .true: return 11, .false: {} }
     @print("\(joined) \(words.read(at: 0)) \(n.name)")

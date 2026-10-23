@@ -1878,9 +1878,9 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
             return metaScalar(eval,node,RangeNodeBool,metaRelation(eval,node->name,left,right,node));
         }
         RangeGraphValue left = metaExpression(eval,scope,node->a);
-        if (same(node->name,"&&") || same(node->name,"||")) {
+        if (same(node->name,"&") || same(node->name,"|")) {
             int value = metaBoolean(eval,left,node);
-            if ((same(node->name,"&&") && value) || (same(node->name,"||") && !value))
+            if ((same(node->name,"&") && value) || (same(node->name,"|") && !value))
                 value = metaBoolean(eval,metaExpression(eval,scope,node->b),node);
             return metaScalar(eval,node,RangeNodeBool,value);
         }
@@ -2482,7 +2482,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         // declares; only the grammar of operators is C's.
         if (node->kind == RangeNodeBinary)
             sourceDiagnostic(report,node,1,"C-implementation",
-                "operator precedence and associativity are fixed in the C parser, in Swift's order; Range does not declare them yet");
+                "operator precedence and associativity are fixed in the C parser: prefix '!' and '-', arithmetic, comparisons, '&', then '|'; Range does not declare them yet");
         break;
     case RangeNodeEmission: case RangeNodeExtension:
         return; /* quoted and extension code is checked where it lands */
@@ -2685,7 +2685,7 @@ static int operatorName(const char *);
  * owner's layout: integer arithmetic and comparison on a storage primitive,
  * joining on the bytes primitive, and on an enum without payloads (the
  * condition type, which the type checker confirms) negation and the
- * short-circuit `&&` and `||`. */
+ * short-circuit `&` and `|`. */
 static void diagnoseBuiltinOperator(SourceReport *report, RangeNode *owner, RangeNode *item, int bytes)
 {
     const char *op = item->name;
@@ -2709,7 +2709,7 @@ static void diagnoseBuiltinOperator(SourceReport *report, RangeNode *owner, Rang
         sourceDiagnostic(report,item,1,"C-implementation","builtin function '+' joins two values' bytes into a new block in C");
     else if (tag && prefix && same(op,"!"))
         sourceDiagnostic(report,item,1,"C-implementation","builtin prefix '!' swaps the condition type's tags 0 and 1 in C");
-    else if (tag && binary && (same(op,"&&") || same(op,"||")))
+    else if (tag && binary && (same(op,"&") || same(op,"|")))
         sourceDiagnostic(report,item,1,"C-implementation","builtin function '%s' is C control flow: the right operand is evaluated only when the left one does not decide the result",op);
     else sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin function '%s' of %s",op,owner->name);
 }
@@ -3433,11 +3433,11 @@ static int operatorName(const char *name)
     return name && *name && !isalpha((unsigned char)*name) && *name != '_';
 }
 
-/* `&&` and `||` evaluate their right operand only when the left does not
+/* `&` and `|` evaluate their right operand only when the left does not
  * decide the result: their builtin functions are C control flow. */
 static int shortCircuit(const RangeNode *function)
 {
-    return function && (function->flags & RangeFlagBuiltin) && (same(function->name,"&&") || same(function->name,"||"));
+    return function && (function->flags & RangeFlagBuiltin) && (same(function->name,"&") || same(function->name,"|"));
 }
 
 /* `=` on values of `type` is checked once every type is known: layouts and
@@ -4939,6 +4939,12 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
                       prefix && binary ? "one parameter, the right operand, or none as a prefix" : prefix ? "no parameters" : "one parameter, the right operand",
                       function->typeName,function->name,function->itemCount);
     }
+    // `&` and `|` are the condition type's short-circuit logic, and they join
+    // the patterns and conditions of a switch label: no other type declares them.
+    if (function->typeName && (same(function->name,"&") || same(function->name,"|"))
+        && (!(function->flags & RangeFlagBuiltin) || !context || context->resolvedDeclaration != typer->boolean))
+        typeError(typer,function,"'%s' is reserved for Bool logic and switch patterns; %s cannot declare it",
+                  function->name,function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
     int loops = typer->loops;
@@ -7088,7 +7094,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         if (expr->c) return nativeExpression(native,expr->c); /* a declared operator with a body: its call */
         if (shortCircuit(expr->resolvedDeclaration)) {
             nativeExpression(native,expr->a);
-            uint32_t base = same(op,"&&") ? armCbz(0,0) : armCbnz(0,0);
+            uint32_t base = same(op,"&") ? armCbz(0,0) : armCbnz(0,0);
             size_t skip = nativeEmit(native,base);
             nativeExpression(native,expr->b);
             rangePatch(&native->machine,skip,base | (uint32_t)(((native->machine.size - skip) / 4) & 0x7FFFF) << 5);

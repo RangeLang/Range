@@ -22,7 +22,7 @@ function classify(let t: Token): Int {
     let a: Token.value(number: 7)
     switch a != .value(number: 7) { .true: return 1, .false: {} }
     switch a = .value(number: 8) { .true: return 2, .false: {} }
-    switch a = .end || Token.end != .end { .true: return 3, .false: {} }
+    switch a = .end | Token.end != .end { .true: return 3, .false: {} }
     switch Token.pair(1, 2) = .pair(2, 1) { .true: return 4, .false: {} }
     switch (Token.flag(true) = .flag(true)) { .false: return 5, .true: {} }
     let t: Tree.node(left: .leaf(value: 1), right: .node(left: .leaf(value: 2), right: .leaf(value: 3)))
@@ -30,6 +30,6 @@ function classify(let t: Token): Int {
     switch t != u { .true: return 6, .false: {} }
     switch t = .node(left: .leaf(value: 1), right: .leaf(value: 5)) { .true: return 7, .false: {} }
     switch Wrapper.token(.pair(3, 4)) != .token(.pair(3, 4)) { .true: return 8, .false: {} }
-    switch classify(t: .pair(1, 2)) != 12 || classify(t: .pair(2, 2)) != -1 { .true: return 9, .false: {} }
+    switch classify(t: .pair(1, 2)) != 12 | classify(t: .pair(2, 2)) != -1 { .true: return 9, .false: {} }
     return 42
 }

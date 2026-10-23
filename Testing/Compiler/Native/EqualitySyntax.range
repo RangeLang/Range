@@ -32,32 +32,32 @@ function level(let s: Shade): Int {
     let direct: a = b
     let typed: (a = b)
     state held: a + 1 = b
-    switch !direct || !typed || held { .true: return 3, .false: {} }
+    switch !direct | !typed | held { .true: return 3, .false: {} }
     let member: Box(size: 4)
     let measured: member.size = 4
     switch measured { .false: return 4, .true: {} }
     // A named argument whose value is a comparison.
-    switch flagged(flag: a = b) != 1 || flagged(flag: a != b) != 0 { .true: return 5, .false: {} }
-    switch !same(a: a, b: 3) || same(a: 1, b: 2) { .true: return 6, .false: {} }
+    switch flagged(flag: a = b) != 1 | flagged(flag: a != b) != 0 { .true: return 5, .false: {} }
+    switch !same(a: a, b: 3) | same(a: 1, b: 2) { .true: return 6, .false: {} }
     // Generic `<bits: 8>` and return types `): T` beside `=`.
     let small: Int<bits: 8>(8)
-    switch !width(n: small) || small = 9 { .true: return 7, .false: {} }
-    // Precedence: arithmetic binds tighter, `&&` and `||` looser.
+    switch !width(n: small) | small = 9 { .true: return 7, .false: {} }
+    // Precedence: arithmetic binds tighter, `&` and `|` looser.
     switch (a + 1 = b * 2 - 2) { .false: return 8, .true: {} }
-    switch !(a = 3 && b = 3) || (a = 4 || b = 4) { .true: return 9, .false: {} }
+    switch !(a = 3 & b = 3) | (a = 4 | b = 4) { .true: return 9, .false: {} }
     switch a < b = true { .true: return 10, .false: {} }
     // Switch subjects, payload bindings, and arm bodies next to `=`.
     let maybe: Int?.present(3)
     switch maybe { .present(let m): switch (m = a) { .false: return 11, .true: {} }, .absent: return 12 }
     switch maybe { .present(let m): x: m = 3, default: return 13 }
     switch x { .false: return 14, .true: {} }
-    switch level(s: .dark(level: 2)) != 2 || level(s: .light) != -1 { .true: return 15, .false: {} }
-    switch bucket(n: 0) != 0 || bucket(n: 1) != 1 || bucket(n: 4) != 2 || bucket(n: 5) != 3 { .true: return 16, .false: {} }
+    switch level(s: .dark(level: 2)) != 2 | level(s: .light) != -1 { .true: return 15, .false: {} }
+    switch bucket(n: 0) != 0 | bucket(n: 1) != 1 | bucket(n: 4) != 2 | bucket(n: 5) != 3 { .true: return 16, .false: {} }
     // Optional promotion, enums with payloads, and strings.
-    switch maybe = .absent || !(maybe = 3) { .true: return 17, .false: {} }
-    switch !(Shade.dark(level: 1) = .dark(level: 1)) || Shade.light = .dark(level: 0) { .true: return 18, .false: {} }
+    switch maybe = .absent | !(maybe = 3) { .true: return 17, .false: {} }
+    switch !(Shade.dark(level: 1) = .dark(level: 1)) | Shade.light = .dark(level: 0) { .true: return 18, .false: {} }
     let word: String("hi")
-    switch !(word = "hi") || word = "ho" { .true: return 19, .false: {} }
+    switch !(word = "hi") | word = "ho" { .true: return 19, .false: {} }
     // while and where conditions.
     state i: 0
     while !(i = 3) { i: i + 1 }

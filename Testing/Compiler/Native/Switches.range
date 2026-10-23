@@ -40,7 +40,7 @@ function flip(let b: Bool): Int {
 
 function both(let a: Bool, let b: Bool): Int {
     state result: 0
-    switch a && b {
+    switch a & b {
     .true: result: 2,
     .false: result: 1
     }
@@ -57,7 +57,7 @@ function both(let a: Bool, let b: Bool): Int {
     switch classify(n: -5) != 300 { .true: return 7, .false: {} }
     switch classify(n: 5000) != 5000 { .true: return 8, .false: {} }
     switch classify(n: 50) != 400 { .true: return 9, .false: {} }
-    switch flip(b: true) != 1 || flip(b: 1 > 2) != 0 { .true: return 10, .false: {} }
-    switch both(a: true, b: !false) != 2 || both(a: true, b: false) != 1 { .true: return 11, .false: {} }
+    switch flip(b: true) != 1 | flip(b: 1 > 2) != 0 { .true: return 10, .false: {} }
+    switch both(a: true, b: !false) != 2 | both(a: true, b: false) != 1 { .true: return 11, .false: {} }
     return 42
 }

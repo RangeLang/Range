@@ -27,7 +27,7 @@ function points(let n: Int): Array<Point> {
     b.append(value: 1) b.append(value: 2) b.append(value: 3)
     switch a != b { .true: return 3, .false: {} }
     b.append(value: 4)
-    switch a = b || b = a { .true: return 4, .false: {} }
+    switch a = b | b = a { .true: return 4, .false: {} }
 
     // Equal contents with different capacities: 4 slots against 3.
     state c: Array<Int>()
@@ -35,12 +35,12 @@ function points(let n: Int): Array<Point> {
     c.capacity: 3
     c.write(at: 0, value: 1) c.write(at: 1, value: 2) c.write(at: 2, value: 3)
     c.count: 3
-    switch a.capacity = c.capacity || a != c { .true: return 5, .false: {} }
+    switch a.capacity = c.capacity | a != c { .true: return 5, .false: {} }
     state d: Array<Int>()
     d.append(value: 1) d.append(value: 2) d.append(value: 9)
     switch a = d { .true: return 6, .false: {} }
 
-    switch points(n: 3) != points(n: 3) || points(n: 3) = points(n: 2) { .true: return 7, .false: {} }
+    switch points(n: 3) != points(n: 3) | points(n: 3) = points(n: 2) { .true: return 7, .false: {} }
     state moved: points(n: 2)
     moved.write(at: 1, value: Point(x: 1, y: 3))
     switch moved = points(n: 2) { .true: return 8, .false: {} }
@@ -58,10 +58,10 @@ function points(let n: Int): Array<Point> {
 
     // A construct with an Array field compares it with Array's `=`.
     switch Bag(label: "x", items: a) != Bag(label: "x", items: c) { .true: return 11, .false: {} }
-    switch Bag(label: "x", items: a) = Bag(label: "x", items: d) || Bag(label: "x", items: a) = Bag(label: "y", items: a) { .true: return 12, .false: {} }
+    switch Bag(label: "x", items: a) = Bag(label: "x", items: d) | Bag(label: "x", items: a) = Bag(label: "y", items: a) { .true: return 12, .false: {} }
 
     // An enum payload holding an Array.
-    switch Holding.some(points(n: 2)) != .some(points(n: 2)) || Holding.some(points(n: 2)) = .some(points(n: 1)) { .true: return 13, .false: {} }
-    switch Holding.some(points(n: 0)) = .none || Holding.none != .none { .true: return 14, .false: {} }
+    switch Holding.some(points(n: 2)) != .some(points(n: 2)) | Holding.some(points(n: 2)) = .some(points(n: 1)) { .true: return 13, .false: {} }
+    switch Holding.some(points(n: 0)) = .none | Holding.none != .none { .true: return 14, .false: {} }
     return 42
 }

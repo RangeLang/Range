@@ -30,7 +30,7 @@ function describe(let maybe: Int?): Int {
     switch describe(maybe: find(xs: xs, wanted: 4)) != -1 { .true: return 2, .false: {} }
     switch describe(maybe: 12) != 12 { .true: return 3, .false: {} }
     let x: Int?.present(5)
-    switch x != 5 || x = 6 || x = .absent { .true: return 4, .false: {} }
+    switch x != 5 | x = 6 | x = .absent { .true: return 4, .false: {} }
     state y: Int?.absent
     y: 7
     switch describe(maybe: y) != 7 { .true: return 5, .false: {} }
@@ -40,7 +40,7 @@ function describe(let maybe: Int?): Int {
     switch p.manager != .absent { .true: return 7, .false: {} }
     let s: switch small(n: 1) { .present(let s): s, .absent: { return 8 } }
     switch s != 5 { .true: return 9, .false: {} }
-    switch heading(up: true) != .north || heading(up: false) != .absent { .true: return 10, .false: {} }
+    switch heading(up: true) != .north | heading(up: false) != .absent { .true: return 10, .false: {} }
     state names: Array<String?>()
     names.append(value: "Ada")
     names.append(value: .absent)

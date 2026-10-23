@@ -178,8 +178,8 @@ int main(void)
              "switch small(text: #name) { .false: @diagnostic(\"too big\"), .true: {} } } "
              "function small(let text: RenamedText): RenamedTruth { return text = \"Quantity\" } "
              "@decimalRule construct Quantity { let storage: 3 }",NULL,1);
-    validate(EFFECT "macro assess(): Construct { switch false && absent { .true: @diagnostic(\"bad\"), .false: {} } "
-                    "switch true || absent { .true: { let ok: true }, .false: {} } } @assess construct Parcel {}",NULL,1);
+    validate(EFFECT "macro assess(): Construct { switch false & absent { .true: @diagnostic(\"bad\"), .false: {} } "
+                    "switch true | absent { .true: { let ok: true }, .false: {} } } @assess construct Parcel {}",NULL,1);
     validate("macro assess(): Construct { let fixed: 0 fixed: 1 } @assess construct Parcel {}","state local",0);
     validate("macro assess(): Construct { let result: 1 / 0 } @assess construct Parcel {}","division by zero",0);
     validate("macro assess(): Construct { let result: 9223372036854775807 + 1 } @assess construct Parcel {}","numeric storage overflow",0);

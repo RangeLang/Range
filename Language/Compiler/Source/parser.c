@@ -7,11 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Binary operator precedence, loosest first. As in Swift, `..<` forms an
+/* Binary operator precedence, loosest first: `|` (or), `&` (and), the
+ * comparisons, `..<`, then arithmetic; the prefix `!` and `-` bind tightest.
+ * Parentheses only override it. Switch labels join patterns and conditions
+ * with the same `&` and `|`, in the same order. As in Swift, `..<` forms an
  * interval below arithmetic and above comparison, and does not chain. */
 static const char *const RANGE_PRECEDENCE[][7] = {
-    {"||", NULL},
-    {"&&", NULL},
+    {"|", NULL},
+    {"&", NULL},
     {"=", "!=", "<", ">", "<=", ">=", NULL},
     {"..<", NULL},
     {"+", "-", NULL},
@@ -19,7 +22,9 @@ static const char *const RANGE_PRECEDENCE[][7] = {
 };
 #define RANGE_PRECEDENCE_LEVELS \
     ((int)(sizeof(RANGE_PRECEDENCE) / sizeof(RANGE_PRECEDENCE[0])))
-/* The level of `..<`, and of arithmetic: a pattern's value is arithmetic. */
+/* The level of the comparisons, of `..<`, and of arithmetic: a pattern's
+ * value is arithmetic, and a condition in a switch label a comparison. */
+#define RANGE_COMPARISON_LEVEL 2
 #define RANGE_INTERVAL_LEVEL 3
 #define RANGE_ARITHMETIC_LEVEL 4
 
@@ -34,6 +39,20 @@ static void parserFail(RangeParser *parser, const RangeToken *token,
     va_end(arguments);
     snprintf(parser->error, sizeof(parser->error), "%s:%d:%d: %s",
              parser->path, token->line, token->column, detail);
+    parser->failed = 1;
+}
+
+/* Fails at a parsed node's position. */
+static void parserFailAt(RangeParser *parser, const RangeNode *node, const char *format, ...)
+{
+    if (parser->failed) return;
+    char detail[384];
+    va_list arguments;
+    va_start(arguments, format);
+    vsnprintf(detail, sizeof(detail), format, arguments);
+    va_end(arguments);
+    snprintf(parser->error, sizeof(parser->error), "%s:%d:%d: %s",
+             parser->path, node->line, node->column, detail);
     parser->failed = 1;
 }
 
@@ -202,7 +221,7 @@ static int atTypePosition(RangeParser *parser)
         for (size_t i = 0; selectors[i]; ++i) if (parserAt(parser, selectors[i])) return 0;
         // `let s: bag.snapshot()` and `let n: a + 1` are expressions; a `<`
         // after the name stays a generic list, as in `Array<Int>`.
-        static const char *const expression[] = {".", "+", "-", "*", "/", "%", "=", "!=", "<=", ">=", "&&", "||", ">", NULL};
+        static const char *const expression[] = {".", "+", "-", "*", "/", "%", "=", "!=", "<=", ">=", "&", "|", ">", NULL};
         const RangeToken *ahead = parserPeek(parser);
         for (size_t i = 0; expression[i]; ++i) if (rangeTokenIs(ahead, expression[i])) return 0;
         // `let v: Int(2) + 1` and `let v: f(n: 1) = 1` are expressions: skip
@@ -780,6 +799,23 @@ static RangeNode *parsePattern(RangeParser *parser, RangeNode *bindings)
 
 /* ---- statements ------------------------------------------------------ */
 
+/* A comparison computes a Bool and changes nothing, so it is not a statement:
+ * `count = count + 1` on its own line is a mistaken assignment. */
+static void rejectComparisonStatement(RangeParser *parser, const RangeNode *expression)
+{
+    static const char *const comparisons[] = {"=", "!=", "<", ">", "<=", ">=", NULL};
+    if (parser->failed || !expression || expression->kind != RangeNodeBinary) return;
+    for (size_t i = 0; comparisons[i]; ++i) {
+        if (strcmp(expression->name, comparisons[i]) != 0) continue;
+        const RangeNode *left = expression->a;
+        if (left && left->kind == RangeNodeName)
+            parserFailAt(parser, expression, "a comparison is not a statement; did you mean '%s: …' to assign?", left->name);
+        else
+            parserFailAt(parser, expression, "a comparison is not a statement; did you mean 'name: …' to assign?");
+        return;
+    }
+}
+
 /* `switch` is the only selector: if, else, and guard are not Range. */
 static int rejectSelector(RangeParser *parser)
 {
@@ -850,6 +886,7 @@ static void parseArm(RangeParser *parser, RangeNode *entry, int value)
         return;
     }
     if (value) { entry->a = expression; return; }
+    rejectComparisonStatement(parser, expression);
     RangeNode *statement = parserNode(parser, RangeNodeExpressionStatement);
     statement->a = expression;
     rangeNodeAppend(parser->arena, body, statement);
@@ -1177,6 +1214,7 @@ static RangeNode *parseStatement(RangeParser *parser)
         node->b = parseExpression(parser, 0);
         return node;
     }
+    rejectComparisonStatement(parser, target);
     RangeNode *node = parserNode(parser, RangeNodeExpressionStatement);
     node->a = target;
     return node;
@@ -1262,7 +1300,7 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
      * a's type, and `function -(): T` the one `-a` calls: the operator symbol
      * is the function's name. `!=` is the negation of `=` and `..<` the
      * @interval sugar, so neither is declared. */
-    static const char *const declarable[] = {"=", "+", "-", "*", "/", "%", "<", ">", "<=", ">=", "!", "&&", "||", NULL};
+    static const char *const declarable[] = {"=", "+", "-", "*", "/", "%", "<", ">", "<=", ">=", "!", "&", "|", NULL};
     if (parser->current.kind == RangeTokenSymbol && !parserAt(parser, "(")) {
         for (size_t i = 0; declarable[i] && !node->name; ++i)
             if (parserAt(parser, declarable[i])) node->name = rangeArenaIntern(parser->arena, declarable[i], strlen(declarable[i]));

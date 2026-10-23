@@ -56,6 +56,8 @@ run switch-expressions 42 "" Testing/Compiler/Native/SwitchExpressions.range
 [[ "$(cat "$work_root/stdout")" == "three" ]] || fail "switch arms printed: $(cat "$work_root/stdout")"
 run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
+run logic 42 "" Testing/Compiler/Native/Logic.range
+printf '%s\n' "touched 3" "touched 4" | cmp -s - "$work_root/stdout" || fail "logic short-circuit printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
 run equatable 42 "" Testing/Compiler/Native/Equatable.range
 grep -Fq "Equatable.range:43:1: warning[macro]: Plain applies @equatable but declares no equals; the default structural equality is used" \
@@ -442,6 +444,25 @@ reject double-equals "double-equals.range:1:21: use '=' for equality" \
 reject double-equals-pattern "double-equals-pattern.range:1:42: use '=' for equality" \
     'function f(let n: Int): Int { switch n { == 1: return 1, default: return 0 } }
 { return f(n: 1) }'
+# One symbol per gate: `&` and `|`; `&&` and `||` are not Range.
+reject double-and "double-and.range:1:24: Range has no '&&'; use '&' for and" \
+    '{ let a: true switch a && true { .true: return 1, .false: {} } return 0 }'
+reject double-or "double-or.range:1:24: Range has no '||'; use '|' for or" \
+    '{ let a: true switch a || true { .true: return 1, .false: {} } return 0 }'
+# `&` and `|` are reserved for Bool logic and switch patterns.
+reject declared-and "'&' is reserved for Bool logic and switch patterns; Flags cannot declare it" \
+    'construct Flags { let bits: Int  function &(let other: Flags): Flags { return Flags(bits: bits) } }
+{ return 0 }'
+reject declared-builtin-or "'|' is reserved for Bool logic and switch patterns; Mode cannot declare it" \
+    'enum Mode { case a, b }
+extension Mode { @builtin function |(let other: Mode): Mode }
+{ return 0 }'
+# A comparison changes nothing, so it is not a statement.
+reject comparison-statement "comparison-statement.range:1:25: a comparison is not a statement; did you mean 'count: …' to assign?" \
+    '{ state count: 0  count = count + 1 return count }'
+reject comparison-arm "a comparison is not a statement; did you mean 'm: …' to assign?" \
+    'function f(let n: Int): Int { state m: n  switch n { 0: m < 1, default: {} } return m }
+{ return f(n: 1) }'
 # Equality code is emitted on demand: only for the types a program compares
 # (here Point), never for types it only declares or constructs.
 text_size() { size -m "$1" | awk '/Section __text:/ { print $3 }'; }
@@ -607,4 +628,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=51 rejections=121 signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"
+echo "compiler native: programs=52 rejections=128 logic=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"

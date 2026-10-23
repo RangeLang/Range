@@ -72,30 +72,30 @@ function half(let f: Fraction): Bool {
 
 {
     let a: Point(x: 1, y: 2)
-    switch a != Point(x: 1, y: 2) || a = Point(x: 2, y: 1) { .true: return 1, .false: {} }
+    switch a != Point(x: 1, y: 2) | a = Point(x: 2, y: 1) { .true: return 1, .false: {} }
     let s: Segment(from: a, to: Point(x: 3, y: 4))
     switch s != Segment(from: Point(x: 1, y: 2), to: Point(x: 3, y: 4)) { .true: return 2, .false: {} }
-    switch Shape.line(s) != .line(s) || Shape.dot(a) = .dot(Point(x: 0, y: 0)) || Shape.none != .none { .true: return 3, .false: {} }
+    switch Shape.line(s) != .line(s) | Shape.dot(a) = .dot(Point(x: 0, y: 0)) | Shape.none != .none { .true: return 3, .false: {} }
     let t: Tree.node(left: .leaf(1), right: .node(left: .leaf(2), right: .leaf(3)))
     switch t != .node(left: .leaf(1), right: .node(left: .leaf(2), right: .leaf(3))) { .true: return 4, .false: {} }
     switch t = .node(left: .leaf(1), right: .leaf(5)) { .true: return 5, .false: {} }
     switch Box<Point>(value: a) != Box<Point>(value: Point(x: 1, y: 2)) { .true: return 6, .false: {} }
     let half1: Fraction(numerator: 1, denominator: 2)
     let half2: Fraction(numerator: 2, denominator: 4)
-    switch half1 != half2 || half1 = Fraction(numerator: 1, denominator: 3) { .true: return 7, .false: {} }
+    switch half1 != half2 | half1 = Fraction(numerator: 1, denominator: 3) { .true: return 7, .false: {} }
     switch Measure(amount: half1, unit: "kg") != Measure(amount: half2, unit: "kg") { .true: return 8, .false: {} }
     switch Measure(amount: half1, unit: "kg") = Measure(amount: half2, unit: "lb") { .true: return 9, .false: {} }
-    switch Reading.exact(half1) != .exact(half2) || Reading.exact(half1) = .unknown { .true: return 10, .false: {} }
+    switch Reading.exact(half1) != .exact(half2) | Reading.exact(half1) = .unknown { .true: return 10, .false: {} }
     switch Parity.even != .odd { .true: return 11, .false: {} }
-    switch Plain(n: 1) = Plain(n: 2) || Plain(n: 3) != Plain(n: 3) { .true: return 12, .false: {} }
+    switch Plain(n: 1) = Plain(n: 2) | Plain(n: 3) != Plain(n: 3) { .true: return 12, .false: {} }
     let loose: LooseFraction(numerator: 1, denominator: 2)
-    switch loose = LooseFraction(numerator: 2, denominator: 4) || loose != LooseFraction(numerator: 1, denominator: 2) { .true: return 13, .false: {} }
+    switch loose = LooseFraction(numerator: 2, denominator: 4) | loose != LooseFraction(numerator: 1, denominator: 2) { .true: return 13, .false: {} }
     switch loose.equals(other: LooseFraction(numerator: 2, denominator: 4)) { .false: return 20, .true: {} }
-    switch classify(p: Point(x: 0, y: 0)) != 0 || classify(p: Point(x: 1, y: 1)) != 1 || classify(p: a) != 2 { .true: return 14, .false: {} }
-    switch !half(f: half2) || half(f: Fraction(numerator: 2, denominator: 3)) { .true: return 15, .false: {} }
+    switch classify(p: Point(x: 0, y: 0)) != 0 | classify(p: Point(x: 1, y: 1)) != 1 | classify(p: a) != 2 { .true: return 14, .false: {} }
+    switch !half(f: half2) | half(f: Fraction(numerator: 2, denominator: 3)) { .true: return 15, .false: {} }
     let maybe: Point?.present(a)
-    switch maybe != a || maybe = .absent { .true: return 16, .false: {} }
-    switch !Pair<Point>(first: a, second: Point(x: 1, y: 2)).same() || Pair<Int>(first: 1, second: 2).same() { .true: return 18, .false: {} }
+    switch maybe != a | maybe = .absent { .true: return 16, .false: {} }
+    switch !Pair<Point>(first: a, second: Point(x: 1, y: 2)).same() | Pair<Int>(first: 1, second: 2).same() { .true: return 18, .false: {} }
     switch !Pair<Fraction>(first: half1, second: half2).same() { .true: return 19, .false: {} }
     return 42
 }

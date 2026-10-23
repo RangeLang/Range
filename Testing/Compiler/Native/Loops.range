@@ -95,7 +95,7 @@ function sum(let xs: Array<Int>): Int {
         ys.append(value: y)
         visits: visits + 1
     }
-    switch visits != 2 || ys.count != 4 { .true: return 6, .false: {} }
+    switch visits != 2 | ys.count != 4 { .true: return 6, .false: {} }
 
     state k: 0
     while true {

@@ -1,5 +1,5 @@
 // A method changes its construct's state through bare member names; values
-// are copies, so changing one never changes another. && and || short-circuit.
+// are copies, so changing one never changes another. & and | short-circuit.
 construct Store {
     state values: Array<Int>()
     state revision: 0
@@ -50,8 +50,8 @@ function early(let value: Int): Int {
     let store: Store()
     let result: choose(store: store)
     let nested: switch result { .success(let nested): nested, default: { return 1 } }
-    switch store.revision != 0 || nested.store.revision != 1 { .true: return 2, .false: {} }
-    switch nested.store.values.read(at: 0) != 4294967297 || nested.store.values.read(at: 1) != 42 { .true: return 3, .false: {} }
+    switch store.revision != 0 | nested.store.revision != 1 { .true: return 2, .false: {} }
+    switch nested.store.values.read(at: 0) != 4294967297 | nested.store.values.read(at: 1) != 42 { .true: return 3, .false: {} }
     switch store.values.count != 0 { .true: return 4, .false: {} }
     state total: 0
     state index: 0
@@ -61,8 +61,8 @@ function early(let value: Int): Int {
     }
     switch total != 6 { .true: return 7, .false: {} }
     // The right side would read outside the storage; it never runs.
-    switch false && store.values.read(at: 999) = 0 { .true: return 8, .false: {} }
-    switch (true || store.values.read(at: 999) = 0) { .false: return 9, .true: {} }
+    switch false & store.values.read(at: 999) = 0 { .true: return 8, .false: {} }
+    switch (true | store.values.read(at: 999) = 0) { .false: return 9, .true: {} }
     switch identity(value: 42) != 42 { .true: return 11, .false: {} }
     return nested.store.values.read(at: 1)
 }

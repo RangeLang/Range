@@ -3,8 +3,8 @@
 {
     let text: String("A\0B")
     switch text.count != 3 { .true: return 1, .false: {} }
-    switch text.byte(at: 1) != 0 || text.byte(at: 2) != 66 { .true: return 2, .false: {} }
+    switch text.byte(at: 1) != 0 | text.byte(at: 2) != 66 { .true: return 2, .false: {} }
     let copy: text
-    switch copy != "A\0B" || copy = "A" { .true: return 3, .false: {} }
+    switch copy != "A\0B" | copy = "A" { .true: return 3, .false: {} }
     return 42
 }

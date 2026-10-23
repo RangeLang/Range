@@ -21,6 +21,6 @@ function small(let value: Int): Int {
     let direction: Direction.north
     state values: Array<Int>()
     values.append(value: 10)
-    switch values.count != 1 || small(value: -1) != 8 || small(value: 3) != 5 { .true: return 1, .false: {} }
+    switch values.count != 1 | small(value: -1) != 8 | small(value: 3) != 5 { .true: return 1, .false: {} }
     return classify(direction: direction) + small(value: 0)
 }

@@ -105,23 +105,23 @@ construct Walker {
     let d: Direction.north
     switch d.turned() != .east { .true: return 1, .false: {} }
     switch d.opposite() != .south { .true: return 2, .false: {} }
-    switch !d.vertical() || Direction.east.vertical() { .true: return 3, .false: {} }
+    switch !d.vertical() | Direction.east.vertical() { .true: return 3, .false: {} }
     switch d.turned().turned().turned().vertical() { .true: return 4, .false: {} }
     let t: Tree.node(left: .leaf(value: 4), right: .node(left: .leaf(value: 5), right: .leaf(value: 6)))
     switch t.sum() != 15 { .true: return 5, .false: {} }
     let e: Either<Int, Bool>.left(3)
-    switch !e.isLeft() || e.leftOr(fallback: 9) != 3 { .true: return 6, .false: {} }
+    switch !e.isLeft() | e.leftOr(fallback: 9) != 3 { .true: return 6, .false: {} }
     let r: Either<Int, Bool>.right(true)
-    switch r.isLeft() || r.leftOr(fallback: 9) != 9 { .true: return 7, .false: {} }
+    switch r.isLeft() | r.leftOr(fallback: 9) != 9 { .true: return 7, .false: {} }
     state w: Walker()
     w.step()
     switch w.current() != .east { .true: return 8, .false: {} }
-    switch !d.isStart() || Direction.west.isStart() { .true: return 9, .false: {} }
+    switch !d.isStart() | Direction.west.isStart() { .true: return 9, .false: {} }
     let maybe: Int?.present(4)
     let none: Int?.absent
-    switch !maybe.isPresent() || none.isPresent() { .true: return 10, .false: {} }
+    switch !maybe.isPresent() | none.isPresent() { .true: return 10, .false: {} }
     let lit: Light.on(.green)
-    switch lit.color() != .green || lit.color().swapped() != .red || Light.off.color() != .red { .true: return 11, .false: {} }
+    switch lit.color() != .green | lit.color().swapped() != .red | Light.off.color() != .red { .true: return 11, .false: {} }
     @print("\(d.opposite()) \(t.sum())")
     return 42
 }

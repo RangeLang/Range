@@ -1,0 +1,39 @@
+// One symbol per gate: `&` is and, `|` is or, `!` is not, on Bool only.
+// Tightest first: `!`, arithmetic, comparisons, `&`, then `|`; parentheses
+// only override it. `&` and `|` short-circuit.
+
+function gate(let ready: Bool, let blocked: Bool, let forced: Bool): Bool {
+    // (ready & !blocked) | forced
+    return ready & !blocked | forced
+}
+
+// Each call counts, so a skipped right operand is visible.
+function touched(let count: Int, let result: Bool): Bool {
+    @print("touched \(count)")
+    return result
+}
+
+{
+    switch gate(ready: true, blocked: false, forced: false) { .false: return 1, .true: {} }
+    switch gate(ready: true, blocked: true, forced: false) { .true: return 2, .false: {} }
+    switch gate(ready: false, blocked: true, forced: true) { .false: return 3, .true: {} }
+    // `|` is looser than `&`: true | false & false is true | (false & false).
+    switch true | false & false { .false: return 4, .true: {} }
+    switch (true | false) & false { .true: return 5, .false: {} }
+    // Comparisons bind tighter than `&`: (a = b) & (c < d).
+    let a: 2
+    let b: 2
+    let c: 1
+    let d: 3
+    switch a = b & c < d { .false: return 6, .true: {} }
+    // Arithmetic binds tighter than comparisons, `!` tighter than all.
+    switch a + 1 = d & !(c * 2 > d) { .false: return 7, .true: {} }
+    switch !(a = c) & a * c = b | false { .false: return 8, .true: {} }
+    // Short circuit: the right operand runs only when the left one does not
+    // decide the result.
+    switch false & touched(count: 1, result: true) { .true: return 9, .false: {} }
+    switch true | touched(count: 2, result: false) { .false: return 10, .true: {} }
+    switch true & touched(count: 3, result: true) { .false: return 11, .true: {} }
+    switch false | touched(count: 4, result: true) { .false: return 12, .true: {} }
+    return 42
+}
