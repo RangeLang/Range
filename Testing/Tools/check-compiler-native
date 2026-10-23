@@ -716,7 +716,7 @@ reject function-returning-function "a function type's result is a value: a closu
 reject unparenthesized-function "a function type puts its parameter types in parentheses: write (Element) -> Bool" \
     'construct Bag<Element> { function keep(let where: Element -> Bool): Int { return 0 } }
 { return 0 }'
-reject function-without-result "a function type names its result after '->', as in (Element) -> Bool; write -> Nothing for a closure that returns nothing" \
+reject function-without-result "a function type names its result after '->', as in (Element) -> Bool; write -> Void for a closure that returns nothing" \
     'function f(let w: (Int)): Int { return 0 }
 { return 0 }'
 reject closure-parameters "this closure takes 2 parameters; (Int<bits: 64, signed: true>) -> Bool takes 1" \
@@ -741,13 +741,13 @@ reject closure-parameter-twice "'x' names two parameters of this closure" \
     'function f(let with: (Int, Int) -> Int): Int { return with(1, 2) }
 { return f { x, x in x } }'
 reject closure-break "'break' is only allowed inside a loop; a closure's body does not leave a loop around the closure" \
-    'function each(let body: (Int) -> Nothing) { body(1) }
+    'function each(let body: (Int) -> Void) { body(1) }
 { state xs: Array<Int>() for x in xs { each { y in break } } return 0 }'
 reject closure-to-value "a closure is an argument for a function-typed parameter" \
     'function f(let value: Int): Int { return value }
 { return f(value: { x in x }) }'
 reject closure-recursion "'again' takes a closure, so it is compiled inline where it is called; it cannot reach itself" \
-    'function again(let body: (Int) -> Nothing) { again(body: body) }
+    'function again(let body: (Int) -> Void) { again(body: body) }
 { again { x in } return 0 }'
 # Declarations and calls the parser and type checker refuse.
 reject colon-function-default "parameter defaults require construction syntax, not a second colon" \

@@ -1,6 +1,0 @@
-// What a closure that returns nothing returns, as in (Element) -> Nothing.
-// A construct without stored members has one value and holds nothing, so a
-// closure returning it yields no value and `return` needs none; C reads that
-// from the members, never from this name. Provisional: the spelling of "no
-// value" is not settled.
-construct Nothing {}

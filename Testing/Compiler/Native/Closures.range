@@ -12,7 +12,7 @@ function count(let xs: Array<Int>, let where: (Int) -> Bool): Int {
     return found
 }
 
-function repeat(let times: Int, let body: (Int) -> Nothing) {
+function repeat(let times: Int, let body: (Int) -> Void) {
     state index: 0
     while index < times {
         body(index)
@@ -35,7 +35,7 @@ construct Counter {
     function add(let value: Int) {
         items.append(value: value)
     }
-    function each(let body: (Int) -> Nothing) {
+    function each(let body: (Int) -> Void) {
         state index: 0
         while index < items.count {
             body(items.read(at: index))
@@ -89,7 +89,7 @@ construct Box<T> {
         return switch x { 3: true, 8: true, default: false }
     }
     switch sign != 2 { .true: return 6, .false: {} }
-    // A closure that returns Nothing, with `return` and a loop of its own.
+    // A closure that returns Void, with `return` and a loop of its own.
     state calls: 0
     repeat(times: 5) { i in
         switch i = 3 { .true: return, .false: {} }

@@ -3435,7 +3435,7 @@ static RangeNode *functionType(Typer *typer, RangeNode **parameters, size_t coun
     return type;
 }
 
-/* A construct with no stored members, such as Nothing: it has one value and
+/* A construct with no stored members, such as Void: it has one value and
  * holds nothing, so a closure that returns it yields no value, and `return`
  * needs none. The rule is structural; C names no such type. */
 static int unitType(Typer *typer, const RangeNode *type)
@@ -4370,7 +4370,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
  * that parameter's type: its parameters take the type's parameter types, and
  * its body returns the type's result. A body that is one expression yields
  * it; otherwise `return` does, and returns from the closure only. A closure
- * whose result is a unit type such as Nothing yields no value. It sees the
+ * whose result is a unit type such as Void yields no value. It sees the
  * names where it is written, and may change a `state` there: it runs while
  * the call it is passed to runs, never after. So a closure, and a parameter
  * holding one, is only called or passed on to a function-typed parameter. */
@@ -5027,7 +5027,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
             break;
         }
         if (output) {
-            if (!node->a && unitType(typer,output)) break; /* a unit result, such as Nothing, needs no value */
+            if (!node->a && unitType(typer,output)) break; /* a unit result, such as Void, needs no value */
             if (!node->a) { char t[160]; describeType(t,sizeof(t),output); typeError(typer,node,"return requires %s",t); break; }
             coerce(typer,node->a,output,typeOf(typer,scope,node->a,output,context),"return");
         } else if (node->a) {

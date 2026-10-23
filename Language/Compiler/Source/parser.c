@@ -168,7 +168,7 @@ static const char *const RANGE_STORED_FUNCTION =
     "so it is not stored, returned, or held in a value";
 
 /* `(Element) -> Bool`, `(Result, Element) -> Result`, `() -> Bool`: always
- * parenthesized, with the result after `->`; `-> Nothing` for none. The type
+ * parenthesized, with the result after `->`; `-> Void` for none. The type
  * is named "->", flagged RangeFlagFunction; its generics block holds one
  * argument per parameter type and the result as its a. A function type's
  * parameters and result are values: closures neither take nor return
@@ -194,7 +194,7 @@ static const char *parseFunctionType(RangeParser *parser, int *flags, RangeNode 
     parserExpect(parser, ")");
     if (!parser->failed && !(parserAt(parser, "-") && rangeTokenIs(parserPeek(parser), ">")))
         parserFail(parser, &parser->current, "a function type names its result after '->', as in (Element) -> Bool; "
-                   "write -> Nothing for a closure that returns nothing");
+                   "write -> Void for a closure that returns nothing");
     parserAdvance(parser);
     parserAdvance(parser);
     if (!parser->failed && parserAt(parser, "("))
