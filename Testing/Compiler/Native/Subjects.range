@@ -1,0 +1,129 @@
+// Switch labels are boolean algebra over patterns: `&` joins one pattern per
+// subject into a row, `|` joins rows, parentheses group the alternatives of
+// one subject, and a trailing `& condition` guards its row, or the whole
+// label when the rows before it are parenthesized.
+
+enum Direction { case north, east, south, west }
+enum Power { case on, off }
+enum Shape { case circle(Int), square(Int), group(Array<Int>), nothing }
+
+// Two subjects, rows joined by `|`.
+function same(let a: Power, let b: Power): Int {
+    switch a, b {
+        .on & .on | .off & .off: return 1,
+        .on & .off: return 2,
+        .off & .on: return 3
+    }
+}
+
+// A grouped position: (.north | .south) & .on is two rows.
+function axis(let d: Direction, let p: Power): Int {
+    return switch d, p {
+        (.north | .south) & .on: 1,
+        (.east | .west) & .on: 2,
+        _ & .off: 0
+    }
+}
+
+// Three subjects, `_`, and bindings from several positions.
+function mix(let a: Int?, let b: Int?, let c: Power): Int {
+    return switch a, b, c {
+        .present(let x) & .present(let y) & .on: x + y,
+        .present(let x) & _ & .off: x,
+        .absent & .present(let y) & _: 100 + y,
+        _ & _ & _: -1
+    }
+}
+
+// A condition guards its own row: `.a & .x | .b & .y & ready` guards only
+// the second row.
+function perRow(let d: Direction, let p: Power, let ready: Bool): Int {
+    switch d, p {
+        .north & .on | .south & .off & ready: return 1,
+        default: return 0
+    }
+}
+
+// Parenthesized rows share the condition after them.
+function wholeArm(let d: Direction, let p: Power, let ready: Bool): Int {
+    switch d, p {
+        (.north & .on | .south & .off) & ready: return 1,
+        default: return 0
+    }
+}
+
+// A single subject takes conditions the same way; the condition uses the
+// row's bindings, and conditions join with `&`.
+function single(let o: Int?): Int {
+    return switch o {
+        .present(let x) & x > 3 & x < 10: 1,
+        .present(let x) & (x = 0 | x = 1): 2,
+        .present(let x): 3,
+        .absent: 4
+    }
+}
+
+// Rows that bind the same names, with a condition on each, and a relational
+// pattern whose operand stops at `&`.
+function measure(let s: Shape, let limit: Int): Int {
+    return switch s, limit {
+        .circle(let n) & < 10 | .square(let n) & < 10 & n > 0: n,
+        .group(let items) & _ & items.count > 2: 1000,
+        _ & _: 0
+    }
+}
+
+// Exhaustive over combinations without a default.
+function both(let a: Bool, let b: Bool): Int {
+    return switch a, b {
+        .true & .true: 3,
+        .true & .false: 2,
+        .false & _: 0
+    }
+}
+
+{
+    switch same(a: .on, b: .on) != 1 | same(a: .off, b: .off) != 1 | same(a: .on, b: .off) != 2 | same(a: .off, b: .on) != 3 {
+        .true: return 1, .false: {}
+    }
+    switch axis(d: .south, p: .on) != 1 | axis(d: .west, p: .on) != 2 | axis(d: .north, p: .off) != 0 { .true: return 2, .false: {} }
+    switch mix(a: .present(2), b: .present(3), c: .on) != 5 | mix(a: .present(2), b: .absent, c: .off) != 2 { .true: return 3, .false: {} }
+    switch mix(a: .absent, b: .present(7), c: .on) != 107 | mix(a: .present(2), b: .absent, c: .on) != -1 { .true: return 4, .false: {} }
+    // perRow: the first row is unguarded.
+    switch perRow(d: .north, p: .on, ready: false) != 1 | perRow(d: .south, p: .off, ready: false) != 0 { .true: return 5, .false: {} }
+    switch perRow(d: .south, p: .off, ready: true) != 1 { .true: return 6, .false: {} }
+    // wholeArm: both rows are guarded.
+    switch wholeArm(d: .north, p: .on, ready: false) != 0 | wholeArm(d: .north, p: .on, ready: true) != 1 { .true: return 7, .false: {} }
+    switch wholeArm(d: .south, p: .off, ready: false) != 0 | wholeArm(d: .south, p: .off, ready: true) != 1 { .true: return 8, .false: {} }
+    switch single(o: .present(5)) != 1 | single(o: .present(1)) != 2 | single(o: .present(12)) != 3 | single(o: .absent) != 4 { .true: return 9, .false: {} }
+    switch measure(s: .circle(4), limit: 3) != 4 | measure(s: .square(0), limit: 3) != 0 | measure(s: .square(2), limit: 3) != 2 { .true: return 10, .false: {} }
+    state xs: Array<Int>()
+    xs.append(value: 1)
+    xs.append(value: 2)
+    xs.append(value: 3)
+    switch measure(s: .group(xs), limit: 50) != 1000 | measure(s: .circle(4), limit: 50) != 0 { .true: return 11, .false: {} }
+    switch both(a: true, b: true) != 3 | both(a: true, b: false) != 2 | both(a: false, b: true) != 0 { .true: return 12, .false: {} }
+    // A for-in condition filters; it never ends the loop.
+    state shapes: Array<Shape>()
+    shapes.append(value: .group(xs))
+    shapes.append(value: .circle(1))
+    shapes.append(value: .group(Array<Int>()))
+    shapes.append(value: .group(xs))
+    state counted: 0
+    for .group(let items) in shapes & items.count > 2 & counted < 100 { counted: counted + items.count }
+    switch counted != 6 { .true: return 13, .false: {} }
+    state odd: 0
+    for x in xs & (x = 1 | x = 3) { odd: odd + x }
+    switch odd != 4 { .true: return 14, .false: {} }
+    // A switch statement over two subjects with a condition and a body block.
+    state seen: 0
+    for x in xs {
+        switch x > 1, x {
+            .true & let n & n != 2: { seen: seen + n },
+            .true & _: seen: seen + 10,
+            .false & _: {}
+        }
+    }
+    switch seen != 13 { .true: return 15, .false: {} }
+    return 42
+}

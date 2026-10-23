@@ -6,12 +6,12 @@
 // yet: a type declares exactly one @iteration function, and it takes one Int
 // parameter and returns an optional, the enum applying @optional.
 //
-// `for pattern in s where guard { body }` copies s when the loop begins and
+// `for pattern in s & condition { body }` copies s when the loop begins and
 // calls the function at positions 0, 1, 2, …; on absence the loop ends.
 // Otherwise the element is matched against pattern (a name, `_`, or a case
 // pattern after a leading dot, as in `for .group(let items) in shapes`), the
-// guard applies, the body runs for a match, and the position advances by one,
-// also on `continue`. C writes the loop as switches and finds the function by
+// condition filters (it never ends the loop), the body runs for a match, and
+// the position advances by one, also on `continue`. C writes the loop as switches and finds the function by
 // this role; it never names the function, its parameter, or the type.
 @builtin
 macro iteration(): Function

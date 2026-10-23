@@ -1534,6 +1534,65 @@ static RangeNode *metaTypePath(MetaEval *eval, MetaScope *scope, RangeNode *path
     return metaTypeEnum(eval,eval->function ? eval->function : from,path->name,path->flags,path);
 }
 
+/* A label row as a coverage vector of `width` columns, one per subject: a
+ * row pattern's items, or the one pattern; NULL, the default, is wild. */
+static void patternRow(RangeNode *row, RangeNode **vector, size_t width)
+{
+    for (size_t k = 0; k < width; ++k) vector[k] = NULL;
+    if (!row) return;
+    if (row->integer != RangePatternRow) { vector[0] = row; return; }
+    for (size_t k = 0; k < width && k < row->itemCount; ++k) vector[k] = row->items[k];
+}
+
+typedef int (*PatternUseful)(void *, RangeNode ***, size_t, RangeNode **, RangeNode **, size_t);
+
+/* The combinations of the subjects' cases that no row covers, written as
+ * '.on & .off' into missing; a subject that is not an enum is `_` there.
+ * cases[k] declares subject k's cases, or is NULL. Returns how many. */
+static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *context, RangeNode ***rows, size_t count,
+                             RangeNode **types, RangeNode **cases, size_t width, char *missing, size_t size)
+{
+    size_t *index = rangeArenaAllocate(arena,width * sizeof(*index)), found = 0, length = strlen(missing);
+    RangeNode **q = rangeArenaAllocate(arena,width * sizeof(*q));
+    for (size_t k = 0; k < width; ++k) index[k] = 0;
+    for (size_t tried = 0; tried < 4096; ++tried) {
+        int valid = 1;
+        for (size_t k = 0; k < width; ++k) {
+            q[k] = NULL;
+            if (!cases[k]) continue;
+            size_t seen = 0;
+            for (size_t i = 0; i < cases[k]->itemCount && !q[k]; ++i)
+                if (cases[k]->items[i]->kind == RangeNodeEnumCase && seen++ == index[k]) {
+                    q[k] = rangeNodeCreate(arena,RangeNodePattern,cases[k]->path,cases[k]->line,cases[k]->column);
+                    q[k]->integer = RangePatternCase;
+                    q[k]->name = cases[k]->items[i]->name;
+                    q[k]->resolvedDeclaration = cases[k]->items[i];
+                }
+            if (!q[k]) valid = 0;
+        }
+        if (valid && isUseful(context,rows,count,q,types,width)) {
+            char text[256]; size_t used = 0;
+            for (size_t k = 0; k < width; ++k)
+                used += (size_t)snprintf(text + used,sizeof(text) > used ? sizeof(text) - used : 0,"%s%s%s",
+                                         k ? " & " : "",q[k] ? "." : "_",q[k] ? q[k]->name : "");
+            if (length + strlen(text) + 8 < size)
+                length += (size_t)snprintf(missing + length,size - length,"%s'%s'",found ? ", " : "",text);
+            ++found;
+        }
+        // The next combination: the last subject's case advances first.
+        size_t k = width;
+        for (;;) {
+            if (k == 0) return found;
+            --k;
+            size_t total = 0;
+            for (size_t i = 0; cases[k] && i < cases[k]->itemCount; ++i) total += cases[k]->items[i]->kind == RangeNodeEnumCase;
+            if (++index[k] < total) break;
+            index[k] = 0;
+        }
+    }
+    return found;
+}
+
 /* Whether `pattern` matches `value` at compile time; its bindings join `into`. */
 static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeGraphValue value)
 {
@@ -1681,19 +1740,42 @@ static int metaUseful(MetaEval *eval, RangeNode ***rows, size_t count, RangeNode
     return metaUseful(eval,rest,n,q + 1,types + 1,width - 1);
 }
 
-/* The arm a compile-time switch runs, its bindings in *arm. The subject's
- * type is the enum its value is a case of; as in compiled code, every pattern
- * must match something the arms above do not, a default comes last, and the
- * arms together match every value of that type. */
+static int metaUsefulRow(void *eval, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width)
+{
+    return metaUseful(eval,rows,count,q,types,width);
+}
+
+/* Whether a row matches the subjects' values; its bindings join `into`. */
+static int metaMatchRow(MetaEval *eval, MetaScope *into, RangeNode *row, RangeGraphValue *subjects, RangeNode **types, size_t width)
+{
+    RangeNode **patterns = rangeArenaAllocate(eval->vm->arena,width * sizeof(*patterns));
+    patternRow(row,patterns,width);
+    for (size_t k = 0; k < width; ++k) {
+        if (patterns[k] && patterns[k]->integer == RangePatternCase && !types[k])
+            fail(eval->vm,patterns[k],"a compile-time case pattern matches an enum value; this value is not one");
+        if (patterns[k] && !metaMatch(eval,into,patterns[k],subjects[k])) return 0;
+    }
+    return 1;
+}
+
+/* The arm a compile-time switch runs, its bindings in *arm. A subject's type
+ * is the enum its value is a case of; as in compiled code, every row must
+ * match something the arms above do not, a default comes last, and the arms
+ * together match every value, or every combination of the subjects' values
+ * when there are several. */
 static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
 {
-    RangeGraphValue subject = metaExpression(eval,scope,node->a);
-    RangeNode *type = metaValueEnum(eval,subject);
     RangeArena *arena = eval->vm->arena;
+    size_t width = node->c ? node->c->itemCount : 1;
+    RangeGraphValue *subjects = rangeArenaAllocate(arena,width * sizeof(*subjects));
+    RangeNode **types = rangeArenaAllocate(arena,width * sizeof(*types));
+    for (size_t k = 0; k < width; ++k) {
+        subjects[k] = metaExpression(eval,scope,node->c ? node->c->items[k] : node->a);
+        types[k] = metaValueEnum(eval,subjects[k]);
+    }
     size_t capacity = 1;
     for (size_t i = 0; i < node->itemCount; ++i) capacity += node->items[i]->itemCount + 1;
     RangeNode ***rows = rangeArenaAllocate(arena,capacity * sizeof(*rows));
-    RangeNode *types[1] = {type};
     size_t count = 0;
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
@@ -1702,21 +1784,32 @@ static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, Met
         size_t patterns = fallback ? 1 : entry->itemCount;
         for (size_t j = 0; j < patterns; ++j) {
             RangeNode *pattern = fallback ? NULL : entry->items[j];
-            if (pattern && pattern->integer == RangePatternCase && !type)
-                fail(eval->vm,pattern,"a compile-time case pattern matches an enum value; this value is not one");
-            RangeNode **row = rangeArenaAllocate(arena,sizeof(*row));
-            row[0] = pattern;
-            if (!metaUseful(eval,rows,count,row,types,1)) {
-                if (pattern) fail(eval->vm,pattern,"this pattern is already handled by earlier arms");
+            RangeNode **row = rangeArenaAllocate(arena,width * sizeof(*row));
+            patternRow(pattern,row,width);
+            for (size_t k = 0; k < width; ++k)
+                if (row[k] && row[k]->integer == RangePatternCase && !types[k])
+                    fail(eval->vm,row[k],"a compile-time case pattern matches an enum value; this value is not one");
+            if (!metaUseful(eval,rows,count,row,types,width)) {
+                if (pattern) fail(eval->vm,pattern,"this %s is already handled by earlier arms",width > 1 ? "row" : "pattern");
                 fail(eval->vm,entry,"'default' is never reached: the arms above match every value");
             }
             if (!pattern || !pattern->b) rows[count++] = row;
         }
     }
-    RangeNode *wild[1] = {NULL};
-    if (metaUseful(eval,rows,count,wild,types,1)) {
+    RangeNode **wild = rangeArenaAllocate(arena,width * sizeof(*wild));
+    patternRow(NULL,wild,width);
+    if (metaUseful(eval,rows,count,wild,types,width)) {
         char missing[256] = "";
         size_t length = 0;
+        if (width > 1) {
+            if (patternMissing(arena,metaUsefulRow,eval,rows,count,types,types,width,missing,sizeof(missing))) {
+                int many = strchr(missing,',') != NULL;
+                fail(eval->vm,node,"compile-time switch over %zu subjects must be exhaustive: %s %s not handled; add %s or a default",
+                     width,missing,many ? "are" : "is",many ? "those combinations" : "that combination");
+            }
+            fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
+        }
+        RangeNode *type = types[0];
         for (size_t i = 0; type && i < type->itemCount; ++i) {
             RangeNode *entry = type->items[i];
             if (entry->kind != RangeNodeEnumCase || !metaUsefulCase(eval,rows,count,wild,types,1,entry)) continue;
@@ -1733,9 +1826,9 @@ static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, Met
         if (entry->flags & RangeFlagLiteral) return entry;
         for (size_t j = 0; j < entry->itemCount; ++j) {
             *arm = (MetaScope){.parent=scope,.application=scope->application};
-            RangeNode *pattern = entry->items[j];
-            if (metaMatch(eval,arm,pattern,subject)
-                && (!pattern->b || metaBoolean(eval,metaExpression(eval,arm,pattern->b),pattern->b))) return entry;
+            RangeNode *row = entry->items[j];
+            if (metaMatchRow(eval,arm,row,subjects,types,width)
+                && (!row->b || metaBoolean(eval,metaExpression(eval,arm,row->b),row->b))) return entry;
         }
     }
     fail(eval->vm,node,"compile-time switch has no arm for this value");
@@ -2487,11 +2580,15 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     case RangeNodeEmission: case RangeNodeExtension:
         return; /* quoted and extension code is checked where it lands */
     case RangeNodeSwitchCase: {
-        // The arm's guard, shared by its `|` alternatives, and its body see
-        // the first pattern's bindings, which every alternative binds.
-        for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,scope,node->items[i],metadata);
+        // A row's condition sees that row's bindings; the arm's body sees the
+        // first row's, which every row binds.
+        for (size_t i = 0; i < node->itemCount; ++i) {
+            RangeNode *row = node->items[i];
+            diagnoseSourceNode(report,scope,row,metadata);
+            SourceScope own = {.owner=row->c ? row->c : node,.parent=scope,.meta=scope && scope->meta};
+            diagnoseSourceNode(report,&own,row->b,metadata);
+        }
         SourceScope bound = {.owner=node->c ? node->c : node,.parent=scope,.meta=scope && scope->meta};
-        if (node->itemCount) diagnoseSourceNode(report,&bound,node->items[0]->b,metadata);
         diagnoseSourceNode(report,&bound,node->a,metadata);
         diagnoseSourceNode(report,&bound,node->b,metadata);
         return;
@@ -4824,14 +4921,34 @@ static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, Range
     return type;
 }
 
+static int typerUseful(void *typer, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width)
+{
+    return useful(typer,rows,count,q,types,width);
+}
+
+/* A row's patterns, each typed with its subject's type. */
+static void typeRow(Typer *typer, SourceScope *scope, RangeNode *row, RangeNode **types, size_t width, RangeNode *context)
+{
+    if (row->integer != RangePatternRow) { typePattern(typer,scope,row,types[0],context); return; }
+    for (size_t k = 0; k < width && k < row->itemCount; ++k) typePattern(typer,scope,row->items[k],types[k],context);
+}
+
 /* A switch statement, or, with RangeFlagValue, a switch expression: its type
  * is the one its arms yield, each typed with `expected` (or, without one,
  * with the first value's type) as context, as any value is. An arm that does
- * not yield is a block that must diverge. */
+ * not yield is a block that must diverge. A switch over several subjects
+ * matches their combinations: each row has one pattern per subject. */
 static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *expected, RangeNode *context, RangeNode *output)
 {
     size_t errors = typer->report->errors;
-    RangeNode *subject = typeSubject(typer,scope,node->a,context);
+    RangeArena *arena = typer->report->arena;
+    size_t width = node->c ? node->c->itemCount : 1;
+    RangeNode **types = rangeArenaAllocate(arena,width * sizeof(*types));
+    int typed = 1;
+    for (size_t k = 0; k < width; ++k) {
+        types[k] = typeSubject(typer,scope,node->c ? node->c->items[k] : node->a,context);
+        typed &= types[k] != NULL;
+    }
     int value = (node->flags & RangeFlagValue) != 0;
     RangeNode *type = NULL;
     for (size_t i = 0; i < node->itemCount; ++i) {
@@ -4839,29 +4956,31 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount)
             typeError(typer,entry,"'default' must be the last arm of a switch");
         for (size_t j = 0; j < entry->itemCount; ++j) {
-            RangeNode *pattern = entry->items[j], *bindings = pattern->c;
-            typePattern(typer,scope,pattern,subject,context);
+            RangeNode *row = entry->items[j], *bindings = row->c;
+            typeRow(typer,scope,row,types,width,context);
             for (size_t k = 0; bindings && k < bindings->itemCount; ++k)
                 for (size_t m = 0; m < k; ++m)
                     if (same(bindings->items[m]->name,bindings->items[k]->name))
-                        typeError(typer,bindings->items[k],"'%s' is bound twice in one pattern",bindings->items[k]->name);
-            // Every alternative of an arm binds the same names, with the same types.
+                        typeError(typer,bindings->items[k],"'%s' is bound twice in one row",bindings->items[k]->name);
+            // Every row of an arm binds the same names, with the same types.
             if (j) {
                 for (size_t k = 0; bindings && k < bindings->itemCount; ++k) {
                     RangeNode *binding = bindings->items[k], *first = bindingNamed(entry->c,binding->name);
-                    if (!first) { typeError(typer,binding,"'%s' must be bound by every pattern of this arm",binding->name); continue; }
+                    if (!first) { typeError(typer,binding,"'%s' must be bound by every row of this arm",binding->name); continue; }
                     binding->resolvedDeclaration = first;
-                    expectType(typer,binding,first->type,binding->type,"a binding shared by the patterns of an arm");
+                    expectType(typer,binding,first->type,binding->type,"a binding shared by the rows of an arm");
                 }
                 for (size_t k = 0; entry->c && k < entry->c->itemCount; ++k)
                     if (!bindingNamed(bindings,entry->c->items[k]->name))
-                        typeError(typer,pattern,"this pattern must also bind '%s'",entry->c->items[k]->name);
+                        typeError(typer,row,"this row must also bind '%s'",entry->c->items[k]->name);
+            }
+            // A row's condition sees that row's bindings.
+            if (row->b) {
+                SourceScope bound = {.owner=bindings ? bindings : entry,.parent=scope};
+                expectType(typer,row->b,typer->booleanType,typeOf(typer,&bound,row->b,typer->booleanType,context),"condition");
             }
         }
-        // The arm's guard, shared by its alternatives, sees the first one's bindings.
-        RangeNode *guard = entry->itemCount ? entry->items[0]->b : NULL;
         SourceScope body = {.owner=entry->c ? entry->c : entry,.parent=scope};
-        if (guard) expectType(typer,guard,typer->booleanType,typeOf(typer,&body,guard,typer->booleanType,context),"guard");
         if (entry->a) {
             RangeNode *actual = typeOf(typer,&body,entry->a,expected ? expected : type,context);
             type = armsType(typer,node,type,entry->a,actual);
@@ -4874,34 +4993,49 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     if (value && !type && typer->report->errors == errors)
         typeError(typer,node,"no arm of this switch expression yields a value");
     node->type = type;
-    if (!subject || typer->report->errors != errors) return type;
-    // Each pattern must match something the earlier ones do not; together they
-    // must match every value.
-    RangeArena *arena = typer->report->arena;
+    if (!typed || typer->report->errors != errors) return type;
+    // Each row must match something the earlier ones do not; together they
+    // must match every value, or every combination of the subjects' values.
+    // A row with a condition covers nothing for the rows after it.
     size_t capacity = 1;
     for (size_t i = 0; i < node->itemCount; ++i) capacity += node->items[i]->itemCount + 1;
     RangeNode ***rows = rangeArenaAllocate(arena,capacity * sizeof(*rows));
-    RangeNode *types[1] = {subject};
     size_t count = 0;
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         size_t patterns = (entry->flags & RangeFlagLiteral) ? 1 : entry->itemCount;
         for (size_t j = 0; j < patterns; ++j) {
             RangeNode *pattern = (entry->flags & RangeFlagLiteral) ? NULL : entry->items[j];
-            RangeNode **row = rangeArenaAllocate(arena,sizeof(*row));
-            row[0] = pattern;
+            RangeNode **row = rangeArenaAllocate(arena,width * sizeof(*row));
+            patternRow(pattern,row,width);
             // A default the compiler wrote for a lowering may be unreachable.
-            if (!useful(typer,rows,count,row,types,1) && !(entry->flags & RangeFlagImplicit)) {
-                if (pattern) typeError(typer,pattern,"this pattern is already handled by earlier arms");
+            if (!useful(typer,rows,count,row,types,width) && !(entry->flags & RangeFlagImplicit)) {
+                if (pattern) typeError(typer,pattern,"this %s is already handled by earlier arms",width > 1 ? "row" : "pattern");
                 else typeError(typer,entry,"'default' is never reached: the arms above match every value");
             }
             if (!pattern || !pattern->b) rows[count++] = row;
         }
     }
-    RangeNode *wild[1] = {NULL};
-    if (!useful(typer,rows,count,wild,types,1)) return type;
-    char t[160]; describeType(t,sizeof(t),subject);
+    RangeNode **wild = rangeArenaAllocate(arena,width * sizeof(*wild));
+    patternRow(NULL,wild,width);
+    if (!useful(typer,rows,count,wild,types,width)) return type;
+    char t[480] = "";
+    for (size_t k = 0, used = 0; k < width; ++k) {
+        char one[160]; describeType(one,sizeof(one),types[k]);
+        used += (size_t)snprintf(t + used,sizeof(t) > used ? sizeof(t) - used : 0,"%s%s",k ? ", " : "",one);
+    }
     char missing[512] = "";
+    if (width > 1) {
+        RangeNode **cases = rangeArenaAllocate(arena,width * sizeof(*cases));
+        for (size_t k = 0; k < width; ++k) cases[k] = isEnum(types[k]) ? types[k]->resolvedDeclaration : NULL;
+        if (patternMissing(arena,typerUseful,typer,rows,count,types,cases,width,missing,sizeof(missing))) {
+            int many = strchr(missing,',') != NULL;
+            typeError(typer,node,"switch over %s must be exhaustive: %s %s not handled; add %s or a default",t,missing,
+                      many ? "are" : "is",many ? "those combinations" : "that combination");
+        } else typeError(typer,node,"switch over %s must be exhaustive; add a default",t);
+        return type;
+    }
+    RangeNode *subject = types[0];
     size_t length = 0;
     if (isEnum(subject))
         for (size_t i = 0; i < subject->resolvedDeclaration->itemCount; ++i) {
@@ -7453,12 +7587,12 @@ static void nativeStatementBody(Native *native, RangeNode *node)
 }
 
 /* ---- switch ----
- * The subject is evaluated once and kept in a frame slot: a scalar's value, or
- * an aggregate's address. An arm tries its `|` alternatives in order. A
- * pattern tests tags and values first, then copies its bindings into the
- * arm's slots (a copy holds its own references), then runs the arm's guard; a
- * failed guard ends the bindings. The first match runs its arm, and arms do
- * not fall through. */
+ * Each subject is evaluated once and kept in a frame slot: a scalar's value,
+ * or an aggregate's address. An arm tries its rows in order. A row tests
+ * tags and values first, subject by subject, then copies its bindings into
+ * the arm's slots (a copy holds its own references), then runs the row's
+ * condition; a failed condition ends the bindings. The first match runs its
+ * arm, and arms do not fall through. */
 
 typedef struct { int32_t slot; size_t offset; int value; } NativePlace; /* value: the slot holds the scalar itself */
 typedef struct { RangeNode *binding; NativePlace place; RangeNode *type; } NativeBind;
@@ -7572,13 +7706,19 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
     RangeNode *valueType = value ? nativeType(native,node->type) : NULL;
     int valueKind = value ? nativeKind(native,valueType,node) : NativeNone;
     if (value && valueKind == NativeNone) return NULL;
-    RangeNode *type = nativeExpression(native,node->a);
-    if (!type) return NULL;
-    int kind = nativeKind(native,type,node->a);
-    if (kind == NativeNone) return NULL;
-    int32_t subject = nativeReserve(native,8,8);
-    nativeStore(native,0,subject);
-    NativePlace top = {.slot=subject,.value=kind == NativeScalar};
+    // Each subject is evaluated once, in order, into its own slot.
+    size_t width = node->c ? node->c->itemCount : 1;
+    NativePlace places[width];
+    RangeNode *types[width];
+    for (size_t k = 0; k < width; ++k) {
+        RangeNode *subject = node->c ? node->c->items[k] : node->a;
+        types[k] = nativeExpression(native,subject);
+        if (!types[k]) return NULL;
+        int kind = nativeKind(native,types[k],subject);
+        if (kind == NativeNone) return NULL;
+        places[k] = (NativePlace){.slot=nativeReserve(native,8,8),.value=kind == NativeScalar};
+        nativeStore(native,0,places[k].slot);
+    }
     int32_t result = valueKind == NativeAggregate ? nativeReserve(native,valueType->size ? valueType->size : 1,valueType->alignment)
                    : valueKind == NativeScalar ? nativeReserve(native,8,8) : 0;
     native->valueDepth += value;
@@ -7597,9 +7737,10 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
         size_t bodyCount = 0, bodyCapacity = 0;
         int fallible = !(entry->flags & RangeFlagLiteral);
         for (size_t j = 0; fallible && j < entry->itemCount; ++j) {
-            RangeNode *pattern = entry->items[j];
+            RangeNode *pattern = entry->items[j], *patterns[width];
             NativeMatch match = {0};
-            nativeMatch(native,&match,pattern,top,type);
+            patternRow(pattern,patterns,width);
+            for (size_t k = 0; k < width; ++k) nativeMatch(native,&match,patterns[k],places[k],types[k]);
             for (size_t b = 0; b < match.bindCount; ++b) {
                 NativeBind *bind = &match.binds[b];
                 RangeNode *target = bind->binding->resolvedDeclaration ? bind->binding->resolvedDeclaration : bind->binding;

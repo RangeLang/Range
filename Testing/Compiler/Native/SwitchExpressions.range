@@ -47,11 +47,11 @@ function loop(let xs: Array<Int>): Int {
     return sum
 }
 
-// An expression switch in a return, with `|` alternatives that bind, a where
-// guard, and a payload binding.
+// An expression switch in a return, with `|` alternatives that bind, a condition
+// for both rows, and a payload binding.
 function measure(let s: Shape): Int {
     return switch s {
-        .circle(radius: let n) | .square(side: let n) where n > 10: 1000,
+        (.circle(radius: let n) | .square(side: let n)) & n > 10: 1000,
         .circle(let n) | .square(let n): n,
         .group(let items): items.count,
         .nothing: 0
@@ -176,7 +176,7 @@ function partial(let xs: Array<Int>): Int {
     shapes.append(value: .group(made(n: 5)))
     shapes.append(value: .circle(radius: 1))
     state counted: 0
-    for .group(let items) in shapes where items.count > 3 { counted: counted + items.count }
+    for .group(let items) in shapes & items.count > 3 { counted: counted + items.count }
     for .group(let items) in shapes { counted: counted + 100 }
     switch counted != 205 { .true: return 20, .false: {} }
     return 42

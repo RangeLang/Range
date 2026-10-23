@@ -36,7 +36,7 @@ construct Countdown {
 
     // Precedence as in Swift: arithmetic binds tighter, comparison looser.
     state wide: 0
-    for i in 1 + 1..<2 * 3 where i % 2 = 0 { wide: wide + i }
+    for i in 1 + 1..<2 * 3 & i % 2 = 0 { wide: wide + i }
     switch wide != 6 { .true: return 5, .false: {} }
 
     // continue still advances the position; break leaves the loop.

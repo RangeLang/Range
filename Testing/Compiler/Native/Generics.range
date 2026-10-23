@@ -27,7 +27,7 @@ function second<Element>(let xs: Array<Element>): Element? {
 
 function count<Element>(let xs: Array<Element>, let value: Element): Int {
     state n: 0
-    for x in xs where x = value { n: n + 1 }
+    for x in xs & x = value { n: n + 1 }
     return n
 }
 

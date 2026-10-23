@@ -56,6 +56,7 @@ run switch-expressions 42 "" Testing/Compiler/Native/SwitchExpressions.range
 [[ "$(cat "$work_root/stdout")" == "three" ]] || fail "switch arms printed: $(cat "$work_root/stdout")"
 run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
+run subjects 42 "" Testing/Compiler/Native/Subjects.range
 run logic 42 "" Testing/Compiler/Native/Logic.range
 printf '%s\n' "touched 3" "touched 4" | cmp -s - "$work_root/stdout" || fail "logic short-circuit printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
@@ -104,7 +105,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
-                   bytes control evaluation identity-references; do
+                   bytes control evaluation identity-references subjects; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -189,7 +190,7 @@ function f(let t: Token): Int { switch t { .value(let n): return n, .end: return
 reject binding-outside-arm "no declaration for 'n' in the loaded sources" \
     'function f(let o: Int?): Int { switch o { .present(let n): return n, .absent: {} } return n }
 { return f(o: .absent) }'
-reject unshared-binding "'b' must be bound by every pattern of this arm" \
+reject unshared-binding "'b' must be bound by every row of this arm" \
     'enum Pair { case one(Int), two(Int, Int) }
 function f(let p: Pair): Int { switch p { .one(let a) | .two(let a, let b): return a } }
 { return f(p: .one(1)) }'
@@ -444,6 +445,64 @@ reject double-equals "double-equals.range:1:21: use '=' for equality" \
 reject double-equals-pattern "double-equals-pattern.range:1:42: use '=' for equality" \
     'function f(let n: Int): Int { switch n { == 1: return 1, default: return 0 } }
 { return f(n: 1) }'
+# A label row is one pattern per subject joined by `&`, then its conditions.
+power='enum Power { case on, off }'
+reject row-width "this switch has 2 subjects, so a row is 2 patterns joined by '&', one per subject in order; this row has 1" \
+    "$power
+enum Direction { case north, south }
+function f(let d: Direction, let p: Power): Int { switch d, p { .north | .south & .on: return 1, default: return 0 } }
+{ return f(d: .north, p: .on) }"
+reject row-width-single "this switch has one subject, so a row is one pattern; this row has 2" \
+    "$power
+function f(let p: Power): Int { switch p { .on & .off: return 1, default: return 0 } }
+{ return f(p: .on) }"
+reject condition-first "a row's conditions come after its patterns" \
+    "$power
+function f(let p: Power, let q: Power, let ready: Bool): Int { switch p, q { .on & ready & .off: return 1, default: return 0 } }
+{ return f(p: .on, q: .on, ready: true) }"
+reject condition-only "this row has no pattern; a condition follows its row's patterns" \
+    'function f(let n: Int): Int { switch n { n > 3: return 1, default: return 0 } }
+{ return f(n: 1) }'
+reject combinations "switch over Power, Power must be exhaustive: '.on & .off' is not handled; add that combination or a default" \
+    "$power
+function f(let p: Power, let q: Power): Int { switch p, q { .on & .on: return 1, .off & _: return 0 } }
+{ return f(p: .on, q: .on) }"
+reject guarded-combinations "switch over Power, Power must be exhaustive: '.on & .on', '.on & .off' are not handled; add those combinations" \
+    "$power
+function f(let p: Power, let q: Power, let ready: Bool): Int { switch p, q { .on & _ & ready: return 1, .off & _: return 0 } }
+{ return f(p: .on, q: .on, ready: true) }"
+reject handled-row "this row is already handled by earlier arms" \
+    "$power
+function f(let p: Power, let q: Power): Int { switch p, q { _ & .on: return 1, .off & .on: return 2, default: return 0 } }
+{ return f(p: .on, q: .on) }"
+reject unreachable-default-rows "'default' is never reached: the arms above match every value" \
+    "$power
+function f(let p: Power, let q: Power): Int { switch p, q { .on & _: return 1, .off & _: return 2, default: return 0 } }
+{ return f(p: .on, q: .on) }"
+reject bound-twice-row "'x' is bound twice in one row" \
+    'function f(let a: Int?, let b: Int?): Int { switch a, b { .present(let x) & .present(let x): return x, default: return 0 } }
+{ return f(a: .absent, b: .absent) }'
+reject shared-binding-type "a binding shared by the rows of an arm requires Int<bits: 64, signed: true>; found String" \
+    'enum Token { case number(Int), word(String) }
+function f(let t: Token): Int { switch t { .number(let v) | .word(let v): return 1 } }
+{ return f(t: .number(1)) }'
+reject condition-other-arm "no declaration for 'x' in the loaded sources" \
+    'function f(let o: Int?): Int { switch o { .present(let x): return x, .absent & x > 0: return 1, .absent: return 0 } }
+{ return f(o: .absent) }'
+reject condition-type "condition requires Bool; found Int<bits: 64, signed: true>" \
+    'function f(let o: Int?): Int { switch o { .present(let x) & x + 1: return x, default: return 0 } }
+{ return f(o: .absent) }'
+reject subject-trailing-comma "no ',' after the last subject of a switch" \
+    'function f(let a: Bool): Int { switch a, { .true: return 1, .false: return 0 } }
+{ return f(a: true) }'
+# `where` is not Range: a condition joins its row with `&`.
+reject where-arm "Range has no 'where'; join a condition to the row with '&', e.g. .present(let x) & x > 3: …" \
+    'function f(let o: Int?): Int { switch o { .present(let x) where x > 3: return x, default: return 0 } }
+{ return f(o: .absent) }'
+reject where-for "Range has no 'where'; filter with '&', e.g. for x in xs & x > 3 { … }" \
+    '{ state n: 0  for x in 0..<5 where x > 2 { n: n + x } return n }'
+reject for-or "a for-in condition joins comparisons with '&'; parenthesize an or" \
+    '{ state n: 0  for x in 0..<5 & x > 3 | x < 1 { n: n + x } return n }'
 # One symbol per gate: `&` and `|`; `&&` and `||` are not Range.
 reject double-and "double-and.range:1:24: Range has no '&&'; use '&' for and" \
     '{ let a: true switch a && true { .true: return 1, .false: {} } return 0 }'
@@ -628,4 +687,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=52 rejections=128 logic=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"
+echo "compiler native: programs=53 rejections=144 logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass strings=pass converted=pass"

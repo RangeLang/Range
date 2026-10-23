@@ -29,7 +29,7 @@ macro equatable(): Construct {
     }
 
     switch equals {
-        .present(let equals) where written != .absent: {
+        .present(let equals) & written != .absent: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}
@@ -90,7 +90,7 @@ macro equatable(): Enum {
     }
 
     switch equals {
-        .present(let equals) where written != .absent: {
+        .present(let equals) & written != .absent: {
             switch equals.parameters.count != 1 {
                 .true: @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
                 .false: {}

@@ -26,7 +26,7 @@ function classify(let n: Int): Int {
     0: return 100,
     1 | 2 | 3: return 200,
     < 0: return 300,
-    let big where big > 1000: return big,
+    let big & big > 1000: return big,
     default: return 400
     }
 }

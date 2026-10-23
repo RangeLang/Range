@@ -159,7 +159,7 @@ int main(void)
                     "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,4);
     validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
                     "@assess construct Second<let ceiling: 2> { let payload: 3 }","source policy rejected",0);
-    validateLanguage("macro assess(): Construct { switch #members.first() { .present(let m) where m.value < 0: @diagnostic(\"negative\"), default: {} } } "
+    validateLanguage("macro assess(): Construct { switch #members.first() { .present(let m) & m.value < 0: @diagnostic(\"negative\"), default: {} } } "
                      "macro assess(): Function { switch #parameters.first() { .absent: @diagnostic(\"missing input\"), .present: {} } } "
                      "@assess construct Parcel { let payload: 8 } @assess function start(let input: Any) {}",NULL,3);
     validate(EFFECT "macro diagnostic(): Construct {} macro assess(): Function { @diagnostic(\"selected effect\") } "
@@ -193,10 +193,10 @@ int main(void)
              "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","duplicate compile-time local",0);
     validate("macro assess(): Construct { switch 1 { .true: {}, .false: {} } } @assess construct Parcel {}","case pattern matches an enum value",0);
     // switch runs at compile time: literal, relational, and `|` labels, a
-    // binding with a where guard, default, text, and switch expressions.
+    // binding with a condition, default, text, and switch expressions.
 #define SIZES "macro assess(): Construct { " FIRST_VALUE "let n: m.value " \
     "switch n { 1 | 2: @diagnostic(\"small\"), < 0: @diagnostic(\"negative\"), " \
-    "let big where big > 100: @diagnostic(\"big \\(big)\"), = 7: @diagnostic(\"seven\"), default: {} } } } } "
+    "let big & big > 100: @diagnostic(\"big \\(big)\"), = 7: @diagnostic(\"seven\"), default: {} } } } } "
     validateLanguage(SIZES "@assess construct Parcel { let payload: 500 }","big 500",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 2 }","small",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: -3 }","negative",0);
@@ -221,7 +221,7 @@ int main(void)
     "function half(let n: Size): Size? { switch n < 0 { .true: return .nothing, .false: {} } return n / 2 } " \
     "function shape(let n: Size): Shape { switch n { 0: return .empty, 1: return Shape.circle(radius: 5), default: return .square(n) } } "
     validate(CASES "macro assess(): Construct { switch half(n: 8) { .nothing: @diagnostic(\"none\"), "
-                   ".just(let v) where v > 10: @diagnostic(\"big\"), .just(4): @diagnostic(\"four\"), .just(let v): {} } } "
+                   ".just(let v) & v > 10: @diagnostic(\"big\"), .just(4): @diagnostic(\"four\"), .just(let v): {} } } "
                    "@assess construct Parcel {}","four",0);
     validate(CASES "macro assess(): Construct { switch half(n: -1) { .nothing: @diagnostic(\"none\"), .just(let v): {} } } "
                    "@assess construct Parcel {}","none",0);
@@ -243,6 +243,24 @@ int main(void)
     validate(CASES "macro assess(): Construct { switch shape(n: 2) { .empty(let x): {}, default: {} } } @assess construct Parcel {}",
              "case 'empty' has no payload to match",0);
     validate(CASES "macro assess(): Construct { let v: .empty } @assess construct Parcel {}","needs a context that names its enum",0);
+    // A compile-time switch over several subjects: rows, grouped positions,
+    // and conditions on one row or on the whole label.
+    validate(CASES "macro assess(): Construct { switch half(n: 8), shape(n: 2) { "
+                   ".just(let v) & .square(let s) & v = s * 2: @diagnostic(\"rows \\(v) \\(s)\"), _ & _: {} } } "
+                   "@assess construct Parcel {}","rows 4 2",0);
+    validate(CASES "macro assess(): Construct { switch half(n: -1), shape(n: 0) { "
+                   "(.nothing | .just) & .empty: @diagnostic(\"grouped\"), _ & _: {} } } @assess construct Parcel {}","grouped",0);
+    validate(CASES "macro assess(): Construct { switch half(n: 8), shape(n: 0) { "
+                   "(.just & .empty | .nothing & .square) & false: @diagnostic(\"guarded\"), "
+                   ".nothing & .empty | .just & .empty & true: @diagnostic(\"second row\"), _ & _: {} } } "
+                   "@assess construct Parcel {}","second row",0);
+    validate(CASES "macro assess(): Construct { switch half(n: 2), shape(n: 0) { .nothing & _: {}, .just & .empty: {} } } "
+                   "@assess construct Parcel {}",
+             "compile-time switch over 2 subjects must be exhaustive: '.just & .circle', '.just & .square' are not handled",0);
+    validate(CASES "macro assess(): Construct { switch half(n: 2), shape(n: 0) { _ & .empty: {}, .just & .empty: {}, default: {} } } "
+                   "@assess construct Parcel {}","this row is already handled by earlier arms",0);
+    validate(CASES "macro assess(): Construct { switch half(n: 2), shape(n: 0) { .nothing & _: {}, .just & _ & true: {} } } "
+                   "@assess construct Parcel {}","must be exhaustive",0);
     validate("macro assess(): Construct { let v: switch true { .true: { let x: 1 }, .false: 1 } } @assess construct Parcel {}",
              "neither yields a value nor diverges",0);
     validate("@builtin macro assess(): Construct @assess construct Parcel {}","no C primitive is implemented for builtin macro 'assess'",0);
@@ -256,8 +274,8 @@ int main(void)
     "extension Array { function last(): Element? { switch count > 0 { .true: return read(at: count - 1), .false: {} } return .absent } } "
     validateLanguage(LIGHT "macro probe(): Enum { "
                      "switch #cases.count = 3 { .true: {}, .false: @diagnostic(\"count\") } "
-                     "switch #cases.first() { .present(let c) where c.name = \"red\": {}, default: @diagnostic(\"first\") } "
-                     "switch #cases.last() { .present(let c) where c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
+                     "switch #cases.first() { .present(let c) & c.name = \"red\": {}, default: @diagnostic(\"first\") } "
+                     "switch #cases.last() { .present(let c) & c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
                      "switch #cases.first(named: \"green\") { .present(let c): switch c.name = \"green\" { .true: {}, .false: @diagnostic(\"named\") }, "
                      ".absent: @diagnostic(\"missing green\") } "
                      "switch #cases.first(named: \"purple\") { .absent: {}, .present: @diagnostic(\"purple\") } "

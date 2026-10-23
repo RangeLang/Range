@@ -19,7 +19,7 @@ construct Lexer {
 
 function weigh(let t: Token): Int {
     switch t {
-    .value(let number) where number > 100: return 100,
+    .value(let number) & number > 100: return 100,
     .value(let number): return number,
     .pair(let a, let b): return a + b,
     .word(text: _, let count): return count,

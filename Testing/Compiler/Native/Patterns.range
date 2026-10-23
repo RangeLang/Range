@@ -20,7 +20,7 @@ enum Tree {
 function size(let s: Shape): Int {
     switch s {
     .circle(let n) | .square(let n): return n,
-    .group(let xs) where xs.count > 2: return 1000,
+    .group(let xs) & xs.count > 2: return 1000,
     .group(let xs): {
         state copy: xs
         copy.append(value: 1)

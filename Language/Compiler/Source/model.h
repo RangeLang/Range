@@ -73,16 +73,18 @@ enum {
                                     * switch arm: a default the compiler wrote for a lowering */
 };
 
-/* Pattern forms. A case pattern's items are arguments (label, sub-pattern); a
- * top-level pattern's b is its arm's `where` guard, shared by every `|`
- * alternative of the arm, and c the block of its bindings. */
+/* Pattern forms. A case pattern's items are arguments (label, sub-pattern).
+ * A row of a switch label is one pattern per subject: in a switch over one
+ * subject the pattern itself, over several a row pattern. A row's b is its
+ * condition, if it has one, and c the block of its bindings. */
 enum {
     RangePatternAny,      /* _ */
     RangePatternBind,     /* let name: a is the Let it declares */
     RangePatternCase,     /* .name(…) or Type.name(…): a is the type path, if written */
     RangePatternValue,    /* a literal compared for equality: a */
     RangePatternRelation, /* < 0 or = limit: name is the operator, a the operand */
-    RangePatternPresent   /* for-in lowering: the payload of the @optional declaration's payload case */
+    RangePatternPresent,  /* for-in lowering: the payload of the @optional declaration's payload case */
+    RangePatternRow       /* a row over several subjects: items are one pattern per subject, in order */
 };
 
 typedef struct RangeNode RangeNode;

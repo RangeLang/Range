@@ -12,7 +12,7 @@ function bucket(let n: Int): Int {
     switch n {
     0: return 0,
     = 1: return 1,
-    let m where m % 2 = 0: return 2,
+    let m & m % 2 = 0: return 2,
     default: return 3
     }
 }
@@ -58,12 +58,12 @@ function level(let s: Shade): Int {
     switch !(Shade.dark(level: 1) = .dark(level: 1)) | Shade.light = .dark(level: 0) { .true: return 18, .false: {} }
     let word: String("hi")
     switch !(word = "hi") | word = "ho" { .true: return 19, .false: {} }
-    // while and where conditions.
+    // while conditions and for-in filters.
     state i: 0
     while !(i = 3) { i: i + 1 }
     switch i = 3 { .false: return 20, .true: {} }
     state evens: 0
-    for n in 0..<6 where n % 2 = 0 { evens: evens + 1 }
+    for n in 0..<6 & n % 2 = 0 { evens: evens + 1 }
     switch evens != 3 { .true: return 21, .false: {} }
     return 42
 }

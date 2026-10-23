@@ -84,7 +84,7 @@ macro collection(): Construct {
                 while index < count {
                     let element: read(at: index)
                     switch name(of: element) {
-                        .present(let found) where found = named: result.append(value: element),
+                        .present(let found) & found = named: result.append(value: element),
                         default: {}
                     }
                     index: index + 1
