@@ -1,0 +1,28 @@
+// A method may be generic: each call specializes it for its receiver's type
+// and its own type arguments, inferred or written.
+construct Picker {
+    let first: Bool
+    function choose<U>(let a: U, let b: U): U {
+        return switch first { .true: a, .false: b }
+    }
+}
+
+construct Box<T> {
+    let item: T
+    function pick<U>(let other: U, let mine: Bool): Bool {
+        return mine
+    }
+    function same<U>(let other: U): U {
+        return other
+    }
+}
+
+{
+    let picker: Picker(first: false)
+    switch picker.choose(a: 1, b: 2) != 2 { .true: return 1, .false: {} }
+    switch picker.choose(a: "x", b: "yy").count != 2 { .true: return 2, .false: {} }
+    let box: Box<Int>(item: 5)
+    switch box.pick(other: "s", mine: true) { .false: return 3, .true: {} }
+    switch box.same<Bool>(other: true) { .false: return 4, .true: {} }
+    return 42
+}

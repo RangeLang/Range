@@ -53,6 +53,7 @@ typedef enum {
     RangeNodeFor,            /* for-in: a is the loop it lowers to, calling the @iteration function */
     RangeNodeBreak,
     RangeNodeContinue,
+    RangeNodeFunctionType,   /* (A, B) -> R: items are the parameter types, a the result */
     RangeNodeKindCount
 } RangeNodeKind;
 
@@ -69,6 +70,8 @@ enum {
     RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
     RangeFlagMutationKnown = 1 << 12,
     RangeFlagValue = 1 << 13,      /* switch: an expression; an arm yields its a, or its block diverges */
+    RangeFlagFunction = 1 << 14,   /* written type: a function type, (A, B) -> R; its generics hold the
+                                    * parameter types as arguments and the result as a */
     RangeFlagImplicit = 1 << 15    /* attribute: applied by its grammar declaration's @defaults, not written;
                                     * switch arm: a default the compiler wrote for a lowering;
                                     * binding: one a lowering wrote, not a pattern's `let` */

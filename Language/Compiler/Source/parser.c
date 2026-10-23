@@ -160,9 +160,63 @@ static int rejectSelector(RangeParser *parser);
 /* Reads a type position, returning the interned name and setting *many when
  * the position is a collection. An empty name means an untyped @many. Any other
  * @name is a macro type: declarations that applied that macro. */
+static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **generics);
+
+/* The message for a function type where only a value's type may stand. */
+static const char *const RANGE_STORED_FUNCTION =
+    "a function type is only a parameter's type: a closure runs only while the call it is passed to runs, "
+    "so it is not stored, returned, or held in a value";
+
+/* `(Element) -> Bool`, `(Result, Element) -> Result`, `() -> Bool`: always
+ * parenthesized, with the result after `->`; `-> Nothing` for none. The type
+ * is named "->", flagged RangeFlagFunction; its generics block holds one
+ * argument per parameter type and the result as its a. A function type's
+ * parameters and result are values: closures neither take nor return
+ * closures. */
+static const char *parseFunctionType(RangeParser *parser, int *flags, RangeNode **generics)
+{
+    RangeNode *shape = parserNode(parser, RangeNodeBlock);
+    shape->name = "functionType";
+    int outer = parser->functionTypes;
+    parser->functionTypes = 0;
+    parserExpect(parser, "(");
+    while (!parser->failed && !parserAt(parser, ")")) {
+        if (parserAt(parser, "(")) {
+            parserFail(parser, &parser->current, "a function type's parameters are values: a closure does not take a closure");
+            break;
+        }
+        RangeNode *argument = parserNode(parser, RangeNodeArgument);
+        argument->a = parserNode(parser, RangeNodeName);
+        argument->a->name = parseTypeName(parser, &argument->a->flags, &argument->a->generics);
+        rangeNodeAppend(parser->arena, shape, argument);
+        parseSeparator(parser, ")", "parameter types");
+    }
+    parserExpect(parser, ")");
+    if (!parser->failed && !(parserAt(parser, "-") && rangeTokenIs(parserPeek(parser), ">")))
+        parserFail(parser, &parser->current, "a function type names its result after '->', as in (Element) -> Bool; "
+                   "write -> Nothing for a closure that returns nothing");
+    parserAdvance(parser);
+    parserAdvance(parser);
+    if (!parser->failed && parserAt(parser, "("))
+        parserFail(parser, &parser->current, "a function type's result is a value: a closure does not return a closure");
+    shape->a = parserNode(parser, RangeNodeName);
+    shape->a->name = parseTypeName(parser, &shape->a->flags, &shape->a->generics);
+    parser->functionTypes = outer;
+    *flags |= RangeFlagFunction;
+    *generics = shape;
+    return rangeArenaIntern(parser->arena, "->", 2);
+}
+
 static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **generics)
 {
     *flags = 0;
+    if (parserAt(parser, "(")) {
+        if (!parser->functionTypes) {
+            parserFail(parser, &parser->current, "%s", RANGE_STORED_FUNCTION);
+            return "";
+        }
+        return parseFunctionType(parser, flags, generics);
+    }
     if (parserAt(parser, "@")) {
         const RangeToken *ahead = parserPeek(parser);
         if (rangeTokenIs(ahead, "many")) {
@@ -195,10 +249,38 @@ static const char *parseTypeName(RangeParser *parser, int *flags, RangeNode **ge
         parserFail(parser, &parser->current, "union types are not part of Range; declare an enum with one case per alternative");
         return name;
     }
+    /* A parameter typed `Element -> Bool` means a function type without its
+     * parentheses; a macro's `: Target -> Result` is not a parameter. */
+    if (!parser->failed && parser->functionTypes && parserAt(parser, "-") && rangeTokenIs(parserPeek(parser), ">")) {
+        RangeToken at = parser->current;
+        parserAdvance(parser);
+        parserAdvance(parser);
+        const char *result = parser->current.kind == RangeTokenName
+            ? rangeArenaIntern(parser->arena, parser->current.text, parser->current.length) : "Result";
+        parserFail(parser, &at, "a function type puts its parameter types in parentheses: write (%s) -> %s", name, result);
+    }
     return name;
 }
 
+/* `let f: (Int) -> Bool` and `state f: (Int) -> Bool`: a stored closure. */
+static int rejectStoredFunctionType(RangeParser *parser)
+{
+    if (parser->failed || !parserAt(parser, "(")) return 0;
+    RangeParser probe = *parser;
+    int depth = 0;
+    do {
+        if (parserAt(&probe, "(")) ++depth;
+        else if (parserAt(&probe, ")")) --depth;
+        parserAdvance(&probe);
+    } while (depth > 0 && !probe.failed && probe.current.kind != RangeTokenEnd);
+    if (probe.failed || !parserAt(&probe, "-") || !rangeTokenIs(parserPeek(&probe), ">")) return 0;
+    parserFail(parser, &parser->current, "%s", RANGE_STORED_FUNCTION);
+    return 1;
+}
+
 /* ---- attributes ------------------------------------------------------ */
+
+static int startsClosure(RangeParser *parser);
 
 /* True when the current token opens a type position rather than an inferred
  * initialiser. `let x: Int(0)` is typed; `let m: #members.filter(...)` and
@@ -235,6 +317,8 @@ static int atTypePosition(RangeParser *parser)
         }
         for (size_t i = 0; expression[i]; ++i) if (parserAt(&probe, expression[i])) return 0;
         if (parserAt(&probe, "<") || parserAt(&probe, "..<")) return 0;
+        // `let n: count { x in x > 2 }` calls count with a trailing closure.
+        if (startsClosure(&probe)) return 0;
         // `let none: Int?.absent` is a case of the optional type.
         if (parserAt(&probe, "?") && rangeTokenIs(parserPeek(&probe), ".")) return 0;
         return 1;
@@ -461,10 +545,93 @@ static int startsGenericArguments(RangeParser *parser)
     return parserAt(&probe, "(") || parserAt(&probe, ".");
 }
 
+/* `{ x in` and `{ a, b in` open a closure; any other `{` is a block. */
+static int startsClosure(RangeParser *parser)
+{
+    if (!parserAt(parser, "{")) return 0;
+    RangeParser probe = *parser;
+    parserAdvance(&probe);
+    while (!probe.failed && probe.current.kind == RangeTokenName && !parserAt(&probe, "in")) {
+        parserAdvance(&probe);
+        if (parserAt(&probe, "in")) return 1;
+        if (!parserAt(&probe, ",")) return 0;
+        parserAdvance(&probe);
+    }
+    return 0;
+}
+
+static RangeNode *parseStatement(RangeParser *parser);
+static RangeNode *parseSwitch(RangeParser *parser, int value);
+static void rejectComparisonStatement(RangeParser *parser, const RangeNode *expression);
+
+/* The statements of a closure's body, up to its closing brace. */
+static RangeNode *parseClosureBody(RangeParser *parser)
+{
+    RangeNode *body = parserNode(parser, RangeNodeBlock);
+    while (!parser->failed && !parserAt(parser, "}") && !parserAtKind(parser, RangeTokenEnd)) {
+        parser->closureStatement = 1;
+        RangeNode *statement = parseStatement(parser);
+        if (statement) rangeNodeAppend(parser->arena, body, statement);
+    }
+    parser->closureStatement = 0;
+    /* `{ x in x > limit }` yields its one comparison; among several
+     * statements a comparison is still a mistaken assignment. */
+    for (size_t i = 0; body->itemCount > 1 && i < body->itemCount; ++i)
+        if (body->items[i]->kind == RangeNodeExpressionStatement) rejectComparisonStatement(parser, body->items[i]->a);
+    return body;
+}
+
+/* `{ x in body }` and `{ a, b in body }`: the parameters are the closure's
+ * items, untyped; their types come from the function type the closure is
+ * passed as. The body is a block, its a. A body that is one switch is also
+ * read as a switch expression, its b: as the only expression of a closure
+ * that returns a value, it yields its arm's value, as in Swift. */
+static RangeNode *parseClosure(RangeParser *parser)
+{
+    RangeNode *closure = parserNode(parser, RangeNodeClosure);
+    parserExpect(parser, "{");
+    while (!parser->failed && !parserAt(parser, "in")) {
+        RangeNode *parameter = parserNode(parser, RangeNodeParameter);
+        parameter->name = parserExpectName(parser);
+        rangeNodeAppend(parser->arena, closure, parameter);
+        if (parserAt(parser, ",")) parserAdvance(parser);
+    }
+    parserExpect(parser, "in");
+    if (parser->failed) return closure;
+    /* The body is its own statements, even inside a switch's subject. */
+    int outerCondition = parser->conditionDepth, outerGeneric = parser->genericDepth;
+    parser->conditionDepth = 0;
+    parser->genericDepth = 0;
+    RangeParser start = *parser;
+    RangeNode *body = parseClosureBody(parser);
+    if (parserAt(&start, "switch")) {
+        RangeParser value = start;
+        RangeNode *expression = parseSwitch(&value, 1);
+        if (!value.failed && parserAt(&value, "}")) {
+            closure->b = expression;
+            if (parser->failed) {
+                // Only the expression reads: `{ x in switch x { 0: true, default: x > 5 } }`.
+                *parser = value;
+                body = parserNode(parser, RangeNodeBlock);
+                RangeNode *statement = rangeNodeCreate(parser->arena, RangeNodeExpressionStatement,
+                                                       expression->path, expression->line, expression->column);
+                statement->a = expression;
+                rangeNodeAppend(parser->arena, body, statement);
+            }
+        }
+    }
+    closure->a = body;
+    parserExpect(parser, "}");
+    parser->conditionDepth = outerCondition;
+    parser->genericDepth = outerGeneric;
+    return closure;
+}
+
 static RangeNode *parsePrimary(RangeParser *parser)
 {
     if (parser->failed) return NULL;
     RangeToken token = parser->current;
+    if (startsClosure(parser)) return parseClosure(parser);
 
     if (token.kind == RangeTokenInteger) {
         RangeNode *node = parserNode(parser, RangeNodeInteger);
@@ -606,48 +773,21 @@ static RangeNode *parsePostfix(RangeParser *parser)
             value = call;
             continue;
         }
-        if (parser->conditionDepth == 0 && parserAt(parser, "{")
-            && parserPeek(parser)->kind == RangeTokenName) {
-            /* Only a `{ name in` block is a closure; `switch x.y {` is not. */
-            size_t savedCursor = parser->lexer.cursor;
-            int savedLine = parser->lexer.line;
-            int savedColumn = parser->lexer.column;
-            RangeToken savedCurrent = parser->current;
-            RangeToken savedAhead = parser->ahead;
-            int savedHasAhead = parser->hasAhead;
-            RangeNode *closure = parserNode(parser, RangeNodeClosure);
-            parserAdvance(parser);
-            const char *binding = rangeArenaIntern(parser->arena,
-                                                   parser->current.text,
-                                                   parser->current.length);
-            parserAdvance(parser);
-            if (parserAt(parser, "in")) {
-                parserAdvance(parser);
-                closure->name = binding;
-                RangeNode *body = parserNode(parser, RangeNodeBlock);
-                while (!parser->failed && !parserAt(parser, "}")
-                       && !parserAtKind(parser, RangeTokenEnd)) {
-                    RangeNode *statement = parseStatement(parser);
-                    if (statement) rangeNodeAppend(parser->arena, body, statement);
-                }
-                parserExpect(parser, "}");
-                closure->a = body;
-                RangeNode *argument = parserNode(parser, RangeNodeArgument);
-                argument->a = closure;
-                if (value->kind != RangeNodeCall) {
-                    RangeNode *call = parserNode(parser, RangeNodeCall);
-                    call->a = value;
-                    value = call;
-                }
-                rangeNodeAppend(parser->arena, value, argument);
-                continue;
+        if (value && parser->conditionDepth == 0 && startsClosure(parser)) {
+            /* A trailing closure, `xs.filter { m in m.unread }`: the last
+             * argument, labeled by the function's last function-typed
+             * parameter. Only a `{ name in` block is one; `switch x.y {` is
+             * a condition, where none binds. */
+            RangeNode *argument = parserNode(parser, RangeNodeArgument);
+            argument->flags |= RangeFlagImplicit;
+            argument->a = parseClosure(parser);
+            if (value->kind != RangeNodeCall) {
+                RangeNode *call = parserNode(parser, RangeNodeCall);
+                call->a = value;
+                value = call;
             }
-            parser->lexer.cursor = savedCursor;
-            parser->lexer.line = savedLine;
-            parser->lexer.column = savedColumn;
-            parser->current = savedCurrent;
-            parser->ahead = savedAhead;
-            parser->hasAhead = savedHasAhead;
+            rangeNodeAppend(parser->arena, value, argument);
+            continue;
         }
         break;
     }
@@ -1339,6 +1479,8 @@ static RangeNode *parseFor(RangeParser *parser)
 static RangeNode *parseStatement(RangeParser *parser)
 {
     if (parser->failed) return NULL;
+    int closure = parser->closureStatement;
+    parser->closureStatement = 0;
     if (parserAt(parser, "@")) {
         RangeNode *attributes = parseAttributes(parser);
         if (parserAt(parser, "{")) {
@@ -1386,6 +1528,7 @@ static RangeNode *parseStatement(RangeParser *parser)
         parserExpect(parser, ":");
         node->rhsStart = parser->current.offset;
         RangeToken rhsToken = parser->current;
+        if (rejectStoredFunctionType(parser)) return node;
         if (atTypePosition(parser)) {
             int typeFlags = 0;
             node->typeName = parseTypeName(parser, &typeFlags, &node->generics);
@@ -1445,7 +1588,7 @@ static RangeNode *parseStatement(RangeParser *parser)
         node->b = parseExpression(parser, 0);
         return node;
     }
-    rejectComparisonStatement(parser, target);
+    if (!closure) rejectComparisonStatement(parser, target);
     RangeNode *node = parserNode(parser, RangeNodeExpressionStatement);
     node->a = target;
     return node;
@@ -1571,12 +1714,15 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
         }
         int typeFlags = 0;
         RangeNode *typeGenerics = NULL;
+        parser->functionTypes = 1; /* a parameter may take a closure */
         const char *typeName = parseTypeName(parser, &typeFlags, &typeGenerics);
+        parser->functionTypes = 0;
         parameter->flags |= typeFlags;
         parameter->b = rangeNodeCreate(parser->arena, RangeNodeName, parser->path,
                                        parameter->line, parameter->column);
         ((RangeNode *)parameter->b)->name = typeName;
         parameter->b->generics = typeGenerics;
+        parameter->b->flags = typeFlags & RangeFlagFunction;
         if (parserAt(parser, "(")) parseArgumentList(parser, parameter);
         if (parserAt(parser, ":"))
             parserFail(parser, &parser->current,
@@ -1655,6 +1801,7 @@ static void parseConstructBody(RangeParser *parser, RangeNode *node, const char 
         member->rhsStart = parser->current.offset;
         RangeToken rhsToken = parser->current;
         int typeFlags = 0;
+        if (rejectStoredFunctionType(parser)) break;
         if (atTypePosition(parser)) {
             member->typeName = parseTypeName(parser, &typeFlags, &member->generics);
             member->flags |= typeFlags;

@@ -1031,7 +1031,6 @@ static void metaSetMember(MetaEval *eval, RangeGraphValue *instance, size_t inde
 }
 
 static RangeGraphValue metaInvoke(MetaEval *, MetaScope *, RangeNode *, RangeNode *, RangeGraphValue *);
-
 /* `Point(x: 1)`: each stored member is its argument or its default, which
  * sees the members before it; a @many member starts with no slots. */
 static RangeGraphValue metaConstruct(MetaEval *eval, MetaScope *scope, RangeNode *declaration, RangeNode **arguments,
@@ -1083,6 +1082,31 @@ static RangeGraphValue metaConstruct(MetaEval *eval, MetaScope *scope, RangeNode
     return instance;
 }
 
+/* The parameter a trailing closure fills: the function's last function-typed
+ * parameter, SIZE_MAX when it has none. */
+static size_t trailingParameter(const RangeNode *function)
+{
+    for (size_t i = function->itemCount; i-- > 0;)
+        if (function->items[i]->flags & RangeFlagFunction) return i;
+    return SIZE_MAX;
+}
+
+/* An argument fits a parameter by its label, or, written as a trailing
+ * closure, `xs.filter { m in … }`, by being the last function-typed one. */
+static int argumentFits(const RangeNode *argument, const RangeNode *function, size_t index)
+{
+    if (same(argument->name,function->items[index]->name)) return 1;
+    return !argument->name && (argument->flags & RangeFlagImplicit) && trailingParameter(function) == index;
+}
+
+/* A trailing closure takes the label of the parameter it fills. */
+static void labelTrailing(RangeNode *call, const RangeNode *function)
+{
+    for (size_t i = 0; i < call->itemCount && i < function->itemCount; ++i)
+        if (!call->items[i]->name && (call->items[i]->flags & RangeFlagImplicit) && trailingParameter(function) == i)
+            call->items[i]->name = function->items[i]->name;
+}
+
 /* The function of `declaration` a call names: its name and argument labels. */
 static RangeNode *metaFunction(RangeNode *declaration, const char *name, RangeNode *call)
 {
@@ -1090,8 +1114,8 @@ static RangeNode *metaFunction(RangeNode *declaration, const char *name, RangeNo
         RangeNode *function = declaration->items[i];
         if (function->kind != RangeNodeFunction || !same(function->name,name) || function->itemCount != call->itemCount) continue;
         int labels = 1;
-        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = same(call->items[j]->name,function->items[j]->name);
-        if (labels) return function;
+        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = argumentFits(call->items[j],function,j);
+        if (labels) { labelTrailing(call,function); return function; }
     }
     return NULL;
 }
@@ -1225,6 +1249,7 @@ static RangeGraphValue metaInvoke(MetaEval *eval, MetaScope *scope, RangeNode *f
         fail(eval->vm,call,"unsupported compile-time function declaration '%s'",function->name);
     if (call->itemCount != function->itemCount)
         fail(eval->vm,call,"compile-time call argument count differs from '%s'",function->name);
+    labelTrailing(call,function);
     if (++eval->depth > 64) fail(eval->vm,call,"compile-time call depth exceeded");
     RangeNode *owner = function->owner ? function->owner : function;
     RangeGraphValue *pending = eval->pending;
@@ -2448,6 +2473,14 @@ static int reflectionList(RangeArena *arena, const char *name)
 static void diagnoseType(SourceReport *report, SourceScope *scope, RangeNode *node)
 {
     if (!node) return;
+    if ((node->flags & RangeFlagFunction) && node->generics) {
+        // (A, B) -> R names its parts; the function type itself is C's.
+        sourceDiagnostic(report,node,1,"C-implementation","function types are C's: a parameter typed (A) -> R takes a closure, "
+                         "which C compiles inline where the call it is passed to is made; it is never a value");
+        for (size_t i = 0; i < node->generics->itemCount; ++i) diagnoseType(report,scope,node->generics->items[i]->a);
+        diagnoseType(report,scope,node->generics->a);
+        return;
+    }
     (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 2);
     diagnoseSourceNode(report,scope,node->generics,0);
     diagnoseType(report,scope,node->a); /* an explicit macro result type */
@@ -2643,7 +2676,19 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         diagnoseSourceNode(report,scope,node->a,metadata);
         for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,scope,node->items[i],metadata);
         return;
-    case RangeNodeClosure: case RangeNodeSyntaxTemplate:
+    case RangeNodeClosure: {
+        // Its parameters name values in its body; it sees the names where it
+        // is written. The body's switch read as an expression, its b, has the
+        // same names, so the statements alone are checked.
+        SourceScope own = {.owner=node,.parent=scope,.meta=scope && scope->meta};
+        if (!(scope && scope->meta))
+            sourceDiagnostic(report,node,1,"C-implementation","a closure is compiled by C inline, where the call it is passed to "
+                             "is made, and runs only during that call");
+        else sourceDiagnostic(report,node,1,"C-implementation","a compile-time closure is run by C's evaluator while the call it is passed to runs");
+        diagnoseSourceNode(report,&own,node->a,metadata);
+        return;
+    }
+    case RangeNodeSyntaxTemplate:
         sourceDiagnostic(report,node,0,"not-implemented","execution of '%s' is not implemented",rangeNodeKindName(node->kind));
         break;
     default: break;
@@ -2944,10 +2989,14 @@ typedef struct {
     struct { RangeNode *type, *at; const char *in; } *equalities; size_t equalityCount, equalityCapacity;
     /* Generic functions, specialized per instantiation: each instance is a
      * copy of the declaration whose type parameters name the inferred types. */
-    struct { RangeNode *declaration, *instance, **types, **values; const char *name; } *instances;
+    struct { RangeNode *declaration, *instance, **types, **values, *context; const char *name; } *instances;
     size_t instanceCount, instanceCapacity;
     const char *instance; /* the instantiation being typed, as written in errors */
     RangeNode *typing[64]; size_t typingCount; /* declarations whose type is being derived from their value */
+    RangeNode *functionTypes;   /* interned RangeNodeFunctionType nodes */
+    RangeNode *closureSite;     /* the argument being typed for a function-typed parameter */
+    int inferring; RangeNode *inferred; /* a closure whose result its returns decide */
+    int closures; /* closure bodies being typed in the function being typed */
 } Typer;
 
 static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
@@ -2976,6 +3025,17 @@ static void describeType(char *out, size_t size, const RangeNode *type)
 {
     if (!type) { snprintf(out,size,"<unknown>"); return; }
     if (type->kind == RangeNodeTypeParameter) { snprintf(out,size,"%s",type->name); return; }
+    if (type->kind == RangeNodeFunctionType) {
+        size_t n = (size_t)snprintf(out,size,"(");
+        for (size_t i = 0; i < type->itemCount && n < size; ++i) {
+            char part[160]; describeType(part,sizeof(part),type->items[i]);
+            n += (size_t)snprintf(out + n,size - n,"%s%s",i ? ", " : "",part);
+        }
+        char result[160] = "?";
+        if (type->a) describeType(result,sizeof(result),type->a);
+        if (n < size) snprintf(out + n,size - n,") -> %s",result);
+        return;
+    }
     size_t n = (size_t)snprintf(out,size,"%s",type->name);
     RangeNode *generics = type->generics;
     if (!generics || !generics->itemCount || n >= size) return;
@@ -3286,12 +3346,68 @@ static RangeNode *selfSpecialization(Typer *typer, RangeNode *declaration)
 }
 
 static int parametric(const RangeNode *);
+static int graphConstruct(Typer *, const RangeNode *);
+
+/* ---- function types ----
+ * `(A, B) -> R` is a parameter's type: the parameter takes a closure, which
+ * runs only while the call it is passed to runs. Function types are interned,
+ * so equal ones are one node; one whose result is still being inferred, for a
+ * generic call, is not interned and has no result. */
+static int isFunctionType(const RangeNode *type)
+{
+    return type && type->kind == RangeNodeFunctionType;
+}
+
+static RangeNode *functionType(Typer *typer, RangeNode **parameters, size_t count, RangeNode *result, RangeNode *at)
+{
+    for (size_t i = 0; result && i < typer->functionTypes->itemCount; ++i) {
+        RangeNode *candidate = typer->functionTypes->items[i];
+        if (candidate->a != result || candidate->itemCount != count) continue;
+        size_t matched = 0;
+        while (matched < count && candidate->items[matched] == parameters[matched]) ++matched;
+        if (matched == count) return candidate;
+    }
+    RangeArena *arena = typer->report->arena;
+    RangeNode *type = rangeNodeCreate(arena,RangeNodeFunctionType,at->path,at->line,at->column);
+    type->name = "->";
+    for (size_t i = 0; i < count; ++i) rangeNodeAppend(arena,type,parameters[i]);
+    type->a = result;
+    if (result) rangeNodeAppend(arena,typer->functionTypes,type);
+    return type;
+}
+
+/* A construct with no stored members, such as Nothing: it has one value and
+ * holds nothing, so a closure that returns it yields no value, and `return`
+ * needs none. The rule is structural; C names no such type. */
+static int unitType(Typer *typer, const RangeNode *type)
+{
+    if (!type || type->kind != RangeNodeSpecialization) return 0;
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (declaration->kind != RangeNodeConstruct || graphConstruct(typer,declaration)) return 0;
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (rangeNodeDeclaresValue(declaration->items[i]->kind)) return 0;
+    return 1;
+}
 
 static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const char *name,
                                        RangeNode *generics, int flags, RangeNode *context, RangeNode *at)
 {
     if (!name || !*name) return NULL;
     if (flags & RangeFlagMacroType) return NULL; /* macro types are not typed in this step */
+    if (flags & RangeFlagFunction) {
+        // Each part resolves where the written type stands. A result that
+        // does not resolve yet, an unbound type parameter, is inferred.
+        if (!generics) return NULL;
+        RangeNode **parts = rangeArenaAllocate(typer->report->arena,(generics->itemCount ? generics->itemCount : 1) * sizeof(*parts));
+        for (size_t i = 0; i < generics->itemCount; ++i) {
+            RangeNode *written = generics->items[i]->a;
+            parts[i] = resolveTypeReference(typer,scope,written->name,written->generics,written->flags,context,written);
+            if (!parts[i]) return NULL;
+        }
+        RangeNode *written = generics->a;
+        RangeNode *result = written ? resolveTypeReference(typer,scope,written->name,written->generics,written->flags,context,written) : NULL;
+        return functionType(typer,parts,generics->itemCount,result,at);
+    }
     if (flags & RangeFlagOptional) {
         // `T?` is the construct applying @optional, specialized with T.
         RangeNode *optional = NULL;
@@ -3390,8 +3506,8 @@ static RangeNode *findCalledFunction(RangeNode *owner, const char *name, const R
         RangeNode *function = owner->items[i];
         if (function->kind != RangeNodeFunction || !same(function->name,name) || function->itemCount != call->itemCount) continue;
         int labels = 1;
-        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = same(call->items[j]->name,function->items[j]->name);
-        if (labels) return function;
+        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = argumentFits(call->items[j],function,j);
+        if (labels) { labelTrailing((RangeNode *)call,function); return function; }
     }
     return findFunction(owner,name);
 }
@@ -3870,7 +3986,9 @@ static int mentionsParameter(const RangeNode *function, const char *name, const 
         if (!generics->items[i]->name && argument && argument->kind == RangeNodeName
             && mentionsParameter(function,argument->name,argument->generics)) return 1;
     }
-    return 0;
+    // A function type's result, as in (Element) -> Result.
+    const RangeNode *result = generics && same(generics->name,"functionType") ? generics->a : NULL;
+    return result && mentionsParameter(function,result->name,result->generics);
 }
 
 /* Bind the type parameters a written type mentions by matching it against a
@@ -3880,6 +3998,17 @@ static int mentionsParameter(const RangeNode *function, const char *name, const 
 static int unifyType(Typer *typer, RangeNode *function, const char *name, RangeNode *generics, int flags,
                      RangeNode *actual, RangeNode **bound, size_t *conflict)
 {
+    // A function type binds through its parameter types and its result:
+    // `(Element) -> Result` against (Int) -> Bool binds Result to Bool.
+    if ((flags & RangeFlagFunction) && generics) {
+        if (!isFunctionType(actual)) return 1; /* coercion reports it */
+        for (size_t i = 0; i < generics->itemCount && i < actual->itemCount; ++i) {
+            RangeNode *part = generics->items[i]->a;
+            if (!unifyType(typer,function,part->name,part->generics,part->flags,actual->items[i],bound,conflict)) return 0;
+        }
+        RangeNode *result = generics->a;
+        return !result || unifyType(typer,function,result->name,result->generics,result->flags,actual->a,bound,conflict);
+    }
     // A type parameter binds to any type, including an enclosing construct's
     // own type parameter: `first(xs: items)` inside Box<T> binds Element to T.
     if (!actual || (actual->kind != RangeNodeSpecialization && actual->kind != RangeNodeTypeParameter)) return 1;
@@ -3917,7 +4046,7 @@ static int unifyType(Typer *typer, RangeNode *function, const char *name, RangeN
  * standing for their types; NULL while one it mentions is unbound, which
  * resolves to no type. */
 static RangeNode *boundType(Typer *typer, RangeNode *function, const char *name, RangeNode *generics, int flags,
-                            RangeNode **bound, RangeNode *at)
+                            RangeNode **bound, RangeNode *at, RangeNode *receiver)
 {
     RangeArena *arena = typer->report->arena;
     RangeNode *owner = rangeNodeCreate(arena,RangeNodeFunction,function->path,function->line,function->column);
@@ -3931,8 +4060,10 @@ static RangeNode *boundType(Typer *typer, RangeNode *function, const char *name,
         copy->resolvedType = bound[k++];
         rangeNodeAppend(arena,owner->generics,copy);
     }
-    SourceScope scope = {.owner=owner};
-    return resolveTypeReference(typer,&scope,name,generics,flags,NULL,at);
+    // A method's types also name its receiver's type parameters.
+    SourceScope ownerScope = {.owner=receiver ? receiver->resolvedDeclaration : NULL};
+    SourceScope scope = {.owner=owner,.parent=receiver ? &ownerScope : NULL};
+    return resolveTypeReference(typer,&scope,name,generics,flags,receiver,at);
 }
 
 static void cloneRemap(RangeNode **from, RangeNode **to, size_t count, RangeNode **slot)
@@ -3990,11 +4121,12 @@ static void cloneLinks(CloneMap *map)
 }
 
 /* The instance of a generic function for these types, typed on first use. */
-static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode **bound, RangeNode **values, RangeNode *at)
+static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode **bound, RangeNode **values, RangeNode *at,
+                             RangeNode *receiver)
 {
     size_t count = typeParameterCount(function), valueCount = valueGenericCount(function);
     for (size_t i = 0; i < typer->instanceCount; ++i) {
-        if (typer->instances[i].declaration != function) continue;
+        if (typer->instances[i].declaration != function || typer->instances[i].context != receiver) continue;
         size_t matched = 0, same = 0;
         while (matched < count && typer->instances[i].types[matched] == bound[matched]) ++matched;
         while (same < valueCount && sameLiteral(typer->instances[i].values[same],values[same])) ++same;
@@ -4007,6 +4139,7 @@ static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode **bou
     memset(map.from,0,map.capacity * sizeof(*map.from));
     RangeNode *instance = cloneNode(&map,function);
     cloneLinks(&map);
+    instance->receiver = NULL; /* a method instance has its own receiver, typed with its context */
     for (size_t i = 0, k = 0, v = 0; instance->generics && i < instance->generics->itemCount; ++i) {
         RangeNode *generic = instance->generics->items[i];
         if (generic->kind == RangeNodeTypeParameter) { generic->resolvedType = bound[k++]; continue; }
@@ -4046,11 +4179,14 @@ static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode **bou
     typer->instances[typer->instanceCount].declaration = function;
     typer->instances[typer->instanceCount].instance = instance;
     typer->instances[typer->instanceCount].types = types;
+    typer->instances[typer->instanceCount].context = receiver;
     typer->instances[typer->instanceCount++].name = rangeArenaIntern(arena,name,strlen(name));
-    // Registered before its body is typed, so a recursive call finds it.
+    // Registered before its body is typed, so a recursive call finds it. A
+    // method's instance is typed in its receiver's specialization.
     const char *outer = typer->instance;
     typer->instance = typer->instances[typer->instanceCount - 1].name;
-    typeFunction(typer,NULL,instance,NULL);
+    SourceScope ownerScope = {.owner=receiver ? receiver->resolvedDeclaration : NULL};
+    typeFunction(typer,receiver ? &ownerScope : NULL,instance,receiver);
     typer->instance = outer;
     return instance;
 }
@@ -4061,7 +4197,7 @@ static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode **bou
  * that need no context; then the expected result; then the rest, such as
  * literals, with whatever the earlier ones bound. */
 static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *function,
-                                  RangeNode *expected, RangeNode *context)
+                                  RangeNode *expected, RangeNode *context, RangeNode *receiver)
 {
     RangeNode *callee = call->a;
     size_t count = typeParameterCount(function), conflict = SIZE_MAX;
@@ -4070,6 +4206,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
     if (call->itemCount != function->itemCount)
         typeError(typer,call,"'%s' takes %zu arguments; %zu supplied",function->name,function->itemCount,call->itemCount);
     size_t n = call->itemCount < function->itemCount ? call->itemCount : function->itemCount;
+    labelTrailing(call,function);
     for (size_t i = 0; i < n; ++i)
         if (!call->items[i]->name || !same(call->items[i]->name,function->items[i]->name))
             typeError(typer,call->items[i],"argument %zu of '%s' requires label '%s'",i + 1,function->name,function->items[i]->name);
@@ -4093,20 +4230,34 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
         bound[index] = resolveTypeReference(typer,scope,reference->name,reference->generics,reference->flags,context,reference);
         if (!bound[index]) return NULL;
     }
-    SourceScope declarationScope = {.owner=function};
+    // A method's signature also names its receiver's type parameters and types.
+    SourceScope ownerScope = {.owner=receiver ? receiver->resolvedDeclaration : NULL};
+    SourceScope declarationScope = {.owner=function,.parent=receiver ? &ownerScope : NULL};
     RangeNode **actual = rangeArenaAllocate(typer->report->arena,(n ? n : 1) * sizeof(*actual));
     int *done = rangeArenaAllocate(typer->report->arena,(n ? n : 1) * sizeof(*done));
     memset(done,0,(n ? n : 1) * sizeof(*done));
-    for (int pass = 0; pass < 3; ++pass) {
+    // A closure for a generic function type is typed last, once the other
+    // arguments have bound what its parameters need; its result binds the rest.
+    for (int pass = 0; pass < 4; ++pass) {
         if (pass == 2 && expected && function->b)
             (void)unifyType(typer,function,function->b->name,function->b->generics,function->b->flags,expected,bound,&(size_t){0});
         for (size_t i = 0; i < n; ++i) {
             RangeNode *parameter = function->items[i], *value = call->items[i]->a;
             int generic = parameter->b && mentionsParameter(function,parameter->b->name,parameter->b->generics);
-            if (done[i] || (pass == 0 && generic) || (pass == 1 && (!generic || contextual(value)))) continue;
-            RangeNode *want = !generic ? declaredType(typer,&declarationScope,parameter,NULL)
-                : boundType(typer,function,parameter->b->name,parameter->b->generics,parameter->flags,bound,parameter->b);
+            int closure = (parameter->flags & RangeFlagFunction) != 0;
+            if (done[i] || (pass == 0 && generic) || (pass == 1 && (!generic || contextual(value) || closure))
+                || (pass == 2 && closure)) continue;
+            RangeNode *want = !generic ? declaredType(typer,&declarationScope,parameter,receiver)
+                : boundType(typer,function,parameter->b->name,parameter->b->generics,parameter->flags,bound,parameter->b,receiver);
+            if (closure && !want) {
+                typeError(typer,value,"the parameter types of this closure for '%s' are not known: write the generic arguments, as in %s<…>(…)",
+                          function->name,function->name);
+                return NULL;
+            }
+            RangeNode *site = typer->closureSite;
+            typer->closureSite = isFunctionType(want) ? value : NULL;
             actual[i] = typeOf(typer,scope,value,want,context);
+            typer->closureSite = site;
             done[i] = 1;
             if (generic && !unifyType(typer,function,parameter->b->name,parameter->b->generics,parameter->flags,actual[i],bound,&conflict)) {
                 char first[160], second[160];
@@ -4126,7 +4277,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
     // A value generic is a literal of its declared type, checked by that type's laws.
     for (size_t v = 0; v < valueCount; ++v) {
         RangeNode *generic = valueGeneric(function,v);
-        RangeNode *want = declaredType(typer,&declarationScope,generic,NULL);
+        RangeNode *want = declaredType(typer,&declarationScope,generic,receiver);
         if (!values[v] && generic->typeName) {
             typeError(typer,call,"'%s' requires generic %s; write it, as in %s<%s: …>(…)",function->name,generic->name,function->name,generic->name);
             return NULL;
@@ -4145,7 +4296,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
     // A type that mentions an enclosing construct's type parameter, as in
     // Box<T>'s methods, gives an instance typed with that parameter; code is
     // generated per concrete specialization, which substitutes it.
-    RangeNode *instance = instantiate(typer,function,bound,values,call);
+    RangeNode *instance = instantiate(typer,function,bound,values,call,receiver);
     callee->resolvedDeclaration = instance;
     for (size_t i = 0; i < n; ++i) {
         char what[160];
@@ -4153,6 +4304,101 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
         coerce(typer,call->items[i]->a,instance->items[i]->type,actual[i],what);
     }
     return instance->type;
+}
+
+/* ---- closures ----
+ * `{ x in body }` is an argument for a function-typed parameter, typed with
+ * that parameter's type: its parameters take the type's parameter types, and
+ * its body returns the type's result. A body that is one expression yields
+ * it; otherwise `return` does, and returns from the closure only. A closure
+ * whose result is a unit type such as Nothing yields no value. It sees the
+ * names where it is written, and may change a `state` there: it runs while
+ * the call it is passed to runs, never after. So a closure, and a parameter
+ * holding one, is only called or passed on to a function-typed parameter. */
+
+static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
+static int exits(const RangeNode *, int);
+
+/* The expression a closure body is: its switch read as an expression, or its
+ * one expression statement. */
+static RangeNode *closureValue(RangeNode *closure)
+{
+    if (closure->b) return closure->b;
+    RangeNode *body = closure->a;
+    if (!body || body->itemCount != 1 || body->items[0]->kind != RangeNodeExpressionStatement) return NULL;
+    RangeNode *value = body->items[0]->a;
+    return value && value->kind != RangeNodeAttribute ? value : NULL;
+}
+
+static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closure, RangeNode *expected, RangeNode *context)
+{
+    char t[320]; describeType(t,sizeof(t),expected);
+    if (closure->itemCount != expected->itemCount) {
+        typeError(typer,closure,"this closure takes %zu parameter%s; %s takes %zu",closure->itemCount,
+                  closure->itemCount == 1 ? "" : "s",t,expected->itemCount);
+        return NULL;
+    }
+    for (size_t i = 0; i < closure->itemCount; ++i) {
+        for (size_t j = 0; j < i; ++j)
+            if (same(closure->items[j]->name,closure->items[i]->name))
+                typeError(typer,closure->items[i],"'%s' names two parameters of this closure",closure->items[i]->name);
+        closure->items[i]->type = expected->items[i];
+    }
+    SourceScope own = {.owner=closure,.parent=scope};
+    RangeNode *result = expected->a, *value = closureValue(closure);
+    int unit = unitType(typer,result);
+    // `break` and `continue` do not leave the closure; `return` returns from it.
+    int loops = typer->loops, inferring = typer->inferring;
+    RangeNode *output = typer->output, *inferred = typer->inferred, *site = typer->closureSite;
+    typer->loops = 0;
+    typer->closures += 1;
+    typer->closureSite = NULL;
+    typer->output = result;
+    typer->inferring = !result;
+    typer->inferred = NULL;
+    if (value && !unit) {
+        RangeNode *actual = typeOf(typer,&own,value,result,context);
+        if (result) coerce(typer,value,result,actual,"the result of this closure");
+        else result = actual;
+        closure->c = value;
+    } else {
+        typeBlock(typer,&own,closure->a,context,result);
+        if (!result) result = typer->inferred;
+        if (!result) typeError(typer,closure,"the result of this closure is not known: return a value, or make its body one expression");
+        else if (!unit && !exits(closure->a,0))
+            typeError(typer,closure,"this closure returns %s: return a value on every path, or make its body one expression",
+                      (describeType(t,sizeof(t),result),t));
+    }
+    typer->loops = loops; typer->inferring = inferring; typer->closures -= 1;
+    typer->output = output; typer->inferred = inferred; typer->closureSite = site;
+    if (!result) return NULL;
+    RangeNode **parameters = rangeArenaAllocate(typer->report->arena,(expected->itemCount ? expected->itemCount : 1) * sizeof(*parameters));
+    for (size_t i = 0; i < expected->itemCount; ++i) parameters[i] = expected->items[i];
+    return functionType(typer,parameters,expected->itemCount,result,closure);
+}
+
+/* `where(element)`: a call of the closure a parameter holds, with one
+ * unlabeled argument per parameter of its type. */
+static RangeNode *typeClosureCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *value, RangeNode *context)
+{
+    RangeNode *callee = call->a, *type = value->type;
+    callee->resolvedDeclaration = value;
+    callee->type = type;
+    char t[320]; describeType(t,sizeof(t),type);
+    if (callee->generics) typeError(typer,callee,"'%s' is a closure, %s; it takes no type arguments",callee->name,t);
+    if (call->itemCount != type->itemCount)
+        typeError(typer,call,"'%s' is %s: it takes %zu argument%s; %zu supplied",callee->name,t,type->itemCount,
+                  type->itemCount == 1 ? "" : "s",call->itemCount);
+    for (size_t i = 0; i < call->itemCount; ++i) {
+        RangeNode *argument = call->items[i];
+        if (argument->name)
+            typeError(typer,argument,"a closure's arguments take no labels: write %s(…) with argument %zu unlabeled",callee->name,i + 1);
+        RangeNode *expected = i < type->itemCount ? type->items[i] : NULL;
+        RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
+        char what[160]; snprintf(what,sizeof(what),"argument %zu of '%s'",i + 1,callee->name);
+        coerce(typer,argument->a,expected,actual,what);
+    }
+    return type->a;
 }
 
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
@@ -4194,8 +4440,13 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         }
     }
     if (callee->kind == RangeNodeName) {
+        // `where(element)` calls the closure a function-typed parameter holds.
+        RangeNode *value = sourceLookup(typer->report,scope,callee->name,0);
+        if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(value->type))
+            return typeClosureCall(typer,scope,call,value,context);
         function = lookupFunction(typer->report,scope,callee->name);
         if (function && function->owner) function = findCalledFunction(function->owner,callee->name,call);
+        if (function) labelTrailing(call,function);
         if (!function) {
             RangeNode *declaration = sourceLookup(typer->report,scope,callee->name,0);
             if (!declaration) declaration = sourceLookup(typer->report,scope,callee->name,2);
@@ -4207,7 +4458,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             if (declaration) typeError(typer,call,"'%s' is not a function",callee->name);
             return NULL; /* undeclared names are reported already */
         }
-        if (genericTemplate(function) && !function->typeName) return typeGenericCall(typer,scope,call,function,expected,context);
+        if (genericTemplate(function)) return typeGenericCall(typer,scope,call,function,expected,context,function->typeName ? context : NULL);
         if (callee->generics) { typeError(typer,callee,"'%s' takes no type arguments",function->name); return NULL; }
         receiver = function->typeName ? context : NULL;
     } else if (callee->kind == RangeNodeMemberAccess) {
@@ -4221,6 +4472,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             typeError(typer,callee,"%s has no function '%s'",type,callee->name);
             return NULL;
         }
+        if (genericTemplate(function)) return typeGenericCall(typer,scope,call,function,expected,context,receiver);
     } else {
         typeError(typer,call,"call target is not a function");
         return NULL;
@@ -4236,7 +4488,10 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         if (!argument->name || !same(argument->name,parameter->name))
             typeError(typer,argument,"argument %zu of '%s' requires label '%s'",i + 1,function->name,parameter->name);
         RangeNode *expected = declaredType(typer,&functionScope,parameter,receiver);
+        RangeNode *site = typer->closureSite;
+        typer->closureSite = isFunctionType(expected) ? argument->a : NULL;
         RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
+        typer->closureSite = site;
         char what[160];
         snprintf(what,sizeof(what),"argument '%s' of '%s'",parameter->name,function->name);
         coerce(typer,argument->a,expected,actual,what);
@@ -4367,8 +4622,22 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
         else if (declaration->kind == RangeNodeTypeParameter || declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
             typeError(typer,expr,"'%s' names a type, not a value",expr->name);
+        if (isFunctionType(type) && (expr != typer->closureSite || !isFunctionType(expected))) {
+            typeError(typer,expr,"'%s' holds a closure: call it, as in %s(…), or pass it on to a function-typed parameter; "
+                      "it runs only while the call it was passed to runs, so it is not stored, returned, or held in a value",
+                      expr->name,expr->name);
+            type = NULL;
+        }
         break;
     }
+    case RangeNodeClosure:
+        if (expr != typer->closureSite || !isFunctionType(expected)) {
+            typeError(typer,expr,"a closure is an argument for a function-typed parameter, as in xs.filter(where: { x in … }); "
+                      "it runs only while that call runs, so it is not stored, returned, or held in a value");
+            break;
+        }
+        type = typeClosure(typer,scope,expr,expected,context);
+        break;
     case RangeNodeCase: {
         // `.red`: a case of the enum the context expects.
         RangeNode *enumeration = caseContext(typer,contextualEnum(typer,expr,expected),expr->name);
@@ -4684,14 +4953,22 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         typeStatement(typer,&body,loop->items[2],context,output);
         break;
     }
-    case RangeNodeBreak:
-        if (!typer->loops) typeError(typer,node,"'break' is only allowed inside a loop");
-        break;
-    case RangeNodeContinue:
-        if (!typer->loops) typeError(typer,node,"'continue' is only allowed inside a loop");
+    case RangeNodeBreak: case RangeNodeContinue:
+        if (!typer->loops)
+            typeError(typer,node,"'%s' is only allowed inside a loop%s",node->kind == RangeNodeBreak ? "break" : "continue",
+                      typer->closures ? "; a closure's body does not leave a loop around the closure" : "");
         break;
     case RangeNodeReturn:
+        if (!output && typer->inferring) {
+            // A closure whose result is inferred: its first return decides it.
+            if (!node->a) { typeError(typer,node,"return a value: the result of this closure is not known"); break; }
+            RangeNode *actual = typeOf(typer,scope,node->a,typer->inferred,context);
+            if (!typer->inferred) typer->inferred = actual;
+            else coerce(typer,node->a,typer->inferred,actual,"return");
+            break;
+        }
         if (output) {
+            if (!node->a && unitType(typer,output)) break; /* a unit result, such as Nothing, needs no value */
             if (!node->a) { char t[160]; describeType(t,sizeof(t),output); typeError(typer,node,"return requires %s",t); break; }
             coerce(typer,node->a,output,typeOf(typer,scope,node->a,output,context),"return");
         } else if (node->a) {
@@ -5100,10 +5377,6 @@ static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, Range
 static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function, RangeNode *context)
 {
     SourceScope scope = {.owner=function,.parent=parent};
-    if (genericTemplate(function) && function->typeName) {
-        typeError(typer,function,"generic methods are not implemented; declare '%s' as a top-level generic function",function->name);
-        return;
-    }
     // An operator takes its right operand, or nothing when it is prefix.
     if (function->typeName && operatorName(function->name)) {
         int prefix = same(function->name,"-") || same(function->name,"!");
@@ -5121,9 +5394,12 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
                   function->name,function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
-    int loops = typer->loops;
-    RangeNode *outer = typer->function, *outerOutput = typer->output;
+    int loops = typer->loops, inferring = typer->inferring, closures = typer->closures;
+    RangeNode *outer = typer->function, *outerOutput = typer->output, *inferred = typer->inferred, *site = typer->closureSite;
     typer->loops = 0;
+    typer->inferring = 0;
+    typer->closures = 0;
+    typer->closureSite = NULL;
     typer->function = function;
     for (size_t i = 0; i < function->itemCount; ++i) function->items[i]->type = declaredType(typer,&scope,function->items[i],context);
     RangeNode *output = function->b
@@ -5134,6 +5410,7 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     typer->loops = loops;
     typer->output = outerOutput;
     typer->function = outer;
+    typer->inferring = inferring; typer->inferred = inferred; typer->closureSite = site; typer->closures = closures;
 }
 
 /* Two written types are the same when they are spelled alike: name, flags,
@@ -5192,9 +5469,10 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
-    // Methods are typed once every case's payload is.
+    // Methods are typed once every case's payload is; a generic one per instance.
     for (size_t i = 0; i < declaration->itemCount; ++i)
-        if (declaration->items[i]->kind == RangeNodeFunction) typeFunction(typer,&scope,declaration->items[i],context);
+        if (declaration->items[i]->kind == RangeNodeFunction && !genericTemplate(declaration->items[i]))
+            typeFunction(typer,&scope,declaration->items[i],context);
     checkIteration(typer,declaration);
     checkInsertion(typer,declaration);
     checkOverloads(typer,declaration);
@@ -5255,7 +5533,7 @@ static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declarat
                 continue;
             }
             item->type = declaredType(typer,&scope,item,context);
-        } else if (item->kind == RangeNodeFunction) typeFunction(typer,&scope,item,context);
+        } else if (item->kind == RangeNodeFunction && !genericTemplate(item)) typeFunction(typer,&scope,item,context);
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
@@ -5694,6 +5972,7 @@ static Typer *typeCheck(SourceReport *report)
     Typer *typer = rangeArenaAllocate(report->arena,sizeof(*typer));
     *typer = (Typer){.report=report,.vm=vm};
     typer->specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
+    typer->functionTypes = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return typer; }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
         RangeNode *candidate = report->units[u]->items[i];
@@ -6957,7 +7236,7 @@ static RangeNode *nativeGenericTarget(Native *native, RangeNode *target, RangeNo
             }
         }
         size_t errors = native->report->errors;
-        RangeNode *instance = instantiate(typer,declaration,bound,values,at);
+        RangeNode *instance = instantiate(typer,declaration,bound,values,at,NULL);
         checkMutations(typer,instance);
         if (native->report->errors != errors) native->failed = 1;
         return instance;
@@ -7966,7 +8245,7 @@ static void nativeMethods(Native *native, RangeNode *construct)
             RangeNode *function = construct->items[j];
             // A type's function '=' is compiled only when the type is compared.
             if (function->kind == RangeNodeFunction && !(function->flags & (RangeFlagBuiltin | RangeFlagExtern))
-                && !same(function->name,"="))
+                && !same(function->name,"=") && !genericTemplate(function))
                 nativeInstance(native,function,self);
         }
     }
@@ -7992,8 +8271,12 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     // Generic functions: one compiled function per concrete instantiation. One
     // typed with an enclosing construct's type parameter is compiled through
     // the concrete instances its callers' specializations substitute.
-    for (size_t i = 0; i < typer->instanceCount; ++i)
-        if (nativeConcreteInstance(typer,i)) nativeInstance(&native,typer->instances[i].instance,NULL);
+    // A generic method's instance is compiled for its receiver's specialization.
+    for (size_t i = 0; i < typer->instanceCount; ++i) {
+        RangeNode *context = typer->instances[i].context;
+        if (!nativeConcreteInstance(typer,i) || (context && (!nativeConcrete(context) || nativeGraphValues(&native,context)))) continue;
+        nativeInstance(&native,typer->instances[i].instance,context);
+    }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
         if (report->units[u]->items[i]->kind == RangeNodeConstruct || report->units[u]->items[i]->kind == RangeNodeEnum)
             nativeMethods(&native,report->units[u]->items[i]);

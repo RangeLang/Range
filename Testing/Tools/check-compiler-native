@@ -120,6 +120,7 @@ for unused in "3:25: warning[unused]: 'v' is bound but never used; write the pat
 done
 ! grep -Eq "'(a|x)' is bound but never used" "$work_root/log" || fail "a binding read in a condition or body was warned"
 ! grep -Fq "warning[unused]" <(grep -v "unused-bindings.range" "$work_root/log") || fail "the language sources bind names they never use"
+run generic-methods 42 "" Testing/Compiler/Native/GenericMethods.range
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
     || fail "strings printed: $(cat "$work_root/stdout")"
@@ -127,7 +128,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
-                   bytes control evaluation identity-references subjects; do
+                   bytes control evaluation identity-references subjects generic-methods; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -609,9 +610,80 @@ reject value-generic-unknown "'f' has no generic 'm'" \
 reject construct-value-required "'Grid' requires generic width" \
     'construct Grid<let width: Int> { let cells: 0 }
 { let g: Grid() return 0 }'
-reject generic-method "generic methods are not implemented; declare 'get' as a top-level generic function" \
-    'construct Box { let n: Int  function get<T>(let t: T): T { return t } }
+reject generic-method-inference "cannot infer type parameter T of 'get'; write it, as in get<…>(…)" \
+    'construct Box { let n: Int  function get<T>(): Int { return n } }
+{ return Box(n: 1).get() }'
+# A closure runs only while the call it is passed to runs: it is an argument
+# for a function-typed parameter, and nothing else holds it.
+take='function count(let xs: Array<Int>, let where: (Int) -> Bool): Int { return 0 }'
+escape="it runs only while the call it was passed to runs, so it is not stored, returned, or held in a value"
+reject closure-let "a closure is an argument for a function-typed parameter, as in xs.filter(where: { x in … })" \
+    "$take
+{ let f: { x in x > 1 } return 0 }"
+reject closure-return "a closure is an argument for a function-typed parameter" \
+    'function make(): Int { return { x in x } }
 { return 0 }'
+reject parameter-let "'where' holds a closure: call it, as in where(…), or pass it on to a function-typed parameter; $escape" \
+    'function keep(let where: (Int) -> Bool): Int { let f: where return 0 }
+{ return 0 }'
+reject parameter-return "'where' holds a closure" \
+    'function keep(let where: (Int) -> Bool): Bool { return where }
+{ return true }'
+reject parameter-member "'where' holds a closure" \
+    'construct Holder { let flag: Bool }
+function keep(let where: (Int) -> Bool): Bool { return Holder(flag: where).flag }
+{ return 0 }'
+reject parameter-captured "'where' holds a closure" \
+    "$take
+function keep(let where: (Int) -> Bool): Int { state xs: Array<Int>() return count(xs: xs) { x in where } }
+{ return 0 }"
+stored="a function type is only a parameter's type: a closure runs only while the call it is passed to runs, so it is not stored, returned, or held in a value"
+reject function-member "$stored" 'construct Box { let f: (Int) -> Bool }
+{ return 0 }'
+reject function-local "$stored" '{ state f: (Int) -> Bool return 0 }'
+reject function-result "$stored" 'function make(): (Int) -> Bool { }
+{ return 0 }'
+reject function-payload "$stored" 'enum Held { case f((Int) -> Bool) }
+{ return 0 }'
+reject function-of-function "a function type's parameters are values: a closure does not take a closure" \
+    'function f(let w: ((Int) -> Bool) -> Bool): Int { return 0 }
+{ return 0 }'
+reject function-returning-function "a function type's result is a value: a closure does not return a closure" \
+    'function f(let w: (Int) -> (Int) -> Bool): Int { return 0 }
+{ return 0 }'
+reject unparenthesized-function "a function type puts its parameter types in parentheses: write (Element) -> Bool" \
+    'construct Bag<Element> { function keep(let where: Element -> Bool): Int { return 0 } }
+{ return 0 }'
+reject function-without-result "a function type names its result after '->', as in (Element) -> Bool; write -> Nothing for a closure that returns nothing" \
+    'function f(let w: (Int)): Int { return 0 }
+{ return 0 }'
+reject closure-parameters "this closure takes 2 parameters; (Int<bits: 64, signed: true>) -> Bool takes 1" \
+    "$take
+{ state xs: Array<Int>() return count(xs: xs, where: { a, b in a > b }) }"
+reject closure-result "the result of this closure requires Bool; found Int<bits: 64, signed: true>" \
+    "$take
+{ state xs: Array<Int>() return count(xs: xs) { x in x + 1 } }"
+reject closure-missing-return "this closure returns Bool: return a value on every path, or make its body one expression" \
+    "$take
+{ state xs: Array<Int>() state n: 0 return count(xs: xs) { x in n: x } }"
+reject closure-argument-label "a closure's arguments take no labels: write where(…) with argument 1 unlabeled" \
+    'function f(let where: (Int) -> Bool): Bool { return where(x: 1) }
+{ return 0 }'
+reject closure-argument-type "argument 1 of 'where' requires Int<bits: 64, signed: true>; found Bool" \
+    'function f(let where: (Int) -> Bool): Bool { return where(true) }
+{ return 0 }'
+reject closure-argument-count "'where' is (Int<bits: 64, signed: true>) -> Bool: it takes 1 argument; 2 supplied" \
+    'function f(let where: (Int) -> Bool): Bool { return where(1, 2) }
+{ return 0 }'
+reject closure-parameter-twice "'x' names two parameters of this closure" \
+    'function f(let with: (Int, Int) -> Int): Int { return with(1, 2) }
+{ return f { x, x in x } }'
+reject closure-break "'break' is only allowed inside a loop; a closure's body does not leave a loop around the closure" \
+    'function each(let body: (Int) -> Nothing) { body(1) }
+{ state xs: Array<Int>() for x in xs { each { y in break } } return 0 }'
+reject closure-to-value "a closure is an argument for a function-typed parameter" \
+    'function f(let value: Int): Int { return value }
+{ return f(value: { x in x }) }'
 # Declarations and calls the parser and type checker refuse.
 reject colon-function-default "parameter defaults require construction syntax, not a second colon" \
     'function sample(let value: Int: 3): Int { return value }
@@ -709,4 +781,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=54 rejections=143 logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=55 rejections=166 closure-types=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

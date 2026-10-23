@@ -18,6 +18,8 @@ typedef struct {
     int conditionDepth;   /* trailing closures do not bind inside conditions */
     int genericDepth;     /* > terminates an unparenthesized generic RHS */
     int macroDepth;       /* macro bodies permit a bare implicit result */
+    int functionTypes;    /* a function type may be written here: a parameter's type */
+    int closureStatement; /* the next statement is a closure body's: it may be one comparison */
     size_t previousEnd;   /* end of last consumed token, excluding trivia */
 } RangeParser;
 
