@@ -1297,8 +1297,9 @@ static void parseLabel(RangeParser *parser, RangeNode *entry, size_t subjects)
  * tests, `phase.failed(let reason)`. A name is bound only where the result
  * reaches the arm: in a case test that `&` and `|` join into the condition,
  * not inside another expression's operand. It is visible to the right of
- * its test, through `&`, and in the body; both sides of `|` bind the same
- * names, the right side's bindings standing for the left's. */
+ * its test, through `&`, and in the body; to its left the same name is
+ * what it names outside. Both sides of `|` bind the same names, the right
+ * side's bindings standing for the left's. */
 
 typedef struct { RangeNode **lets; size_t count, capacity; } Bound;
 
@@ -1408,8 +1409,9 @@ static void scanCondition(RangeParser *parser, RangeNode *node, int joined, Boun
         return;
     }
     case RangeNodeName:
-        if (bindingsName(bindings, node->name) && !boundNamed(visible, node->name))
-            parserFailAt(parser, node, "'%s' is read before the case test that binds it", node->name);
+        // Left of the test that binds it, a name is what it names outside:
+        // `equals.present(let equals)` tests the outer equals.
+        if (bindingsName(bindings, node->name) && !boundNamed(visible, node->name)) node->flags |= RangeFlagEarlier;
         return;
     case RangeNodeClosure: case RangeNodeSwitch:
         return; /* their own names */

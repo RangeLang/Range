@@ -74,9 +74,12 @@ enum {
     RangeFlagValue = 1 << 13,      /* switch: an expression; an arm yields its a, or its block diverges */
     RangeFlagFunction = 1 << 14,   /* written type: a function type, (A, B) -> R; its generics hold the
                                     * parameter types as arguments and the result as a */
-    RangeFlagImplicit = 1 << 15    /* attribute: applied by its grammar declaration's @defaults, not written;
+    RangeFlagImplicit = 1 << 15,   /* attribute: applied by its grammar declaration's @defaults, not written;
                                     * switch arm: a default the compiler wrote for a lowering;
-                                    * binding: one a lowering wrote, not a pattern's `let` */
+                                    * binding: one a lowering wrote, not a pattern's `let`;
+                                    * name: the receiver a bare case name tests */
+    RangeFlagEarlier = 1 << 16     /* name: read to the left of the case test that binds the same name
+                                    * in its condition, so it names what it names outside the condition */
 };
 
 /* Pattern forms. A case pattern's items are arguments (label, sub-pattern).

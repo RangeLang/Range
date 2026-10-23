@@ -1,6 +1,7 @@
 // A case read off a value is a Bool test: `phase.loading`, and with its
 // payload's patterns, `phase.failed(let reason)`. A switch's arms are
-// conditions, tried in order; the first that holds runs.
+// conditions; their case tests on one subject make a table the compiler
+// checks, so a switch whose tests cover every case needs no default.
 enum Phase {
     case loading
     case loaded(Int)
@@ -14,13 +15,13 @@ enum Pair {
     case none
 }
 
+// Every case of the subject is tested: no default.
 function describe(let phase: Phase): Int {
     switch {
         phase.loading: return 1,
         phase.loaded(let n) & n > 10: return n,
         phase.loaded(let n): return n + 100,
-        phase.failed(reason: let r, code: _): return r.count + 1000,
-        default: return -1
+        phase.failed(reason: let r, code: _): return r.count + 1000
     }
 }
 
@@ -41,29 +42,36 @@ function lights(let p: Pair): Int {
         p.pair(_, Light.on): return 1,
         p.pair(.off, .off): return 2,
         p.pair(.on, .off): return 3,
-        p.none: return 4,
-        default: return -1
+        p.none: return 4
     }
 }
 
-// A guard narrows its arm.
+// A guard: the arm counts for nothing after it, so the table still needs
+// its own arms for every case.
 function guarded(let o: Int?, let limit: Int): Int {
     switch {
         o.present(let v) & v > limit: return 2,
         o.present: return 1,
-        o.absent: return 0,
-        default: return -1
+        o.absent: return 0
     }
 }
 
-// Every combination of two optionals.
+// Every combination of two optionals, without a default.
 function both(let a: Int?, let b: Int?): Int {
     switch {
         a.present(let x) & b.present(let y): return x * y,
         a.present(let x) & b.absent: return x,
         a.absent & b.present(let y): return y,
-        a.absent & b.absent: return 0,
-        default: return -1
+        a.absent & b.absent: return 0
+    }
+}
+
+// Left of the test that binds it, a name is what it names outside: the
+// parameter is tested, and the arm's body reads the payload.
+function unwrapped(let value: Int?): Int {
+    switch {
+        value.present(let value): return value,
+        value.absent: return 0
     }
 }
 
@@ -86,8 +94,7 @@ enum Message {
         switch {
             text(let s): return s.count,
             pair(let a, let b): return a.count + b.count,
-            empty: return 0,
-            default: return -1
+            empty: return 0
         }
     }
 
@@ -115,6 +122,7 @@ enum Message {
     switch { longer(a: Phase.failed(reason: "abcdef", code: 1), limit: 3) != 6: return 16, default: {} }
     switch { longer(a: Phase.failed(reason: "ab", code: 1), limit: 3) != -2: return 17, default: {} }
     switch { longer(a: Phase.loading, limit: 3) != 0: return 18, default: {} }
+    switch { unwrapped(value: 7) != 7 | unwrapped(value: .absent) != 0: return 24, default: {} }
 
     // A for filter reads cases too, and binds for the body.
     state messages: Array<Message>()
@@ -134,8 +142,7 @@ enum Message {
     let maybe: Int?.present(4)
     let doubled: switch {
         maybe.present(let x): switch { x > 3: x * 2, default: x },
-        maybe.absent: 0,
-        default: -1
+        maybe.absent: 0
     }
     switch { doubled != 8: return 22, default: {} }
     state reached: 0
@@ -146,8 +153,7 @@ enum Message {
                 default: reached: 1
             }
         },
-        maybe.absent: {},
-        default: {}
+        maybe.absent: {}
     }
     switch { reached != 9: return 23, default: {} }
     return 42

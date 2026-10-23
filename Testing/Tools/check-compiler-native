@@ -403,11 +403,38 @@ reject binding-one-side "'y' is bound on one side of '|' only; both sides bind t
 reject binding-types "both sides of '|' bind 'x' with one type; the left side binds Int<bits: 64, signed: true>, this side String" \
     'function f(let o: Int?, let p: String?): Int { switch { o.present(let x) | p.present(let x): return 1, default: return 0 } }
 { return 0 }'
-reject binding-before "'x' is read before the case test that binds it" \
+reject binding-before "no declaration for 'x' here; the case test that binds it is to its right" \
     'function f(let o: Int?): Int { switch { x > 0 & o.present(let x): return x, default: return 0 } }
 { return 0 }'
 reject binding-twice "'x' is bound twice in this condition" \
     'function f(let o: Int?, let p: Int?): Int { switch { o.present(let x) & p.present(let x): return x, default: return 0 } }
+{ return 0 }'
+# A switch's case tests on one subject are a table: the arms must cover
+# every combination of their subjects' cases unless a default ends them, a
+# guarded arm covers nothing after it, and every arm must be reachable.
+reject missing-case "switch must be exhaustive: 'phase.loaded' is not handled; add an arm for it or a default" \
+    'enum Phase { case loading, loaded(Int), failed(String) }
+function f(let phase: Phase): Int { switch { phase.loading: return 1, phase.failed: return 2 } }
+{ return 0 }'
+reject missing-combinations "switch must be exhaustive: 'value.present & bits.absent' is not handled; add an arm for it or a default" \
+    'function f(let value: Int?, let bits: Int?): Int { switch { value.present & bits.present: return 1, value.absent: return 0 } }
+{ return 0 }'
+reject missing-guarded "switch must be exhaustive: 'value.present & bits.absent', 'value.present & bits.present' are not handled; add arms for them or a default" \
+    'function f(let value: Int?, let bits: Int?): Int { switch { value.present(let v) & v > 0 & bits.present: return 1, value.absent: return 0 } }
+{ return 0 }'
+reject guards-only "switch must be exhaustive; add a default" \
+    'function f(let n: Int): Int { switch { n > 0: return 1, n <= 0: return 0 } }
+{ return 0 }'
+reject call-subject "switch must be exhaustive; add a default" \
+    'function g(): Int? { return 1 }
+function f(): Int { switch { g().present: return 1, g().absent: return 0 } }
+{ return 0 }'
+reject condition-unreachable "this condition is already handled by earlier arms" \
+    'enum Phase { case loading, loaded(Int), failed(String) }
+function f(let phase: Phase): Int { switch { phase.loading | phase.failed: return 1, phase.failed(let s): return 2, default: return 0 } }
+{ return 0 }'
+reject condition-default-unreached "'default' is never reached: the arms above match every value" \
+    'function f(let o: Int?): Int { switch { o.present: return 1, o.absent: return 0, default: return 2 } }
 { return 0 }'
 # Case tests run at compile time too, in conditions and as plain Bools.
 paired='macro paired(): Enum {
@@ -429,6 +456,23 @@ reject macro-case-missing "Half needs on and off" "$paired
 @paired
 enum Half { case on }
 { return 0 }"
+reject macro-case-coverage "compile-time switch must be exhaustive: 'off.absent' is not handled; add an arm for it or a default" \
+    'macro both(): Enum {
+    let off: #cases.first(where: { c in c.name = "off" })
+    switch { off.present(let c) & c.name = "off": {}, off.present: {} }
+}
+@both
+enum Light { case on, off }
+{ return 0 }'
+reject macro-case-unreachable "this condition is already handled by earlier arms" \
+    'macro both(): Enum {
+    let off: #cases.first(where: { c in c.name = "off" })
+    switch { off.present: {}, off.absent: {}, off.present(let c): {} }
+}
+@both
+enum Light { case on, off }
+{ return 0 }'
+
 reject case-test-not-enum "Int<bits: 64, signed: true> has no member 'present'" \
     'function f(let o: Int): Int { switch { o.present: return 1, default: return 0 } }
 { return 0 }'
@@ -902,4 +946,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=61 rejections=178 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=61 rejections=187 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

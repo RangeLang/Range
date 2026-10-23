@@ -1714,7 +1714,7 @@ typedef int (*PatternUseful)(void *, RangeNode ***, size_t, RangeNode **, RangeN
  * '.on & .off' into missing; a subject that is not an enum is `_` there.
  * cases[k] declares subject k's cases, or is NULL. Returns how many. */
 static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *context, RangeNode ***rows, size_t count,
-                             RangeNode **types, RangeNode **cases, size_t width, char *missing, size_t size)
+                             RangeNode **types, RangeNode **cases, size_t width, const char **names, char *missing, size_t size)
 {
     size_t *index = rangeArenaAllocate(arena,width * sizeof(*index)), found = 0, length = strlen(missing);
     RangeNode **q = rangeArenaAllocate(arena,width * sizeof(*q));
@@ -1736,9 +1736,14 @@ static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *co
         }
         if (valid && isUseful(context,rows,count,q,types,width)) {
             char text[256]; size_t used = 0;
-            for (size_t k = 0; k < width; ++k)
-                used += (size_t)snprintf(text + used,sizeof(text) > used ? sizeof(text) - used : 0,"%s%s%s",
-                                         k ? " & " : "",q[k] ? "." : "_",q[k] ? q[k]->name : "");
+            // Named subjects read as the condition that tests them: 'value.present & bits.absent'.
+            for (size_t k = 0, written = 0; k < width; ++k) {
+                if (names && !q[k]) continue;
+                const char *subject = names ? names[k] : "";
+                used += (size_t)snprintf(text + used,sizeof(text) > used ? sizeof(text) - used : 0,"%s%s%s%s",
+                                         written++ ? " & " : "",subject,q[k] && (!names || *subject) ? "." : q[k] ? "" : "_",
+                                         q[k] ? q[k]->name : "");
+            }
             if (length + strlen(text) + 8 < size)
                 length += (size_t)snprintf(missing + length,size - length,"%s'%s'",found ? ", " : "",text);
             ++found;
@@ -1755,6 +1760,180 @@ static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *co
         }
     }
     return found;
+}
+
+/* ---- the static structure of a switch's conditions ----
+ * A switch arm's condition is a Bool, but its case tests on stable subjects
+ * are a pattern table: a local, a parameter, a member path of one, a
+ * #reflection value, or the receiver, never a call or a name the arm binds.
+ * The condition, read as `|` of `&`s, gives one row per alternative, with
+ * one column per subject: the case test of that subject, or wild. A row
+ * that also needs anything else, a guard, covers nothing for the arms after
+ * it. The rows then decide, as a switch over those subjects would, which
+ * arms are reached and whether the arms cover every combination. */
+
+static RangeNode *bindingNamed(const RangeNode *, const char *);
+
+/* A case test on a stable subject, as the evaluator or type checker knows it, or NULL. */
+typedef RangeNode *(*CaseTestOf)(void *context, RangeNode *term, RangeNode *bindings);
+
+static int stablePath(const RangeNode *path, const RangeNode *bindings)
+{
+    if (!path || path->generics) return 0;
+    if (path->kind == RangeNodeName)
+        return (path->flags & (RangeFlagImplicit | RangeFlagEarlier)) || !bindings || !bindingNamed(bindings,path->name);
+    if (path->kind == RangeNodeEnvironment) return 1;
+    return path->kind == RangeNodeMemberAccess && stablePath(path->a,bindings);
+}
+
+static int samePath(const RangeNode *a, const RangeNode *b)
+{
+    if (!a || !b || a->kind != b->kind) return 0;
+    if ((a->flags & RangeFlagImplicit) || (b->flags & RangeFlagImplicit)) return (a->flags & RangeFlagImplicit) && (b->flags & RangeFlagImplicit);
+    if (!same(a->name,b->name)) return 0;
+    return a->kind != RangeNodeMemberAccess || samePath(a->a,b->a);
+}
+
+static const char *pathText(RangeArena *arena, const RangeNode *path)
+{
+    if (path->flags & RangeFlagImplicit) return "";
+    const char *owner = path->kind == RangeNodeMemberAccess ? pathText(arena,path->a) : path->kind == RangeNodeEnvironment ? "#" : "";
+    size_t length = strlen(owner) + strlen(path->name) + 2;
+    char *text = rangeArenaAllocate(arena,length);
+    snprintf(text,length,"%s%s%s",owner,path->kind == RangeNodeMemberAccess ? "." : "",path->name);
+    return text;
+}
+
+typedef struct { RangeNode **terms; size_t count; int guarded; } ShapeRow;
+typedef struct { ShapeRow *rows; size_t count; } ShapeRows;
+
+#define RANGE_SHAPE_ROWS 256
+
+/* The condition as alternatives of case tests; *overflow when there are too many to check. */
+static ShapeRows shapeRows(RangeArena *arena, CaseTestOf test, void *context, RangeNode *node, RangeNode *bindings, int *overflow)
+{
+    ShapeRows out = {0};
+    if (*overflow) return out;
+    if (node && node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"))) {
+        ShapeRows left = shapeRows(arena,test,context,node->a,bindings,overflow);
+        ShapeRows right = shapeRows(arena,test,context,node->b,bindings,overflow);
+        size_t count = same(node->name,"|") ? left.count + right.count : left.count * right.count;
+        if (*overflow || count > RANGE_SHAPE_ROWS) { *overflow = 1; return out; }
+        out.rows = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*out.rows));
+        if (same(node->name,"|")) {
+            memcpy(out.rows,left.rows,left.count * sizeof(*out.rows));
+            memcpy(out.rows + left.count,right.rows,right.count * sizeof(*out.rows));
+            out.count = count;
+            return out;
+        }
+        for (size_t i = 0; i < left.count; ++i)
+            for (size_t j = 0; j < right.count; ++j) {
+                ShapeRow *row = &out.rows[out.count++];
+                row->count = left.rows[i].count + right.rows[j].count;
+                row->terms = rangeArenaAllocate(arena,(row->count ? row->count : 1) * sizeof(*row->terms));
+                memcpy(row->terms,left.rows[i].terms,left.rows[i].count * sizeof(*row->terms));
+                memcpy(row->terms + left.rows[i].count,right.rows[j].terms,right.rows[j].count * sizeof(*row->terms));
+                row->guarded = left.rows[i].guarded || right.rows[j].guarded;
+            }
+        return out;
+    }
+    out.rows = rangeArenaAllocate(arena,sizeof(*out.rows));
+    out.rows[0] = (ShapeRow){0};
+    out.count = 1;
+    RangeNode *found = node ? test(context,node,bindings) : NULL;
+    if (found) {
+        out.rows[0].terms = rangeArenaAllocate(arena,sizeof(*out.rows[0].terms));
+        out.rows[0].terms[0] = found;
+        out.rows[0].count = 1;
+    } else out.rows[0].guarded = 1;
+    return out;
+}
+
+/* The pattern table of a switch over conditions: its subjects, and one row
+ * per alternative of each arm in order (the default a wild row), each with
+ * its arm and whether a guard narrows it. `overflow` marks an arm with too
+ * many alternatives to check, which counts as guarded. */
+typedef struct {
+    RangeNode **subjects; const char **names; size_t width;
+    RangeNode ***rows; RangeNode **arms; int *guarded; size_t count;
+} ConditionShape;
+
+static void conditionShape(RangeArena *arena, RangeNode *node, CaseTestOf test, void *context, ConditionShape *shape)
+{
+    size_t arms = node->itemCount;
+    ShapeRows *each = rangeArenaAllocate(arena,(arms ? arms : 1) * sizeof(*each));
+    size_t subjectCapacity = 1, total = 0;
+    for (size_t i = 0; i < arms; ++i) {
+        RangeNode *entry = node->items[i];
+        int overflow = 0;
+        if (entry->flags & RangeFlagLiteral || !entry->itemCount) each[i] = (ShapeRows){0};
+        else each[i] = shapeRows(arena,test,context,entry->items[0]->b,entry->items[0]->c,&overflow);
+        if (overflow) {
+            each[i].rows = rangeArenaAllocate(arena,sizeof(*each[i].rows));
+            each[i].rows[0] = (ShapeRow){.guarded=1};
+            each[i].count = 1;
+        }
+        if (!each[i].count) {
+            each[i].rows = rangeArenaAllocate(arena,sizeof(*each[i].rows));
+            each[i].rows[0] = (ShapeRow){0};
+            each[i].count = 1;
+        }
+        total += each[i].count;
+        for (size_t r = 0; r < each[i].count; ++r) subjectCapacity += each[i].rows[r].count;
+    }
+    *shape = (ConditionShape){0};
+    shape->subjects = rangeArenaAllocate(arena,subjectCapacity * sizeof(*shape->subjects));
+    shape->names = rangeArenaAllocate(arena,subjectCapacity * sizeof(*shape->names));
+    for (size_t i = 0; i < arms; ++i)
+        for (size_t r = 0; r < each[i].count; ++r)
+            for (size_t t = 0; t < each[i].rows[r].count; ++t) {
+                RangeNode *subject = each[i].rows[r].terms[t]->a;
+                size_t k = 0;
+                while (k < shape->width && !samePath(shape->subjects[k],subject)) ++k;
+                if (k < shape->width) continue;
+                shape->subjects[shape->width] = subject;
+                shape->names[shape->width++] = pathText(arena,subject);
+            }
+    shape->rows = rangeArenaAllocate(arena,(total ? total : 1) * sizeof(*shape->rows));
+    shape->arms = rangeArenaAllocate(arena,(total ? total : 1) * sizeof(*shape->arms));
+    shape->guarded = rangeArenaAllocate(arena,(total ? total : 1) * sizeof(*shape->guarded));
+    for (size_t i = 0; i < arms; ++i)
+        for (size_t r = 0; r < each[i].count; ++r) {
+            ShapeRow *row = &each[i].rows[r];
+            RangeNode **vector = rangeArenaAllocate(arena,(shape->width ? shape->width : 1) * sizeof(*vector));
+            for (size_t k = 0; k < shape->width; ++k) vector[k] = NULL;
+            int guarded = row->guarded;
+            for (size_t t = 0; t < row->count; ++t) {
+                size_t k = 0;
+                while (!samePath(shape->subjects[k],row->terms[t]->a)) ++k;
+                // A second test of one subject narrows the row as a guard does.
+                if (vector[k]) guarded = 1;
+                else vector[k] = row->terms[t]->b;
+            }
+            shape->rows[shape->count] = vector;
+            shape->arms[shape->count] = node->items[i];
+            shape->guarded[shape->count++] = guarded;
+        }
+}
+
+/* Which rows nothing before them leaves anything for (reached[i] = 0), and
+ * the combinations no row covers, written into missing; returns whether the
+ * arms cover every combination. cases[k] declares subject k's cases. */
+static int conditionCoverage(RangeArena *arena, ConditionShape *shape, PatternUseful isUseful, void *context,
+                             RangeNode **types, RangeNode **cases, int *reached, char *missing, size_t size)
+{
+    RangeNode ***rows = rangeArenaAllocate(arena,(shape->count ? shape->count : 1) * sizeof(*rows));
+    size_t count = 0;
+    for (size_t i = 0; i < shape->count; ++i) {
+        reached[i] = isUseful(context,rows,count,shape->rows[i],types,shape->width);
+        if (!shape->guarded[i]) rows[count++] = shape->rows[i];
+    }
+    RangeNode **wild = rangeArenaAllocate(arena,(shape->width ? shape->width : 1) * sizeof(*wild));
+    for (size_t k = 0; k < shape->width; ++k) wild[k] = NULL;
+    if (!isUseful(context,rows,count,wild,types,shape->width)) return 1;
+    *missing = '\0';
+    if (shape->width) patternMissing(arena,isUseful,context,rows,count,types,cases,shape->width,shape->names,missing,size);
+    return 0;
 }
 
 /* Whether `pattern` matches `value` at compile time; its bindings join `into`. */
@@ -1950,15 +2129,74 @@ static int metaMatchRow(MetaEval *eval, MetaScope *into, RangeNode *row, RangeGr
     return 1;
 }
 
-/* A compile-time switch over conditions runs the first arm whose condition
- * holds; until the compiler reads the conditions' structure, it ends with a
- * default. */
+/* A compile-time switch over conditions: its stable subjects, each
+ * evaluated once to learn which names are case tests and of which enum. */
+typedef struct { MetaEval *eval; MetaScope *scope; RangeNode **paths; RangeGraphValue *values; size_t count, capacity; } MetaShape;
+
+static RangeGraphValue *metaShapeSubject(MetaShape *shape, RangeNode *path)
+{
+    for (size_t i = 0; i < shape->count; ++i) if (samePath(shape->paths[i],path)) return &shape->values[i];
+    if (shape->count == shape->capacity) {
+        size_t capacity = shape->capacity ? shape->capacity * 2 : 8;
+        RangeNode **paths = rangeArenaAllocate(shape->eval->vm->arena,capacity * sizeof(*paths));
+        RangeGraphValue *values = rangeArenaAllocate(shape->eval->vm->arena,capacity * sizeof(*values));
+        if (shape->count) {
+            memcpy(paths,shape->paths,shape->count * sizeof(*paths));
+            memcpy(values,shape->values,shape->count * sizeof(*values));
+        }
+        shape->paths = paths; shape->values = values; shape->capacity = capacity;
+    }
+    shape->paths[shape->count] = path;
+    shape->values[shape->count] = metaExpression(shape->eval,shape->scope,path);
+    return &shape->values[shape->count++];
+}
+
+static RangeNode *metaShapeTest(void *context, RangeNode *term, RangeNode *bindings)
+{
+    MetaShape *shape = context;
+    RangeNode *path = NULL, *call = NULL;
+    const char *name = NULL;
+    if (term->kind == RangeNodeCaseTest) path = term->a, name = term->name;
+    else if (term->kind == RangeNodeMemberAccess) path = term->a, name = term->name;
+    else if (term->kind == RangeNodeCall && term->a && term->a->kind == RangeNodeMemberAccess)
+        path = term->a->a, name = term->a->name, call = term;
+    if (!path || !stablePath(path,bindings) || (path->flags & RangeFlagImplicit)) return NULL;
+    if (term->kind == RangeNodeCaseTest) { (void)metaShapeSubject(shape,path); return term; }
+    if (metaTypePath(shape->eval,shape->scope,path)) return NULL; /* `Light.red` makes a value */
+    if (!metaHoldsCase(shape->eval,*metaShapeSubject(shape,path),name)) return NULL;
+    becomeCaseTest(shape->eval->vm->arena,term,path,name,call);
+    return term;
+}
+
+/* The arm a compile-time switch over conditions runs: the first whose
+ * condition holds. As in compiled code, every arm must be reachable, and the
+ * arms must cover every combination of their case tests' subjects unless a
+ * default ends them. */
 static RangeNode *metaConditionArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
 {
+    RangeArena *arena = eval->vm->arena;
     for (size_t i = 0; i + 1 < node->itemCount; ++i)
         if (node->items[i]->flags & RangeFlagLiteral) fail(eval->vm,node->items[i],"'default' must be the last arm of a switch");
-    if (!node->itemCount || !(node->items[node->itemCount - 1]->flags & RangeFlagLiteral))
-        fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
+    MetaShape cache = {.eval=eval,.scope=scope};
+    ConditionShape shape;
+    conditionShape(arena,node,metaShapeTest,&cache,&shape);
+    RangeNode **types = rangeArenaAllocate(arena,(shape.width ? shape.width : 1) * sizeof(*types));
+    for (size_t k = 0; k < shape.width; ++k) types[k] = metaValueEnum(eval,*metaShapeSubject(&cache,shape.subjects[k]));
+    int *reached = rangeArenaAllocate(arena,(shape.count ? shape.count : 1) * sizeof(*reached));
+    char missing[512] = "";
+    int complete = conditionCoverage(arena,&shape,metaUsefulRow,eval,types,types,reached,missing,sizeof(missing));
+    for (size_t i = 0; i < shape.count; ++i) {
+        RangeNode *entry = shape.arms[i];
+        if (reached[i]) continue;
+        if (entry->flags & RangeFlagLiteral) fail(eval->vm,entry,"'default' is never reached: the arms above match every value");
+        fail(eval->vm,entry->items[0]->b,"this condition is already handled by earlier arms");
+    }
+    if (!complete) {
+        if (!*missing) fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
+        int many = strchr(missing,',') != NULL;
+        fail(eval->vm,node,"compile-time switch must be exhaustive: %s %s not handled; add %s or a default",missing,
+             many ? "are" : "is",many ? "arms for them" : "an arm for it");
+    }
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         *arm = (MetaScope){.parent=scope,.application=scope->application};
@@ -2014,7 +2252,7 @@ static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, Met
         char missing[256] = "";
         size_t length = 0;
         if (width > 1) {
-            if (patternMissing(arena,metaUsefulRow,eval,rows,count,types,types,width,missing,sizeof(missing))) {
+            if (patternMissing(arena,metaUsefulRow,eval,rows,count,types,types,width,NULL,missing,sizeof(missing))) {
                 int many = strchr(missing,',') != NULL;
                 fail(eval->vm,node,"compile-time switch over %zu subjects must be exhaustive: %s %s not handled; add %s or a default",
                      width,missing,many ? "are" : "is",many ? "those combinations" : "that combination");
@@ -2581,6 +2819,18 @@ static RangeNode *sourceLookup(SourceReport *report, SourceScope *scope,
     return NULL;
 }
 
+/* A name read to the left of the case test that binds it: what it names
+ * outside that condition's bindings. */
+static RangeNode *nameLookup(SourceReport *report, SourceScope *scope, const RangeNode *name)
+{
+    if (name->flags & RangeFlagEarlier)
+        for (SourceScope *outer = scope; outer; outer = outer->parent)
+            if (outer->owner && outer->owner->kind == RangeNodeBlock && same(outer->owner->name,"bindings")
+                && bindingNamed(outer->owner,name->name))
+                return sourceLookup(report,outer->parent,name->name,0);
+    return sourceLookup(report,scope,name->name,0);
+}
+
 /* A declaration nested in a construct or an enum. */
 static RangeNode *nestedDeclaration(RangeNode *owner, const char *name, size_t length)
 {
@@ -2691,7 +2941,7 @@ static RangeNode *bindingNamed(const RangeNode *bindings, const char *name)
 static int nameRead(const RangeNode *node, const char *name)
 {
     if (!node) return 0;
-    if (node->kind == RangeNodeName && same(node->name,name)) return 1;
+    if (node->kind == RangeNodeName && same(node->name,name) && !(node->flags & RangeFlagEarlier)) return 1;
     // `let copy: xs` keeps a bare right-hand name in the type position.
     if (rangeNodeDeclaresValue(node->kind) && same(node->typeName,name)) return 1;
     if (nameRead(node->a,name) || nameRead(node->b,name) || nameRead(node->c,name)
@@ -2811,6 +3061,11 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
     }
     case RangeNodeName:
         if (!(node->flags & RangeFlagMacroType) && receiverCaseName(scope,node->name)) break; /* tests the receiver */
+        if (node->flags & RangeFlagEarlier) {
+            if (!nameLookup(report,scope,node))
+                sourceDiagnostic(report,node,0,"undeclared","no declaration for '%s' here; the case test that binds it is to its right",node->name);
+            break;
+        }
         (void)sourceReference(report,scope,node,node->name,node->flags & RangeFlagMacroType ? 1 : 0);
         break;
     case RangeNodeMemberAccess:
@@ -4868,7 +5123,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         type = typeLiteral(typer,expr,expr,expected);
         break;
     case RangeNodeName: {
-        RangeNode *declaration = sourceLookup(typer->report,scope,expr->name,0);
+        RangeNode *declaration = nameLookup(typer->report,scope,expr);
         expr->resolvedDeclaration = declaration;
         if (!declaration && receiverCase(typer,context,expr->name)) {
             becomeCaseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
@@ -5542,12 +5797,43 @@ static void typeRow(Typer *typer, SourceScope *scope, RangeNode *row, RangeNode 
     for (size_t k = 0; k < width && k < row->itemCount; ++k) typePattern(typer,scope,row->items[k],types[k],context);
 }
 
-/* `switch { condition: body, … }` ends with a default until the compiler
- * reads the conditions' structure. */
+static RangeNode *typerCaseTest(void *context, RangeNode *term, RangeNode *bindings)
+{
+    (void)context;
+    return term->kind == RangeNodeCaseTest && stablePath(term->a,bindings) ? term : NULL;
+}
+
+/* `switch { condition: body, … }`: every arm must be reachable, and unless
+ * a default ends it, the arms' case tests must cover every combination of
+ * their subjects' cases. */
 static void typeConditionCoverage(Typer *typer, RangeNode *node)
 {
-    if (!node->itemCount || !(node->items[node->itemCount - 1]->flags & RangeFlagLiteral))
-        typeError(typer,node,"switch must be exhaustive; add a default");
+    RangeArena *arena = typer->report->arena;
+    ConditionShape shape;
+    conditionShape(arena,node,typerCaseTest,typer,&shape);
+    size_t width = shape.width;
+    RangeNode **types = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*types));
+    RangeNode **cases = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*cases));
+    for (size_t k = 0; k < width; ++k) {
+        types[k] = shape.subjects[k]->type;
+        cases[k] = isEnum(types[k]) ? types[k]->resolvedDeclaration : NULL;
+    }
+    int *reached = rangeArenaAllocate(arena,(shape.count ? shape.count : 1) * sizeof(*reached));
+    char missing[512] = "";
+    int complete = conditionCoverage(arena,&shape,typerUseful,typer,types,cases,reached,missing,sizeof(missing));
+    RangeNode *reported = NULL;
+    for (size_t i = 0; i < shape.count; ++i) {
+        RangeNode *entry = shape.arms[i];
+        if (reached[i] || (entry->flags & RangeFlagImplicit) || entry == reported) continue;
+        reported = entry;
+        if (entry->flags & RangeFlagLiteral) typeError(typer,entry,"'default' is never reached: the arms above match every value");
+        else typeError(typer,entry->items[0]->b,"this condition is already handled by earlier arms");
+    }
+    if (complete) return;
+    if (!*missing) { typeError(typer,node,"switch must be exhaustive; add a default"); return; }
+    int many = strchr(missing,',') != NULL;
+    typeError(typer,node,"switch must be exhaustive: %s %s not handled; add %s or a default",missing,
+              many ? "are" : "is",many ? "arms for them" : "an arm for it");
 }
 
 /* A switch statement, or, with RangeFlagValue, a switch expression: its type
@@ -5646,7 +5932,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     if (width > 1) {
         RangeNode **cases = rangeArenaAllocate(arena,width * sizeof(*cases));
         for (size_t k = 0; k < width; ++k) cases[k] = isEnum(types[k]) ? types[k]->resolvedDeclaration : NULL;
-        if (patternMissing(arena,typerUseful,typer,rows,count,types,cases,width,missing,sizeof(missing))) {
+        if (patternMissing(arena,typerUseful,typer,rows,count,types,cases,width,NULL,missing,sizeof(missing))) {
             int many = strchr(missing,',') != NULL;
             typeError(typer,node,"switch over %s must be exhaustive: %s %s not handled; add %s or a default",t,missing,
                       many ? "are" : "is",many ? "those combinations" : "that combination");
