@@ -121,6 +121,36 @@ done
 ! grep -Eq "'(a|x)' is bound but never used" "$work_root/log" || fail "a binding read in a condition or body was warned"
 ! grep -Fq "warning[unused]" <(grep -v "unused-bindings.range" "$work_root/log") || fail "the language sources bind names they never use"
 run generic-methods 42 "" Testing/Compiler/Native/GenericMethods.range
+# Closures: functions that take them are compiled inline, and so are they.
+run closures 42 "" Testing/Compiler/Native/Closures.range
+[[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"
+grep -Fq "warning[C-implementation]: a closure is compiled by C inline, where the call it is passed to is made" "$work_root/log" \
+    || fail "closures are not reported as C's"
+# Macros run closures at compile time: a Range function's closure parameter
+# holds one, which sees and changes the macro's own values.
+run compile-time-closures 0 "" "$(case_file compile-time-closures 'function count(let cases: Array<EnumCase>, let where: (EnumCase) -> Bool): Int {
+    state found: 0
+    state index: 0
+    while index < cases.count {
+        switch where(cases.read(at: index)) { .true: found: found + 1, .false: {} }
+        index: index + 1
+    }
+    return found
+}
+macro counted(): Enum {
+    state seen: 0
+    let others: count(cases: #cases) { c in
+        seen: seen + 1
+        switch c.name = "on" { .true: return false, .false: {} }
+        return true
+    }
+    @warning("\(#name) has \(others) other cases of \(seen)")
+}
+@counted
+enum Light { case on, off, dim }
+{ return 0 }')"
+grep -Fq "compile-time-closures.range:19:1: warning[macro]: Light has 2 other cases of 3" "$work_root/log" \
+    || fail "a compile-time closure did not run: $(grep 'error\[' "$work_root/log")"
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
     || fail "strings printed: $(cat "$work_root/stdout")"
@@ -128,7 +158,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
-                   bytes control evaluation identity-references subjects generic-methods; do
+                   bytes control evaluation identity-references subjects closures generic-methods; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -684,6 +714,9 @@ reject closure-break "'break' is only allowed inside a loop; a closure's body do
 reject closure-to-value "a closure is an argument for a function-typed parameter" \
     'function f(let value: Int): Int { return value }
 { return f(value: { x in x }) }'
+reject closure-recursion "'again' takes a closure, so it is compiled inline where it is called; it cannot reach itself" \
+    'function again(let body: (Int) -> Nothing) { again(body: body) }
+{ again { x in } return 0 }'
 # Declarations and calls the parser and type checker refuse.
 reject colon-function-default "parameter defaults require construction syntax, not a second colon" \
     'function sample(let value: Int: 3): Int { return value }
@@ -781,4 +814,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=55 rejections=166 closure-types=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=57 rejections=167 closures=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

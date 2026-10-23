@@ -832,6 +832,8 @@ static MetaLocal *metaLocal(MetaScope *scope, const char *name)
 
 static void metaBind(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeGraphValue value)
 {
+    if (value.kind == RangeGraphClosure && node->kind != RangeNodeParameter)
+        fail(eval->vm,node,"a closure is an argument for a function-typed parameter; it is not held in '%s'",node->name);
     for (MetaLocal *local = scope->locals; local; local = local->next)
         if (same(local->name,node->name)) fail(eval->vm,node,"duplicate compile-time local '%s'",node->name);
     MetaLocal *local = rangeArenaAllocate(eval->vm->arena,sizeof(*local));
@@ -1031,6 +1033,46 @@ static void metaSetMember(MetaEval *eval, RangeGraphValue *instance, size_t inde
 }
 
 static RangeGraphValue metaInvoke(MetaEval *, MetaScope *, RangeNode *, RangeNode *, RangeGraphValue *);
+static RangeNode *closureValue(RangeNode *);
+
+/* A closure at compile time: what it sees where it is written, and the enum
+ * its result is a case of, once a function-typed parameter holds it. It is
+ * used only while the call it is passed to runs, so the scopes it holds are
+ * alive whenever it runs. */
+typedef struct {
+    MetaScope *scope;
+    RangeGraphValue *self;
+    RangeNode *function, *output;
+} MetaClosure;
+
+/* `where(element)` at compile time: the closure's body with its parameters
+ * bound to the arguments, evaluated where the call is, in the scope where the
+ * closure is written. It yields its one expression, or what `return` gives. */
+static RangeGraphValue metaCallClosure(MetaEval *eval, MetaScope *scope, RangeNode *call, RangeGraphValue closure)
+{
+    MetaClosure *captured = closure.closure;
+    RangeNode *literal = closure.node;
+    if (call->itemCount != literal->itemCount)
+        fail(eval->vm,call,"this closure takes %zu argument%s; %zu supplied",literal->itemCount,literal->itemCount == 1 ? "" : "s",call->itemCount);
+    if (++eval->depth > 64) fail(eval->vm,call,"compile-time call depth exceeded");
+    MetaScope parameters = {.parent=captured->scope,.application=captured->scope ? captured->scope->application : NULL};
+    for (size_t i = 0; i < call->itemCount; ++i) {
+        if (call->items[i]->name) fail(eval->vm,call->items[i],"a closure's arguments take no labels");
+        metaBind(eval,&parameters,literal->items[i],metaExpression(eval,scope,call->items[i]->a));
+    }
+    RangeGraphValue *self = eval->self;
+    RangeNode *function = eval->function, *output = eval->output;
+    eval->self = captured->self; eval->function = captured->function; eval->output = captured->output;
+    RangeGraphValue result = {0};
+    RangeNode *value = closureValue(literal);
+    if (value) result = metaExpect(eval,&parameters,value,captured->output);
+    else (void)metaStatement(eval,&parameters,literal->a,&result);
+    result = metaConvert(eval,result,captured->output,call);
+    eval->self = self; eval->function = function; eval->output = output;
+    --eval->depth;
+    return result;
+}
+
 /* `Point(x: 1)`: each stored member is its argument or its default, which
  * sees the members before it; a @many member starts with no slots. */
 static RangeGraphValue metaConstruct(MetaEval *eval, MetaScope *scope, RangeNode *declaration, RangeNode **arguments,
@@ -1245,7 +1287,11 @@ static RangeGraphValue metaInvoke(MetaEval *eval, MetaScope *scope, RangeNode *f
     int effects = 0;
     for (size_t i = 0; function->c && i < function->c->itemCount; ++i)
         effects += !roleMacro(function->c->items[i]->resolvedDeclaration);
-    if (function->generics || (effects && !(function->flags & RangeFlagBuiltin)))
+    // Compile-time values carry no types, so a type parameter changes nothing.
+    int valueGenerics = 0;
+    for (size_t i = 0; function->generics && i < function->generics->itemCount; ++i)
+        valueGenerics += function->generics->items[i]->kind != RangeNodeTypeParameter;
+    if (valueGenerics || (effects && !(function->flags & RangeFlagBuiltin)))
         fail(eval->vm,call,"unsupported compile-time function declaration '%s'",function->name);
     if (call->itemCount != function->itemCount)
         fail(eval->vm,call,"compile-time call argument count differs from '%s'",function->name);
@@ -1261,9 +1307,20 @@ static RangeGraphValue metaInvoke(MetaEval *eval, MetaScope *scope, RangeNode *f
         RangeNode *argument = call->items[i], *parameter = NULL;
         for (size_t j = 0; j < function->itemCount; ++j)
             if (same(argument->name,function->items[j]->name)) parameter = function->items[j];
-        if (!parameter || (parameter->flags & ~RangeFlagOptional) || parameter->itemCount)
+        if (!parameter || (parameter->flags & ~(RangeFlagOptional | RangeFlagFunction)) || parameter->itemCount)
             fail(eval->vm,argument,"compile-time call requires an explicit label for each plain parameter");
         RangeNode *type = parameter->b;
+        if (parameter->flags & RangeFlagFunction) {
+            // A closure, or a parameter holding one: its result is a case of
+            // the enum the function type's result names.
+            values[i] = metaExpression(eval,scope,argument->a);
+            if (values[i].kind != RangeGraphClosure)
+                fail(eval->vm,argument,"'%s' takes a closure, as in { x in … }",parameter->name);
+            RangeNode *result = type && type->generics ? type->generics->a : NULL;
+            ((MetaClosure *)values[i].closure)->output = result ? metaTypeEnum(eval,owner,result->name,result->flags,result) : NULL;
+            metaBind(eval,&arguments,parameter,values[i]);
+            continue;
+        }
         RangeNode *expected = type ? metaTypeEnum(eval,owner,type->name,parameter->flags,type) : NULL;
         values[i] = pending && i == 0 ? metaConvert(eval,*pending,expected,argument) : metaExpect(eval,scope,argument->a,expected);
         metaBind(eval,&arguments,parameter,values[i]);
@@ -1318,6 +1375,8 @@ static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *cal
     }
     if (!callee || callee->kind != RangeNodeName || callee->generics)
         fail(eval->vm,call,"compile-time calls require a plain function reference");
+    MetaLocal *closure = metaLocal(scope,callee->name);
+    if (closure && closure->value.kind == RangeGraphClosure) return metaCallClosure(eval,scope,call,closure->value);
     if (!metaLocal(scope,callee->name) && eval->self && eval->self->kind == RangeGraphInstance) {
         RangeNode *function = metaFunction(eval->self->declaration,callee->name,call);
         if (function) return metaInvoke(eval,scope,function,call,eval->self);
@@ -1889,6 +1948,11 @@ static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNod
         fail(eval->vm,entry,"this arm of a switch expression neither yields a value nor diverges");
     }
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return graphNode(node);
+    case RangeNodeClosure: {
+        MetaClosure *captured = rangeArenaAllocate(eval->vm->arena,sizeof(*captured));
+        *captured = (MetaClosure){.scope=scope,.self=eval->self,.function=eval->function};
+        return (RangeGraphValue){.kind=RangeGraphClosure,.node=node,.closure=captured};
+    }
     case RangeNodeCase:
         // `.absent`: a case of the enum the context expects.
         if (!expected) fail(eval->vm,node,"'.%s' needs a context that names its enum",node->name);
@@ -2102,6 +2166,8 @@ static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, Rang
         }
         if (!local || !local->mutable) fail(eval->vm,node,"compile-time assignment requires a state local");
         local->value = metaExpression(eval,scope,node->b);
+        if (local->value.kind == RangeGraphClosure)
+            fail(eval->vm,node,"a closure is an argument for a function-typed parameter; it is not held in '%s'",local->name);
         return 0;
     }
     case RangeNodeSwitch: {
@@ -6081,6 +6147,37 @@ typedef struct {
     NativeJump *breaks; size_t breakCount, breakCapacity;
 } NativeTarget;
 
+/* What a body runs in: its receiver and its function. A body inlined into
+ * another, a callee's or a closure's, runs in its own context; outer is the
+ * context it was inlined from, whose receiver substitutes its types too. */
+typedef struct NativeContext {
+    RangeNode *owner, *self, *function;
+    int32_t selfSlot;
+    struct NativeContext *outer;
+} NativeContext;
+/* The closure a function-typed parameter holds while the call it was passed
+ * to is compiled inline: the closure, the context it was written in, and the
+ * slots and closures visible there. */
+typedef struct {
+    RangeNode *parameter, *closure;
+    NativeContext *context;
+    size_t slots, closures;
+} NativeClosure;
+/* Slots and closures a closure's body does not see: those of the calls
+ * inlined since it was written. */
+typedef struct { size_t slotFrom, slotTo, closureFrom, closureTo; } NativeHidden;
+/* An inlined body: `return` leaves its value in result and branches to its
+ * end, ending the values the body began; sp returns to stack when the return
+ * is inside a switch expression's arm. */
+typedef struct NativeRegion {
+    RangeNode *function, *resultType;
+    int32_t result, stack;
+    int resultKind, valueDepth;
+    size_t slots, temps;
+    NativeJump *returns; size_t returnCount, returnCapacity;
+    struct NativeRegion *outer;
+} NativeRegion;
+
 typedef struct {
     SourceReport *report;
     Typer *typer;
@@ -6089,6 +6186,10 @@ typedef struct {
     /* The function being compiled. */
     RangeNode *owner, *self, *output, *function;
     int32_t frame, selfSlot, resultSlot;
+    NativeContext *outer;  /* the context the running body was inlined from */
+    NativeRegion *region;  /* the inlined body being compiled, if any */
+    NativeClosure *closures; size_t closureCount, closureCapacity;
+    NativeHidden *hidden; size_t hiddenCount, hiddenCapacity;
     NativeTarget *targets; size_t targetCount, targetCapacity;
     int valueDepth; /* switch expressions whose arms are being compiled */
     size_t *stackResets; size_t stackResetCount, stackResetCapacity; /* sp := frame base, patched at the end */
@@ -6177,7 +6278,16 @@ static RangeNode *nativeSubstitute(Native *native, RangeNode *type, RangeNode *s
     return specialization;
 }
 
-static RangeNode *nativeType(Native *native, RangeNode *type) { return nativeSubstitute(native,type,native->self); }
+/* A type of a body running in `self`, inlined from `outer`: each receiver
+ * substitutes the type parameters it declares. */
+static RangeNode *nativeTypeIn(Native *native, RangeNode *type, RangeNode *self, NativeContext *outer)
+{
+    type = nativeSubstitute(native,type,self);
+    for (; outer; outer = outer->outer) type = nativeSubstitute(native,type,outer->self);
+    return type;
+}
+
+static RangeNode *nativeType(Native *native, RangeNode *type) { return nativeTypeIn(native,type,native->self,native->outer); }
 
 static int nativeKind(Native *native, RangeNode *type, RangeNode *at)
 {
@@ -6211,10 +6321,15 @@ static int32_t nativeReserve(Native *native, size_t size, size_t alignment)
     return -(int32_t)frame;
 }
 
+/* The latest slot of a declaration that the running body sees. */
 static NativeSlot *nativeSlotOf(Native *native, RangeNode *declaration)
 {
-    for (size_t i = 0; declaration && i < native->slotCount; ++i)
-        if (native->slots[i].declaration == declaration) return &native->slots[i];
+    for (size_t i = native->slotCount; declaration && i-- > 0;) {
+        int hidden = 0;
+        for (size_t h = 0; h < native->hiddenCount && !hidden; ++h)
+            hidden = i >= native->hidden[h].slotFrom && i < native->hidden[h].slotTo;
+        if (!hidden && native->slots[i].declaration == declaration) return &native->slots[i];
+    }
     return NULL;
 }
 
@@ -7244,9 +7359,203 @@ static RangeNode *nativeGenericTarget(Native *native, RangeNode *target, RangeNo
     return target;
 }
 
+/* ---- closures ----
+ * A function with a function-typed parameter is compiled inline where it is
+ * called, never on its own: its parameters are slots of the caller's frame,
+ * and each function-typed one holds the closure the call passes. Calling that
+ * parameter compiles the closure's body inline there, in the context the
+ * closure was written in, with its parameters as slots and the slots of the
+ * calls inlined since hidden, so its names mean what they mean where it was
+ * written. Nothing is allocated and nothing is called indirectly; a closure
+ * reads and changes its caller's values in place. A body's `return` ends its
+ * own inlined body only. */
+
+static void nativeBlock(Native *, RangeNode *);
+static void nativeReleaseSlots(Native *, size_t);
+static void nativeEndTemps(Native *, size_t);
+static void nativeReleaseTemps(Native *, size_t);
+
+/* Whether a function takes a closure, and so is compiled only inline. */
+static int nativeInlined(const RangeNode *function)
+{
+    for (size_t i = 0; function && function->kind == RangeNodeFunction && i < function->itemCount; ++i)
+        if (function->items[i]->flags & RangeFlagFunction) return 1;
+    return 0;
+}
+
+/* The closure a function-typed parameter holds, as the running body sees it. */
+static NativeClosure *nativeClosureOf(Native *native, RangeNode *parameter)
+{
+    for (size_t i = native->closureCount; parameter && i-- > 0;) {
+        int hidden = 0;
+        for (size_t h = 0; h < native->hiddenCount && !hidden; ++h)
+            hidden = i >= native->hidden[h].closureFrom && i < native->hidden[h].closureTo;
+        if (!hidden && native->closures[i].parameter == parameter) return &native->closures[i];
+    }
+    return NULL;
+}
+
+/* Evaluate an argument where the call is written and keep it at `offset`. */
+static int nativeArgument(Native *native, RangeNode *value, RangeNode *type, int kind, int32_t offset)
+{
+    if (!nativeExpression(native,value)) return 0;
+    if (kind == NativeScalar) { nativeStore(native,0,offset); return 1; }
+    int moved = nativeTakeTemp(native);
+    nativeFrameAddress(native,1,offset);
+    nativeCopyValue(native,1,0,type,!moved);
+    return 1;
+}
+
+/* Compile `body` inline, in `context`, with the slots from `slots` on as its
+ * parameters; or, given `value`, the expression a closure yields. Its result
+ * is left as a call's: a scalar in x0, or an aggregate temporary's address. */
+static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *function, RangeNode *output,
+                               NativeContext *context, RangeNode *body, RangeNode *value, size_t slots)
+{
+    int kind = output ? nativeKind(native,output,at) : NativeNone;
+    if (output && kind == NativeNone) return NULL;
+    NativeRegion region = {.function=function,.resultType=output,.resultKind=kind,.outer=native->region,
+                           .valueDepth=native->valueDepth + 1,.slots=slots,.temps=native->tempCount};
+    // The result starts zeroed, for a body that ends without returning.
+    if (kind == NativeAggregate) {
+        region.result = nativeReserve(native,output->size ? output->size : 1,output->alignment);
+        nativeFrameAddress(native,0,region.result);
+        nativeZero(native,0,output->size);
+    } else if (kind == NativeScalar) {
+        region.result = nativeReserve(native,8,8);
+        nativeStore(native,31,region.result);
+    }
+    region.stack = nativeReserve(native,8,8);
+    nativeEmit(native,armAddImm(10,31,0)); /* mov x10, sp */
+    nativeStore(native,10,region.stack);
+    NativeContext saved = {.owner=native->owner,.self=native->self,.function=native->function,
+                           .selfSlot=native->selfSlot,.outer=native->outer};
+    native->owner = context->owner; native->self = context->self; native->function = context->function;
+    native->selfSlot = context->selfSlot; native->outer = context->outer;
+    native->region = &region;
+    native->valueDepth += 1;
+    if (value) {
+        size_t temps = native->tempCount;
+        RangeNode *type = nativeExpression(native,value);
+        if (type && kind == NativeScalar) nativeStore(native,0,region.result);
+        else if (type && kind == NativeAggregate) {
+            int moved = nativeTakeTemp(native);
+            nativeFrameAddress(native,1,region.result);
+            nativeCopyValue(native,1,0,output,!moved);
+        }
+        nativeReleaseTemps(native,temps);
+    } else nativeBlock(native,body);
+    nativeReleaseSlots(native,slots);
+    native->slotCount = slots;
+    for (size_t i = 0; i < region.returnCount; ++i) nativeBranchHere(native,region.returns[i].at,region.returns[i].base);
+    free(region.returns);
+    native->valueDepth -= 1;
+    native->region = region.outer;
+    native->owner = saved.owner; native->self = saved.self; native->function = saved.function;
+    native->selfSlot = saved.selfSlot; native->outer = saved.outer;
+    native->resultTemp = -1;
+    if (kind == NativeScalar) nativeLoad(native,0,region.result);
+    else if (kind == NativeAggregate) { nativeTrackTemp(native,region.result,output); nativeFrameAddress(native,0,region.result); }
+    return output;
+}
+
+/* `xs.filter(where: { m in m.unread })`: the callee's body inline, its
+ * receiver's address and its parameters in slots, each closure bound to its
+ * parameter. A function-typed argument that is itself a parameter passes on
+ * the closure it holds. */
+static RangeNode *nativeInline(Native *native, RangeNode *call, RangeNode *target)
+{
+    RangeNode *callee = call->a, *self = NULL;
+    // Inlining ends only if no such function reaches itself: through the
+    // bodies it inlines, or, more deeply, through the closures they call.
+    size_t depth = 0;
+    for (NativeRegion *region = native->region; region; region = region->outer) ++depth;
+    for (NativeRegion *region = native->region; region && region->function; region = region->outer)
+        if (region->function == target) depth = SIZE_MAX;
+    if (depth > 64) {
+        nativeMissing(native,call,"'%s' takes a closure, so it is compiled inline where it is called; it cannot reach itself",target->name);
+        return NULL;
+    }
+    int32_t selfSlot = 0;
+    if (callee->kind == RangeNodeMemberAccess) {
+        int frameSlot = 0;
+        self = nativeAddress(native,callee->a,&frameSlot);
+        if (!self) return NULL;
+        selfSlot = nativeReserve(native,8,8);
+        nativeStore(native,0,selfSlot);
+    } else if (target->typeName) {
+        // A sibling call inside a method acts on the same receiver.
+        if (!native->owner) { nativeMissing(native,call,"method '%s' called without a receiver",target->name); return NULL; }
+        self = native->self;
+        selfSlot = native->selfSlot;
+    }
+    NativeContext caller = {.owner=native->owner,.self=native->self,.function=native->function,
+                            .selfSlot=native->selfSlot,.outer=native->outer};
+    size_t slots = native->slotCount, closures = native->closureCount;
+    for (size_t i = 0; i < call->itemCount && i < target->itemCount; ++i) {
+        RangeNode *parameter = target->items[i], *value = call->items[i]->a;
+        if (parameter->flags & RangeFlagFunction) {
+            NativeClosure bound = {.parameter=parameter,.closure=value,.context=&caller,.slots=slots,.closures=closures};
+            if (value->kind != RangeNodeClosure) {
+                NativeClosure *passed = value->kind == RangeNodeName ? nativeClosureOf(native,value->resolvedDeclaration) : NULL;
+                if (!passed) { nativeMissing(native,value,"no closure is bound to '%s' here",value->name ? value->name : "this argument"); return NULL; }
+                bound = *passed;
+                bound.parameter = parameter;
+            }
+            NATIVE_PUSH(native->closures,native->closureCount,native->closureCapacity,bound);
+            continue;
+        }
+        RangeNode *type = nativeTypeIn(native,parameter->type,self,&caller);
+        int kind = nativeKind(native,type,parameter);
+        if (kind == NativeNone) return NULL;
+        int32_t offset = kind == NativeAggregate ? nativeReserve(native,type->size ? type->size : 1,type->alignment) : nativeReserve(native,8,8);
+        if (!nativeArgument(native,value,type,kind,offset)) return NULL;
+        NativeSlot slot = {.declaration=parameter,.offset=offset,.type=type};
+        NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
+    }
+    NativeContext context = {.owner=self ? self->resolvedDeclaration : NULL,.self=self,.function=target,
+                             .selfSlot=selfSlot,.outer=&caller};
+    RangeNode *output = target->type ? nativeTypeIn(native,target->type,self,&caller) : NULL;
+    RangeNode *result = nativeRegion(native,call,target,output,&context,target->a,NULL,slots);
+    native->closureCount = closures;
+    return result;
+}
+
+/* `where(element)`: the closure the parameter holds, inline, where it was
+ * written. Its arguments are evaluated here first. */
+static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *parameter)
+{
+    NativeClosure *bound = nativeClosureOf(native,parameter);
+    if (!bound) { nativeMissing(native,call,"no closure is bound to '%s' here",parameter->name); return NULL; }
+    NativeClosure closure = *bound;
+    RangeNode *literal = closure.closure;
+    size_t count = literal->itemCount;
+    int32_t offsets[count ? count : 1];
+    RangeNode *types[count ? count : 1];
+    for (size_t i = 0; i < count && i < call->itemCount; ++i) {
+        types[i] = nativeTypeIn(native,literal->items[i]->type,closure.context->self,closure.context->outer);
+        int kind = nativeKind(native,types[i],literal->items[i]);
+        if (kind == NativeNone) return NULL;
+        offsets[i] = kind == NativeAggregate ? nativeReserve(native,types[i]->size ? types[i]->size : 1,types[i]->alignment) : nativeReserve(native,8,8);
+        if (!nativeArgument(native,call->items[i]->a,types[i],kind,offsets[i])) return NULL;
+    }
+    NativeHidden hidden = {.slotFrom=closure.slots,.slotTo=native->slotCount,.closureFrom=closure.closures,.closureTo=native->closureCount};
+    NATIVE_PUSH(native->hidden,native->hiddenCount,native->hiddenCapacity,hidden);
+    size_t slots = native->slotCount;
+    for (size_t i = 0; i < count; ++i) {
+        NativeSlot slot = {.declaration=literal->items[i],.offset=offsets[i],.type=types[i]};
+        NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
+    }
+    RangeNode *output = literal->type ? nativeTypeIn(native,literal->type->a,closure.context->self,closure.context->outer) : NULL;
+    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,literal->c,slots);
+    native->hiddenCount -= 1;
+    return result;
+}
+
 static RangeNode *nativeCall(Native *native, RangeNode *call)
 {
     RangeNode *callee = call->a, *target = callee ? callee->resolvedDeclaration : NULL;
+    if (target && target->kind == RangeNodeParameter && isFunctionType(target->type)) return nativeCallClosure(native,call,target);
     if (target && target->kind == RangeNodeFunction && !target->typeName && target->generics && native->self) {
         target = nativeGenericTarget(native,target,call);
         if (!target) return NULL;
@@ -7256,6 +7565,7 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     if (target && target->kind == RangeNodeEnumCase)
         return nativeVariant(native,call,nativeType(native,call->type),target,call->items,call->itemCount,0);
     if (!target || target->kind != RangeNodeFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
+    if (nativeInlined(target)) return nativeInline(native,call,target);
     RangeNode *self = NULL;
     int hasSelf = 0;
     if (callee->kind == RangeNodeMemberAccess) {
@@ -7870,6 +8180,27 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         break;
     }
     case RangeNodeReturn: {
+        if (native->region) {
+            // An inlined body's return: its value into the region's result,
+            // the values the body began end, and control leaves the body.
+            NativeRegion *region = native->region;
+            RangeNode *type = node->a ? nativeExpression(native,node->a) : NULL;
+            if (type && region->resultKind == NativeScalar) nativeStore(native,0,region->result);
+            else if (type && region->resultKind == NativeAggregate) {
+                int moved = nativeTakeTemp(native);
+                nativeFrameAddress(native,1,region->result);
+                nativeCopyValue(native,1,0,region->resultType,!moved);
+            }
+            nativeEndTemps(native,region->temps);
+            nativeReleaseSlots(native,region->slots);
+            if (native->valueDepth > region->valueDepth) {
+                nativeLoad(native,10,region->stack);
+                nativeEmit(native,armAddImm(31,10,0)); /* mov sp, x10 */
+            }
+            NativeJump jump = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
+            NATIVE_PUSH(region->returns,region->returnCount,region->returnCapacity,jump);
+            break;
+        }
         // The result moves or is retained into place; then every value in scope ends.
         if (node->a) {
             RangeNode *type = nativeExpression(native,node->a);
@@ -8139,6 +8470,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     native->valueDepth = 0; native->stackResetCount = 0;
     native->tempCount = 0; native->resultTemp = -1;
     native->selfSlot = 0; native->resultSlot = 0;
+    native->outer = NULL; native->region = NULL; native->closureCount = 0; native->hiddenCount = 0;
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0)); /* mov x29, sp */
     size_t frameHigh = nativeEmit(native,armSubImmHigh(31,31,0));
@@ -8245,7 +8577,7 @@ static void nativeMethods(Native *native, RangeNode *construct)
             RangeNode *function = construct->items[j];
             // A type's function '=' is compiled only when the type is compared.
             if (function->kind == RangeNodeFunction && !(function->flags & (RangeFlagBuiltin | RangeFlagExtern))
-                && !same(function->name,"=") && !genericTemplate(function))
+                && !same(function->name,"=") && !genericTemplate(function) && !nativeInlined(function))
                 nativeInstance(native,function,self);
         }
     }
@@ -8265,7 +8597,8 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     if (entry) nativeInstance(&native,entry,NULL);
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
         RangeNode *item = report->units[u]->items[i];
-        if (item->kind == RangeNodeFunction && !(item->flags & (RangeFlagBuiltin | RangeFlagExtern)) && !genericTemplate(item))
+        if (item->kind == RangeNodeFunction && !(item->flags & (RangeFlagBuiltin | RangeFlagExtern)) && !genericTemplate(item)
+            && !nativeInlined(item))
             nativeInstance(&native,item,NULL);
     }
     // Generic functions: one compiled function per concrete instantiation. One
@@ -8274,7 +8607,8 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     // A generic method's instance is compiled for its receiver's specialization.
     for (size_t i = 0; i < typer->instanceCount; ++i) {
         RangeNode *context = typer->instances[i].context;
-        if (!nativeConcreteInstance(typer,i) || (context && (!nativeConcrete(context) || nativeGraphValues(&native,context)))) continue;
+        if (!nativeConcreteInstance(typer,i) || (context && (!nativeConcrete(context) || nativeGraphValues(&native,context)))
+            || nativeInlined(typer->instances[i].instance)) continue;
         nativeInstance(&native,typer->instances[i].instance,context);
     }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
@@ -8308,6 +8642,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     rangeMachineFree(&native.machine);
     free(native.slots); free(native.returns); free(native.calls); free(native.traps); free(native.instances); free(native.texts);
     free(native.temps); free(native.helpers); free(native.helperCalls); free(native.targets); free(native.stackResets);
+    free(native.closures); free(native.hidden);
     return written;
 }
 

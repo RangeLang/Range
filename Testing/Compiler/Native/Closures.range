@@ -1,0 +1,132 @@
+// Functions that take closures, written in Range. A closure is an argument
+// for a function-typed parameter: labeled, or trailing after the call. It sees
+// the names where it is written and runs only while that call runs.
+
+function count(let xs: Array<Int>, let where: (Int) -> Bool): Int {
+    state found: 0
+    state index: 0
+    while index < xs.count {
+        switch where(xs.read(at: index)) { .true: found: found + 1, .false: {} }
+        index: index + 1
+    }
+    return found
+}
+
+function repeat(let times: Int, let body: (Int) -> Nothing) {
+    state index: 0
+    while index < times {
+        body(index)
+        index: index + 1
+    }
+}
+
+// A closure is passed on to another function-typed parameter.
+function countBoth(let xs: Array<Int>, let where: (Int) -> Bool): Int {
+    return count(xs: xs, where: where) + count(xs: xs) { x in where(x) }
+}
+
+function combine(let a: Int, let b: Int, let with: (Int, Int) -> Int): Int {
+    return with(a, b)
+}
+
+construct Counter {
+    state total: 0
+    state items: Array<Int>()
+    function add(let value: Int) {
+        items.append(value: value)
+    }
+    function each(let body: (Int) -> Nothing) {
+        state index: 0
+        while index < items.count {
+            body(items.read(at: index))
+            index: index + 1
+        }
+    }
+    // A closure in a method changes the receiver's state.
+    function absorb() {
+        each { x in total: total + x }
+    }
+}
+
+construct Box<T> {
+    state items: Array<T>()
+    function matching(let where: (T) -> Bool): Int {
+        state found: 0
+        state index: 0
+        while index < items.count {
+            switch where(items.read(at: index)) { .true: found: found + 1, .false: {} }
+            index: index + 1
+        }
+        return found
+    }
+}
+
+{
+    state xs: Array<Int>()
+    xs.append(value: 3)
+    xs.append(value: 8)
+    xs.append(value: 1)
+    xs.append(value: 6)
+    // Labeled and trailing; a closure reads the caller's let.
+    let limit: 4
+    switch count(xs: xs, where: { x in x > limit }) != 2 { .true: return 1, .false: {} }
+    // A switch's subject takes no trailing closure, as in Swift.
+    let small: count(xs: xs) { x in x < limit }
+    switch small != 2 { .true: return 2, .false: {} }
+    let eights: countBoth(xs: xs) { x in x = 8 }
+    switch eights != 2 { .true: return 3, .false: {} }
+    switch combine(a: 6, b: 7, with: { a, b in a * b }) != 42 { .true: return 4, .false: {} }
+    // A closure changes a state of its caller.
+    state seen: 0
+    let big: count(xs: xs) { x in
+        seen: seen + x
+        return x > 5
+    }
+    switch seen != 18 | big != 2 { .true: return 5, .false: {} }
+    // `return` returns from the closure only; a switch is its expression.
+    let sign: count(xs: xs) { x in
+        switch x < 2 { .true: return false, .false: {} }
+        return switch x { 3: true, 8: true, default: false }
+    }
+    switch sign != 2 { .true: return 6, .false: {} }
+    // A closure that returns Nothing, with `return` and a loop of its own.
+    state calls: 0
+    repeat(times: 5) { i in
+        switch i = 3 { .true: return, .false: {} }
+        calls: calls + 1
+    }
+    switch calls != 4 { .true: return 7, .false: {} }
+    state found: 0
+    repeat(times: 3) { i in
+        state j: 0
+        while j < 10 {
+            switch j = i { .true: break, .false: {} }
+            j: j + 1
+        }
+        found: found + j
+    }
+    switch found != 3 { .true: return 8, .false: {} }
+    // Nested closures: the inner one reads the outer one's parameter.
+    state pairs: 0
+    repeat(times: 3) { i in
+        repeat(times: 3) { j in
+            switch i < j { .true: pairs: pairs + 1, .false: {} }
+        }
+    }
+    switch pairs != 3 { .true: return 9, .false: {} }
+    // A return inside a switch expression's arm, inside an operand.
+    let lifted: combine(a: 1, b: 2) { a, b in 100 + switch a { 1: { return 7 }, default: b } }
+    switch lifted != 7 { .true: return 10, .false: {} }
+    state c: Counter()
+    c.add(value: 4)
+    c.add(value: 9)
+    c.absorb()
+    switch c.total != 13 { .true: return 11, .false: {} }
+    state box: Box<String>()
+    box.items.append(value: "a")
+    box.items.append(value: "bb")
+    let long: box.matching { s in s.count > 1 }
+    switch long != 1 { .true: return 12, .false: {} }
+    @print("calls: \(calls), pairs: \(pairs)")
+    return 42
+}

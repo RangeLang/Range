@@ -99,9 +99,11 @@ typedef struct RangeMacroApplication RangeMacroApplication;
  * declaration the enum, values its payload, one per field. An instance is a
  * value of a construct: declaration is the construct, values one per item of
  * the declaration (only stored members are set). Slots are the elements of a
- * @many member: values, count of them. */
+ * @many member: values, count of them. A closure is node, the closure
+ * literal, with what it captured; it lives only while the call it was passed
+ * to runs. */
 typedef enum { RangeGraphNone, RangeGraphNode, RangeGraphNodes, RangeGraphText,
-               RangeGraphCase, RangeGraphInstance, RangeGraphSlots } RangeGraphValueKind;
+               RangeGraphCase, RangeGraphInstance, RangeGraphSlots, RangeGraphClosure } RangeGraphValueKind;
 typedef struct RangeGraphValue {
     RangeGraphValueKind kind;
     RangeNode *node;
@@ -110,6 +112,7 @@ typedef struct RangeGraphValue {
     const char *text;
     RangeNode *declaration;
     struct RangeGraphValue *values;
+    void *closure; /* a closure: what it captured where it was written, for the evaluator */
 } RangeGraphValue;
 
 typedef struct {
