@@ -3,7 +3,7 @@
 // Parameter.type hold one. Each kind declares its own fields; every kind has
 // a name.
 macro nominal(): Construct {
-  switch #members.first(named: "name") {
+  switch #members.first(where: { member in member.name = "name" }) {
     .absent: @diagnostic("Type kind must declare name"),
     .present: {}
   }

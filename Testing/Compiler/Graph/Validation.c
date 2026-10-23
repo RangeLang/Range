@@ -124,7 +124,7 @@ static void validateLanguage(const char *source, const char *expected, size_t co
 #define EFFECT "@builtin macro diagnostic(let message: TextValue) "
 #define POLICY \
     "macro assess(): Construct { " \
-    "switch #members.first(named: \"payload\"), #generics.first(named: \"ceiling\") { " \
+    "switch #members.first(where: { m in m.name = \"payload\" }), #generics.first(where: { g in g.name = \"ceiling\" }) { " \
     ".absent & _: @diagnostic(\"missing payload\"), " \
     "_ & .absent: @diagnostic(\"missing ceiling\"), " \
     ".present(let payload) & .present(let ceiling) & !accepts(limit: ceiling.value, candidate: payload.value): " \
@@ -269,18 +269,20 @@ int main(void)
                      "switch m.value = 7 { .true: {}, .false: {} } } } } @assess construct Parcel { let payload: leaked }",
                      "unresolved compile-time local 'leaked'",0);
     // Reflection lists are Array values: count is its member, and first,
-    // first(named:), and filter(named:) are the Range functions @collection
-    // emits, run here. Any function Array declares runs the same way.
+    // first(where:), filter(where:), and map(transform:) are the Range
+    // functions @collection emits, run here with the closures a macro writes.
+    // Any function Array declares runs the same way.
 #define LIGHT "enum Light { case red case green(Int) case blue } " \
     "extension Array { function last(): Element? { switch count > 0 { .true: return read(at: count - 1), .false: {} } return .absent } } "
     validateLanguage(LIGHT "macro probe(): Enum { "
                      "switch #cases.count = 3 { .true: {}, .false: @diagnostic(\"count\") } "
                      "switch #cases.first() { .present(let c) & c.name = \"red\": {}, default: @diagnostic(\"first\") } "
                      "switch #cases.last() { .present(let c) & c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
-                     "switch #cases.first(named: \"green\") { .present(let c): switch c.name = \"green\" { .true: {}, .false: @diagnostic(\"named\") }, "
+                     "switch #cases.first(where: { c in c.name = \"green\" }) { .present(let c): switch c.name = \"green\" { .true: {}, .false: @diagnostic(\"named\") }, "
                      ".absent: @diagnostic(\"missing green\") } "
-                     "switch #cases.first(named: \"purple\") { .absent: {}, .present: @diagnostic(\"purple\") } "
-                     "switch #cases.filter(named: \"blue\").count = 1 { .true: {}, .false: @diagnostic(\"filter\") } } "
+                     "switch #cases.first(where: { c in c.name = \"purple\" }) { .absent: {}, .present: @diagnostic(\"purple\") } "
+                     "switch #cases.filter(where: { c in c.name = \"blue\" }).count = 1 { .true: {}, .false: @diagnostic(\"filter\") } "
+                     "switch #cases.map(transform: { c in c.name }).last() { .present(\"blue\"): {}, default: @diagnostic(\"map\") } } "
                      "@probe extension Light {}",NULL,2);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.second() } @probe extension Light {}",
                      "Array has no function 'second' with these labels",0);
@@ -306,7 +308,7 @@ int main(void)
                                           "write(at: count, value: value)","write(at: count, value: element)",NULL};
     validateLanguage(LIGHT "macro probe(): Enum { "
                      "switch #cases.count = 3 { .true: {}, .false: @diagnostic(\"count\") } "
-                     "switch #cases.first(named: \"green\") { .present: {}, .absent: @diagnostic(\"missing green\") } } "
+                     "switch #cases.first(where: { c in c.name = \"green\" }) { .present: {}, .absent: @diagnostic(\"missing green\") } } "
                      "@probe extension Light {}",NULL,2);
     // Without the role, C has no function to build them with.
     languageEdits = (const char *const[]){"@insertion\n","",NULL};

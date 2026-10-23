@@ -18,9 +18,9 @@
 // written there, and sees the equals declared in that extension. That is how
 // @collection makes every collection compare by the equals it emits.
 macro equatable(): Construct {
-    let written: #macros.first(named: "equatable")
-    let equals: #functions.first(named: "equals")
-    let declared: #functions.first(named: "=")
+    let written: #macros.first { applied in applied.name = "equatable" }
+    let equals: #functions.first { candidate in candidate.name = "equals" }
+    let declared: #functions.first { candidate in candidate.name = "=" }
 
     // Every combination is a row, so the compiler checks that each is handled.
     switch declared, equals, written {
@@ -77,9 +77,9 @@ macro equatable(): Construct {
 // that contains itself is compared recursively. Writing @equatable makes `=`
 // call the enum's own equals instead.
 macro equatable(): Enum {
-    let written: #macros.first(named: "equatable")
-    let equals: #functions.first(named: "equals")
-    let declared: #functions.first(named: "=")
+    let written: #macros.first { applied in applied.name = "equatable" }
+    let equals: #functions.first { candidate in candidate.name = "equals" }
+    let declared: #functions.first { candidate in candidate.name = "=" }
 
     // Every combination is a row, so the compiler checks that each is handled.
     switch declared, equals, written {

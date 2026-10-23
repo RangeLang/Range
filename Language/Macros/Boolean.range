@@ -1,6 +1,6 @@
 @literal("true|false")
 macro boolean(): Enum {
-  switch #cases.first(named: "false"), #cases.first(named: "true") {
+  switch #cases.first(where: { entry in entry.name = "false" }), #cases.first(where: { entry in entry.name = "true" }) {
     .present & .present: {},
     .absent & _: @diagnostic("Enum must declare case false"),
     _ & .absent: @diagnostic("Enum must declare case true")
@@ -14,8 +14,8 @@ macro boolean(): Enum {
   // `!a` calls the function `!` declared here, a C primitive on the tag.
   // `a & b` (and) and `a | b` (or) short-circuit: b is evaluated only when a
   // does not decide the result. A call evaluates its argument first, and
-  // Range has no closures to delay it, so these two stay C control-flow
-  // primitives. They are declared here so the operators exist only on this
+  // `a & b` writes no closure that could delay b, so these two stay C
+  // control-flow primitives. They are declared here so the operators exist only on this
   // type, and C writes the branch. No other type may declare `&` or `|`:
   // they also join the patterns and conditions of a switch label.
   #graph {

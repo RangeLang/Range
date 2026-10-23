@@ -19,7 +19,7 @@ construct Twice {
 // Reports whether @equatable is written, which #macros tells apart from a
 // @defaults application.
 macro reportsEquatable(): Construct {
-    switch #macros.first(named: "equatable") {
+    switch #macros.first(where: { applied in applied.name = "equatable" }) {
         .present: @warning("\(#name) writes @equatable"),
         .absent: @warning("\(#name) has only the default @equatable")
     }

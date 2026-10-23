@@ -2,7 +2,7 @@
 // including escapes and \( ) interpolation; this pattern only picks the construct.
 @literal("\".*\"")
 macro string(): Construct {
-  switch #members.first(named: "value") {
+  switch #members.first(where: { member in member.name = "value" }) {
     .absent: @diagnostic("Construct must specify value"),
     .present: {}
   }

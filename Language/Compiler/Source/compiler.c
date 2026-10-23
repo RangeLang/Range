@@ -72,9 +72,13 @@ static RangeGraphValue graphProperty(Resolver *vm, RangeMacroApplication *app,
     if (receiver.kind == RangeGraphNodes) { vm->deferred = 1; return (RangeGraphValue){0}; }
     if (receiver.kind != RangeGraphNode) fail(vm,at,"graph value has no property '%s'",name);
     RangeNode *node = receiver.node;
-    RangeNode *field = rangeGraphField(node->graphType,name);
-    if (!field) fail(vm,at,"field '%s' is not declared by @type %s",name,
-        node->graphType ? node->graphType->name : rangeNodeKindName(node->kind));
+    // A macro application, an element of a declaration's `macros`, reads as
+    // the Macro it applies, as the grammar's Array<Macro> says: its name.
+    RangeNode *shape = node->graphType ? node->graphType
+        : node->kind == RangeNodeAttribute ? rangeGraphType(vm->arena,"Macro") : NULL;
+    RangeNode *field = rangeGraphField(shape,name);
+    if (!field || (!node->graphType && !same(name,"name"))) fail(vm,at,"field '%s' is not declared by @type %s",name,
+        shape ? shape->name : rangeNodeKindName(node->kind));
     // A macro's own locals read their bound value; other declarations their RHS.
     if (same(name,"value") && rangeNodeDeclaresValue(node->kind))
         for (size_t i = 0; i < app->count; ++i)
@@ -1239,15 +1243,6 @@ static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char 
 static RangeGraphValue metaBuiltin(MetaEval *eval, RangeNode *function, RangeGraphValue *self,
                                    RangeGraphValue *arguments, RangeNode *call)
 {
-    if (same(function->name,"name") && function->itemCount == 1 && same(function->items[0]->name,"of")) {
-        // The name of a declaration: the one reflective field every element
-        // of a reflection list has. Other values have no name.
-        RangeGraphValue element = arguments[0];
-        RangeGraphValue text = element.kind == RangeGraphNode ? rangeGraphStoredField(eval->vm->arena,element.node,"name") : (RangeGraphValue){0};
-        if (element.kind == RangeGraphNode && (element.node->kind == RangeNodeInteger || element.node->kind == RangeNodeBool
-            || element.node->kind == RangeNodeString)) text = (RangeGraphValue){0};
-        return text;
-    }
     if (!self || self->kind != RangeGraphInstance || !slotPrimitive(function))
         fail(eval->vm,call,"no compile-time primitive is implemented for builtin function '%s'",function->name);
     size_t many = SIZE_MAX;
@@ -2988,8 +2983,6 @@ static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
         if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
         if (same(item->name,"="))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function '=' is C's structural comparison: every stored member, or the tag then the payload; it is emitted only for the types a program compares");
-        else if (same(item->name,"name") && item->itemCount == 1 && same(item->items[0]->name,"of"))
-            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'name(of:)' reads a declaration's reflective name in C, at compile time only; compiled code that calls it is rejected");
         else if (bytes && same(item->name,"byte"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'byte' reads one byte of the bytes primitive in C, checking the index");
         else if (operatorName(item->name)) diagnoseBuiltinOperator(report,owner,item,bytes);

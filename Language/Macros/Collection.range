@@ -105,34 +105,6 @@ macro collection(): Construct {
                 return switch first(where: where) { .present: true, .absent: false }
             }
 
-            // The elements named `named`, in order, as a new collection: a
-            // name is what reflection elements share.
-            function filter(let named: String): #name {
-                state result: #name()
-                state index: 0
-                while index < count {
-                    let element: read(at: index)
-                    switch name(of: element) {
-                        .present(let found) & found = named: result.append(value: element),
-                        default: {}
-                    }
-                    index: index + 1
-                }
-                return result
-            }
-
-            // The first element named `named`, or absence.
-            function first(let named: String): Element? {
-                return filter(named: named).first()
-            }
-
-            // C primitive: the name of a declaration, such as an element of
-            // `#cases` or `#members`; absence for a value that is not one.
-            // Element declares no `name`, and Range has no constraints on
-            // type parameters to require one, so C reads the reflective
-            // field. It runs at compile time only.
-            @builtin function name(let of: Element): String?
-
             // Each element transformed, in order, as an Array of the results.
             function map<Result>(let transform: (Element) -> Result): Array<Result> {
                 state result: Array<Result>()

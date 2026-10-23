@@ -108,14 +108,14 @@ function g(let o: Int?, let p: Int?): Int {
     switch o, p { .present(let x) & _ & x > 0 | _ & .present(let x): return 1, default: return 0 }
 }
 macro checked(): Enum {
-    switch #cases.first(named: "on") { .present(let c): {}, .absent: @diagnostic("\(#name) has no case on") }
+    switch #cases.first(where: { c in c.name = "on" }) { .present(let c): {}, .absent: @diagnostic("\(#name) has no case on") }
 }
 @checked
 enum Light { case on, off }
 { return f(p: .one(1)) + g(o: .absent, p: .absent) }')"
 for unused in "3:25: warning[unused]: 'v' is bound but never used; write the pattern without 'let v'" \
     "3:55: warning[unused]: 'b' is bound but never used; write the pattern without 'let b'" \
-    "9:53: warning[unused]: 'c' is bound but never used; write the pattern without 'let c'"; do
+    "9:71: warning[unused]: 'c' is bound but never used; write the pattern without 'let c'"; do
     grep -Fq "unused-bindings.range:$unused" "$work_root/log" || fail "unused binding was not warned: $unused"
 done
 ! grep -Eq "'(a|x)' is bound but never used" "$work_root/log" || fail "a binding read in a condition or body was warned"
@@ -821,9 +821,9 @@ reject interval-undeclared "'..<' needs exactly one construct applying @interval
     '{ let r: 0..<3 return 0 }'
 grep -Fq "interval-undeclared.range:1:11: error" "$work_root/log" || fail "interval-undeclared was not reported at its use"
 core=("${full[@]}")
-# name(of:) reads a declaration's name at compile time; compiled code has no
-# declarations to read, so calling it through first(named:) is refused.
-reject name-at-runtime "native calls to builtin function 'name' are not implemented" \
+# A macro reads a reflection element's name as its own field; compiled code
+# has no declarations, and Array has no name lookup of its own.
+reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch xs.first(named: "a") { .absent: return 0, .present(let v): return v } }'
 # @defaults written through an extension reaches every declaration of its
 # kind. The language's Enum already writes @defaults, so this grammar kind is

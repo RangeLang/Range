@@ -15,7 +15,7 @@ int main(void)
          "function throughCall(): Whole { return start() } function finish() { return } "
          "function take(let w: Whole, let m: Missing): Whole { return w }"),
         "@integer construct Whole<let bits: 64, let signed: true> { let value: 0  function same(let other: Whole): Whole { return other } }",
-        "macro integer(): Construct { let bits: #generics let first: #generics.first(named: \"bits\") }"
+        "macro integer(): Construct { let bits: #generics let first: #generics.first { generic in generic.name = \"bits\" } }"
     };
     RangeNode *units[3];
     for (size_t i = 0; i < 3; ++i) {
