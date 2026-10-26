@@ -89,7 +89,7 @@ static size_t loadLanguage(RangeArena *arena, RangeNode **units, size_t capacity
 }
 
 /* As validate, with the language loaded; count is the applications beyond
- * the language's own, each construct's default @equatable among them. */
+ * the language's own. */
 static void validateLanguage(const char *source, const char *expected, size_t count)
 {
     static size_t baseline = SIZE_MAX;
@@ -138,7 +138,7 @@ static void validateLanguage(const char *source, const char *expected, size_t co
 
 static void validateInteger(const char *source, int accepted)
 {
-    if (accepted) validateLanguage(source,NULL,2); /* @integer and the default @equatable */
+    if (accepted) validateLanguage(source,NULL,1);
     else validateLanguage(source,"Integer value does not fit the declared bits and signedness",0);
 }
 
@@ -151,19 +151,19 @@ int main(void)
     validateLanguage("@integer construct Empty<let bits: 0, let signed: true> { let value: 0 }","Integer bits must be positive",0);
     validateLanguage("@integer construct Unsized<let signed: true> { let value: 0 }","Construct must specify value, bits and signed",0);
     validateInteger("@integer construct Unsigned<let bits: 8, let signed: false> { let value: -1 }",0);
-    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 7 }",NULL,2);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 7 }",NULL,1);
     validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 8 }","source policy rejected",0);
-    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 8> { let payload: 8 }",NULL,2);
-    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 3 + 4 }",NULL,2);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 8> { let payload: 8 }",NULL,1);
+    validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> { let payload: 3 + 4 }",NULL,1);
     validateLanguage(POLICY "@assess construct Parcel<let ceiling: 7> {}","missing payload",0);
     validateLanguage(POLICY "@assess construct Parcel { let payload: 1 }","missing ceiling",0);
     validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
-                    "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,4);
+                    "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,2);
     validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
                     "@assess construct Second<let ceiling: 2> { let payload: 3 }","source policy rejected",0);
     validateLanguage("macro assess(): Construct { switch { #members.first().present(let m) & m.value < 0: @diagnostic(\"negative\"), default: {} } } "
                      "macro assess(): Function { let input: #parameters.first() switch { input.absent: @diagnostic(\"missing input\"), input.present: {} } } "
-                     "@assess construct Parcel { let payload: 8 } @assess function start(let input: Any) {}",NULL,3);
+                     "@assess construct Parcel { let payload: 8 } @assess function start(let input: Any) {}",NULL,2);
     validate(EFFECT "macro diagnostic(): Construct {} macro assess(): Function { @diagnostic(\"selected effect\") } "
                     "@assess function start() {}","selected effect",0);
     // Whole rule bodies are executed. Reversing the source condition changes validity.
@@ -171,7 +171,7 @@ int main(void)
     validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value < 10: @diagnostic(\"too small\"), default: {} } } } } "
                      "@assess construct Parcel { let payload: 8 }","too small",0);
     validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value > 10: @diagnostic(\"too large\"), default: {} } } } } "
-                     "@assess construct Parcel { let payload: 8 }",NULL,2);
+                     "@assess construct Parcel { let payload: 8 }",NULL,1);
     // No concrete type, helper, or parameter spelling is an intrinsic;
     // builtin macros are selected by their own names.
     validate("@builtin macro diagnostic(let text: RenamedText) "
@@ -203,7 +203,7 @@ int main(void)
     validateLanguage(SIZES "@assess construct Parcel { let payload: 2 }","small",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: -3 }","negative",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 7 }","seven",0);
-    validateLanguage(SIZES "@assess construct Parcel { let payload: 50 }",NULL,2);
+    validateLanguage(SIZES "@assess construct Parcel { let payload: 50 }",NULL,1);
     validateLanguage("macro assess(): Construct { let first: #members.first() let kind: switch { first.present: \"filled\", first.absent: \"empty\" } "
                      "@diagnostic(\"\\(#name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
     validateLanguage("macro assess(): Construct { let first: #members.first() let size: switch { first.present(let m): switch { m.value = 3: 30, default: 0 }, first.absent: 0 } "
@@ -284,7 +284,7 @@ int main(void)
                      "switch { #cases.first(where: { c in c.name = \"purple\" }).absent: {}, default: @diagnostic(\"purple\") } "
                      "switch { #cases.filter(where: { c in c.name = \"blue\" }).count = 1: {}, default: @diagnostic(\"filter\") } "
                      "switch { #cases.map(transform: { c in c.name }).last().present(\"blue\"): {}, default: @diagnostic(\"map\") } } "
-                     "@probe extension Light {}",NULL,2);
+                     "@probe extension Light {}",NULL,1);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.second() } @probe extension Light {}",
                      "Array has no function 'second' with these labels",0);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first.name } @probe extension Light {}",
@@ -310,7 +310,7 @@ int main(void)
     validateLanguage(LIGHT "macro probe(): Enum { "
                      "switch { #cases.count = 3: {}, default: @diagnostic(\"count\") } "
                      "switch { #cases.first(where: { c in c.name = \"green\" }).present: {}, default: @diagnostic(\"missing green\") } } "
-                     "@probe extension Light {}",NULL,2);
+                     "@probe extension Light {}",NULL,1);
     // Without the role, C has no function to build them with.
     languageEdits = (const char *const[]){"@insertion\n","",NULL};
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",

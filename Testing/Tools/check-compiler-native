@@ -75,20 +75,11 @@ grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable
     "$work_root/log" || fail "@equatable extension without equals was not warned"
 grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
     || fail "a second application of @equatable was not noted"
-grep -Fq "ExtensionTypes.range:29:1: warning[macro]: Written writes @equatable" "$work_root/log" \
+grep -Fq "ExtensionTypes.range:28:1: warning[macro]: Written writes @equatable" "$work_root/log" \
     || fail "#macros does not list an application written through an extension"
-grep -Fq "ExtensionTypes.range:32:1: warning[macro]: Defaulted has only the default @equatable" "$work_root/log" \
-    || fail "#macros lists a @defaults application"
 ! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no equals" "$work_root/log" \
     || fail "@equatable on an extension missed the equals beside it"
 ! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its equals"
-# The same macro twice on one declaration: the same arguments are one
-# application, noted; different arguments are an error naming both sites.
-run defaults-repeated 0 "" "$(case_file defaults-repeated '@defaults(equatable)
-extension Construct {}
-{ return 0 }')"
-grep -Fq "defaults-repeated.range:1:1: note[macro]: @defaults is already applied to 'Construct' at" "$work_root/log" \
-    || fail "a repeated @defaults was not noted"
 run member-defaults 42 "" Testing/Compiler/Native/MemberDefaults.range
 run expressions 42 "" Testing/Compiler/Native/Expressions.range
 run generics 42 "" Testing/Compiler/Native/Generics.range
@@ -668,10 +659,10 @@ reject equals-enum-type "the parameter of Bad.equals must be of type Bad, the ty
 enum Bad { case one, two  function equals(let other: Bool): Bool { return true } }
 { return 0 }'
 # One way to define equality: a type never writes '=' itself.
-reject user-equality "Own declares '=' itself; apply @equatable and declare 'function equals(let other: Own): Bool' instead" \
+reject user-equality "Own declares '=' itself; a type's '=' is the built-in structural comparison, or the one a macro it applies emits" \
     'construct Own { let n: Int  function =(let other: Own): Bool { return true } }
 { switch { Own(n: 1) = Own(n: 2): return 1, default: {} } return 0 }'
-reject user-equality-extension "Own declares '=' itself; apply @equatable and declare 'function equals(let other: Own): Bool' instead" \
+reject user-equality-extension "Own declares '=' itself; a type's '=' is the built-in structural comparison, or the one a macro it applies emits" \
     'enum Own { case one, two }
 extension Own { function =(let other: Own): Bool { return true } }
 { return 0 }'
@@ -987,10 +978,6 @@ reject unknown-reference "no declaration for 'missing' in the loaded sources" '{
 reject union-type "a type is a single name, not several joined by '|'; related: an enum's cases are its alternatives" \
     'function f(let value: Int | Bool): Int { return 1 }
 { return f(value: 3) }'
-reject defaults-different "@defaults is applied to 'Construct' twice with different arguments, at" \
-    '@defaults(collection)
-extension Construct {}
-{ return 0 }'
 reject macro-target "unknown macro target type 'Int'" \
     'macro transform(): Int { return 3 }
 { @transform return 0 }'
@@ -1006,25 +993,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-# @defaults written through an extension reaches every declaration of its
-# kind. The language's Enum already writes @defaults, so this grammar kind is
-# the project's own, without one.
-full=("${core[@]}")
-core=(Language/Macros Language/Types)
-for grammar in Language/Grammar/*.range; do [[ "$grammar" == */Enum.range ]] || core+=("$grammar"); done
-run defaults-extension 0 "" "$(case_file defaults-extension 'construct Enum {
-    let name: String
-    let cases: Array<EnumCase>
-    let functions: Array<Function>
-    let macros: Array<Macro>
-}
-macro announce(): Enum { @warning("\(#name) is announced") }
-@defaults(announce)
-extension Enum {}
-enum Light { case on, off }
-{ return 0 }')"
-grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$work_root/log" \
-    || fail "@defaults through an extension did not apply"
-core=("${full[@]}")
-
-echo "compiler native: programs=64 rejections=194 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=62 rejections=193 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

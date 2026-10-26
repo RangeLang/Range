@@ -4,9 +4,7 @@
 // enum's own functions, a bare case name tests the current value:
 // `switch { north: …, default: {} }`; no function of the enum takes a
 // case's name.
-// Every enum applies @equatable unless it writes @equatable itself.
 @nominal
-@defaults(equatable)
 construct Enum {
     let name: String
     let cases: Array<EnumCase>

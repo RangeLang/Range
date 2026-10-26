@@ -1,35 +1,25 @@
-// `a = b` calls the function named `=` that a's type declares, with b as its
-// one argument. The operator symbol is that function's name, so the
-// compiler finds it by the symbol itself; no role or hidden contract selects
-// it. `a != b` is `!(a = b)` through the same function, and a case test's
-// value argument compares with it too. An optional operand is promoted first, so
-// `maybe = 5` compares two Int? values. The other operators (`+`, `<`, …)
-// work the same way, but any type may declare those; `=` comes only from here.
+// `a = b` compares two values of one type; `a != b` is `!(a = b)`, and a
+// case test's value argument compares the same way. An optional operand is
+// promoted first, so `maybe = 5` compares two Int? values.
 //
-// Every construct and enum applies @equatable (the grammar declarations carry
-// @defaults(equatable)), so every type declares one `=`, emitted here. Its
-// code is generated only for the types, per specialization, that a program
-// compares, and for the field and payload types those reach.
-
-// A construct is equal to another when every stored member is equal, each
-// compared with its own type's `=`. Writing @equatable makes `=` call the
-// construct's own `function equals(let other: <Type>): Bool` instead.
+// Every construct and enum has `=` built in: C compares a construct's stored
+// members in order, or an enum's case and then that case's payload fields,
+// each with its own type's `=`; an enum that contains itself is compared
+// recursively. Its code is generated only for the types, per specialization,
+// that a program compares, and for the field and payload types those reach.
+//
+// A type never writes `=` itself; C reports one written in the type or in an
+// extension of it. Writing @equatable makes `=` call the type's own
+// `function equals(let other: <Type>): Bool` instead, through the `=` this
+// macro emits. Without @equatable, an equals is an ordinary function.
 // `@equatable extension Type { … }` writes it as well: it applies to Type, as
 // written there, and sees the equals declared in that extension. That is how
 // @collection makes every collection compare by the equals it emits.
 macro equatable(): Construct {
-    let written: #macros.first { applied in applied.name = "equatable" }
     let equals: #functions.first { candidate in candidate.name = "equals" }
-    let declared: #functions.first { candidate in candidate.name = "=" }
 
-    // The arms test every combination of the three, so the compiler checks
-    // that each is handled.
     switch {
-        // One way to define equality: a type does not write `=` itself.
-        declared.present:
-            @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-
-        declared.absent & equals.present & written.present: {
+        equals.present: {
             switch {
                 equals.parameters.count != 1:
                     @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
@@ -56,47 +46,17 @@ macro equatable(): Construct {
             }
         },
 
-        declared.absent & equals.absent & written.present: {
+        equals.absent:
             @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
-            // C primitive: compares every stored member in order, each with its
-            // own type's `=`. It becomes Range code once macros can iterate members.
-            #graph {
-                extension #name {
-                    @builtin
-                    function =(let other: #name): Bool
-                }
-            }
-        },
-
-        // Without @equatable written, an equals is an ordinary function.
-        declared.absent & written.absent: {
-            #graph {
-                extension #name {
-                    @builtin
-                    function =(let other: #name): Bool
-                }
-            }
-        }
     }
 }
 
-// An enum is equal to another when both hold the same case and that case's
-// payload fields are equal, each compared with its own type's `=`; an enum
-// that contains itself is compared recursively. Writing @equatable makes `=`
-// call the enum's own equals instead.
+// The same for an enum: writing @equatable makes `=` call its equals.
 macro equatable(): Enum {
-    let written: #macros.first { applied in applied.name = "equatable" }
     let equals: #functions.first { candidate in candidate.name = "equals" }
-    let declared: #functions.first { candidate in candidate.name = "=" }
 
-    // The arms test every combination of the three, so the compiler checks
-    // that each is handled.
     switch {
-        // One way to define equality: a type does not write `=` itself.
-        declared.present:
-            @diagnostic("\(#name) declares '=' itself; apply @equatable and declare 'function equals(let other: \(#name)): Bool' instead"),
-
-        declared.absent & equals.present & written.present: {
+        equals.present: {
             switch {
                 equals.parameters.count != 1:
                     @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
@@ -123,26 +83,7 @@ macro equatable(): Enum {
             }
         },
 
-        declared.absent & equals.absent & written.present: {
+        equals.absent:
             @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
-            // C primitive: compares the tags, then the current case's payload
-            // fields. It becomes Range code once macros can iterate members.
-            #graph {
-                extension #name {
-                    @builtin
-                    function =(let other: #name): Bool
-                }
-            }
-        },
-
-        // Without @equatable written, an equals is an ordinary function.
-        declared.absent & written.absent: {
-            #graph {
-                extension #name {
-                    @builtin
-                    function =(let other: #name): Bool
-                }
-            }
-        }
     }
 }

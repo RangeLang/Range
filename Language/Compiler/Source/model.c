@@ -194,10 +194,9 @@ RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const 
         list = node->generics;
     else if (!strcmp(name,"macros") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeMacro
         || node->kind == RangeNodeFunction || node->kind == RangeNodeEnum)) {
-        // The applications a declaration writes; @defaults ones are not listed.
+        // The applications a declaration writes, copied: a merge may add more.
         RangeNode result = {0};
-        for (size_t i = 0; node->c && i < node->c->itemCount; ++i)
-            if (!(node->c->items[i]->flags & RangeFlagImplicit)) rangeNodeAppend(arena,&result,node->c->items[i]);
+        for (size_t i = 0; node->c && i < node->c->itemCount; ++i) rangeNodeAppend(arena,&result,node->c->items[i]);
         return (RangeGraphValue){.kind=RangeGraphNodes,.nodes=result.items,.count=result.itemCount};
     } else if (!strcmp(name,"functions") && (node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum)) {
         RangeNode result = {0};

@@ -16,20 +16,19 @@ construct Twice {
     function equals(let other: Twice): Bool { return true }
 }
 
-// Reports whether @equatable is written, which #macros tells apart from a
-// @defaults application.
+// Reports whether @equatable is written, through an extension too.
 macro reportsEquatable(): Construct {
     let written: #macros.first(where: { applied in applied.name = "equatable" })
     switch {
         written.present: @warning("\(#name) writes @equatable"),
-        written.absent: @warning("\(#name) has only the default @equatable")
+        written.absent: @warning("\(#name) does not write @equatable")
     }
 }
 
 @reportsEquatable
 construct Written { let n: Int }
 
-@reportsEquatable
+// Compared by the built-in structural '='.
 construct Defaulted { let n: Int }
 
 // Emitted through #graph: the application's extension carries @equatable.

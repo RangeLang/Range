@@ -177,37 +177,6 @@ static RangeNode *grammarDeclaration(Resolver *vm, RangeNode *node)
     return found;
 }
 
-/* @defaults(m) on a grammar declaration: a declaration of that kind applies @m
- * unless it writes @m itself. The application is marked implicit, so #macros
- * does not list it. */
-static void applyDefaults(Resolver *vm, RangeNode *target)
-{
-    RangeNode *grammar = grammarDeclaration(vm,target);
-    if (!grammar || !grammar->c) return;
-    for (size_t i = 0; i < grammar->c->itemCount; ++i) {
-        RangeNode *attribute = grammar->c->items[i];
-        if (!same(attribute->name,"defaults")) continue;
-        RangeNode *macro = attribute->resolvedDeclaration ? attribute->resolvedDeclaration
-            : resolveMacroDeclaration(vm,attribute,grammar,NULL);
-        if (!macroBuiltin(macro,"defaults")) continue;
-        for (size_t j = 0; j < attribute->itemCount; ++j) {
-            RangeNode *applied = attribute->items[j]->a;
-            if (!applied || applied->kind != RangeNodeName || applied->generics || attribute->items[j]->name)
-                fail(vm,attribute,"@defaults takes macro names, such as @defaults(equatable)");
-            int present = 0;
-            for (size_t k = 0; target->c && k < target->c->itemCount; ++k)
-                if (same(target->c->items[k]->name,applied->name)) present = 1;
-            if (present) continue;
-            if (!target->c) target->c = rangeNodeCreate(vm->arena,RangeNodeAttribute,target->path,target->line,target->column);
-            RangeNode *implicit = rangeNodeCreate(vm->arena,RangeNodeAttribute,target->path,target->line,target->column);
-            implicit->name = applied->name;
-            implicit->flags = RangeFlagImplicit;
-            implicit->source = target->source;
-            rangeNodeAppend(vm->arena,target->c,implicit);
-        }
-    }
-}
-
 /* One application site on a target: its macro declaration, selected by name
  * and the target's type, and the bindings its body reads. */
 static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attribute)
@@ -217,7 +186,7 @@ static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attri
     if (same(attribute->name,"builtin")
         || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))) return;
     RangeNode *macro = resolveMacroDeclaration(vm,attribute,target,&unit);
-    if (macroBuiltin(macro,"literal") || macroBuiltin(macro,"defaults")) return; /* registered compiler primitives */
+    if (macroBuiltin(macro,"literal")) return; /* a registered compiler primitive */
     if (attribute->itemCount || macro->itemCount)
         fail(vm,attribute,"parameterized macro graph resolution is not implemented");
     RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
@@ -247,7 +216,6 @@ static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attri
 static void resolveGraphTarget(Resolver *vm, RangeNode *target)
 {
     if (!target->graphType) return;
-    if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum) applyDefaults(vm,target);
     RangeNode *attributes = target->c;
     if (attributes) for (size_t a = 0; a < attributes->itemCount; ++a)
         resolveApplication(vm,target,attributes->items[a]);
@@ -1010,7 +978,7 @@ static void metaPrepare(MetaEval *eval, RangeNode *declaration)
     for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i) {
         RangeNode *attribute = declaration->c->items[i];
         RangeMacroApplication *app = attribute->macroApplication;
-        if (compilerAttribute(declaration,attribute) || (attribute->flags & RangeFlagImplicit) || !app || app->applied) continue;
+        if (compilerAttribute(declaration,attribute) || !app || app->applied) continue;
         app->applied = 1;
         RangeNode *emitted = vm->emitted, *unit = vm->unit;
         int skip = vm->skipEmission;
@@ -2627,7 +2595,7 @@ static int compilerAttribute(RangeNode *target, RangeNode *attribute)
 {
     return same(attribute->name,"builtin")
         || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))
-        || macroBuiltin(attribute->resolvedDeclaration,"literal") || macroBuiltin(attribute->resolvedDeclaration,"defaults");
+        || macroBuiltin(attribute->resolvedDeclaration,"literal");
 }
 
 /* Run one application. Its #graph output is collected and returned only when
@@ -2687,22 +2655,10 @@ static int sameSyntax(const RangeNode *a, const RangeNode *b)
     return 1;
 }
 
-static void attachDefaults(Resolver *vm, RangeNode *grammar, RangeNode *node)
-{
-    if (!node) return;
-    if (node->kind == RangeNodeUnit || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum)
-        for (size_t i = 0; i < node->itemCount; ++i) attachDefaults(vm,grammar,node->items[i]);
-    if ((node->kind != RangeNodeConstruct && node->kind != RangeNodeEnum) || !node->graphType
-        || grammarDeclaration(vm,node) != grammar) return;
-    size_t before = node->c ? node->c->itemCount : 0;
-    applyDefaults(vm,node);
-    for (size_t i = before; node->c && i < node->c->itemCount; ++i) resolveApplication(vm,node,node->c->items[i]);
-}
-
 /* A macro application written on an extension applies to the extended
- * declaration as if written there: it is listed in #macros and replaces a
- * @defaults application of the same macro. The same macro applied twice to
- * one declaration is one application; different arguments are an error. */
+ * declaration as if written there: it is listed in #macros. The same macro
+ * applied twice to one declaration is one application; different arguments
+ * are an error. */
 static void attachApplication(Resolver *vm, RangeNode *declaration, RangeNode *attribute)
 {
     if (!declaration->c)
@@ -2711,14 +2667,6 @@ static void attachApplication(Resolver *vm, RangeNode *declaration, RangeNode *a
     for (size_t i = 0; i < list->itemCount; ++i) {
         RangeNode *existing = list->items[i];
         if (!same(existing->name,attribute->name)) continue;
-        if (existing->flags & RangeFlagImplicit) {
-            if (existing->macroApplication && existing->macroApplication->applied)
-                fail(vm,attribute,"@%s is applied to '%s' through an extension after its @defaults application already ran",
-                     attribute->name,declaration->name);
-            list->items[i] = attribute;
-            resolveApplication(vm,declaration,attribute);
-            return;
-        }
         if (!sameSyntax(existing,attribute))
             fail(vm,attribute,"@%s is applied to '%s' twice with different arguments, at %s:%d:%d and at %s:%d:%d",
                  attribute->name,declaration->name,existing->path,existing->line,existing->column,
@@ -2731,10 +2679,6 @@ static void attachApplication(Resolver *vm, RangeNode *declaration, RangeNode *a
     }
     rangeNodeAppend(vm->arena,list,attribute);
     resolveApplication(vm,declaration,attribute);
-    // A @defaults written through an extension reaches every declaration of
-    // its grammar kind, as if written on the grammar declaration.
-    if (macroBuiltin(attribute->resolvedDeclaration,"defaults"))
-        for (size_t u = 0; u < vm->count; ++u) attachDefaults(vm,declaration,vm->units[u]);
 }
 
 /* An extension names its declaration; its members move there and resolve in
@@ -3092,8 +3036,6 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         }
         else if (macroBuiltin(node,"interval"))
             sourceDiagnostic(report,node,1,"C-implementation","'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C");
-        else if (macroBuiltin(node,"defaults"))
-            sourceDiagnostic(report,node,1,"C-implementation","@defaults(m) attaches an implicit @m to every declaration of the grammar kind that does not write @m, in C");
         else if (macroBuiltin(node,"warning"))
             sourceDiagnostic(report,node,1,"C-implementation","@warning reports a compile-time warning through C's diagnostics");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic")
@@ -3153,13 +3095,6 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         if (node->name) {
             RangeNode *macro = sourceReference(report,scope,node,node->name,1);
             if (node->resolvedDeclaration) macro = node->resolvedDeclaration;
-            if (macroBuiltin(macro,"defaults")) {
-                // Its arguments name macros.
-                for (size_t i = 0; i < node->itemCount; ++i)
-                    if (node->items[i]->a && node->items[i]->a->kind == RangeNodeName)
-                        (void)sourceReference(report,scope,node->items[i]->a,node->items[i]->a->name,1);
-                return;
-            }
             metadata = macroBuiltin(macro,"literal") || macroBuiltin(macro,"diagnostic") || macroBuiltin(macro,"warning");
         }
         break;
@@ -3253,8 +3188,7 @@ static void writeSourceDiagnostics(SourceReport *report, FILE *output)
 
 /* Macro application: written extensions merge first, then every application
  * runs once and its #graph output merges before the next round. Applications
- * introduced by emitted code run in a later round; @defaults applications run
- * only in a round where no written application is left. This discovery order is a
+ * introduced by emitted code run in a later round. This discovery order is a
  * bootstrap stand-in: the accepted design is a Datalog scheduler that orders
  * applications by what they read and write, reruns only reads a write changes,
  * and rejects cycles through absence or whole-list reads. */
@@ -3279,14 +3213,13 @@ static void applyAndMerge(Resolver *vm, RangeNode *attribute)
 }
 
 static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
-                       RangeNode *target, int defaults, size_t *checked)
+                       RangeNode *target, size_t *checked)
 {
     if (!target->graphType) return 0;
     int ran = 0;
     if (target->c) for (size_t i = 0; i < target->c->itemCount; ++i) {
         RangeNode *attribute = target->c->items[i];
         if (compilerAttribute(target,attribute)) continue;
-        if ((attribute->flags & RangeFlagImplicit) && !defaults) continue;
         // An unresolved application here comes from a merge that already failed.
         RangeMacroApplication *app = attribute->macroApplication;
         if (!app || app->applied) continue;
@@ -3299,7 +3232,7 @@ static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
     // Members merged during this round wait for the next one.
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
         for (size_t i = 0, n = target->itemCount; i < n; ++i)
-            ran |= applyTarget(vm,report,unit,target->items[i],defaults,checked);
+            ran |= applyTarget(vm,report,unit,target->items[i],checked);
     return ran;
 }
 
@@ -3309,14 +3242,11 @@ static void applyMacros(Resolver *vm, SourceReport *report, size_t *checked)
         for (size_t i = 0; i < vm->units[u]->itemCount; ++i)
             if (vm->units[u]->items[i]->kind == RangeNodeExtension)
                 guarded(vm,report,"resolution",mergeExtension,vm->units[u]->items[i]);
-    // A @defaults application waits until written ones settle: one written
-    // through an emitted extension replaces it before it runs.
     for (int round = 0; round < RangeMacroRounds; ++round) {
         int ran = 0;
-        for (int defaults = 0; defaults < 2 && !ran; ++defaults)
-            for (size_t u = 0; u < vm->count; ++u)
-                for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
-                    ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],defaults,checked);
+        for (size_t u = 0; u < vm->count; ++u)
+            for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
+                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],checked);
         if (!ran) return;
     }
     if (!report) fail(vm,NULL,"macro emission did not settle after %d rounds",RangeMacroRounds);
@@ -5662,7 +5592,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         }
         if (!rightFirst) right = typeOf(typer,scope,expr->b,deferredType(typer,left) ? NULL : left,context);
         if (!left || !right) break;
-        // `=` comes only from @equatable, which declares it returning Bool.
+        // `=` gives Bool: the built-in structural comparison, or the type's equality function.
         if (deferredType(typer,left) || deferredType(typer,right)) { type = typer->booleanType; break; }
         if (left != right) {
             // A kind's value compares with a value of a macro type it applies,
@@ -6351,6 +6281,11 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
         && (!(function->flags & RangeFlagBuiltin) || !context || context->resolvedDeclaration != typer->boolean))
         typeError(typer,function,"'%s' is reserved for Bool logic; %s cannot declare it",
                   function->name,function->typeName);
+    // One way to define equality: `=` is built in, and a macro the type
+    // applies may emit another; the type does not write one.
+    if (function->typeName && same(function->name,"=") && !function->emittedBy)
+        typeError(typer,function,"%s declares '=' itself; a type's '=' is the built-in structural comparison, or the one a macro it applies emits",
+                  function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
     int loops = typer->loops, inferring = typer->inferring, closures = typer->closures;
@@ -6862,19 +6797,26 @@ static void checkMutations(Typer *typer, RangeNode *node)
     for (size_t i = 0; i < node->itemCount; ++i) checkMutations(typer,node->items[i]);
 }
 
-/* Whether `=` can compare values of `type`. A type compares through the
- * function `=` it declares: one with a body is called; a builtin one is C's
- * structural comparison, which needs every stored member, or every payload
- * field, to be comparable in turn. A type already being compared counts as
- * comparable, so recursive enums are. On failure, `why` says which field
- * stops it. */
+/* The function `=` calls on values of a type: the `=` with a body that
+ * @equatable emits from the type's equals. Without one, `=` is C's built-in
+ * structural comparison. */
+static RangeNode *equalityFunction(const RangeNode *type)
+{
+    RangeNode *function = type && type->kind == RangeNodeSpecialization ? operatorFunction(type->resolvedDeclaration,"=",1) : NULL;
+    return function && !(function->flags & RangeFlagBuiltin) ? function : NULL;
+}
+
+/* Whether `=` can compare values of `type`. A type with an equality function
+ * calls it; any other type is compared structurally, which needs every
+ * stored member, or every payload field, to be comparable in turn. A type
+ * already being compared counts as comparable, so recursive enums are. On
+ * failure, `why` says which field stops it. */
 static int comparable(Typer *typer, RangeNode *type, Comparing *visit, char *why, size_t size)
 {
     char name[160]; describeType(name,sizeof(name),type);
     if (!type || type->kind != RangeNodeSpecialization) { snprintf(why,size,"%s is not a value type",name); return 0; }
-    RangeNode *declaration = type->resolvedDeclaration, *function = operatorFunction(declaration,"=",1);
-    if (!function) { snprintf(why,size,"%s declares no function '='",name); return 0; }
-    if (!(function->flags & RangeFlagBuiltin)) return 1;
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (equalityFunction(type)) return 1;
     for (size_t i = 0; i < visit->count; ++i) if (visit->seen[i] == type) return 1;
     if (visit->count == sizeof(visit->seen)/sizeof(*visit->seen)) { snprintf(why,size,"%s nests too deeply to compare",name); return 0; }
     visit->seen[visit->count++] = type;
@@ -6917,7 +6859,12 @@ static void checkEqualities(Typer *typer)
         RangeNode *type = typer->equalities[i].type;
         Comparing visit = {.count=0};
         char why[512], name[160];
-        if (comparable(typer,type,&visit,why,sizeof(why))) continue;
+        if (comparable(typer,type,&visit,why,sizeof(why))) {
+            if (!equalityFunction(type))
+                sourceDiagnostic(typer->report,typer->equalities[i].at,1,"C-implementation","'=' here is C's built-in structural comparison: "
+                    "every stored member, or the case then its payload fields; it is emitted only for the types a program compares");
+            continue;
+        }
         describeType(name,sizeof(name),type);
         typer->instance = typer->equalities[i].in;
         typeError(typer,typer->equalities[i].at,"'=' cannot compare %s: %s",name,why);
@@ -8010,25 +7957,23 @@ static void nativeCallFunction(Native *native, RangeNode *function, RangeNode *s
 }
 
 /* x0 = 1 when the values in x0 and x1 (scalars, or aggregates' addresses) are
- * equal, through the function `=` that `type` declares. One with a body is
- * called as x0.=(other: x1); a builtin one is C's structural comparison:
- * scalars compare directly, other values through a subroutine emitted once per
- * type a program compares. */
+ * equal. A type's equality function is called as x0.=(other: x1); any other
+ * type is compared structurally: scalars directly, other values through a
+ * subroutine emitted once per type a program compares. */
 static int nativeEquals(Native *native, RangeNode *type, RangeNode *at)
 {
-    RangeNode *function = type && type->kind == RangeNodeSpecialization ? operatorFunction(type->resolvedDeclaration,"=",1) : NULL;
+    RangeNode *function = equalityFunction(type);
     Comparing visit = {.count=0};
     char why[512];
-    if (!function || ((function->flags & RangeFlagBuiltin) && !comparable(native->typer,type,&visit,why,sizeof(why)))) {
+    if (!function && !comparable(native->typer,type,&visit,why,sizeof(why))) {
         char name[160], in[160] = "";
         describeType(name,sizeof(name),type);
-        if (!function) snprintf(why,sizeof(why),"%s declares no function '='",name);
         if (native->self) { char self[140]; describeType(self,sizeof(self),native->self); snprintf(in,sizeof(in)," (in %s)",self); }
         sourceDiagnostic(native->report,at,0,"type","'=' cannot compare %s: %s%s",name,why,in);
         native->failed = 1;
         return 0;
     }
-    if (!(function->flags & RangeFlagBuiltin)) {
+    if (function) {
         // The receiver is an address: a scalar is passed through the stack.
         if (type->scalarBits) { nativeEmit(native,armPush(0)); nativeEmit(native,armAddImm(0,31,0)); }
         nativeCallFunction(native,function,type);
@@ -8042,15 +7987,14 @@ static int nativeEquals(Native *native, RangeNode *type, RangeNode *at)
 }
 
 /* One member or payload field of a structural comparison: x0 and x1 hold the
- * two fields' addresses. A builtin scalar compares inline; anything else goes
- * through its own type's function '='. */
+ * two fields' addresses. A scalar compared structurally compares inline;
+ * anything else goes through its own type's `=`. */
 static void nativeEqualField(Native *native, RangeNode *fieldType, NativeJump **fails, size_t *failCount, size_t *failCapacity)
 {
-    RangeNode *function = operatorFunction(fieldType->resolvedDeclaration,"=",1);
     if (fieldType->scalarBits) {
         nativeLoadScalar(native,0,0,0,fieldType);
         nativeLoadScalar(native,1,1,0,fieldType);
-        if (function && (function->flags & RangeFlagBuiltin)) {
+        if (!equalityFunction(fieldType)) {
             nativeEmit(native,armCmp(0,1));
             NativeJump jump = {.at=nativeEmit(native,armBcond(RangeNE,0)),.base=armBcond(RangeNE,0)};
             NATIVE_PUSH(*fails,*failCount,*failCapacity,jump);
