@@ -738,8 +738,9 @@ static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
  * it, `.case(…)` tests it in turn, and any other expression is a value the
  * field must equal, by its type's `=`. Inside an enum's own functions a bare
  * case name tests the receiver. Once the subject is known to hold an enum
- * with that case, the member access or call becomes a RangeNodeCaseTest: a
- * the subject, b the case pattern. */
+ * with that case, typing records beside the member access or call the
+ * RangeNodeCaseTest that runs in its place: a the subject, b the case
+ * pattern. */
 
 static RangeNode *casePattern(RangeArena *arena, RangeNode *at, const char *name, RangeNode *call);
 
@@ -772,19 +773,16 @@ static RangeNode *casePattern(RangeArena *arena, RangeNode *at, const char *name
     return pattern;
 }
 
-/* The member access `subject.name`, the call `subject.name(…)`, or the
- * bare `name` or `name(…)` (subject flagged implicit: the receiver) becomes
- * the case test it is. */
-static void becomeCaseTest(RangeArena *arena, RangeNode *node, RangeNode *subject, const char *name, RangeNode *call)
+/* The case test the member access `subject.name`, the call
+ * `subject.name(…)`, or the bare `name` or `name(…)` (subject flagged
+ * implicit: the receiver) is, written beside it. */
+static RangeNode *caseTest(RangeArena *arena, RangeNode *at, RangeNode *subject, const char *name, RangeNode *call)
 {
-    RangeNode *pattern = casePattern(arena,node,name,call);
-    node->kind = RangeNodeCaseTest;
-    node->a = subject;
-    node->b = pattern;
-    node->c = NULL;
-    node->name = name;
-    node->itemCount = 0;
-    node->resolvedDeclaration = NULL;
+    RangeNode *test = rangeNodeCreate(arena,RangeNodeCaseTest,at->path,at->line,at->column);
+    test->a = subject;
+    test->b = casePattern(arena,at,name,call);
+    test->name = name;
+    return test;
 }
 
 /* The receiver a bare case name tests, inside an enum's own functions. */
@@ -934,7 +932,8 @@ static ShapeRows shapeRows(RangeArena *arena, RangeNode *node, RangeNode *bindin
     out.rows = rangeArenaAllocate(arena,sizeof(*out.rows));
     out.rows[0] = (ShapeRow){0};
     out.count = 1;
-    RangeNode *found = node && node->kind == RangeNodeCaseTest && stablePath(node->a,bindings) ? node : NULL;
+    RangeNode *test = node && node->lowered ? node->lowered : node;
+    RangeNode *found = test && test->kind == RangeNodeCaseTest && stablePath(test->a,bindings) ? test : NULL;
     if (found) {
         out.rows[0].terms = rangeArenaAllocate(arena,sizeof(*out.rows[0].terms));
         out.rows[0].terms[0] = found;
@@ -3724,7 +3723,7 @@ static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test
             typeError(typer,bound->a,"'%s' is already narrowed to the payload here; related: a test of an optional "
                       "value for its present case narrows that value",subject->name);
     }
-    return typer->booleanType;
+    return test->type = typer->booleanType;
 }
 
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
@@ -3769,8 +3768,8 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         // `where(element)` calls the closure a function-typed parameter holds.
         RangeNode *value = sourceLookup(typer->report,scope,callee->name,0);
         if (!value && receiverCase(typer,context,callee->name)) {
-            becomeCaseTest(typer->report->arena,call,receiverSubject(typer->report->arena,callee),callee->name,call);
-            return typeCaseTest(typer,scope,call,context);
+            call->lowered = caseTest(typer->report->arena,call,receiverSubject(typer->report->arena,callee),callee->name,call);
+            return typeCaseTest(typer,scope,call->lowered,context);
         }
         if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(value->type))
             return typeClosureCall(typer,scope,call,value,context);
@@ -3816,8 +3815,8 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         }
         if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
             // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
-            becomeCaseTest(typer->report->arena,call,callee->a,callee->name,call);
-            return typeCaseTest(typer,scope,call,context);
+            call->lowered = caseTest(typer->report->arena,call,callee->a,callee->name,call);
+            return typeCaseTest(typer,scope,call->lowered,context);
         }
         // A member with no name is one `for … in` resolved by its @iteration role.
         function = callee->name ? findCalledFunction(receiver->resolvedDeclaration,callee->name,call) : callee->resolvedDeclaration;
@@ -4027,7 +4026,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         type = typeEither(typer,scope,expr,context);
         expr->type = type;
     } else type = typeExpression(typer,scope,expr,expected,context);
-    if (!logic && expr->kind != RangeNodeCaseTest) typer->narrowedCount = mark;
+    if (!logic && !(expr->lowered && expr->lowered->kind == RangeNodeCaseTest)) typer->narrowedCount = mark;
     type = narrowedRead(typer,expr,type);
     return type;
 }
@@ -4048,8 +4047,8 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             break;
         }
         if (!declaration && receiverCase(typer,context,expr->name)) {
-            becomeCaseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
-            type = typeCaseTest(typer,scope,expr,context);
+            expr->lowered = caseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
+            type = typeCaseTest(typer,scope,expr->lowered,context);
             break;
         }
         if (!declaration) break;
@@ -4133,8 +4132,8 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         RangeNode *declaration = receiver->resolvedDeclaration;
         if (isEnum(receiver) && enumCase(declaration,expr->name)) {
             // `phase.loading`: whether phase holds the case.
-            becomeCaseTest(typer->report->arena,expr,expr->a,expr->name,NULL);
-            type = typeCaseTest(typer,scope,expr,context);
+            expr->lowered = caseTest(typer->report->arena,expr,expr->a,expr->name,NULL);
+            type = typeCaseTest(typer,scope,expr->lowered,context);
             break;
         }
         RangeNode *member = findMember(declaration,expr->name);
@@ -4167,9 +4166,6 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         type = memberType(typer,target,member,selfSpecialization(typer,target));
         break;
     }
-    case RangeNodeCaseTest:
-        type = typeCaseTest(typer,scope,expr,context);
-        break;
     case RangeNodeEmission:
         if (!typer->macro) { typeError(typer,expr,"#graph is written only in a macro's body"); break; }
         typeSplices(typer,scope,expr->b);
@@ -6438,6 +6434,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
  * expression. */
 static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
 {
+    if (expr->lowered) return NULL; /* it runs as something else */
     if (expr->kind == RangeNodeName) {
         RangeValue *bound = evalNamed(frame,expr->resolvedDeclaration);
         if (bound) return bound;
@@ -8432,7 +8429,9 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
 static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
 {
     *frameSlot = 0;
-    if (expr->kind == RangeNodeName) {
+    // A form that runs as what typing lowered it to is no place: it is materialized below.
+    RangeNodeKind kind = expr->lowered ? expr->lowered->kind : expr->kind;
+    if (kind == RangeNodeName) {
         RangeNode *declaration = expr->resolvedDeclaration;
         if (declaration && native->function && declaration == native->function->receiver && native->owner) {
             // The receiver, whose address the method holds.
@@ -8458,7 +8457,7 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
         nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name);
         return NULL;
     }
-    if (expr->kind == RangeNodeMemberAccess && (expr->flags & RangeFlagNarrowed)) {
+    if (kind == RangeNodeMemberAccess && (expr->flags & RangeFlagNarrowed)) {
         // A narrowed optional's payload: its field, read with no check.
         int innerSlot = 0;
         RangeNode *optional = nativeAddress(native,expr->a,&innerSlot);
@@ -8482,7 +8481,7 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
         }
         return optional->memberTypes[found];
     }
-    if (expr->kind == RangeNodeMemberAccess && !(expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase)) {
+    if (kind == RangeNodeMemberAccess && !(expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase)) {
         int innerSlot = 0;
         RangeNode *receiver = nativeAddress(native,expr->a,&innerSlot);
         if (!receiver) return NULL;

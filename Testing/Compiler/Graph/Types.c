@@ -213,6 +213,16 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A case test runs as the test typing records beside the member access or call.
+    compile(&c,"enum Phase { case idle case failed(reason: Int) "
+        "function quiet(): Bool { return idle | failed(reason: 3) } } "
+        "function check(let p: Phase): Int { switch { p.failed(let r) & r > 0: return r, p.idle | p.quiet(): return 0, default: {} } return 1 }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *test = named(c.project,"check")->a->items[0]->items[0]->items[0]->b->a;
+    assert(test->kind == RangeNodeCall && test->lowered && test->lowered->kind == RangeNodeCaseTest);
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
