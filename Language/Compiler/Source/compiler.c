@@ -4672,41 +4672,19 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
     switch (pattern->integer) {
     case RangePatternAny: return;
     case RangePatternBind: pattern->a->type = type; return;
-    case RangePatternPresent: {
-        // The element `for … in` binds: the payload of the @optional
-        // declaration's single payload case.
-        RangeNode *payload = NULL;
-        size_t payloads = 0;
-        if (isEnum(type) && appliesBuiltin(type->resolvedDeclaration,"optional"))
-            for (size_t i = 0; i < type->resolvedDeclaration->itemCount; ++i) {
-                RangeNode *entry = type->resolvedDeclaration->items[i];
-                if (entry->kind != RangeNodeEnumCase || !entry->itemCount) continue;
-                payloads += entry->itemCount == 1 ? 1 : 2;
-                payload = entry;
-            }
-        if (!type) return;
-        if (!payload || payloads != 1) { typeError(typer,pattern,"'for … in' unwraps an optional element; found %s",t); return; }
-        RangeNode *inner = rangeNodeCreate(typer->report->arena,RangeNodePattern,pattern->path,pattern->line,pattern->column);
-        inner->integer = RangePatternBind;
-        inner->a = pattern->a;
-        RangeNode *argument = rangeNodeCreate(typer->report->arena,RangeNodeArgument,pattern->path,pattern->line,pattern->column);
-        argument->a = inner;
-        pattern->integer = RangePatternCase;
-        pattern->a = NULL;
-        pattern->name = payload->name;
-        pattern->flags |= RangeFlagApplication;
-        rangeNodeAppend(typer->report->arena,pattern,argument);
-        typePattern(typer,scope,pattern,type,context);
-        return;
-    }
     case RangePatternCase: {
-        // `.name` is always a case of the subject's type.
+        // `.name` is always a case of the subject's type. The case `for … in`
+        // writes without a name is the payload case of the @optional
+        // declaration, whose payload is the element.
         if (!type) return;
-        if (!isEnum(type)) {
+        RangeNode *entry = NULL;
+        if (!pattern->name) {
+            (void)optionalWrapped(typer,type,&entry);
+            if (!entry) { typeError(typer,pattern,"'for … in' unwraps an optional element; found %s",t); return; }
+        } else if (!isEnum(type)) {
             typeError(typer,pattern,"'.%s' matches an enum case, but the subject is %s",pattern->name,t);
             return;
-        }
-        RangeNode *entry = namedCase(typer,type,pattern->name,pattern);
+        } else entry = namedCase(typer,type,pattern->name,pattern);
         if (!entry) return;
         pattern->resolvedDeclaration = entry;
         if (!(pattern->flags & RangeFlagApplication)) return; /* `.value` matches any payload */

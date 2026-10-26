@@ -290,6 +290,17 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // `for … in` writes the case it unwraps without a name; typing resolves it beside the pattern.
+    compile(&c,"function total(let xs: Array<Int>): Int { state sum: 0 for x in xs & x > 1 { sum: sum + x } "
+        "for i in 0..<3 { sum: sum + i } return sum }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *loop = named(c.project,"total")->a->items[1]->a;
+    RangeNode *unwrap = loop->items[2]->b->items[0]->items[0]->items[0];
+    assert(unwrap->integer == RangePatternCase && !unwrap->name && unwrap->itemCount == 1);
+    assert(unwrap->resolvedDeclaration && same(unwrap->resolvedDeclaration->name,"present"));
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }

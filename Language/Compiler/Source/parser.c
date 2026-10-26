@@ -1292,14 +1292,20 @@ static RangeNode *parseFor(RangeParser *parser)
     next->a->a = forNode(parser, node, RangeNodeName, "for sequence");
     rangeNodeAppend(parser->arena, next, forArgument(parser, node, NULL, forNode(parser, node, RangeNodeName, "for index")));
 
+    /* <present>(let element): a case pattern without a name, which the type
+     * checker resolves to the payload case of the optional the function returns. */
     RangeNode *bound = forNode(parser, node, RangeNodePattern, NULL);
-    bound->integer = RangePatternPresent;
+    bound->integer = RangePatternCase;
+    bound->flags |= RangeFlagImplicit | RangeFlagApplication;
     bound->c = forNode(parser, node, RangeNodeBlock, "bindings");
     RangeNode *value = forNode(parser, node, RangeNodeLet, NULL);
     value->name = element;
     value->flags |= RangeFlagImplicit; /* the loop names it; no pattern writes `let` */
     rangeNodeAppend(parser->arena, bound->c, value);
-    bound->a = value;
+    RangeNode *binding = forNode(parser, node, RangeNodePattern, NULL);
+    binding->integer = RangePatternBind;
+    binding->a = value;
+    rangeNodeAppend(parser->arena, bound, forArgument(parser, node, NULL, binding));
     RangeNode *found = forNode(parser, node, RangeNodeBlock, NULL);
     RangeNode *end = forNode(parser, node, RangeNodeBlock, NULL);
     rangeNodeAppend(parser->arena, end, forNode(parser, node, RangeNodeBreak, NULL));

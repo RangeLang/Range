@@ -77,6 +77,7 @@ enum {
                                     * parameter types as arguments and the result as a */
     RangeFlagImplicit = 1 << 15,   /* switch arm: a default the compiler wrote for a lowering;
                                     * binding: one a lowering wrote, not a pattern's `let`;
+                                    * case pattern: the payload case `for … in` unwraps, unnamed;
                                     * name: the receiver a bare case name tests */
     RangeFlagEarlier = 1 << 16,    /* name: read to the left of the case test that binds the same name
                                     * in its condition, so it names what it names outside the condition */
@@ -105,7 +106,6 @@ enum {
     RangePatternBind,     /* let name: a is the Let it declares */
     RangePatternCase,     /* .name(…): a case, with one sub-pattern per payload field */
     RangePatternValue,    /* a value compared for equality, by its type's `=`: a */
-    RangePatternPresent,  /* for-in lowering: the payload of the @optional declaration's payload case */
     RangePatternRow       /* a row of a switch over conditions: no items, b its condition */
 };
 
