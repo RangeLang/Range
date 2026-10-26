@@ -202,6 +202,17 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // An operator with a body and `..<` run as the calls typing lowers them to, beside the written code.
+    compile(&c,"construct Money { let cents: Int function +(let other: Money): Money { return Money(cents: cents + other.cents) } } "
+        "function sums(let a: Money, let b: Money): Money { let r: 0..<3 let total: a + b return total }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *sum = rangeNodeRHS(local(&c,"sums","total")), *span = rangeNodeRHS(local(&c,"sums","r"));
+    assert(sum->kind == RangeNodeBinary && sum->lowered && sum->lowered->kind == RangeNodeCall);
+    assert(span->kind == RangeNodeBinary && span->lowered && span->lowered->kind == RangeNodeCall && !span->itemCount);
+    expectDescription(span->type,"Interval");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }

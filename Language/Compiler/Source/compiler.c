@@ -3857,7 +3857,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
 }
 
 /* `a..<b` is sugar for the construct applying @interval, constructed with
- * lower: a and upper: b; the construction's arguments are kept on the node. */
+ * lower: a and upper: b: that construction, typed, is what runs in its place. */
 static RangeNode *typeInterval(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context)
 {
     RangeNode *interval = NULL;
@@ -3870,24 +3870,29 @@ static RangeNode *typeInterval(Typer *typer, SourceScope *scope, RangeNode *expr
         sourceDiagnostic(typer->report,expr,0,"undeclared","'..<' needs exactly one construct applying @interval; found %zu",found);
         return NULL;
     }
-    if (!expr->itemCount) {
-        static const char *const labels[] = {"lower","upper"};
-        for (int side = 0; side < 2; ++side) {
-            RangeNode *argument = rangeNodeCreate(typer->report->arena,RangeNodeArgument,expr->path,expr->line,expr->column);
-            argument->name = labels[side];
-            argument->a = side ? expr->b : expr->a;
-            rangeNodeAppend(typer->report->arena,expr,argument);
-        }
+    RangeArena *arena = typer->report->arena;
+    RangeNode *callee = rangeNodeCreate(arena,RangeNodeName,expr->path,expr->line,expr->column);
+    callee->name = interval->name;
+    callee->resolvedDeclaration = interval;
+    RangeNode *call = rangeNodeCreate(arena,RangeNodeCall,expr->path,expr->line,expr->column);
+    call->a = callee;
+    static const char *const labels[] = {"lower","upper"};
+    for (int side = 0; side < 2; ++side) {
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,expr->path,expr->line,expr->column);
+        argument->name = labels[side];
+        argument->a = side ? expr->b : expr->a;
+        rangeNodeAppend(arena,call,argument);
     }
+    expr->lowered = call;
     RangeNode *type = specialize(typer,scope,interval,NULL,context,expr);
-    return typeConstructionOf(typer,scope,expr,type,expr->items,expr->itemCount,context);
+    return call->type = typeConstructionOf(typer,scope,call,type,call->items,call->itemCount,context);
 }
 
 /* `a + b` and `-a`: the function the operator names on the operand's type.
  * Its parameter and result are typed in that type, as a method's are, so
  * inside Int<bits: 8> `#name` is Int<bits: 8>. A function with a body is
- * called: the expression keeps that call, typed, in c. A builtin one is the C
- * primitive its name selects, lowered where the operator is. */
+ * called: that call, typed, is what runs in the operator's place. A builtin
+ * one is the C primitive its name selects, lowered where the operator is. */
 static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *operand,
                                RangeNode *right, RangeNode *context)
 {
@@ -3936,7 +3941,7 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
             argument->a = expr->b;
             rangeNodeAppend(arena,call,argument);
         }
-        expr->c = call;
+        expr->lowered = call;
     }
     return type;
 }
@@ -4014,6 +4019,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
 {
     if (!expr) return NULL;
     if (expr->flags & RangeFlagNarrowed) return expr->type; /* already read through its narrowing */
+    expr->lowered = NULL; /* typing records it afresh */
     size_t mark = typer->narrowedCount;
     int logic = expr->kind == RangeNodeBinary && (same(expr->name,"&") || same(expr->name,"|"));
     RangeNode *type;
@@ -5356,7 +5362,8 @@ static int mutatesIn(Typer *typer, RangeNode *owner, RangeNode *node)
         RangeNode *callee = node->a->resolvedDeclaration;
         if (callee && callee->kind == RangeNodeFunction && memberOf(owner,callee) && mutates(typer,callee)) return 1;
     }
-    if (mutatesIn(typer,owner,node->a) || mutatesIn(typer,owner,node->b) || mutatesIn(typer,owner,node->c)) return 1;
+    if (mutatesIn(typer,owner,node->a) || mutatesIn(typer,owner,node->b) || mutatesIn(typer,owner,node->c)
+        || mutatesIn(typer,owner,node->lowered)) return 1;
     for (size_t i = 0; i < node->itemCount; ++i) if (mutatesIn(typer,owner,node->items[i])) return 1;
     return 0;
 }
@@ -5385,6 +5392,7 @@ static void checkMutations(Typer *typer, RangeNode *node)
         }
     }
     checkMutations(typer,node->a); checkMutations(typer,node->b); checkMutations(typer,node->c);
+    checkMutations(typer,node->lowered);
     for (size_t i = 0; i < node->itemCount; ++i) checkMutations(typer,node->items[i]);
 }
 
@@ -6566,8 +6574,6 @@ static int evalOperator(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValu
 {
     const char *op = expr->name;
     int binary = expr->kind == RangeNodeBinary, status;
-    if (binary && same(op,"..<")) return evalConstruct(eval,frame,expr->type,expr->items,expr->itemCount,expr,out);
-    if (expr->c) return evalExpression(eval,frame,expr->c,out);
     // `-128` is one literal.
     if (!binary && same(op,"-") && expr->a && expr->a->kind == RangeNodeInteger) {
         *out = (RangeValue){.kind=ValueLiteral,.node=expr->a,.integer=-expr->a->integer};
@@ -6766,10 +6772,9 @@ static int evalLiteral(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue
     return evalAdopt(eval,out,expr->type,expr);
 }
 
-static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+/* An expression as written: what its own kind computes. */
+static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
-    *out = (RangeValue){0};
-    if (!expr) return EvalNormal;
     int status = evalStep(eval,expr);
     if (status) return status;
     switch (expr->kind) {
@@ -6805,6 +6810,15 @@ static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeVa
         return evalEmit(eval,frame,expr);
     default: return evalFail(eval,expr,"%s expressions are not run at macro time",rangeNodeKindName(expr->kind));
     }
+}
+
+/* An expression's value: what typing lowered it to, if anything, runs in
+ * its place. */
+static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+{
+    *out = (RangeValue){0};
+    if (!expr) return EvalNormal;
+    return evalPlain(eval,frame,expr->lowered ? expr->lowered : expr,out);
 }
 
 /* ---- statements ---- */
@@ -8508,13 +8522,15 @@ static RangeNode *nativeLoadPlace(Native *native, RangeNode *type, int frameSlot
 
 static RangeNode *nativeExpressionValue(Native *, RangeNode *);
 
-/* Only a call, construction, switch expression, or slot read produces a temporary; any other
- * expression reports none, whatever its operands left behind. */
+/* What typing lowered an expression to, if anything, is compiled in its
+ * place. Only a call, construction, switch expression, or slot read produces
+ * a temporary; any other expression reports none, whatever its operands left
+ * behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
+    if (expr && expr->lowered) expr = expr->lowered;
     RangeNode *type = nativeExpressionValue(native,expr);
-    int construction = expr && (expr->kind == RangeNodeCall || expr->kind == RangeNodeSwitch || (expr->kind == RangeNodeBinary && same(expr->name,"..<"))
-        || ((expr->kind == RangeNodeBinary || expr->kind == RangeNodeUnary) && expr->c));
+    int construction = expr && (expr->kind == RangeNodeCall || expr->kind == RangeNodeSwitch);
     if (!expr || (!construction && !(expr->resolvedDeclaration
         && expr->resolvedDeclaration->kind == RangeNodeEnumCase))) native->resultTemp = -1;
     return type;
@@ -8643,7 +8659,6 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         return placed ? nativeLoadPlace(native,placed,frameSlot,expr) : NULL;
     }
     case RangeNodeUnary: {
-        if (expr->c) return nativeExpression(native,expr->c); /* a declared operator with a body: its call */
         RangeNode *operand = nativeExpression(native,expr->a);
         if (!operand) return NULL;
         if (nativeKind(native,operand,expr) != NativeScalar) {
@@ -8666,9 +8681,6 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
     }
     case RangeNodeBinary: {
         const char *op = expr->name;
-        if (same(op,"..<")) /* the @interval construct, with lower: and upper: */
-            return nativeConstruct(native,expr,type,expr->items,expr->itemCount,0);
-        if (expr->c) return nativeExpression(native,expr->c); /* a declared operator with a body: its call */
         if (shortCircuit(expr->resolvedDeclaration)) {
             nativeExpression(native,expr->a);
             uint32_t base = same(op,"&") ? armCbz(0,0) : armCbnz(0,0);
