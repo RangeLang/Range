@@ -3562,6 +3562,7 @@ typedef struct {
      * the function being typed sees those from narrowedFloor on. */
     struct { RangeNode *path, *entry, *field, *type; } *narrowed;
     size_t narrowedCount, narrowedCapacity, narrowedFloor;
+    RangeNode *deferred; /* the type of a value known only at macro time */
 } Typer;
 
 static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
@@ -3954,11 +3955,86 @@ static int unitType(Typer *typer, const RangeNode *type)
     return 1;
 }
 
+/* ---- macro time ----
+ * A macro type, @member, names a declaration of any kind that applies the
+ * macro, as a grammar kind such as Let names a declaration of that kind. Its
+ * values are declarations, which exist only up to macro time, and so do
+ * values of grammar kinds and of types holding them, such as Array<@member>:
+ * they have no runtime layout, and the evaluator compares them. A macro
+ * type's specialization has the macro as its declaration.
+ *
+ * Some values' types depend on which declaration a reflection value holds:
+ * a member kind's C-backed value, a field only some kinds of a macro type
+ * declare, and what an operator or a function makes of a macro type's value.
+ * Their type is known at macro time: it is accepted wherever a type is
+ * expected, what is computed from it is known at macro time too, and the
+ * evaluator checks it when the macro runs. */
+
+static int isMacroType(const RangeNode *type)
+{
+    return type && type->kind == RangeNodeSpecialization && type->resolvedDeclaration
+        && type->resolvedDeclaration->kind == RangeNodeMacro;
+}
+
+static int deferredType(const Typer *typer, const RangeNode *type)
+{
+    return type && type == typer->deferred;
+}
+
+/* A value whose operations are chosen only at macro time: one known then, or
+ * a declaration of some kind a macro type admits. */
+static int macroOperand(const Typer *typer, const RangeNode *type)
+{
+    return deferredType(typer,type) || isMacroType(type);
+}
+
+/* Whether values of `type` exist only up to macro time. */
+static int macroTimeType(Typer *typer, const RangeNode *type)
+{
+    if (deferredType(typer,type)) return 1;
+    if (!type || type->kind != RangeNodeSpecialization) return 0;
+    if (isMacroType(type) || graphConstruct(typer,type->resolvedDeclaration)) return 1;
+    for (size_t i = 0; type->generics && i < type->generics->itemCount; ++i) {
+        RangeNode *generic = type->generics->items[i];
+        if (generic->kind == RangeNodeTypeParameter && macroTimeType(typer,generic->resolvedType)) return 1;
+    }
+    return 0;
+}
+
+/* `@member` as a type: the one macro of that name. */
+static RangeNode *macroTypeNamed(Typer *typer, const char *name, RangeNode *at)
+{
+    RangeNode *macro = NULL;
+    size_t found = 0;
+    for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+        RangeNode *candidate = typer->report->units[u]->items[i];
+        if (candidate->kind == RangeNodeMacro && same(candidate->name,name)) { macro = candidate; ++found; }
+    }
+    if (!found) return NULL; /* undeclared is reported already */
+    if (found > 1) { typeError(typer,at,"'@%s' names %zu macros; a macro type names one",name,found); return NULL; }
+    int created = 0;
+    RangeNode *type = internSpecialization(typer,macro,NULL,&created);
+    if (created) {
+        char spelled[160];
+        snprintf(spelled,sizeof(spelled),"@%s",name);
+        type->name = rangeArenaIntern(typer->report->arena,spelled,strlen(spelled));
+        type->flags |= RangeFlagChecked; /* the kinds it admits ran their own laws */
+    }
+    return type;
+}
+
+/* A value of a kind is a value of a macro type that kind applies: an Enum is
+ * a @nominal. */
+static int converts(const RangeNode *expected, const RangeNode *actual)
+{
+    return isMacroType(expected) && actual && actual->kind == RangeNodeSpecialization
+        && appliesMacro(actual->resolvedDeclaration,expected->resolvedDeclaration);
+}
+
 static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const char *name,
                                        RangeNode *generics, int flags, RangeNode *context, RangeNode *at)
 {
     if (!name || !*name) return NULL;
-    if (flags & RangeFlagMacroType) return NULL; /* macro types are not typed in this step */
     if (flags & RangeFlagFunction) {
         // Each part resolves where the written type stands. A result that
         // does not resolve yet, an unbound type parameter, is inferred.
@@ -3996,6 +4072,7 @@ static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const c
         rangeNodeAppend(arena,arguments,argument);
         return specialize(typer,scope,optional,arguments,context,at);
     }
+    if (flags & RangeFlagMacroType) return macroTypeNamed(typer,name,at);
     if (context && context->generics)
         for (size_t i = 0; i < context->generics->itemCount; ++i) {
             RangeNode *generic = context->generics->items[i];
@@ -4075,6 +4152,55 @@ static RangeNode *findCalledFunction(RangeNode *owner, const char *name, const R
         if (labels) { labelTrailing((RangeNode *)call,function); return function; }
     }
     return findFunction(owner,name);
+}
+
+/* A member's type in a specialization of its declaration. A grammar kind's
+ * builtin member without a type, such as Let's value, is C's reflection of
+ * the declaration, known at macro time. */
+static RangeNode *memberType(Typer *typer, RangeNode *declaration, RangeNode *member, RangeNode *receiver)
+{
+    if (builtinMember(member) && !member->typeName && graphConstruct(typer,declaration)) return typer->deferred;
+    SourceScope scope = {.owner=declaration};
+    return declaredType(typer,&scope,member,receiver);
+}
+
+/* The kinds a macro type admits: the constructs and enums applying its macro. */
+static size_t macroKinds(Typer *typer, const RangeNode *type, RangeNode **kinds, size_t capacity)
+{
+    size_t count = 0;
+    for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+        RangeNode *kind = typer->report->units[u]->items[i];
+        if ((kind->kind == RangeNodeConstruct || kind->kind == RangeNodeEnum)
+            && appliesMacro(kind,type->resolvedDeclaration) && count < capacity) kinds[count++] = kind;
+    }
+    return count;
+}
+
+/* `member.name` on a value of a macro type: the type every kind admitted
+ * gives the field, when all declare it with one type. A field only some
+ * kinds declare, or declare with different types, is known at macro time,
+ * from the declaration the value holds. */
+static RangeNode *macroTypeMember(Typer *typer, RangeNode *type, const char *name, RangeNode *at)
+{
+    RangeNode *kinds[32], *found = NULL;
+    size_t count = macroKinds(typer,type,kinds,32), declaring = 0;
+    int agree = 1, function = 0;
+    for (size_t i = 0; i < count; ++i) {
+        RangeNode *member = findMember(kinds[i],name);
+        if (!member) { function |= findFunction(kinds[i],name) != NULL; continue; }
+        if (member->flags & RangeFlagMany) { typeError(typer,at,"'%s' holds @many storage and is not a value",name); return NULL; }
+        RangeNode *field = memberType(typer,kinds[i],member,selfSpecialization(typer,kinds[i]));
+        if (!declaring++) found = field;
+        else if (field != found) agree = 0;
+    }
+    if (!count) return NULL; /* no kind applies the macro: nothing says what its values hold */
+    if (!declaring) {
+        char t[160]; describeType(t,sizeof(t),type);
+        if (function) typeError(typer,at,"'%s.%s' is a function; call it",t,name);
+        else typeError(typer,at,"%s has no member '%s'",t,name);
+        return NULL;
+    }
+    return declaring == count && agree && found ? found : typer->deferred;
 }
 
 static RangeNode *lookupFunction(SourceReport *report, SourceScope *scope, const char *name)
@@ -4271,6 +4397,7 @@ static int nativeConcrete(const RangeNode *);
 static void noteEquality(Typer *typer, RangeNode *type, RangeNode *at)
 {
     if (!nativeConcrete(type)) return; /* it mentions a type parameter: checked per specialization */
+    if (macroTimeType(typer,type)) return; /* compared by the evaluator, at macro time */
     if (typer->equalityCount == typer->equalityCapacity) {
         typer->equalityCapacity = typer->equalityCapacity ? typer->equalityCapacity * 2 : 64;
         void *grown = rangeArenaAllocate(typer->report->arena,typer->equalityCapacity * sizeof(*typer->equalities));
@@ -4284,7 +4411,8 @@ static void noteEquality(Typer *typer, RangeNode *type, RangeNode *at)
 
 static void expectType(Typer *typer, RangeNode *at, RangeNode *expected, RangeNode *actual, const char *what)
 {
-    if (!expected || !actual || expected == actual) return;
+    if (!expected || !actual || expected == actual || deferredType(typer,expected) || deferredType(typer,actual)
+        || converts(expected,actual)) return;
     char want[160], got[160];
     describeType(want,sizeof(want),expected); describeType(got,sizeof(got),actual);
     typeError(typer,at,"%s requires %s; found %s",what,want,got);
@@ -4312,8 +4440,10 @@ static RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **pre
  * present case holding it. The expression becomes `.present(value)` in place. */
 static void coerce(Typer *typer, RangeNode *expr, RangeNode *expected, RangeNode *actual, const char *what)
 {
-    RangeNode *present = NULL;
-    if (expr && expected && actual && expected != actual && optionalWrapped(typer,expected,&present) == actual) {
+    RangeNode *present = NULL, *wrapped = NULL;
+    if (deferredType(typer,expected) || deferredType(typer,actual) || converts(expected,actual)) return;
+    if (expr && expected && actual && expected != actual && (wrapped = optionalWrapped(typer,expected,&present))
+        && (wrapped == actual || converts(wrapped,actual))) {
         RangeArena *arena = typer->report->arena;
         RangeNode *value = rangeArenaAllocate(arena,sizeof(*value));
         *value = *expr;
@@ -5172,6 +5302,21 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         receiver = typeOf(typer,scope,callee->a,NULL,context);
         if (!receiver) return NULL;
         if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,callee,"type parameter %s has no functions",receiver->name); return NULL; }
+        if (macroOperand(typer,receiver)) {
+            // Which function this calls depends on the declaration the value
+            // holds: its result is known at macro time.
+            RangeNode *kinds[32];
+            size_t count = isMacroType(receiver) ? macroKinds(typer,receiver,kinds,32) : 0, declaring = 0;
+            for (size_t i = 0; i < count; ++i) declaring += findFunction(kinds[i],callee->name) != NULL;
+            if (count && !declaring) {
+                char type[160]; describeType(type,sizeof(type),receiver);
+                typeError(typer,callee,"%s has no function '%s'",type,callee->name);
+                return NULL;
+            }
+            for (size_t i = 0; i < call->itemCount; ++i)
+                if (call->items[i]->a && call->items[i]->a->kind != RangeNodeClosure) (void)typeOf(typer,scope,call->items[i]->a,NULL,context);
+            return typer->deferred;
+        }
         if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
             // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
             becomeCaseTest(typer->report->arena,call,callee->a,callee->name,call);
@@ -5266,7 +5411,7 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
         RangeNode *parameter = declaredType(typer,&functionScope,function->items[0],operand);
         if (!right) right = typeOf(typer,scope,expr->b,parameter,context);
         if (!right) return NULL;
-        if (parameter == operand && right != operand && optionalWrapped(typer,parameter,NULL) != right) {
+        if (parameter == operand && right != operand && optionalWrapped(typer,parameter,NULL) != right && !deferredType(typer,right)) {
             char r[160]; describeType(r,sizeof(r),right);
             typeError(typer,expr,"operator '%s' requires matching types; found %s and %s",expr->name,t,r);
             return NULL;
@@ -5404,7 +5549,9 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         }
         RangeNode *receiver = typeOf(typer,scope,expr->a,NULL,context);
         if (!receiver) break;
+        if (deferredType(typer,receiver)) { type = receiver; break; }
         if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,expr,"type parameter %s has no members",receiver->name); break; }
+        if (isMacroType(receiver)) { type = macroTypeMember(typer,receiver,expr->name,expr); break; }
         RangeNode *declaration = receiver->resolvedDeclaration;
         if (isEnum(receiver) && enumCase(declaration,expr->name)) {
             // `phase.loading`: whether phase holds the case.
@@ -5416,7 +5563,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         expr->resolvedDeclaration = member;
         if (member) {
             if (member->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
-            else { SourceScope declarationScope = {.owner=declaration}; type = declaredType(typer,&declarationScope,member,receiver); }
+            else type = memberType(typer,declaration,member,receiver);
         } else if (findFunction(declaration,expr->name)) typeError(typer,expr,"'%s.%s' is a function; call it",declaration->name,expr->name);
         else { char t[160]; describeType(t,sizeof(t),receiver); typeError(typer,expr,"%s has no %s '%s'",t,isEnum(receiver) ? "case" : "member",expr->name); }
         break;
@@ -5443,7 +5590,8 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             break;
         }
         RangeNode *operand = typeOf(typer,scope,expr->a,expected,context);
-        if (operand) type = typeOperator(typer,scope,expr,operand,NULL,context);
+        if (macroOperand(typer,operand)) type = typer->deferred; /* its operator is chosen at macro time */
+        else if (operand) type = typeOperator(typer,scope,expr,operand,NULL,context);
         break;
     }
     case RangeNodeBinary: {
@@ -5460,17 +5608,27 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             left = typeOf(typer,scope,expr->a,right ? right : want,context);
         } else left = typeOf(typer,scope,expr->a,want,context);
         if (!equality) {
-            // Any other operator calls the function its left operand's type declares.
-            if (left) type = typeOperator(typer,scope,expr,left,right,context);
+            // Any other operator calls the function its left operand's type
+            // declares; on a value of a macro type, that is chosen at macro time.
+            if (macroOperand(typer,left)) {
+                if (!rightFirst) (void)typeOf(typer,scope,expr->b,NULL,context);
+                type = typer->deferred;
+            } else if (left) type = typeOperator(typer,scope,expr,left,right,context);
             else if (!rightFirst) (void)typeOf(typer,scope,expr->b,NULL,context);
             break;
         }
-        if (!rightFirst) right = typeOf(typer,scope,expr->b,left,context);
+        if (!rightFirst) right = typeOf(typer,scope,expr->b,deferredType(typer,left) ? NULL : left,context);
         if (!left || !right) break;
+        // `=` comes only from @equatable, which declares it returning Bool.
+        if (deferredType(typer,left) || deferredType(typer,right)) { type = typer->booleanType; break; }
         if (left != right) {
-            // `maybe = 5` compares with the present case holding 5.
-            if (optionalWrapped(typer,left,NULL) == right) { coerce(typer,expr->b,left,right,"operand"); right = left; }
-            else if (optionalWrapped(typer,right,NULL) == left) { coerce(typer,expr->a,right,left,"operand"); left = right; }
+            // A kind's value compares with a value of a macro type it applies,
+            // and `maybe = 5` with the present case holding 5.
+            RangeNode *leftWrapped = optionalWrapped(typer,left,NULL), *rightWrapped = optionalWrapped(typer,right,NULL);
+            if (converts(left,right)) right = left;
+            else if (converts(right,left)) left = right;
+            else if (leftWrapped && (leftWrapped == right || converts(leftWrapped,right))) { coerce(typer,expr->b,left,right,"operand"); right = left; }
+            else if (rightWrapped && (rightWrapped == left || converts(rightWrapped,left))) { coerce(typer,expr->a,right,left,"operand"); left = right; }
         }
         if (left != right) {
             char l[160], r[160]; describeType(l,sizeof(l),left); describeType(r,sizeof(r),right);
@@ -5858,6 +6016,14 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
 {
     if (!pattern) return;
     pattern->type = type;
+    if (deferredType(typer,type)) {
+        // Which cases the subject has is known at macro time: what the
+        // pattern binds is known then too.
+        if (pattern->integer == RangePatternBind) pattern->a->type = type;
+        else if (pattern->integer == RangePatternValue) (void)typeOf(typer,scope,pattern->a,NULL,context);
+        else for (size_t i = 0; i < pattern->itemCount; ++i) typePattern(typer,scope,pattern->items[i]->a,type,context);
+        return;
+    }
     char t[160]; describeType(t,sizeof(t),type);
     switch (pattern->integer) {
     case RangePatternAny: return;
@@ -5938,6 +6104,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
 static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, RangeNode *arm, RangeNode *actual)
 {
     if (!type || !actual || type == actual) return type ? type : actual;
+    if (deferredType(typer,type) || deferredType(typer,actual)) return typer->deferred;
     if (optionalWrapped(typer,type,NULL) == actual) {
         coerce(typer,arm,type,actual,"an arm of a switch expression");
         return type;
@@ -6450,7 +6617,9 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
         sourceDiagnostic(typer->report,at,0,"layout","%s has no layout: it contains itself",name);
         return 0;
     }
-    if (graphConstruct(typer,declaration)) {
+    // A grammar kind's values and a macro type's are declarations, which
+    // exist only up to macro time.
+    if (graphConstruct(typer,declaration) || declaration->kind == RangeNodeMacro) {
         specialization->layout = 2;
         specialization->integer = 1; /* graph value: runtime uses report it */
         return 0;
@@ -6711,6 +6880,8 @@ static Typer *typeCheck(SourceReport *report)
     *typer = (Typer){.report=report,.vm=vm};
     typer->specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->functionTypes = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
+    typer->deferred = rangeNodeCreate(report->arena,RangeNodeType,"<compiler>",1,1);
+    typer->deferred->name = "a value known at macro time";
     if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return typer; }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
         RangeNode *candidate = report->units[u]->items[i];
@@ -6964,6 +7135,15 @@ static RangeNode *nativeType(Native *native, RangeNode *type) { return nativeTyp
 static int nativeKind(Native *native, RangeNode *type, RangeNode *at)
 {
     char name[160];
+    if (deferredType(native->typer,type)) {
+        nativeMissing(native,at,"this value is known only at macro time; compiled code has no value of it");
+        return NativeNone;
+    }
+    if (macroTimeType(native->typer,type)) {
+        describeType(name,sizeof(name),type);
+        nativeMissing(native,at,"values of %s exist only up to macro time; compiled code has no value of it",name);
+        return NativeNone;
+    }
     if (!type || type->kind != RangeNodeSpecialization) {
         describeType(name,sizeof(name),type);
         nativeMissing(native,at,"native values of %s are not implemented",name);
@@ -9276,15 +9456,12 @@ static int nativeConcrete(const RangeNode *type)
     return 1;
 }
 
-/* A specialization over graph constructs (Array<Macro> in the grammar) holds
- * compile-time graph values that C provides; it has no runtime instance. */
+/* A specialization over graph constructs or macro types (Array<Macro> and
+ * Array<@member> in the grammar) holds compile-time graph values that C
+ * provides; it has no runtime instance. */
 static int nativeGraphValues(Native *native, const RangeNode *type)
 {
-    if (!type || type->kind != RangeNodeSpecialization) return 0;
-    if (graphConstruct(native->typer,type->resolvedDeclaration)) return 1;
-    for (size_t i = 0; type->generics && i < type->generics->itemCount; ++i)
-        if (type->generics->items[i]->kind == RangeNodeTypeParameter && nativeGraphValues(native,type->generics->items[i]->resolvedType)) return 1;
-    return 0;
+    return macroTimeType(native->typer,type);
 }
 
 /* A construct's methods are compiled for each concrete specialization. A
@@ -9331,8 +9508,11 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     // A generic method's instance is compiled for its receiver's specialization.
     for (size_t i = 0; i < typer->instanceCount; ++i) {
         RangeNode *context = typer->instances[i].context;
+        int graph = 0; /* one a macro calls with its graph values runs only at macro time */
+        for (size_t k = 0; k < typeParameterCount(typer->instances[i].declaration); ++k)
+            graph |= nativeGraphValues(&native,typer->instances[i].types[k]);
         if (!nativeConcreteInstance(typer,i) || (context && (!nativeConcrete(context) || nativeGraphValues(&native,context)))
-            || nativeInlined(typer->instances[i].instance)) continue;
+            || graph || nativeInlined(typer->instances[i].instance)) continue;
         nativeInstance(&native,typer->instances[i].instance,context);
     }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
