@@ -50,11 +50,11 @@ static void compile(Compiled *c, const char *project)
     int ok = resolveGraphApplications(&c->arena,c->units,c->count,error,sizeof(error));
     if (!ok) fprintf(stderr,"%s\n",error);
     assert(ok);
-    diagnoseMacroApplications(&c->report);
+    Typer *typer = diagnoseMacroApplications(&c->report);
     for (size_t u = 0; u < c->count; ++u) diagnoseSourceNode(&c->report,NULL,c->units[u],0);
     diagnoseDuplicates(&c->report);
     for (size_t u = 0; u < c->count; ++u) diagnoseBuiltinFunctions(&c->report,c->units[u]);
-    typeCheck(&c->report);
+    typeCheck(typer);
 }
 
 static SourceDiagnostic *reported(Compiled *c, const char *category, const char *text)

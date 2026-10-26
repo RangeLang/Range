@@ -12,6 +12,7 @@
 
 struct SourceReport;
 static void sourceDiagnostic(struct SourceReport *, RangeNode *, int, const char *, const char *, ...);
+typedef struct Typer Typer;
 
 /* Resolution context; ordinary Range execution is not implemented here. */
 typedef struct {
@@ -26,6 +27,9 @@ typedef struct {
     int skipEmission;   /* law runs per specialization check; emission stays on the declaration */
     struct SourceReport *report; /* where @warning reports, when compiling */
     int deferred; /* a resolution-time binding needs Range code that runs with the application */
+    Typer *typer; /* alive from before the first application to the end of type checking */
+    const char *absent; /* the @optional enum's case without payload: what `let v: T?` starts as */
+    size_t checked; /* applications run */
 } Resolver;
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
@@ -942,6 +946,7 @@ static RangeNode *emitNode(MetaEval *eval, MetaScope *scope, RangeNode *node, in
     *copy = *node;
     eval->emittedFrom[slot] = node; eval->emittedTo[slot] = copy; ++eval->emittedCount;
     copy->emittedBy = attribute;
+    copy->flags &= ~RangeFlagTyped;
     copy->resolvedDeclaration = NULL;
     copy->macroApplication = NULL;
     copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
@@ -2630,8 +2635,11 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     return emitted;
 }
 
+static void absentDefaults(RangeArena *, RangeNode *, const char *);
+
 /* Emitted and written declarations join the graph through the same path as
- * parsed source: shape, grammar identity, macro targets, literal defaults. */
+ * parsed source: shape, grammar identity, macro targets, literal defaults,
+ * and the absent case a bare `let v: T?` starts as. */
 static void resolveMergedNode(Resolver *vm, RangeNode *node)
 {
     validateGraphShape(vm,node,node->source);
@@ -2639,6 +2647,7 @@ static void resolveMergedNode(Resolver *vm, RangeNode *node)
     resolveSignatureTypes(vm,node,node->kind == RangeNodeFunction ? node->owner : NULL);
     resolveGraphTarget(vm,node);
     resolveLiteralDefaults(vm,node);
+    if (vm->absent) absentDefaults(vm->arena,node,vm->absent);
 }
 
 /* Two applications with the same written arguments, compared as syntax. */
@@ -3210,8 +3219,7 @@ static void applyAndMerge(Resolver *vm, RangeNode *attribute)
     mergeEmitted(vm,runMacroApplication(vm,attribute));
 }
 
-static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
-                       RangeNode *target, size_t *checked)
+static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit, RangeNode *target)
 {
     if (!target->graphType) return 0;
     int ran = 0;
@@ -3223,18 +3231,20 @@ static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit,
         if (!app || app->applied) continue;
         app->applied = 1;
         ran = 1;
-        ++*checked;
+        ++vm->checked;
         vm->unit = unit;
         guarded(vm,report,"macro-validation",applyAndMerge,attribute);
     }
     // Members merged during this round wait for the next one.
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
         for (size_t i = 0, n = target->itemCount; i < n; ++i)
-            ran |= applyTarget(vm,report,unit,target->items[i],checked);
+            ran |= applyTarget(vm,report,unit,target->items[i]);
     return ran;
 }
 
-static void applyMacros(Resolver *vm, SourceReport *report, size_t *checked)
+static void drainLaws(Typer *);
+
+static void applyMacros(Resolver *vm, SourceReport *report)
 {
     for (size_t u = 0; u < vm->count; ++u)
         for (size_t i = 0; i < vm->units[u]->itemCount; ++i)
@@ -3244,38 +3254,29 @@ static void applyMacros(Resolver *vm, SourceReport *report, size_t *checked)
         int ran = 0;
         for (size_t u = 0; u < vm->count; ++u)
             for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
-                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],checked);
+                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i]);
+        drainLaws(vm->typer);
         if (!ran) return;
     }
     sourceDiagnostic(report,NULL,0,"macro-validation","macro emission did not settle after %d rounds",RangeMacroRounds);
 }
 
-static size_t diagnoseMacroApplications(SourceReport *report)
+static Typer *newTyper(SourceReport *, Resolver *);
+static void typerLanguage(Typer *);
+
+/* Apply every macro. The type checker exists from the start, so macro time
+ * can type what it runs; the typer returned finishes in typeCheck. */
+static Typer *diagnoseMacroApplications(SourceReport *report)
 {
     Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
     *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
         .error=rangeArenaAllocate(report->arena,512),.errorSize=512,.report=report};
-    size_t checked = 0;
-    if (setjmp(vm->failure) == 0) applyMacros(vm,report,&checked);
-    else sourceDiagnostic(report,NULL,0,"macro-validation","%s",vm->error);
-    return checked;
-}
-
-/* Macro application as compiling runs it, for tests: the number of
- * applications run, or the first error, located. */
-int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
-    size_t *checked, char *error, size_t errorSize)
-{
-    SourceReport report = {.arena=arena,.units=units,.count=count};
-    *checked = diagnoseMacroApplications(&report);
-    for (SourceDiagnostic *d = report.first; d; d = d->next) {
-        if (d->warning) continue;
-        if (d->at) snprintf(error,errorSize,"%s:%d:%d: %s",d->at->path,d->at->line,d->at->column,d->message);
-        else snprintf(error,errorSize,"%s",d->message);
-        *checked = 0;
-        return 0;
-    }
-    return 1;
+    vm->typer = newTyper(report,vm);
+    if (setjmp(vm->failure) == 0) {
+        typerLanguage(vm->typer);
+        applyMacros(vm,report);
+    } else sourceDiagnostic(report,NULL,0,"macro-validation","%s",vm->error);
+    return vm->typer;
 }
 
 /* The ordinary rule: one declaration per name in a scope, however it arrived.
@@ -3464,9 +3465,9 @@ typedef struct {
     size_t failureCount;
 } LawResult;
 
-typedef struct {
+struct Typer {
     SourceReport *report;
-    Resolver *vm;                /* runs laws per specialization */
+    Resolver *vm;                /* applies macros, and runs laws per specialization */
     RangeNode *specializations;  /* interned RangeNodeSpecialization nodes */
     RangeNode *integer, *boolean; /* constructs the integer and boolean literal rules select */
     RangeNode *booleanType;
@@ -3492,7 +3493,55 @@ typedef struct {
     size_t narrowedCount, narrowedCapacity, narrowedFloor;
     RangeNode *deferred; /* the type of a value known only at macro time */
     RangeNode *macro;    /* the macro whose body is being typed */
-} Typer;
+    /* Laws to run: typing never runs Range code, so a specialization or a
+     * literal it meets waits here until typing returns to the top level. */
+    struct { RangeNode *type, *value, *at; } *queued; size_t queuedCount, queuedCapacity;
+};
+
+/* What the typer is in the middle of. Typing one declaration from inside
+ * another saves it first and restores it after, so the outer one goes on as
+ * it was. */
+typedef struct {
+    RangeNode *function, *output, *macro, *inferred, *closureSite;
+    int loops, inferring, closures;
+    size_t narrowedFloor, narrowedCount, typingCount;
+    const char *instance;
+} TyperContext;
+
+static TyperContext typerSave(const Typer *typer)
+{
+    return (TyperContext){.function=typer->function,.output=typer->output,.macro=typer->macro,
+        .inferred=typer->inferred,.closureSite=typer->closureSite,.loops=typer->loops,
+        .inferring=typer->inferring,.closures=typer->closures,.narrowedFloor=typer->narrowedFloor,
+        .narrowedCount=typer->narrowedCount,.typingCount=typer->typingCount,.instance=typer->instance};
+}
+
+static void typerRestore(Typer *typer, TyperContext saved)
+{
+    typer->function = saved.function; typer->output = saved.output; typer->macro = saved.macro;
+    typer->inferred = saved.inferred; typer->closureSite = saved.closureSite; typer->loops = saved.loops;
+    typer->inferring = saved.inferring; typer->closures = saved.closures;
+    typer->narrowedFloor = saved.narrowedFloor; typer->narrowedCount = saved.narrowedCount;
+    typer->typingCount = saved.typingCount; typer->instance = saved.instance;
+}
+
+/* Macro application as compiling runs it, for tests: the number of
+ * applications run, or the first error, located. */
+int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
+    size_t *checked, char *error, size_t errorSize)
+{
+    SourceReport report = {.arena=arena,.units=units,.count=count};
+    Typer *typer = diagnoseMacroApplications(&report);
+    *checked = typer->vm->checked;
+    for (SourceDiagnostic *d = report.first; d; d = d->next) {
+        if (d->warning) continue;
+        if (d->at) snprintf(error,errorSize,"%s:%d:%d: %s",d->at->path,d->at->line,d->at->column,d->message);
+        else snprintf(error,errorSize,"%s",d->message);
+        *checked = 0;
+        return 0;
+    }
+    return 1;
+}
 
 static RangeNode *typeOf(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 static RangeNode *declaredType(Typer *, SourceScope *, RangeNode *, RangeNode *);
@@ -3715,6 +3764,7 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         *member = *holder;
         member->rhsReference = NULL; member->typeName = NULL; member->a = NULL;
         member->items = NULL; member->itemCount = 0; member->itemCapacity = 0;
+        member->flags &= ~RangeFlagTyped;
         RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,value->path,value->line,value->column);
         argument->a = value;
         rangeNodeAppend(arena,member,argument);
@@ -3765,6 +3815,37 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         memcpy(known->failures,failures,failureCount * sizeof(*failures));
         known->failureCount = failureCount;
     }
+}
+
+/* A law to run once typing is back at the top level. Typing may rewrite a
+ * literal in place before then, promoting it into an optional, so the law
+ * keeps the literal as it was met. */
+static void queueLaws(Typer *typer, RangeNode *specialization, RangeNode *value, RangeNode *at)
+{
+    if (value) {
+        RangeNode *kept = rangeArenaAllocate(typer->report->arena,sizeof(*kept));
+        *kept = *value;
+        if (at == value) at = kept;
+        value = kept;
+    }
+    if (typer->queuedCount == typer->queuedCapacity) {
+        typer->queuedCapacity = typer->queuedCapacity ? typer->queuedCapacity * 2 : 64;
+        void *grown = rangeArenaAllocate(typer->report->arena,typer->queuedCapacity * sizeof(*typer->queued));
+        if (typer->queuedCount) memcpy(grown,typer->queued,typer->queuedCount * sizeof(*typer->queued));
+        typer->queued = grown;
+    }
+    typer->queued[typer->queuedCount].type = specialization;
+    typer->queued[typer->queuedCount].value = value;
+    typer->queued[typer->queuedCount++].at = at;
+}
+
+/* Run every queued law, in the order typing met them, including any queued
+ * while they run. */
+static void drainLaws(Typer *typer)
+{
+    for (size_t i = 0; i < typer->queuedCount; ++i)
+        checkLaws(typer,typer->queued[i].type,typer->queued[i].value,typer->queued[i].at);
+    typer->queuedCount = 0;
 }
 
 /* Build the specialization named by generic arguments, in the context whose
@@ -3835,7 +3916,7 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
     if (created) {
         // The declaration's own application already covered its defaults.
         if (isDefault) specialization->flags |= RangeFlagChecked;
-        else checkLaws(typer,specialization,NULL,at);
+        else queueLaws(typer,specialization,NULL,at);
     }
     return specialization;
 }
@@ -4438,7 +4519,7 @@ static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value
             typeError(typer,value,"this literal names no case of %s",declaration->name);
     } else if (type) {
         if (value != literal) value->resolvedDeclaration = rule;
-        checkLaws(typer,type,value,value);
+        queueLaws(typer,type,value,value);
     }
     literal->type = type;
     return type;
@@ -4742,6 +4823,7 @@ static RangeNode *cloneNode(CloneMap *map, RangeNode *node)
     }
     RangeNode *copy = rangeArenaAllocate(map->arena,sizeof(*copy));
     *copy = *node;
+    copy->flags &= ~RangeFlagTyped;
     map->from[at] = node; map->to[at] = copy; ++map->count;
     if (node->itemCount) {
         copy->items = rangeArenaAllocate(map->arena,node->itemCount * sizeof(*copy->items));
@@ -6263,6 +6345,8 @@ static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, Range
 
 static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function, RangeNode *context)
 {
+    if (function->flags & RangeFlagTyped) return;
+    function->flags |= RangeFlagTyped;
     SourceScope scope = {.owner=function,.parent=parent};
     // An operator takes its right operand, or nothing when it is prefix.
     if (function->typeName && operatorName(function->name)) {
@@ -6286,16 +6370,13 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
                   function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
-    int loops = typer->loops, inferring = typer->inferring, closures = typer->closures;
-    RangeNode *outer = typer->function, *outerOutput = typer->output, *inferred = typer->inferred, *site = typer->closureSite;
-    RangeNode *macro = typer->macro; /* a function a macro instantiates is not macro code */
-    size_t floor = typer->narrowedFloor, narrowed = typer->narrowedCount;
-    typer->narrowedFloor = narrowed;
+    TyperContext outer = typerSave(typer);
+    typer->narrowedFloor = typer->narrowedCount;
     typer->loops = 0;
     typer->inferring = 0;
     typer->closures = 0;
     typer->closureSite = NULL;
-    typer->macro = NULL;
+    typer->macro = NULL; /* a function a macro instantiates is not macro code */
     typer->function = function;
     for (size_t i = 0; i < function->itemCount; ++i) function->items[i]->type = declaredType(typer,&scope,function->items[i],context);
     RangeNode *output = function->b
@@ -6303,12 +6384,7 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     function->type = output;
     typer->output = output;
     if (function->a) typeBlock(typer,&scope,function->a,context,output);
-    typer->loops = loops;
-    typer->narrowedFloor = floor; typer->narrowedCount = narrowed;
-    typer->output = outerOutput;
-    typer->function = outer;
-    typer->macro = macro;
-    typer->inferring = inferring; typer->inferred = inferred; typer->closureSite = site; typer->closures = closures;
+    typerRestore(typer,outer);
 }
 
 /* A macro's body is typed as a function's is, returning no value: its
@@ -6320,7 +6396,8 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
  * time, and each switch's coverage, the evaluator checks when the macro runs. */
 static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro)
 {
-    if (!macro->a) return; /* a @builtin macro has no body */
+    if (!macro->a || (macro->flags & RangeFlagTyped)) return; /* a @builtin macro has no body */
+    macro->flags |= RangeFlagTyped;
     RangeArena *arena = typer->report->arena;
     CloneMap map = {.capacity=256,.arena=arena};
     map.from = rangeArenaAllocate(arena,map.capacity * sizeof(*map.from));
@@ -6335,17 +6412,15 @@ static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro)
     for (size_t i = 0; i < macro->itemCount; ++i) copy->items[i] = cloneNode(&map,macro->items[i]);
     cloneLinks(&map);
     SourceScope scope = {.owner=copy,.parent=parent};
-    RangeNode *function = typer->function, *output = typer->output, *outer = typer->macro;
-    size_t floor = typer->narrowedFloor, narrowed = typer->narrowedCount;
-    typer->narrowedFloor = narrowed;
+    TyperContext outer = typerSave(typer);
+    typer->narrowedFloor = typer->narrowedCount;
     typer->function = NULL;
     typer->output = NULL;
     typer->macro = copy;
     for (size_t i = 0; i < copy->itemCount; ++i) copy->items[i]->type = declaredType(typer,&scope,copy->items[i],NULL);
     typeBlock(typer,&scope,copy->a,NULL,NULL);
     checkMutations(typer,copy->a);
-    typer->narrowedFloor = floor; typer->narrowedCount = narrowed;
-    typer->function = function; typer->output = output; typer->macro = outer;
+    typerRestore(typer,outer);
 }
 
 /* Two written types are the same when they are spelled alike: name, flags,
@@ -6459,6 +6534,8 @@ static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declarat
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
         if (rangeNodeDeclaresValue(item->kind)) {
+            if (item->flags & RangeFlagTyped) continue;
+            item->flags |= RangeFlagTyped;
             if (item->typeName && (item->flags & RangeFlagApplication)) {
                 // A member initialized by construction, e.g. `state from: Point(x: 0)`.
                 if (!lookupFunction(typer->report,&scope,item->typeName))
@@ -6884,11 +6961,15 @@ static RangeNode *literalFamily(Typer *typer, const char *spelling)
 
 /* `let v: Int?` with no value is `let v: Int?.absent`: an optional binding
  * starts as the case of the @optional enum that carries no payload. Rewritten
- * before typing, so locals and construct members (as construction defaults)
- * read it like any written value. */
+ * before macros run, so locals and construct members (as construction
+ * defaults) read it like any written value. A grammar declaration's fields
+ * are C's reflection of a node, which macros read by their written types, so
+ * they stay as written. */
 static void absentDefaults(RangeArena *arena, RangeNode *node, const char *absent)
 {
     if (!node || node->kind == RangeNodeEnumCase) return; /* payload fields are types, not bindings */
+    for (size_t i = 0; node->kind == RangeNodeConstruct && i < arena->graphTypes->itemCount; ++i)
+        if (arena->graphTypes->items[i]->resolvedDeclaration == node) return;
     if ((node->kind == RangeNodeLet || node->kind == RangeNodeState) && node->typeName
         && (node->flags & RangeFlagOptional) && !(node->flags & (RangeFlagApplication | RangeFlagMacroType))
         && !node->rhsReference && !node->a && !node->itemCount) {
@@ -6911,26 +6992,31 @@ static void absentDefaults(RangeArena *arena, RangeNode *node, const char *absen
     for (size_t i = 0; i < node->itemCount; ++i) absentDefaults(arena,node->items[i],absent);
 }
 
-/* Returns the typer, kept for code generation: generic methods are lowered per
- * concrete specialization, which substitutes and lays out new types. */
-static Typer *typeCheck(SourceReport *report)
+static Typer *newTyper(SourceReport *report, Resolver *vm)
 {
-    Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
-    *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
-        .error=rangeArenaAllocate(report->arena,512),.errorSize=512};
     Typer *typer = rangeArenaAllocate(report->arena,sizeof(*typer));
     *typer = (Typer){.report=report,.vm=vm};
     typer->specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->functionTypes = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->deferred = rangeNodeCreate(report->arena,RangeNodeType,"<compiler>",1,1);
     typer->deferred->name = "a value known at macro time";
-    if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return typer; }
+    return typer;
+}
+
+/* What the language's declarations give the typer before any macro runs:
+ * the absent case optionals start as, the integer default, and the
+ * condition type. */
+static void typerLanguage(Typer *typer)
+{
+    SourceReport *report = typer->report;
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
         RangeNode *candidate = report->units[u]->items[i];
         if (candidate->kind != RangeNodeEnum || !appliesBuiltin(candidate,"optional")) continue;
         for (size_t c = 0; c < candidate->itemCount; ++c)
-            if (candidate->items[c]->kind == RangeNodeEnumCase && !candidate->items[c]->itemCount)
-                for (size_t v = 0; v < report->count; ++v) absentDefaults(report->arena,report->units[v],candidate->items[c]->name);
+            if (candidate->items[c]->kind == RangeNodeEnumCase && !candidate->items[c]->itemCount) {
+                typer->vm->absent = candidate->items[c]->name;
+                for (size_t v = 0; v < report->count; ++v) absentDefaults(report->arena,report->units[v],typer->vm->absent);
+            }
         break;
     }
     typer->integer = literalFamily(typer,"0");
@@ -6944,6 +7030,17 @@ static Typer *typeCheck(SourceReport *report)
             sourceDiagnostic(report,typer->boolean,0,"layout","%s is the condition type, so it needs case false, then case true, without payloads",
                 typer->boolean->name);
     }
+}
+
+/* Type the program, after macro time: what macros left untyped, and the
+ * checks that need every declaration. The typer is kept for code
+ * generation: generic methods are lowered per concrete specialization, which
+ * substitutes and lays out new types. */
+static void typeCheck(Typer *typer)
+{
+    SourceReport *report = typer->report;
+    Resolver *vm = typer->vm;
+    if (setjmp(vm->failure) != 0) { sourceDiagnostic(report,NULL,0,"type","%s",vm->error); return; }
     // The entry block returns the default integer: the process exit status.
     RangeNode *status = typer->integer ? specialize(typer,NULL,typer->integer,NULL,NULL,typer->integer) : NULL;
     for (size_t u = 0; u < report->count; ++u) {
@@ -6965,7 +7062,8 @@ static Typer *typeCheck(SourceReport *report)
                 else if (operatorName(item->name))
                     typeError(typer,item,"'%s' must be declared on the type of its left operand, in the type or an extension of it",item->name);
             }
-            else if (item->kind == RangeNodeMain) {
+            else if (item->kind == RangeNodeMain && !(item->flags & RangeFlagTyped)) {
+                item->flags |= RangeFlagTyped;
                 item->type = status;
                 typer->output = status;
                 typeBlock(typer,&unit,item->a,NULL,status);
@@ -6973,6 +7071,7 @@ static Typer *typeCheck(SourceReport *report)
             }
         }
     }
+    drainLaws(typer); /* the specializations and literals typing met */
     for (size_t u = 0; u < report->count; ++u) checkOverloads(typer,report->units[u]);
     for (size_t u = 0; u < report->count; ++u) checkMutations(typer,report->units[u]);
     for (size_t i = 0; i < typer->instanceCount; ++i) checkMutations(typer,typer->instances[i].instance);
@@ -6985,7 +7084,7 @@ static Typer *typeCheck(SourceReport *report)
         char name[160]; describeType(name,sizeof(name),specialization);
         sourceDiagnostic(report,specialization->resolvedDeclaration,0,"layout","%s has no layout",name);
     }
-    return typer;
+    drainLaws(typer); /* the specializations comparing and layout met */
 }
 
 /* ---- native code -----------------------------------------------------------
@@ -9577,6 +9676,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
         rangePatch(&native.machine,native.calls[i].at,armBl((int32_t)(((int64_t)instance->offset - (int64_t)native.calls[i].at) / 4)));
     }
     nativeTraps(&native);
+    drainLaws(typer); /* the specializations and instances code generation met */
     int written = 0;
     if (!native.failed && entry) {
         char error[512];
@@ -9743,11 +9843,11 @@ int main(int argc, char **argv)
         int resolved = unitCount && resolveGraphApplications(&arena,units,unitCount,error,sizeof(error));
         if (unitCount && !resolved) sourceDiagnostic(&report,NULL,0,"resolution","%s",error);
         // Build the graph, apply macros and merge their output, then resolve names.
-        if (resolved && !failures) diagnoseMacroApplications(&report);
+        Typer *typer = resolved && !failures ? diagnoseMacroApplications(&report) : NULL;
         for (size_t u = 0; u < unitCount; ++u) diagnoseSourceNode(&report,NULL,units[u],0);
         diagnoseDuplicates(&report);
         for (size_t u = 0; u < unitCount; ++u) diagnoseBuiltinFunctions(&report,units[u]);
-        Typer *typer = resolved && !failures ? typeCheck(&report) : NULL;
+        if (typer) typeCheck(typer);
         // Native code is generated from a complete, well-typed graph only.
         int written = typer && !report.errors && emitNative(&report,typer,output);
         writeSourceDiagnostics(&report,stderr);
