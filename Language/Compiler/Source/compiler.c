@@ -2724,10 +2724,28 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
 /* The declared type of another declaration's generic, member, payload
  * field, or parameter, as typing that declaration finds it, whatever key the
  * code that asks is typed under. */
+/* The key a declaration's members, payload fields, and generics are typed
+ * under for `type`: NULL for one that is not a specialization of it, or is
+ * its own view, the one its bodies are typed in; else that specialization. */
+static RangeNode *keyOf(const RangeNode *declaration, RangeNode *type)
+{
+    if (!declaration || !type || type->kind != RangeNodeSpecialization || type->resolvedDeclaration != declaration) return NULL;
+    for (size_t i = 0; declaration->generics && i < declaration->generics->itemCount; ++i) {
+        RangeNode *generic = declaration->generics->items[i], *value = type->generics->items[i];
+        if (generic->kind == RangeNodeTypeParameter ? value->resolvedType != generic
+            : generic->typeName ? rangeNodeRHS(value) != NULL : !sameGenericValue(value,generic)) return type;
+    }
+    return NULL;
+}
+
+/* The declared type of a declaration's generic, member, payload field, or
+ * parameter, for `context`: typed under that declaration's key, whatever key
+ * the code that asks is typed under, so each specialization keeps its own
+ * findings about the declaration's nodes. */
 static RangeNode *declaredTypeIn(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context)
 {
     RangeNode *key = typer->key;
-    typer->key = NULL;
+    typer->key = keyOf(scope ? scope->owner : NULL,context);
     RangeNode *type = declaredType(typer,scope,node,context);
     typer->key = key;
     return type;
@@ -3188,7 +3206,7 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
     }
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
-        if (!constructionInput(member) || declarationValue(typer->key,member) || optionalWithoutValue(member)) continue;
+        if (!constructionInput(member) || declarationValue(keyOf(declaration,type),member) || optionalWithoutValue(member)) continue;
         int supplied = 0;
         for (size_t j = 0; j < count; ++j) if (found(typer->key,arguments[j])->resolvedDeclaration == member) supplied = 1;
         if (!supplied) typeError(typer,at,"%s requires input '%s'",typeName,member->name);
@@ -6427,7 +6445,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
     RangeNode *declaration = type->resolvedDeclaration;
     evalPrepare(eval,declaration);
     typeMembersOnDemand(eval->typer,declaration);
-    EvalFrame defaults = {0};
+    EvalFrame defaults = {.key=keyOf(declaration,type)};
     int status, bits, isSigned;
     if (bytesDeclaration(declaration) || scalarShape(type,&bits,&isSigned)) {
         RangeNode *value = count ? arguments[0]->a : NULL;
@@ -7434,6 +7452,27 @@ static RangeNode *nativeVariant(Native *native, RangeNode *at, RangeNode *type, 
     return type;
 }
 
+/* Make `context` the running one; returns the one it replaces. */
+static NativeContext nativeUse(Native *native, NativeContext context)
+{
+    NativeContext running = {.owner=native->owner,.self=native->self,.function=native->function,.key=native->key,
+                             .selfSlot=native->selfSlot,.outer=native->outer};
+    native->owner = context.owner; native->self = context.self; native->function = context.function;
+    native->key = context.key; native->selfSlot = context.selfSlot; native->outer = context.outer;
+    return running;
+}
+
+/* A member's default, compiled where it is declared: in the specialization
+ * being constructed, under its key. */
+static RangeNode *nativeDefault(Native *native, RangeNode *type, RangeNode *value)
+{
+    NativeContext caller = nativeUse(native,(NativeContext){.owner=type->resolvedDeclaration,.self=type,
+                                                            .key=keyOf(type->resolvedDeclaration,type)});
+    RangeNode *result = nativeExpression(native,value);
+    nativeUse(native,caller);
+    return result;
+}
+
 /* Construct `type` at frame offset `destination` (an aggregate), or into x0 (a
  * scalar). Arguments populate the members they name; the rest take their
  * defaults; @many storage starts empty. */
@@ -7442,14 +7481,14 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
 {
     int kind = nativeKind(native,type,at);
     if (kind == NativeNone) return NULL;
-    RangeNode *declaration = type->resolvedDeclaration;
+    RangeNode *declaration = type->resolvedDeclaration, *key = keyOf(declaration,type);
     if (kind == NativeScalar) {
         // A scalar's single input is the value itself.
         native->resultTemp = -1;
         if (count) return nativeExpression(native,arguments[0]->a), type;
         for (size_t i = 0; i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i]) && declarationValue(native->key,declaration->items[i])) {
-                nativeExpression(native,declarationValue(native->key,declaration->items[i]));
+            if (constructionInput(declaration->items[i]) && declarationValue(key,declaration->items[i])) {
+                nativeDefault(native,type,declarationValue(key,declaration->items[i]));
                 return type;
             }
         nativeEmit(native,armMovz(0,0,0));
@@ -7461,12 +7500,13 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         // Like a scalar, a bytes construct's single input is the value itself:
         // `String("hi")` is the literal's bytes, and `String()` its default's.
         RangeNode *value = count ? arguments[0]->a : NULL;
+        int defaulted = !value;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) value = declarationValue(native->key,declaration->items[i]);
+            if (constructionInput(declaration->items[i])) value = declarationValue(key,declaration->items[i]);
         nativeFrameAddress(native,0,destination);
         nativeZero(native,0,type->size);
         if (value) {
-            if (!nativeExpression(native,value)) return NULL;
+            if (!(defaulted ? nativeDefault(native,type,value) : nativeExpression(native,value))) return NULL;
             int moved = nativeTakeTemp(native);
             nativeFrameAddress(native,1,destination);
             nativeCopyValue(native,1,0,type,!moved);
@@ -7507,14 +7547,16 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         for (size_t j = 0; j < count; ++j) if (found(native->key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
         int memberKind = nativeKind(native,memberType,member);
         if (memberKind == NativeNone) continue;
-        if (!value) value = declarationValue(native->key,member);
-        if (value == member) {
+        if (value) nativeExpression(native,value);
+        else if ((value = declarationValue(key,member)) == member) {
+            // A default that constructs: its arguments are the declaration's.
+            NativeContext caller = nativeUse(native,(NativeContext){.owner=declaration,.self=type,.key=key});
             nativeConstruct(native,member,memberType,member->items,member->itemCount,destination + (int32_t)offset);
+            nativeUse(native,caller);
             if (memberKind == NativeScalar) { nativeFrameAddress(native,1,destination); nativeStoreScalar(native,0,1,offset,memberType); }
             continue;
-        }
-        if (!value) continue; /* required inputs are enforced by the type checker */
-        nativeExpression(native,value);
+        } else if (value) nativeDefault(native,type,value);
+        else continue; /* required inputs are enforced by the type checker */
         int moved = nativeTakeTemp(native);
         nativeFrameAddress(native,1,destination);
         if (memberKind == NativeScalar) nativeStoreScalar(native,0,1,offset,memberType);
@@ -8276,10 +8318,7 @@ static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *functio
     region.stack = nativeReserve(native,8,8);
     nativeEmit(native,armAddImm(10,31,0)); /* mov x10, sp */
     nativeStore(native,10,region.stack);
-    NativeContext saved = {.owner=native->owner,.self=native->self,.function=native->function,.key=native->key,
-                           .selfSlot=native->selfSlot,.outer=native->outer};
-    native->owner = context->owner; native->self = context->self; native->function = context->function;
-    native->key = context->key; native->selfSlot = context->selfSlot; native->outer = context->outer;
+    NativeContext saved = nativeUse(native,*context);
     native->region = &region;
     native->valueDepth += 1;
     if (value) {
@@ -8299,8 +8338,7 @@ static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *functio
     free(region.returns);
     native->valueDepth -= 1;
     native->region = region.outer;
-    native->owner = saved.owner; native->self = saved.self; native->function = saved.function;
-    native->key = saved.key; native->selfSlot = saved.selfSlot; native->outer = saved.outer;
+    nativeUse(native,saved);
     native->resultTemp = -1;
     if (kind == NativeScalar) nativeLoad(native,0,region.result);
     else if (kind == NativeAggregate) { nativeTrackTemp(native,region.result,output); nativeFrameAddress(native,0,region.result); }

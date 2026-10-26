@@ -350,6 +350,21 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A generic construct's member is typed per specialization it is read in:
+    // each keeps the absent case its optional starts as.
+    compile(&c,"construct Box<T> { let v: T? } "
+        "function boxes(let a: Box<Int>, let b: Box<Bool>): Bool { let x: a.v let y: b.v return x.absent & y.absent }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *boxes = named(c.project,"boxes"), *v = named(named(c.project,"Box"),"v");
+    RangeNode *ints = boxes->items[0]->type, *bools = boxes->items[1]->type;
+    expectDescription(ints,"Box<T: Int<bits: 64, signed: true>>");
+    expectDescription(bools,"Box<T: Bool>");
+    expectDescription(v->lowered->type,"Optional<Wrapped: T>");
+    expectDescription(found(ints,v)->lowered->type,"Optional<Wrapped: Int<bits: 64, signed: true>>");
+    expectDescription(found(bools,v)->lowered->type,"Optional<Wrapped: Bool>");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
