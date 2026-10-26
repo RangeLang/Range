@@ -111,7 +111,7 @@ int main(void)
     compile(&c,CORE
         "macro clash(): Construct { let name: 1 #graph { construct Clash { let value: #name } } } "
         "@clash construct Box {}");
-    assert(reported(&c,"macro-validation","#name names both a macro local and a target field"));
+    assert(reported(&c,"type","#name names both a macro local and a target field"));
     assert(!declaration(c.unit,"Clash"));
     rangeArenaDestroy(&c.arena);
     // A failed application emits nothing from its body. A shape-only block,

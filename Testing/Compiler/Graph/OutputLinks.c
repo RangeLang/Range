@@ -29,12 +29,10 @@ int main(void)
     assert(!units[0]->items[1]->b->resolvedDeclaration);
     RangeMacroApplication *app = construct->c->items[0]->macroApplication;
     assert(app && app->target == construct && app->declaration == units[2]->items[0]);
-    // A field chain resolves with the application; a call is Range code and
-    // waits until the application runs.
-    assert(app->bindings[0].state == 2 && app->bindings[0].value.kind == RangeGraphNodes);
-    assert(app->bindings[0].value.nodes[0] == construct->generics->items[0]);
-    assert(rangeNodeRHS(app->bindings[0].value.nodes[0])->integer == 64);
-    assert(app->bindings[1].state == 0);
+    // #generics reads the construct's own generics; a generic's value is its literal.
+    RangeGraphValue generics = rangeGraphStoredField(&arena,construct,"generics");
+    assert(generics.kind == RangeGraphNodes && generics.nodes[0] == construct->generics->items[0]);
+    assert(rangeNodeRHS(generics.nodes[0])->integer == 64);
     assert(function->a->items[0]->a->integer == 42);
     RangeNode *call = units[0]->items[2]->a->items[0]->a;
     assert(units[0]->items[2]->b->resolvedDeclaration == construct);
@@ -54,6 +52,6 @@ int main(void)
     assert(!resolveGraphApplications(&arena,units,3,error,sizeof(error)));
     assert(strstr(error,"ambiguous graph output 'Whole'"));
     rangeArenaDestroy(&arena);
-    puts("graph output links: identity, macro, actual value, deferred, parameter types, receivers, ambiguity=pass");
+    puts("graph output links: identity, macro, actual value, parameter types, receivers, ambiguity=pass");
     return 0;
 }

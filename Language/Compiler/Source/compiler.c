@@ -34,12 +34,12 @@ typedef struct {
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
 
-/* Migration switch: with RANGE_TYPED_MACROS set, macro bodies are typed in
- * place and run by the known-value evaluator over typed nodes. */
+/* Migration switch: macro bodies are typed in place and run by the
+ * known-value evaluator over typed nodes, unless RANGE_TYPED_MACROS is 0. */
 static int typedMacros(void)
 {
     static int on = -1;
-    if (on < 0) on = getenv("RANGE_TYPED_MACROS") != NULL;
+    if (on < 0) on = !getenv("RANGE_TYPED_MACROS") || strcmp(getenv("RANGE_TYPED_MACROS"),"0");
     return on;
 }
 
@@ -3661,31 +3661,10 @@ static RangeNode *resolveTypeReference(Typer *, SourceScope *, const char *, Ran
 static void expectType(Typer *, RangeNode *, RangeNode *, RangeNode *, const char *);
 static void coerce(Typer *, RangeNode *, RangeNode *, RangeNode *, const char *);
 
-/* A macro runs before its body is typed, so a mistake in the body may have
- * stopped an application already, at the same position: the type error says
- * what is wrong there, so it replaces that failure. One problem, one report. */
-static void replaceMacroFailure(SourceReport *report, const RangeNode *at)
-{
-    char prefix[512];
-    int length = snprintf(prefix,sizeof(prefix),"%s:%d:%d: ",at->path,at->line,at->column);
-    if (length < 0 || (size_t)length >= sizeof(prefix)) return;
-    SourceDiagnostic *previous = NULL;
-    for (SourceDiagnostic *d = report->first; d;) {
-        SourceDiagnostic *next = d->next;
-        if (!d->at && !d->warning && same(d->category,"macro-validation") && !strncmp(d->message,prefix,(size_t)length)) {
-            if (previous) previous->next = next; else report->first = next;
-            if (report->last == d) report->last = previous;
-            report->errors -= 1;
-        } else previous = d;
-        d = next;
-    }
-}
-
 static void typeError(Typer *typer, RangeNode *at, const char *format, ...)
 {
     char text[768]; va_list args; va_start(args,format);
     vsnprintf(text,sizeof(text),format,args); va_end(args);
-    if (typer->macro && at && !typedMacros()) replaceMacroFailure(typer->report,at);
     // Code a macro emitted is located in the macro; name the application too.
     RangeNode *emitter = typer->function ? typer->function->emittedBy : NULL;
     RangeMacroApplication *app = emitter ? emitter->macroApplication : NULL;
@@ -5462,11 +5441,10 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             }
             for (size_t i = 0; i < call->itemCount; ++i) {
                 RangeNode *argument = call->items[i]->a;
-                if (argument && argument->kind == RangeNodeClosure) {
-                    if (typedMacros())
-                        typeError(typer,argument,"this closure's parameter types are not known: '%s' is called on a value known only at macro time",
-                                  callee->name);
-                } else if (argument) (void)typeOf(typer,scope,argument,NULL,context);
+                if (argument && argument->kind == RangeNodeClosure)
+                    typeError(typer,argument,"this closure's parameter types are not known: '%s' is called on a value known only at macro time",
+                              callee->name);
+                else if (argument) (void)typeOf(typer,scope,argument,NULL,context);
             }
             return typer->deferred;
         }
@@ -5691,7 +5669,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     case RangeNodeName: {
         RangeNode *declaration = nameLookup(typer->report,scope,expr);
         expr->resolvedDeclaration = declaration;
-        if (typedMacros() && declaration && declaredLater(scope,declaration)) {
+        if (declaration && declaredLater(scope,declaration)) {
             typeError(typer,expr,"'%s' is read before its declaration",expr->name);
             break;
         }
@@ -5819,7 +5797,6 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         type = typeCaseTest(typer,scope,expr,context);
         break;
     case RangeNodeEmission:
-        if (!typedMacros()) break;
         if (!typer->macro) { typeError(typer,expr,"#graph is written only in a macro's body"); break; }
         typeSplices(typer,scope,expr->b);
         break;
@@ -6033,7 +6010,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
     typeStatementOnly(typer,scope,node,context,output);
     typer->narrowedCount = mark;
     // A local is declared once its statement is typed: later ones may read it.
-    if (typedMacros() && node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) node->flags |= RangeFlagTyped;
+    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) node->flags |= RangeFlagTyped;
 }
 
 static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
@@ -6457,7 +6434,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         size_t narrowed = typer->narrowedCount; /* what the arm's condition narrows holds in its body */
-        if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount && (!typer->macro || typedMacros()))
+        if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount)
             typeError(typer,entry,"'default' must be the last arm of a switch");
         for (size_t j = 0; j < entry->itemCount; ++j) {
             // The parser checked where the row binds; its condition sees its bindings.
@@ -6477,16 +6454,13 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         }
         typeBlock(typer,&body,entry->b,context,output);
         typer->narrowedCount = narrowed;
-        if (value && (!typer->macro || typedMacros()) && !exits(entry->b,typer->loops > 0))
+        if (value && !exits(entry->b,typer->loops > 0))
             typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic");
     }
     if (value && !type && typer->report->errors == errors)
         typeError(typer,node,"no arm of this switch expression yields a value");
     node->type = type;
     if (!typed || typer->report->errors != errors) return type;
-    // A macro's switches are checked where it runs, by the evaluator: which
-    // arm is last, which yield, and what the arms cover.
-    if (typer->macro && !typedMacros()) return type;
     if (!width) { typeConditionCoverage(typer,node); return type; }
     // Each row must match something the earlier ones do not; together they
     // must match every value, or every combination of the subjects' values.
@@ -6585,59 +6559,30 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     typerRestore(typer,outer);
 }
 
-/* A macro's body is typed as a function's is, returning no value: its
- * parameters, its locals, and top-level functions are in scope; `#field` is
- * the field its target kind declares; #graph code is typed where it lands.
- * The macro has run already and runs again per specialization, so the body
- * typed is a copy: what typing writes into the tree, a promotion or a
- * narrowed read, never reaches the evaluator. What typing leaves to macro
- * time, and each switch's coverage, the evaluator checks when the macro runs. */
+/* A macro's body is typed as a function's is, returning no value, in place
+ * and once, as it is first applied: its parameters, its locals, and
+ * top-level functions are in scope; `#field` is the field its target kind
+ * declares; #graph code is typed where it lands, its splices here. Typing at
+ * the first application reports what the source pass would then, and a body
+ * with anything unresolved or mistyped does not run. A macro never applied
+ * is typed after macro time; the source pass checked it. */
 static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro, int diagnose)
 {
     if (!macro->a || (macro->flags & RangeFlagTyped)) return; /* a @builtin macro has no body */
-    if (typedMacros()) {
-        // Typed as it is first applied, a macro reports then what the source
-        // pass would; anything unresolved or mistyped keeps it from running.
-        size_t errors = typer->report->errors;
-        if (diagnose) diagnoseSourceNode(typer->report,parent,macro,0);
-        macro->flags |= RangeFlagTyped;
-        SourceScope scope = {.owner=macro,.parent=parent};
-        TyperContext outer = typerSave(typer);
-        typer->narrowedFloor = typer->narrowedCount;
-        typer->function = NULL;
-        typer->output = NULL;
-        typer->macro = macro;
-        for (size_t i = 0; i < macro->itemCount; ++i) macro->items[i]->type = declaredType(typer,&scope,macro->items[i],NULL);
-        typeBlock(typer,&scope,macro->a,NULL,NULL);
-        checkMutations(typer,macro->a);
-        typerRestore(typer,outer);
-        if (typer->report->errors != errors) macro->flags |= RangeFlagInvalid;
-        return;
-    }
+    size_t errors = typer->report->errors;
+    if (diagnose) diagnoseSourceNode(typer->report,parent,macro,0);
     macro->flags |= RangeFlagTyped;
-    RangeArena *arena = typer->report->arena;
-    CloneMap map = {.capacity=256,.arena=arena};
-    map.from = rangeArenaAllocate(arena,map.capacity * sizeof(*map.from));
-    map.to = rangeArenaAllocate(arena,map.capacity * sizeof(*map.to));
-    memset(map.from,0,map.capacity * sizeof(*map.from));
-    // The macro itself stays: literals in it name it when it is their rule.
-    RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
-    *copy = *macro;
-    copy->a = cloneNode(&map,macro->a);
-    copy->items = rangeArenaAllocate(arena,(macro->itemCount ? macro->itemCount : 1) * sizeof(*copy->items));
-    copy->itemCapacity = macro->itemCount;
-    for (size_t i = 0; i < macro->itemCount; ++i) copy->items[i] = cloneNode(&map,macro->items[i]);
-    cloneLinks(&map);
-    SourceScope scope = {.owner=copy,.parent=parent};
+    SourceScope scope = {.owner=macro,.parent=parent};
     TyperContext outer = typerSave(typer);
     typer->narrowedFloor = typer->narrowedCount;
     typer->function = NULL;
     typer->output = NULL;
-    typer->macro = copy;
-    for (size_t i = 0; i < copy->itemCount; ++i) copy->items[i]->type = declaredType(typer,&scope,copy->items[i],NULL);
-    typeBlock(typer,&scope,copy->a,NULL,NULL);
-    checkMutations(typer,copy->a);
+    typer->macro = macro;
+    for (size_t i = 0; i < macro->itemCount; ++i) macro->items[i]->type = declaredType(typer,&scope,macro->items[i],NULL);
+    typeBlock(typer,&scope,macro->a,NULL,NULL);
+    checkMutations(typer,macro->a);
     typerRestore(typer,outer);
+    if (typer->report->errors != errors) macro->flags |= RangeFlagInvalid;
 }
 
 /* Two written types are the same when they are spelled alike: name, flags,

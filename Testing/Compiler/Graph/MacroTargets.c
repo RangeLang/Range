@@ -31,24 +31,6 @@ static RangeMacroApplication *application(RangeNode *target, RangeNode *macro)
     return app;
 }
 
-static RangeGraphValue binding(RangeMacroApplication *app, const char *name)
-{
-    for (size_t i = 0; i < app->count; ++i) if (same(app->bindings[i].definition->name,name)) {
-        assert(app->bindings[i].state == 2);
-        return app->bindings[i].value;
-    }
-    assert(0 && "binding is missing");
-    return (RangeGraphValue){0};
-}
-
-static int deferred(RangeMacroApplication *app, const char *name)
-{
-    for (size_t i = 0; i < app->count; ++i)
-        if (same(app->bindings[i].definition->name,name)) return app->bindings[i].state == 0;
-    assert(0 && "binding is missing");
-    return 0;
-}
-
 static void reject(const char *source, const char *expected)
 {
     RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
@@ -98,35 +80,29 @@ int main(void)
         RangeMacroApplication *a = application(first,macros->items[0]);
         RangeMacroApplication *b = application(second,macros->items[0]);
         assert(a != b);
-        assert(same(binding(a,"targetName").text,"First"));
-        assert(same(binding(b,"targetName").text,"Second"));
-        assert(binding(a,"chosen").nodes[0] == first->items[0]);
-        assert(binding(b,"chosen").nodes[0] == second->items[0]);
-        assert(binding(a,"config").nodes[0] == first->generics->items[0]);
-        assert(binding(b,"config").nodes[0] == second->generics->items[0]);
-        assert(binding(a,"attached").nodes[0] == first->c->items[0]);
-        // Collection functions are Range code: those bindings wait for the
-        // application to run.
-        assert(deferred(a,"width") && deferred(b,"width"));
-        assert(deferred(a,"missing") && deferred(b,"missing"));
-        RangeMacroApplication *f = application(function,macros->items[1]);
-        assert(binding(f,"parameters").nodes[0] == function->items[0]);
-        assert(binding(f,"output").node == first);
-        assert(binding(f,"body").node == function->a);
-        assert(same(binding(application(first->items[1],macros->items[1]),"targetName").text,"nested"));
-        RangeMacroApplication *e = application(enumeration,macros->items[2]);
-        assert(binding(e,"chosen").nodes[0] == enumeration->items[0]);
-        RangeMacroApplication *m = application(recipe,macros->items[3]);
-        assert(same(binding(m,"targetName").text,"recipe"));
-        assert(binding(m,"targetType").node == graphTypeIdentity(first));
-        assert(binding(m,"body").node == recipe->a);
-        assert(binding(m,"original").nodes[0] == recipe->a->items[0]);
-        assert(binding(m,"expansions").count == 1);
+        assert(same(rangeGraphStoredField(&arena,first,"name").text,"First") && same(rangeGraphStoredField(&arena,second,"name").text,"Second"));
+        assert(rangeGraphStoredField(&arena,first,"members").nodes[0] == first->items[0]);
+        assert(rangeGraphStoredField(&arena,second,"members").nodes[0] == second->items[0]);
+        assert(rangeGraphStoredField(&arena,first,"generics").nodes[0] == first->generics->items[0]);
+        assert(rangeGraphStoredField(&arena,first,"macros").nodes[0] == first->c->items[0]);
+        application(function,macros->items[1]);
+        assert(rangeGraphStoredField(&arena,function,"parameters").nodes[0] == function->items[0]);
+        assert(rangeGraphStoredField(&arena,function,"output").node == first);
+        assert(rangeGraphStoredField(&arena,function,"body").node == function->a);
+        application(first->items[1],macros->items[1]);
+        application(enumeration,macros->items[2]);
+        assert(rangeGraphStoredField(&arena,enumeration,"cases").nodes[0] == enumeration->items[0]);
+        application(recipe,macros->items[3]);
+        assert(rangeGraphStoredField(&arena,recipe,"target").node == graphTypeIdentity(first));
+        assert(rangeGraphStoredField(&arena,recipe,"body").node == recipe->a);
+        RangeGraphValue original = rangeGraphStoredField(&arena,recipe->a,"members"), expansions = rangeGraphStoredField(&arena,recipe->a,"graph");
+        assert(original.nodes[0] == recipe->a->items[0]);
+        assert(expansions.count == 1);
         assert(recipe->a->items[1]->kind == RangeNodeExpressionStatement);
-        assert(binding(m,"expansions").nodes[0] == recipe->a->items[1]->a);
-        assert(binding(m,"body").node->source == targets->source);
-        assert(binding(m,"original").nodes[0]->source == targets->source);
-        assert(binding(m,"expansions").nodes[0]->source == targets->source);
+        assert(expansions.nodes[0] == recipe->a->items[1]->a);
+        assert(recipe->a->source == targets->source);
+        assert(original.nodes[0]->source == targets->source);
+        assert(expansions.nodes[0]->source == targets->source);
     }
     RangeNode *reordered[] = {grammar,macros,targets};
     RangeNode *swap = macros->items[0]; macros->items[0] = macros->items[2]; macros->items[2] = swap;
@@ -164,6 +140,6 @@ int main(void)
     char error[512]; int matched = 0;
     assert(matchLiteralRule(&arena,&literal,1,"digits","42",&matched,error,sizeof(error)) && matched);
     rangeArenaDestroy(&arena);
-    puts("macro targets: direct fields, identities, overloads, isolation, reflection, rejections=pass");
+    puts("macro targets: identities, field adapters, overloads, isolation, rejections=pass");
     return 0;
 }

@@ -46,9 +46,9 @@ for mode in ordinary sanitized; do
         grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks source location"
         [[ ! -s "$work_root/log" ]] || fail "$mode $fixture claimed success"
         if [[ "$fixture" == Forward ]]; then
-            grep -Fq "unresolved compile-time local 'other'" "$work_root/error" || fail "$mode forward reference failed for wrong reason"
+            grep -Fq "'other' is read before its declaration" "$work_root/error" || fail "$mode forward reference failed for wrong reason"
         elif [[ "$fixture" == UnknownBody ]]; then
-            grep -Fq "field 'unknown' is not declared by @type Block" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
+            grep -Fq "Optional<Wrapped: Block> has no case 'unknown'" "$work_root/error" || fail "$mode unknown body field failed for wrong reason"
         else
             grep -Fq "field 'unknown' is not declared by @type Construct" "$work_root/error" || fail "$mode unknown field failed for wrong reason"
         fi

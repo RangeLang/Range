@@ -440,7 +440,7 @@ reject macro-case-missing "Half needs on and off" "$paired
 @paired
 enum Half { case on }
 { return 0 }"
-reject macro-case-coverage "compile-time switch must be exhaustive: 'off.absent' is not handled; add an arm for it or a default" \
+reject macro-case-coverage "switch must be exhaustive: 'off.absent' is not handled; add an arm for it or a default" \
     'macro both(): Enum {
     let off: #cases.first(where: { c in c.name = "off" })
     switch { off.present(let c) & c.name = "off": {}, off.present: {} }
@@ -522,7 +522,7 @@ enum Light { case on, off }
 { return 0 }'
 # A macro's body is typed as a function's is: #members is Array<@member>, so
 # a member's name is a String, and the same mistake is the same type error.
-# It replaces the evaluator's failure at the same place.
+# A body with a type error does not run, so the mistake is reported once.
 reject macro-mismatch "macro-mismatch.range:2:63: error[type]: operator '=' requires matching types; found String and Int<bits: 64, signed: true>" \
     'macro valued(): Construct {
     let stored: #members.first(where: { member in member.name = 5 })
@@ -530,7 +530,7 @@ reject macro-mismatch "macro-mismatch.range:2:63: error[type]: operator '=' requ
 @valued
 construct Box { let value: 1 }
 { return 0 }'
-! grep -Fq "a compile-time name requires text" "$work_root/log" || fail "a macro's type error was reported twice"
+! grep -Fq "error[macro-validation]" "$work_root/log" || fail "a macro's type error was reported twice"
 # @member names a declaration of any kind applying @member: a field none of
 # them declares is an error; one only some declare is known at macro time.
 reject macro-type-member "@member has no member 'nmae'" \

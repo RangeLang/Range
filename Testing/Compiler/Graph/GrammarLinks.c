@@ -85,9 +85,10 @@ int main(void)
     assert(units[1]->items[3]->a->items[0]->grammarDefinition == returns);
     assert(!units[1]->items[3]->a->items[0]->a);
     assert(units[0]->items[4]->b->resolvedDeclaration == construct);
-    assert(box->c->items[0]->macroApplication->bindings[0].value.nodes[0] == box->items[0]);
+    assert(box->c->items[0]->macroApplication->target == box);
+    assert(rangeGraphStoredField(&arena,box,"members").nodes[0] == box->items[0]);
     assert(rangeGraphStoredField(&arena,start->a->items[1],"value").node == start->a->items[1]->a);
-    // Re-resolution must rebuild bindings without confusing Core and project names.
+    // Re-resolution must not confuse Core and project names.
     assert(resolveGraphApplications(&arena,units,2,error,sizeof(error)));
     assert(start->a->items[1]->grammarDefinition == returns);
     // Merely placing a grammar-named construct in a project cannot claim the adapter.

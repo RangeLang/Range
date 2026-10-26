@@ -89,7 +89,7 @@ int main(void)
     assert(box->items[0]->c->items[0]->resolvedDeclaration == grow);
     assert(box->items[1]->c->items[0]->resolvedDeclaration == describe);
     assert(box->items[2]->c->items[0]->resolvedDeclaration == describe);
-    assert(same(box->items[2]->c->items[0]->macroApplication->bindings[0].value.text,"b"));
+    assert(box->items[2]->c->items[0]->macroApplication->target == box->items[2]);
     rangeArenaDestroy(&arena);
 
     reject("macro grow(): State {} construct Box { @grow let items: 0 }","no macro 'grow' targets Let");

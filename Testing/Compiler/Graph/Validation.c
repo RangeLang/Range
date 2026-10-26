@@ -99,7 +99,7 @@ static void validateLanguage(const char *source, const char *expected, size_t co
     "let ceiling: #generics.first(where: { g in g.name = \"ceiling\" }) " \
     "switch { payload.absent: @diagnostic(\"missing payload\"), " \
     "ceiling.absent: @diagnostic(\"missing ceiling\"), " \
-    "payload.present & ceiling.present & !accepts(limit: ceiling.value, candidate: payload.value): " \
+    "payload.present & ceiling.present & !accepts(candidate: payload.value, limit: ceiling.value): " \
     "@diagnostic(\"source policy rejected\"), " \
     "payload.present & ceiling.present: {} } } " \
     "function accepts(let candidate: Int, let limit: Int): Bool { " \
@@ -155,19 +155,19 @@ int main(void)
     // `&` and `|` evaluate their right operand only when the left does not decide.
     validateLanguage("macro assess(): Construct { switch { false & 1 / 0 = 0: @diagnostic(\"bad\"), default: {} } "
                      "switch { true | 1 / 0 = 0: { let ok: true }, default: {} } } @assess construct Parcel {}",NULL,1);
-    validateLanguage("macro assess(): Construct { let fixed: 0 fixed: 1 } @assess construct Parcel {}","state local",0);
+    validateLanguage("macro assess(): Construct { let fixed: 0 fixed: 1 } @assess construct Parcel {}","cannot assign to let 'fixed'",0);
     validateLanguage("macro assess(): Construct { let result: 1 / 0 } @assess construct Parcel {}","division by zero",0);
-    validateLanguage("macro assess(): Construct { let result: 9223372036854775807 + 1 } @assess construct Parcel {}","numeric storage overflow",0);
+    validateLanguage("macro assess(): Construct { let result: 9223372036854775807 + 1 } @assess construct Parcel {}","result of '+' does not fit Int<bits: 64, signed: true>",0);
     validateLanguage("macro assess(): Construct { while true {} } @assess construct Parcel {}","step limit",0);
     validateLanguage("function recurse(): Int { return recurse() } "
                      "macro assess(): Construct { let result: recurse() } @assess construct Parcel {}","call depth",0);
     validateLanguage("function helper(): Int { #graph {} return 0 } "
-                     "macro assess(): Construct { let value: helper() } @assess construct Parcel {}","#graph requires a macro application",0);
-    validateLanguage("macro assess(): Construct { @unknown(\"bad\") } @assess construct Parcel {}","unresolved compile-time declaration",0);
+                     "macro assess(): Construct { let value: helper() } @assess construct Parcel {}","#graph is written only in a macro's body",0);
+    validateLanguage("macro assess(): Construct { @unknown(\"bad\") } @assess construct Parcel {}","no declaration for macro 'unknown' in the loaded sources",0);
     validateLanguage("function f(let a: Int, let b: Int): Int { return a } "
-                     "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","duplicate compile-time local",0);
+                     "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","argument 2 of 'f' requires label 'b'",0);
     validateLanguage("macro assess(): Construct { let n: 1 switch { n.true: {}, default: {} } } @assess construct Parcel {}",
-                     "field 'true' is not declared by @type integer",0);
+                     "Int<bits: 64, signed: true> has no member 'true'",0);
     // switch runs at compile time: conditions joined by `|`, comparisons,
     // default, text, and switch expressions.
 #define SIZES "macro assess(): Construct { " FIRST_VALUE "let n: m.value " \
@@ -208,7 +208,7 @@ int main(void)
                      "let held: Int?.just(5) switch { held.just(5): {}, default: @diagnostic(\"not held\") } } "
                      "@assess construct Parcel {}",NULL,1);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 2) switch { h.nothing: {} } } @assess construct Parcel {}",
-                     "compile-time switch must be exhaustive: 'h.just' is not handled; add an arm for it or a default",0);
+                     "switch must be exhaustive: 'h.just' is not handled; add an arm for it or a default",0);
     validateLanguage(CASES "macro assess(): Construct { let s: shape(n: 2) switch { s.circle: {}, s.square: {}, s.empty: {}, default: {} } } "
                      "@assess construct Parcel {}","'default' is never reached",0);
     validateLanguage(CASES "macro assess(): Construct { let s: shape(n: 2) switch { s.square: {}, s.square(3): {}, default: {} } } "
@@ -231,18 +231,18 @@ int main(void)
                      "@assess construct Parcel {}","second row",0);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 2) let s: shape(n: 0) switch { h.nothing: {}, h.just & s.empty: {} } } "
                      "@assess construct Parcel {}",
-                     "compile-time switch must be exhaustive: 'h.just & s.circle', 'h.just & s.square' are not handled; add arms for them or a default",0);
+                     "switch must be exhaustive: 'h.just & s.circle', 'h.just & s.square' are not handled; add arms for them or a default",0);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 2) let s: shape(n: 0) switch { s.empty: {}, h.just & s.empty: {}, default: {} } } "
                      "@assess construct Parcel {}","this condition is already handled by earlier arms",0);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 2) let s: shape(n: 0) switch { h.nothing: {}, h.just & true: {} } } "
                      "@assess construct Parcel {}","must be exhaustive",0);
     languageEdits = NULL;
     validateLanguage("macro assess(): Construct { let b: true let v: switch { b.true: { let x: 1 }, b.false: 1 } } @assess construct Parcel {}",
-                     "neither yields a value nor diverges",0);
+                     "an arm of a switch expression yields a value or diverges",0);
     validateLanguage("@builtin macro assess(): Construct @assess construct Parcel {}","no C primitive is implemented for builtin macro 'assess'",0);
     validateLanguage("macro assess(): Construct { let leaked: 7 " FIRST_VALUE
                      "switch { m.value = 7: {}, default: {} } } } } @assess construct Parcel { let payload: leaked }",
-                     "unresolved compile-time local 'leaked'",0);
+                     "the value of 'leaked' is not known at macro time",0);
     // Reflection lists are Array values: count is its member, and first,
     // first(where:), filter(where:), and map(transform:) are the Range
     // functions @collection emits, run here with the closures a macro writes.
@@ -261,12 +261,12 @@ int main(void)
                      "switch { #cases.map(transform: { c in c.name }).last().present(\"blue\"): {}, default: @diagnostic(\"map\") } } "
                      "@probe extension Light {}",NULL,1);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.second() } @probe extension Light {}",
-                     "Array has no function 'second' with these labels",0);
+                     "Array<Element: EnumCase> has no function 'second'",0);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first.name } @probe extension Light {}",
                      "'Array.first' is a function; call it",0);
     // An optional is tested by its cases; it has no isTarget, or any member.
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first().isTarget } @probe extension Light {}",
-                     "Optional has no case 'isTarget'",0);
+                     "Optional<Wrapped: EnumCase> has no case 'isTarget'",0);
     // Bodies are Block values, absent for a builtin; a block lists the
     // declarations written in it.
     validateLanguage("macro probe(): Function { let body: #body switch { body.present(let b): switch { b.members.count = 2: {}, "
@@ -294,10 +294,10 @@ int main(void)
     languageEdits = (const char *const[]){"@iteration\n","",NULL};
     validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",
                      "which declares no @iteration function; a reflection list's collection declares both @iteration and @insertion",0);
-    // Without a grammar member for the field, a reflection list has no Range type to be.
+    // Without a grammar member for the field, it has no Range type: typing the macro says so.
     languageEdits = (const char *const[]){"    let members: Array<@member>\n","",NULL};
     validateLanguage("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
-                     "reflection field 'members' has no Range type",0);
+                     "Construct has no member 'members'",0);
     languageEdits = NULL;
     puts("macro validation: source policies, renamed declarations, diagnostics, scopes, control flow, limits=pass");
     return 0;
