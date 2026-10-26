@@ -3194,12 +3194,10 @@ static void writeSourceDiagnostics(SourceReport *report, FILE *output)
  * and rejects cycles through absence or whole-list reads. */
 enum { RangeMacroRounds = 16 };
 
-/* Without a report, the first failure stops application (tests). With one,
- * each failure is recorded and the remaining applications still run. */
+/* Each failure is recorded and the remaining applications still run. */
 static void guarded(Resolver *vm, SourceReport *report, const char *category,
                     void (*step)(Resolver *, RangeNode *), RangeNode *node)
 {
-    if (!report) { step(vm,node); return; }
     jmp_buf outer;
     memcpy(outer,vm->failure,sizeof(outer));
     if (setjmp(vm->failure) == 0) step(vm,node);
@@ -3249,28 +3247,10 @@ static void applyMacros(Resolver *vm, SourceReport *report, size_t *checked)
                 ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],checked);
         if (!ran) return;
     }
-    if (!report) fail(vm,NULL,"macro emission did not settle after %d rounds",RangeMacroRounds);
     sourceDiagnostic(report,NULL,0,"macro-validation","macro emission did not settle after %d rounds",RangeMacroRounds);
 }
 
-int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
-    size_t *checked, char *error, size_t errorSize)
-{
-    *checked = 0;
-    Resolver *vm = calloc(1,sizeof(*vm));
-    if (!vm) { snprintf(error,errorSize,"cannot allocate macro validator"); return 0; }
-    vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
-    int ok = 0;
-    if (setjmp(vm->failure) == 0) {
-        applyMacros(vm,NULL,checked);
-        ok = 1;
-    }
-    if (!ok) *checked = 0;
-    free(vm);
-    return ok;
-}
-
-static void diagnoseMacroApplications(SourceReport *report)
+static size_t diagnoseMacroApplications(SourceReport *report)
 {
     Resolver *vm = rangeArenaAllocate(report->arena,sizeof(*vm));
     *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
@@ -3278,6 +3258,24 @@ static void diagnoseMacroApplications(SourceReport *report)
     size_t checked = 0;
     if (setjmp(vm->failure) == 0) applyMacros(vm,report,&checked);
     else sourceDiagnostic(report,NULL,0,"macro-validation","%s",vm->error);
+    return checked;
+}
+
+/* Macro application as compiling runs it, for tests: the number of
+ * applications run, or the first error, located. */
+int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
+    size_t *checked, char *error, size_t errorSize)
+{
+    SourceReport report = {.arena=arena,.units=units,.count=count};
+    *checked = diagnoseMacroApplications(&report);
+    for (SourceDiagnostic *d = report.first; d; d = d->next) {
+        if (d->warning) continue;
+        if (d->at) snprintf(error,errorSize,"%s:%d:%d: %s",d->at->path,d->at->line,d->at->column,d->message);
+        else snprintf(error,errorSize,"%s",d->message);
+        *checked = 0;
+        return 0;
+    }
+    return 1;
 }
 
 /* The ordinary rule: one declaration per name in a scope, however it arrived.

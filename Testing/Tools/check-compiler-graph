@@ -39,8 +39,9 @@ for mode in ordinary sanitized; do
         -o "$work_root/$mode-types"
     "$work_root/$mode-types"
     for fixture in Unknown UnknownBody Forward; do
+        # With the language, as every program that runs a macro body.
         status=0
-        "$compiler" "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?
+        "$compiler" Language/Grammar Language/Macros Language/Types "Testing/Compiler/Graph/ResolutionFail/$fixture.range" > "$work_root/log" 2> "$work_root/error" || status=$?
         [[ "$status" == 65 ]] || fail "$mode $fixture exited $status"
         grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks source location"
         [[ ! -s "$work_root/log" ]] || fail "$mode $fixture claimed success"
