@@ -34,6 +34,15 @@ typedef struct {
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
 
+/* Migration switch: with RANGE_TYPED_MACROS set, macro bodies are typed in
+ * place and run by the known-value evaluator over typed nodes. */
+static int typedMacros(void)
+{
+    static int on = -1;
+    if (on < 0) on = getenv("RANGE_TYPED_MACROS") != NULL;
+    return on;
+}
+
 _Noreturn static void fail(Resolver *vm, RangeNode *at, const char *format, ...)
 {
     char detail[384]; va_list args; va_start(args,format);
@@ -209,7 +218,7 @@ static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attri
     attribute->resolvedDeclaration = macro;
     attribute->macroApplication = app;
     // A switch is evaluated when the application runs, not at resolution.
-    for (size_t i = 0; i < app->count; ++i) {
+    for (size_t i = 0; !typedMacros() && i < app->count; ++i) {
         RangeNode *rhs = rangeNodeRHS(app->bindings[i].definition);
         if (rangeNodeHasContextReference(app->bindings[i].definition) && !(rhs && rhs->kind == RangeNodeSwitch))
             (void)graphBinding(vm,app,&app->bindings[i]);
@@ -2648,6 +2657,8 @@ static int compilerAttribute(RangeNode *target, RangeNode *attribute)
         || macroBuiltin(attribute->resolvedDeclaration,"literal");
 }
 
+static int evalApplication(Resolver *, RangeMacroApplication *, int);
+
 /* An application's shape-only #graph blocks, emitted and merged once. Shape
  * rounds run them for every application before any macro body runs; an
  * application that joins later runs them just before its body. They land
@@ -2662,7 +2673,8 @@ static void shapeApplication(Resolver *vm, RangeNode *attribute)
     MetaEval eval = {.vm=vm};
     MetaScope scope = {.application=app};
     vm->emitted = emitted;
-    for (size_t i = 0; body && i < body->itemCount; ++i) {
+    if (typedMacros()) (void)evalApplication(vm,app,1);
+    for (size_t i = 0; !typedMacros() && body && i < body->itemCount; ++i) {
         RangeNode *emission = body->items[i]->kind == RangeNodeExpressionStatement ? body->items[i]->a : NULL;
         if (emission && emission->kind == RangeNodeEmission && (emission->flags & RangeFlagShape)) metaEmit(&eval,&scope,emission);
     }
@@ -2691,6 +2703,13 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
                 fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
             fail(vm,attribute,"builtin target effects are not supported by compile-time validation");
         }
+    if (typedMacros()) {
+        // A body that stopped on a problem typing reported emits nothing.
+        vm->emitted = emitted;
+        if (!evalApplication(vm,app,0)) emitted->itemCount = 0;
+        vm->emitted = NULL;
+        return emitted;
+    }
     // Bindings read the graph as it stands when the application runs, with
     // every extension merged so far, not as it stood at resolution.
     for (size_t i = 0; i < app->count; ++i) app->bindings[i].state = 0;
@@ -3092,6 +3111,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         return;
     }
     case RangeNodeConstruct: case RangeNodeEnum: case RangeNodeFunction: case RangeNodeMacro: {
+        if (node->kind == RangeNodeMacro && (node->flags & RangeFlagTyped)) return; /* diagnosed as it was typed, when first applied */
         SourceScope declaration = {.owner=node,.parent=scope,.meta=(scope && scope->meta) || node->kind == RangeNodeMacro};
         if (node->kind == RangeNodeFunction)
             (void)sourceReference(report,scope,node,node->typeName,2);
@@ -3606,6 +3626,17 @@ static void typerRestore(Typer *typer, TyperContext saved)
     typer->typingCount = saved.typingCount; typer->instance = saved.instance;
 }
 
+/* Typing on demand starts from the top level, as typing in order does; the
+ * caller restores the context returned once it is done. */
+static TyperContext typerTop(Typer *typer)
+{
+    TyperContext saved = typerSave(typer);
+    typer->function = NULL; typer->output = NULL; typer->macro = NULL; typer->inferred = NULL; typer->closureSite = NULL;
+    typer->loops = 0; typer->inferring = 0; typer->closures = 0;
+    typer->narrowedFloor = typer->narrowedCount; typer->typingCount = 0; typer->instance = NULL;
+    return saved;
+}
+
 /* Macro application as compiling runs it, for tests: the number of
  * applications run, or the first error, located. */
 int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
@@ -3654,7 +3685,7 @@ static void typeError(Typer *typer, RangeNode *at, const char *format, ...)
 {
     char text[768]; va_list args; va_start(args,format);
     vsnprintf(text,sizeof(text),format,args); va_end(args);
-    if (typer->macro && at) replaceMacroFailure(typer->report,at);
+    if (typer->macro && at && !typedMacros()) replaceMacroFailure(typer->report,at);
     // Code a macro emitted is located in the macro; name the application too.
     RangeNode *emitter = typer->function ? typer->function->emittedBy : NULL;
     RangeMacroApplication *app = emitter ? emitter->macroApplication : NULL;
@@ -3876,10 +3907,13 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         memcpy(outer,vm->failure,sizeof(outer));
         vm->skipEmission = 1;
         if (setjmp(vm->failure) == 0) {
-            MetaEval eval = {.vm=vm};
-            MetaScope scope = {.application=app};
-            RangeGraphValue returned = {0};
-            (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
+            if (typedMacros()) (void)evalApplication(vm,app,0);
+            else {
+                MetaEval eval = {.vm=vm};
+                MetaScope scope = {.application=app};
+                RangeGraphValue returned = {0};
+                (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
+            }
         } else {
             char type[160], text[768];
             describeType(type,sizeof(type),specialization);
@@ -5426,8 +5460,14 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
                 typeError(typer,callee,"%s has no function '%s'",type,callee->name);
                 return NULL;
             }
-            for (size_t i = 0; i < call->itemCount; ++i)
-                if (call->items[i]->a && call->items[i]->a->kind != RangeNodeClosure) (void)typeOf(typer,scope,call->items[i]->a,NULL,context);
+            for (size_t i = 0; i < call->itemCount; ++i) {
+                RangeNode *argument = call->items[i]->a;
+                if (argument && argument->kind == RangeNodeClosure) {
+                    if (typedMacros())
+                        typeError(typer,argument,"this closure's parameter types are not known: '%s' is called on a value known only at macro time",
+                                  callee->name);
+                } else if (argument) (void)typeOf(typer,scope,argument,NULL,context);
+            }
             return typer->deferred;
         }
         if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
@@ -5558,6 +5598,70 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
 static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
 static RangeNode *typeExpression(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 
+/* A local of a block in scope whose statement is not typed yet: it is
+ * declared later than where it is read. Names a pattern binds are declared
+ * by their case tests. */
+static int declaredLater(SourceScope *scope, const RangeNode *declaration)
+{
+    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState) || (declaration->flags & RangeFlagTyped)) return 0;
+    for (; scope; scope = scope->parent)
+        if (scope->owner && scope->owner->kind == RangeNodeBlock && !same(scope->owner->name,"bindings"))
+            for (size_t i = 0; i < scope->owner->itemCount; ++i) if (scope->owner->items[i] == declaration) return 1;
+    return 0;
+}
+
+/* The local, binding, or parameter a splice `#name` names: one declared, in
+ * the scopes the #graph block is written in, before it. */
+static RangeNode *spliceLocal(SourceScope *scope, const char *name)
+{
+    for (SourceScope *at = scope; at; at = at->parent) {
+        RangeNode *owner = at->owner;
+        for (size_t i = 0; owner && owner->kind != RangeNodeUnit && i < owner->itemCount; ++i) {
+            RangeNode *item = owner->items[i];
+            if ((rangeNodeDeclaresValue(item->kind) || item->kind == RangeNodeParameter) && same(item->name,name)
+                && !declaredLater(scope,item)) return item;
+        }
+    }
+    return NULL;
+}
+
+/* Whether the macro's target declares field `name`: its kind's C shape, or
+ * the shape of a kind its macro type admits. */
+static int targetField(RangeArena *arena, const RangeNode *macro, const char *name)
+{
+    if (!macro->b) return 0;
+    if (!(macro->b->flags & RangeFlagMacroType)) return rangeGraphField(rangeGraphType(arena,macro->b->name),name) != NULL;
+    for (size_t i = 0; i < arena->graphTypes->itemCount; ++i) {
+        RangeNode *shape = arena->graphTypes->items[i];
+        if (appliesMacro(shape->resolvedDeclaration,macro->b->resolvedDeclaration) && rangeGraphField(shape,name)) return 1;
+    }
+    return 0;
+}
+
+/* Quoted code is typed where it lands; its splices are typed where the
+ * macro runs. `#x` is the macro's local x or the target's field x, never
+ * both. A nested macro's splices are its own. */
+static void typeSplices(Typer *typer, SourceScope *scope, RangeNode *node)
+{
+    if (!node || node->kind == RangeNodeMacro) return;
+    if (spliceChain(node)) {
+        RangeNode *root = node;
+        while (root->kind != RangeNodeEnvironment) root = root->a;
+        RangeNode *local = spliceLocal(scope,root->name);
+        int field = targetField(typer->report->arena,typer->macro,root->name);
+        if (local && field) typeError(typer,root,"#%s names both a macro local and a target field",root->name);
+        else if (!local && !field) typeError(typer,root,"#%s is neither a macro local nor a target field",root->name);
+        else {
+            root->resolvedDeclaration = local;
+            (void)typeOf(typer,scope,node,NULL,NULL);
+        }
+        return;
+    }
+    typeSplices(typer,scope,node->a); typeSplices(typer,scope,node->b); typeSplices(typer,scope,node->c);
+    typeSplices(typer,scope,node->generics); typeSplices(typer,scope,node->annotations); typeSplices(typer,scope,node->rhsReference);
+    for (size_t i = 0; i < node->itemCount; ++i) typeSplices(typer,scope,node->items[i]);
+}
+
 /* An expression's type. A case test's narrowing holds beyond it only
  * through `&` and `|`; reads of a narrowed value read its payload. */
 static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
@@ -5587,6 +5691,10 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     case RangeNodeName: {
         RangeNode *declaration = nameLookup(typer->report,scope,expr);
         expr->resolvedDeclaration = declaration;
+        if (typedMacros() && declaration && declaredLater(scope,declaration)) {
+            typeError(typer,expr,"'%s' is read before its declaration",expr->name);
+            break;
+        }
         if (!declaration && receiverCase(typer,context,expr->name)) {
             becomeCaseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
             type = typeCaseTest(typer,scope,expr,context);
@@ -5690,6 +5798,8 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         type = typeCall(typer,scope,expr,expected,context);
         break;
     case RangeNodeEnvironment: {
+        // A splice of a macro local is that local.
+        if (expr->resolvedDeclaration) { type = expr->resolvedDeclaration->type; break; }
         // `#cases`: the field the macro's target kind declares. A target
         // with no grammar declaration has fields without Range types; a
         // field C has no adapter for is reported where the macro resolves.
@@ -5707,6 +5817,11 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     }
     case RangeNodeCaseTest:
         type = typeCaseTest(typer,scope,expr,context);
+        break;
+    case RangeNodeEmission:
+        if (!typedMacros()) break;
+        if (!typer->macro) { typeError(typer,expr,"#graph is written only in a macro's body"); break; }
+        typeSplices(typer,scope,expr->b);
         break;
     case RangeNodePattern:
         // A case test's pattern argument anywhere else.
@@ -5917,6 +6032,8 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
     size_t mark = typer->narrowedCount;
     typeStatementOnly(typer,scope,node,context,output);
     typer->narrowedCount = mark;
+    // A local is declared once its statement is typed: later ones may read it.
+    if (typedMacros() && node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) node->flags |= RangeFlagTyped;
 }
 
 static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
@@ -6340,7 +6457,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         size_t narrowed = typer->narrowedCount; /* what the arm's condition narrows holds in its body */
-        if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount && !typer->macro)
+        if ((entry->flags & RangeFlagLiteral) && i + 1 != node->itemCount && (!typer->macro || typedMacros()))
             typeError(typer,entry,"'default' must be the last arm of a switch");
         for (size_t j = 0; j < entry->itemCount; ++j) {
             // The parser checked where the row binds; its condition sees its bindings.
@@ -6360,7 +6477,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         }
         typeBlock(typer,&body,entry->b,context,output);
         typer->narrowedCount = narrowed;
-        if (value && !typer->macro && !exits(entry->b,typer->loops > 0))
+        if (value && (!typer->macro || typedMacros()) && !exits(entry->b,typer->loops > 0))
             typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic");
     }
     if (value && !type && typer->report->errors == errors)
@@ -6369,7 +6486,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     if (!typed || typer->report->errors != errors) return type;
     // A macro's switches are checked where it runs, by the evaluator: which
     // arm is last, which yield, and what the arms cover.
-    if (typer->macro) return type;
+    if (typer->macro && !typedMacros()) return type;
     if (!width) { typeConditionCoverage(typer,node); return type; }
     // Each row must match something the earlier ones do not; together they
     // must match every value, or every combination of the subjects' values.
@@ -6475,9 +6592,28 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
  * typed is a copy: what typing writes into the tree, a promotion or a
  * narrowed read, never reaches the evaluator. What typing leaves to macro
  * time, and each switch's coverage, the evaluator checks when the macro runs. */
-static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro)
+static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro, int diagnose)
 {
     if (!macro->a || (macro->flags & RangeFlagTyped)) return; /* a @builtin macro has no body */
+    if (typedMacros()) {
+        // Typed as it is first applied, a macro reports then what the source
+        // pass would; anything unresolved or mistyped keeps it from running.
+        size_t errors = typer->report->errors;
+        if (diagnose) diagnoseSourceNode(typer->report,parent,macro,0);
+        macro->flags |= RangeFlagTyped;
+        SourceScope scope = {.owner=macro,.parent=parent};
+        TyperContext outer = typerSave(typer);
+        typer->narrowedFloor = typer->narrowedCount;
+        typer->function = NULL;
+        typer->output = NULL;
+        typer->macro = macro;
+        for (size_t i = 0; i < macro->itemCount; ++i) macro->items[i]->type = declaredType(typer,&scope,macro->items[i],NULL);
+        typeBlock(typer,&scope,macro->a,NULL,NULL);
+        checkMutations(typer,macro->a);
+        typerRestore(typer,outer);
+        if (typer->report->errors != errors) macro->flags |= RangeFlagInvalid;
+        return;
+    }
     macro->flags |= RangeFlagTyped;
     RangeArena *arena = typer->report->arena;
     CloneMap map = {.capacity=256,.arena=arena};
@@ -6608,25 +6744,30 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
     }
 }
 
+/* A member's type in its construct's own specialization, once. */
+static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeNode *context)
+{
+    if (item->flags & RangeFlagTyped) return;
+    item->flags |= RangeFlagTyped;
+    if (item->typeName && (item->flags & RangeFlagApplication)) {
+        // A member initialized by construction, e.g. `state from: Point(x: 0)`.
+        if (!lookupFunction(typer->report,scope,item->typeName))
+            item->type = typeConstruction(typer,scope,item,item->typeName,item->generics,item->flags,
+                                          item->items,item->itemCount,context);
+        else typeError(typer,item,"member '%s' cannot be initialized by calling '%s'",item->name,item->typeName);
+        return;
+    }
+    item->type = declaredType(typer,scope,item,context);
+}
+
 static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declaration)
 {
     RangeNode *context = selfSpecialization(typer,declaration);
     SourceScope scope = {.owner=declaration,.parent=parent};
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
-        if (rangeNodeDeclaresValue(item->kind)) {
-            if (item->flags & RangeFlagTyped) continue;
-            item->flags |= RangeFlagTyped;
-            if (item->typeName && (item->flags & RangeFlagApplication)) {
-                // A member initialized by construction, e.g. `state from: Point(x: 0)`.
-                if (!lookupFunction(typer->report,&scope,item->typeName))
-                    item->type = typeConstruction(typer,&scope,item,item->typeName,item->generics,item->flags,
-                                                  item->items,item->itemCount,context);
-                else typeError(typer,item,"member '%s' cannot be initialized by calling '%s'",item->name,item->typeName);
-                continue;
-            }
-            item->type = declaredType(typer,&scope,item,context);
-        } else if (item->kind == RangeNodeFunction && !genericTemplate(item)) typeFunction(typer,&scope,item,context);
+        if (rangeNodeDeclaresValue(item->kind)) typeMember(typer,&scope,item,context);
+        else if (item->kind == RangeNodeFunction && !genericTemplate(item)) typeFunction(typer,&scope,item,context);
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
@@ -7113,6 +7254,81 @@ static void typerLanguage(Typer *typer)
     }
 }
 
+/* ---- typing on demand ----
+ * Macro time runs code before typing in order reaches it: a function is
+ * typed when it is first called, a construct's members when it is first
+ * constructed, a member when `.value` reads its initializer, and a macro's
+ * body when it is first applied. Each is typed once, from the top level, in
+ * the scopes it is declared in. */
+
+/* The scopes a declaration sees around it, innermost first: the constructs
+ * and enums enclosing it, then its unit; NULL when no unit holds it. */
+static SourceScope *enclosingScope(Typer *typer, RangeNode *declaration, SourceScope scopes[33])
+{
+    RangeNode *chain[32];
+    for (size_t u = 0; u < typer->report->count; ++u) {
+        size_t count = 0;
+        if (!enclosing(typer->report->units[u],declaration,chain,&count,32)) continue;
+        scopes[count] = (SourceScope){.owner=typer->report->units[u]};
+        for (size_t i = count; i-- > 0;) scopes[i] = (SourceScope){.owner=chain[i],.parent=&scopes[i + 1]};
+        return &scopes[0];
+    }
+    return NULL;
+}
+
+/* A function the evaluator calls, typed in its owner's own specialization
+ * as typing in order types it. Returns whether it may run. */
+static int typeOnDemand(Typer *typer, RangeNode *function)
+{
+    if (!(function->flags & RangeFlagTyped)) {
+        SourceScope scopes[33];
+        size_t errors = typer->report->errors;
+        TyperContext outer = typerTop(typer);
+        typeFunction(typer,enclosingScope(typer,function,scopes),function,function->owner ? selfSpecialization(typer,function->owner) : NULL);
+        typerRestore(typer,outer);
+        if (typer->report->errors != errors) function->flags |= RangeFlagInvalid;
+    }
+    return !(function->flags & RangeFlagInvalid);
+}
+
+/* A construct's members, before it is first constructed. */
+static void typeMembersOnDemand(Typer *typer, RangeNode *declaration)
+{
+    int pending = 0;
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        pending |= rangeNodeDeclaresValue(declaration->items[i]->kind) && !(declaration->items[i]->flags & RangeFlagTyped);
+    if (!pending) return;
+    SourceScope scopes[33], scope = {.owner=declaration,.parent=enclosingScope(typer,declaration,scopes)};
+    TyperContext outer = typerTop(typer);
+    RangeNode *context = selfSpecialization(typer,declaration);
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (rangeNodeDeclaresValue(declaration->items[i]->kind)) typeMember(typer,&scope,declaration->items[i],context);
+    typerRestore(typer,outer);
+}
+
+/* A construct's member whose initializer `.value` reads. */
+static void typeValueOnDemand(Typer *typer, RangeNode *member)
+{
+    SourceScope scopes[33], *scope = member->flags & RangeFlagTyped ? NULL : enclosingScope(typer,member,scopes);
+    if (!scope || scope->owner->kind != RangeNodeConstruct) return; /* only a construct's members are typed on their own */
+    TyperContext outer = typerTop(typer);
+    typeMember(typer,scope,member,selfSpecialization(typer,scope->owner));
+    typerRestore(typer,outer);
+}
+
+/* A macro's body, before its first application runs it. Returns whether it may run. */
+static int typeMacroOnDemand(Typer *typer, RangeMacroApplication *app)
+{
+    RangeNode *macro = app->declaration;
+    if (!(macro->flags & RangeFlagTyped)) {
+        SourceScope unit = {.owner=app->unit};
+        TyperContext outer = typerTop(typer);
+        typeMacro(typer,&unit,macro,1);
+        typerRestore(typer,outer);
+    }
+    return !(macro->flags & RangeFlagInvalid);
+}
+
 /* Type the program, after macro time: what macros left untyped, and the
  * checks that need every declaration. The typer is kept for code
  * generation: generic methods are lowered per concrete specialization, which
@@ -7130,7 +7346,7 @@ static void typeCheck(Typer *typer)
             RangeNode *item = report->units[u]->items[i];
             if (item->kind == RangeNodeConstruct) typeConstruct(typer,&unit,item);
             else if (item->kind == RangeNodeEnum) typeEnum(typer,&unit,item);
-            else if (item->kind == RangeNodeMacro) typeMacro(typer,&unit,item);
+            else if (item->kind == RangeNodeMacro) typeMacro(typer,&unit,item,0); /* never applied */
             else if (item->kind == RangeNodeFunction && genericTemplate(item)) continue; /* typed per instance */
             else if (item->kind == RangeNodeFunction) {
                 typeFunction(typer,&unit,item,NULL);
@@ -7166,6 +7382,1175 @@ static void typeCheck(Typer *typer)
         sourceDiagnostic(report,specialization->resolvedDeclaration,0,"layout","%s has no layout",name);
     }
     drainLaws(typer); /* the specializations comparing and layout met */
+}
+
+/* ---- known values ------------------------------------------------------------
+ * Macros are ordinary Range code, run here on the values they know: a macro
+ * body as the type checker typed it, and every function, closure,
+ * construction, and operator it reaches, each the declaration or the C
+ * primitive typing chose, as native code runs it. A value keeps the type it
+ * was made with, so what typing left to macro time (a value of a macro type,
+ * a member kind's value) is chosen from the value it holds when it runs.
+ * What only a macro has, its application's target fields, effects, #graph
+ * emission, and the applications a use of a declaration needs first, is
+ * reached through those nodes alone; outside an application they are not
+ * known. Evaluation stops with a message, which the application reports, or
+ * with none when typing reported the problem already. */
+
+typedef enum {
+    ValueNone, ValueLiteral, ValueScalar, ValueText, ValueCase, ValueInstance, ValueSlots,
+    ValueDeclaration, ValueClosure
+} RangeValueKind;
+
+struct EvalFrame;
+
+/* A known value. A literal has no type yet: a member kind's `.value` is the
+ * literal its declaration writes, and it takes the type of its use, node
+ * being the literal. A scalar is a value of a type with a storage primitive,
+ * integer its bits. Text is a value of a type with the bytes primitive, or a
+ * name C holds; node is the string literal it was written as, or the
+ * declaration whose name it is, which a splice writes as a reference to it.
+ * A case is a value of an enum: node the case, values its payload; Bool's
+ * values are the condition type's cases. An instance has one value per item
+ * of its construct, set for the stored members; slots are a @many member's
+ * elements. A declaration is a graph node, a value of its grammar kind or of
+ * a macro type. A closure is its literal and the frame it was written in. */
+typedef struct RangeValue {
+    RangeValueKind kind;
+    RangeNode *type;
+    RangeNode *node;
+    long long integer;
+    const char *text; size_t length;
+    struct RangeValue *values; size_t count;
+    struct EvalFrame *frame;
+} RangeValue;
+
+/* The values a running body names, found by the declaration typing resolved
+ * each name to: its parameters, locals, and bindings. A closure's frame
+ * continues in the one it was written in, which is alive while it runs: a
+ * closure runs only while the call it is passed to runs. */
+typedef struct EvalBinding { RangeNode *declaration; RangeValue value; struct EvalBinding *next; } EvalBinding;
+typedef struct EvalFrame {
+    struct EvalFrame *parent;
+    EvalBinding *bindings;
+    RangeValue *self;    /* the receiver of the running method, changed in place */
+    RangeNode *function; /* the running function: its receiver and its value generics */
+    RangeNode *output;   /* what its `return` gives */
+} EvalFrame;
+
+/* How evaluation goes on: normally, or leaving through return (the value in
+ * returned), break, continue, or a failure (the message at, or none). */
+enum { EvalNormal, EvalReturn, EvalBreak, EvalContinue, EvalFailed };
+
+typedef struct {
+    Resolver *vm;
+    Typer *typer;
+    RangeMacroApplication *application; /* the running application: its target and output */
+    unsigned steps, depth;
+    RangeValue returned;
+    const char *message; RangeNode *at;
+    /* Emitted copies by original, so a node quoted code reaches twice (a
+     * for-in's binding is in its pattern and its scope) stays one node. */
+    RangeNode **emittedFrom, **emittedTo; size_t emittedCapacity, emittedCount;
+} Eval;
+
+static size_t nativeMemberIndex(RangeNode *, RangeNode *);
+static int evalExpression(Eval *, EvalFrame *, RangeNode *, RangeValue *);
+static int evalStatement(Eval *, EvalFrame *, RangeNode *);
+static int evalInvoke(Eval *, RangeNode *, RangeValue *, RangeValue *, RangeNode *, RangeValue *);
+static int evalConstruct(Eval *, EvalFrame *, RangeNode *, RangeNode **, size_t, RangeNode *, RangeValue *);
+
+static int evalFail(Eval *eval, RangeNode *at, const char *format, ...)
+{
+    char text[512]; va_list args; va_start(args,format);
+    vsnprintf(text,sizeof(text),format,args); va_end(args);
+    eval->message = rangeArenaIntern(eval->vm->arena,text,strlen(text));
+    eval->at = at;
+    return EvalFailed;
+}
+
+/* A problem typing reported already: evaluation stops without another report. */
+static int evalStop(Eval *eval)
+{
+    eval->message = NULL;
+    return EvalFailed;
+}
+
+static int evalStep(Eval *eval, RangeNode *at)
+{
+    return ++eval->steps > 100000 ? evalFail(eval,at,"compile-time evaluation step limit exceeded") : EvalNormal;
+}
+
+static RangeValue *evalNamed(EvalFrame *frame, const RangeNode *declaration)
+{
+    for (; frame && declaration; frame = frame->parent)
+        for (EvalBinding *binding = frame->bindings; binding; binding = binding->next)
+            if (binding->declaration == declaration) return &binding->value;
+    return NULL;
+}
+
+static void evalBind(Eval *eval, EvalFrame *frame, RangeNode *declaration, RangeValue value)
+{
+    for (EvalBinding *binding = frame->bindings; binding; binding = binding->next)
+        if (binding->declaration == declaration) { binding->value = value; return; }
+    EvalBinding *binding = rangeArenaAllocate(eval->vm->arena,sizeof(*binding));
+    *binding = (EvalBinding){.declaration=declaration,.value=value,.next=frame->bindings};
+    frame->bindings = binding;
+}
+
+/* The index of a member of the receiver's construct, or SIZE_MAX. */
+static size_t evalMember(const RangeValue *self, RangeNode *member)
+{
+    if (!self || self->kind != ValueInstance || !member) return SIZE_MAX;
+    size_t index = nativeMemberIndex(self->type->resolvedDeclaration,member);
+    return index < self->count ? index : SIZE_MAX;
+}
+
+/* A value's members or slots change only through its own place: their array
+ * is copied first, so the copies of the value made before never change. */
+static void evalOwn(Eval *eval, RangeValue *value)
+{
+    RangeValue *values = rangeArenaAllocate(eval->vm->arena,(value->count ? value->count : 1) * sizeof(*values));
+    if (value->count) memcpy(values,value->values,value->count * sizeof(*values));
+    value->values = values;
+}
+
+static RangeValue *evalValues(Eval *eval, size_t count)
+{
+    RangeValue *values = rangeArenaAllocate(eval->vm->arena,(count ? count : 1) * sizeof(*values));
+    memset(values,0,(count ? count : 1) * sizeof(*values));
+    return values;
+}
+
+/* A Bool: the condition type's case whose tag is the truth. Without the
+ * condition type a boolean literal stands for it. */
+static RangeValue evalBool(Eval *eval, int truth)
+{
+    RangeNode *condition = eval->typer->boolean;
+    for (size_t i = 0; condition && condition->kind == RangeNodeEnum && i < condition->itemCount; ++i)
+        if (condition->items[i]->kind == RangeNodeEnumCase && condition->items[i]->integer == truth)
+            return (RangeValue){.kind=ValueCase,.type=eval->typer->booleanType,.node=condition->items[i]};
+    RangeNode *literal = rangeNodeCreate(eval->vm->arena,RangeNodeBool,"<compiler>",1,1);
+    literal->integer = truth;
+    return (RangeValue){.kind=ValueLiteral,.node=literal,.integer=truth};
+}
+
+static int evalTruth(RangeValue value)
+{
+    return value.kind == ValueCase ? value.node->integer != 0 : value.integer != 0;
+}
+
+/* A type with a storage primitive is a scalar that many bits wide, signed
+ * or not, as its specialization declares: the members layout reads. */
+static int scalarShape(RangeNode *type, int *bits, int *isSigned)
+{
+    if (!type || type->kind != RangeNodeSpecialization) return 0;
+    RangeNode *declaration = type->resolvedDeclaration, *width = NULL, *signedness = NULL;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"storage")) width = builtinValue(type,declaration->items[i]);
+        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"signed")) signedness = builtinValue(type,declaration->items[i]);
+    }
+    if (!width || width->kind != RangeNodeInteger || width->integer <= 0 || width->integer > 64) return 0;
+    *bits = (int)width->integer;
+    *isSigned = signedness && signedness->kind == RangeNodeBool && signedness->integer;
+    return 1;
+}
+
+static __int128 scalarValue(RangeValue value, int isSigned)
+{
+    return isSigned ? (__int128)value.integer : (__int128)(unsigned long long)value.integer;
+}
+
+static int scalarFits(__int128 value, int bits, int isSigned)
+{
+    __int128 low = isSigned ? -((__int128)1 << (bits - 1)) : 0;
+    __int128 high = isSigned ? ((__int128)1 << (bits - 1)) - 1 : ((__int128)1 << bits) - 1;
+    return value >= low && value <= high;
+}
+
+/* The type a literal has where nothing else gives it one: its family's. */
+static RangeNode *literalType(Typer *typer, RangeNode *literal)
+{
+    return literal && literal->resolvedType ? specialize(typer,NULL,literal->resolvedType,NULL,NULL,literal) : NULL;
+}
+
+/* A value meeting a typed use: a literal takes the type, if its storage holds
+ * it (the type's laws are not run), and a value where an optional of its
+ * type is expected is the optional's present case holding it. */
+static int evalAdopt(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *at)
+{
+    if (!type || type->kind != RangeNodeSpecialization || value->kind == ValueNone || value->kind == ValueClosure) return EvalNormal;
+    RangeNode *present = NULL, *wrapped = optionalWrapped(eval->typer,type,&present);
+    if (wrapped && !(value->kind == ValueCase && value->type && value->type->resolvedDeclaration == type->resolvedDeclaration)) {
+        RangeValue *payload = evalValues(eval,1);
+        *payload = *value;
+        int status = evalAdopt(eval,payload,wrapped,at);
+        *value = (RangeValue){.kind=ValueCase,.type=type,.node=present,.values=payload,.count=1};
+        return status;
+    }
+    if (value->kind != ValueLiteral) return EvalNormal;
+    RangeNode *literal = value->node, *declaration = type->resolvedDeclaration;
+    char name[160]; describeType(name,sizeof(name),type);
+    int bits, isSigned;
+    if (literal->kind == RangeNodeString && bytesDeclaration(declaration)) {
+        *value = (RangeValue){.kind=ValueText,.type=type,.node=literal,.text=value->text,.length=value->length};
+        return EvalNormal;
+    }
+    if (literal->kind == RangeNodeBool && declaration->kind == RangeNodeEnum) {
+        RangeNode spelled = {.kind=RangeNodeBool,.integer=value->integer}, *entry = literalCase(declaration,&spelled);
+        if (entry) { *value = (RangeValue){.kind=ValueCase,.type=type,.node=entry}; return EvalNormal; }
+    }
+    if (literal->kind == RangeNodeInteger && scalarShape(type,&bits,&isSigned)) {
+        if (!scalarFits(value->integer,bits,isSigned)) return evalFail(eval,at,"%lld does not fit %s",value->integer,name);
+        *value = (RangeValue){.kind=ValueScalar,.type=type,.integer=value->integer};
+        return EvalNormal;
+    }
+    return evalFail(eval,at,"%s requires a value of its own; found a %s literal",name,
+                    literal->kind == RangeNodeString ? "string" : literal->kind == RangeNodeBool ? "boolean" : "numeric");
+}
+
+/* ---- text ---- */
+
+/* A value as a message writes it: integers in decimal, a case without a
+ * payload by its name, text as its bytes, a declaration by its name. */
+static int evalWrite(Eval *eval, RangeValue value, RangeNode *at, const char **text, size_t *length)
+{
+    char piece[64];
+    int bits = 64, isSigned = 1;
+    switch (value.kind) {
+    case ValueText: *text = value.text; *length = value.length; return EvalNormal;
+    case ValueLiteral:
+        if (value.node->kind == RangeNodeString) { *text = value.text; *length = value.length; return EvalNormal; }
+        if (value.node->kind == RangeNodeBool) { *text = value.integer ? "true" : "false"; *length = strlen(*text); return EvalNormal; }
+        snprintf(piece,sizeof(piece),"%lld",value.integer);
+        break;
+    case ValueScalar:
+        (void)scalarShape(value.type,&bits,&isSigned);
+        snprintf(piece,sizeof(piece),isSigned ? "%lld" : "%llu",value.integer);
+        break;
+    case ValueCase:
+        if (value.count) return evalFail(eval,at,"a compile-time message cannot interpolate this value");
+        *text = value.node->name; *length = strlen(*text);
+        return EvalNormal;
+    case ValueDeclaration:
+        if (!value.node->name) return evalFail(eval,at,"a compile-time message cannot interpolate this value");
+        *text = value.node->name; *length = strlen(*text);
+        return EvalNormal;
+    default: return evalFail(eval,at,"a compile-time message cannot interpolate this value");
+    }
+    *length = strlen(piece);
+    *text = rangeArenaIntern(eval->vm->arena,piece,*length);
+    return EvalNormal;
+}
+
+/* The text of a message or a string literal: its literal parts, and its
+ * interpolated values as they are written. */
+static int evalText(Eval *eval, EvalFrame *frame, RangeNode *node, const char **text, size_t *length)
+{
+    int status;
+    if (node->kind != RangeNodeString) {
+        RangeValue value;
+        status = evalExpression(eval,frame,node,&value);
+        return status ? status : evalWrite(eval,value,node,text,length);
+    }
+    size_t used = 0, capacity = 64;
+    char *buffer = malloc(capacity);
+    if (!buffer) abort();
+    for (size_t i = 0; i < node->itemCount; ++i) {
+        RangeNode *part = node->items[i];
+        const char *piece = part->name;
+        size_t size = (size_t)part->integer;
+        if (!(part->flags & RangeFlagLiteral)) {
+            RangeValue value;
+            status = evalExpression(eval,frame,part->a,&value);
+            if (!status) status = evalWrite(eval,value,part->a,&piece,&size);
+            if (status) { free(buffer); return status; }
+        }
+        while (used + size + 1 > capacity) {
+            capacity *= 2;
+            buffer = realloc(buffer,capacity);
+            if (!buffer) abort();
+        }
+        memcpy(buffer + used,piece,size);
+        used += size;
+    }
+    *text = rangeArenaIntern(eval->vm->arena,buffer,used);
+    *length = used;
+    free(buffer);
+    return EvalNormal;
+}
+
+/* ---- the macro-only inputs ---- */
+
+static void typeMembersOnDemand(Typer *, RangeNode *);
+static void typeValueOnDemand(Typer *, RangeNode *);
+
+/* A declaration's members and functions include what its written macros
+ * emit, so a use of it at macro time first applies those that have not run:
+ * `#cases.first()` needs the functions @collection gives Array. A failure
+ * there fails the application that needed it. */
+static void evalPrepare(Eval *eval, RangeNode *declaration)
+{
+    Resolver *vm = eval->vm;
+    for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i) {
+        RangeNode *attribute = declaration->c->items[i];
+        RangeMacroApplication *app = attribute->macroApplication;
+        if (compilerAttribute(declaration,attribute) || !app || app->applied) continue;
+        app->applied = 1;
+        RangeNode *emitted = vm->emitted, *unit = vm->unit;
+        int skip = vm->skipEmission;
+        vm->unit = app->unit ? app->unit : unit;
+        for (size_t u = 0; u < vm->count; ++u)
+            for (size_t j = 0; j < vm->units[u]->itemCount; ++j)
+                if (vm->units[u]->items[j] == declaration) vm->unit = vm->units[u];
+        vm->skipEmission = 0;
+        mergeEmitted(vm,runMacroApplication(vm,attribute));
+        vm->emitted = emitted; vm->unit = unit; vm->skipEmission = skip;
+    }
+}
+
+/* `.value` of a member kind: its initializer, known at macro time. A literal
+ * is a value of no type yet, which takes its use's type; anything else is
+ * typed where it is declared and run without a receiver, so a read of
+ * another member is not known. */
+static int evalInitializer(Eval *eval, RangeNode *declaration, RangeNode *at, RangeValue *out)
+{
+    RangeGraphValue raw = rangeGraphStoredField(eval->vm->arena,declaration,"value");
+    RangeNode *rhs = raw.kind == RangeGraphNode ? raw.node : NULL;
+    RangeNodeKind kind; long long integer; const char *text;
+    if (!rhs) return evalFail(eval,at,"the value of '%s' is not known at macro time",declaration->name);
+    if (lawInputs(rhs,&kind,&integer,&text)) {
+        *out = (RangeValue){.kind=ValueLiteral,.node=rhs->kind == RangeNodeUnary ? rhs->a : rhs,.integer=integer,
+                            .text=text,.length=text ? strlen(text) : 0};
+        return EvalNormal;
+    }
+    typeValueOnDemand(eval->typer,declaration);
+    EvalFrame none = {0};
+    return evalExpression(eval,&none,rhs,out);
+}
+
+/* A reflection list, such as Enum.cases: Array<EnumCase>, is the collection
+ * its grammar field's type names, built as Range builds one: constructed,
+ * then each declaration added in order with the collection's @insertion
+ * function. The collection declares @iteration too, so the list can be read. */
+static int evalList(Eval *eval, RangeNode *grammar, const char *name, RangeNode *type, RangeGraphValue raw,
+                    RangeNode *at, RangeValue *out)
+{
+    RangeNode *collection = type && type->kind == RangeNodeSpecialization ? type->resolvedDeclaration : NULL;
+    if (!collection || collection->kind != RangeNodeConstruct)
+        return evalFail(eval,at,"reflection field %s.%s holds declarations; its type must be a collection construct",grammar->name,name);
+    // The collection's own applications run first: they may emit the
+    // @insertion function, as @collection does for Array.
+    evalPrepare(eval,collection);
+    size_t insertions = 0, iterations = 0;
+    RangeNode *append = insertionFunction(collection,&insertions);
+    if (insertions != 1 || append->itemCount != 1)
+        return evalFail(eval,at,"reflection field %s.%s is %s, which %s to build it with%s",grammar->name,name,collection->name,
+                        insertions > 1 ? "declares more than one @insertion function"
+                        : insertions ? "declares an @insertion function that does not take one element"
+                        : "declares no @insertion function",
+                        eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
+    (void)iterationFunction(collection,&iterations);
+    if (iterations != 1)
+        return evalFail(eval,at,"reflection field %s.%s is %s, which %s; a reflection list's collection declares both @iteration and @insertion%s",
+                        grammar->name,name,collection->name,
+                        iterations ? "declares more than one @iteration function" : "declares no @iteration function",
+                        eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
+    // The list as it stands now: adding may merge emitted members into it.
+    RangeNode **nodes = rangeArenaAllocate(eval->vm->arena,(raw.count ? raw.count : 1) * sizeof(*nodes));
+    if (raw.count) memcpy(nodes,raw.nodes,raw.count * sizeof(*nodes));
+    EvalFrame none = {0};
+    int status = evalConstruct(eval,&none,type,NULL,0,at,out);
+    for (size_t i = 0; !status && i < raw.count; ++i) {
+        RangeValue element = {.kind=ValueDeclaration,.node=nodes[i]}, ignored;
+        status = evalInvoke(eval,append,out,&element,at,&ignored);
+    }
+    return status;
+}
+
+/* `#field` of the target, or `.field` of a declaration: what C's adapter
+ * holds there, as the value its grammar member's type says. An element of
+ * `#macros`, an application, reads as the Macro it applies: its name. */
+static int evalField(Eval *eval, RangeNode *owner, const char *name, RangeNode *at, RangeValue *out)
+{
+    RangeArena *arena = eval->vm->arena;
+    RangeNode *shape = owner->graphType ? owner->graphType : owner->kind == RangeNodeAttribute ? rangeGraphType(arena,"Macro") : NULL;
+    if (!rangeGraphField(shape,name) || (!owner->graphType && !same(name,"name")))
+        return evalFail(eval,at,"field '%s' is not declared by @type %s",name,shape ? shape->name : rangeNodeKindName(owner->kind));
+    if (same(name,"value") && rangeNodeDeclaresValue(owner->kind)) return evalInitializer(eval,owner,at,out);
+    RangeGraphValue raw = rangeGraphStoredField(arena,owner,name);
+    RangeNode *grammar = owner->graphType ? grammarDeclaration(eval->vm,owner) : shape->resolvedDeclaration;
+    RangeNode *member = grammar ? findMember(grammar,name) : NULL;
+    if (!member && raw.kind == RangeGraphNodes)
+        return evalFail(eval,at,"reflection field '%s' has no Range type: %s declares no member '%s' in the loaded grammar",
+                        name,grammar ? grammar->name : shape->name,name);
+    RangeNode *type = member ? memberType(eval->typer,grammar,member,selfSpecialization(eval->typer,grammar)) : NULL;
+    if (raw.kind == RangeGraphNodes) return evalList(eval,grammar,name,type,raw,at,out);
+    *out = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.node=owner,.text=raw.text,.length=strlen(raw.text)}
+        : raw.kind == RangeGraphNode ? (RangeValue){.kind=ValueDeclaration,.node=raw.node} : (RangeValue){0};
+    // An optional field, such as Function.output, is a case of the optional.
+    RangeNode *present = NULL;
+    if (type && optionalWrapped(eval->typer,type,&present) && out->kind == ValueNone) {
+        for (size_t i = 0; i < type->resolvedDeclaration->itemCount; ++i)
+            if (type->resolvedDeclaration->items[i]->kind == RangeNodeEnumCase && !type->resolvedDeclaration->items[i]->itemCount)
+                *out = (RangeValue){.kind=ValueCase,.type=type,.node=type->resolvedDeclaration->items[i]};
+        return EvalNormal;
+    }
+    if (out->kind == ValueText && !deferredType(eval->typer,type)) out->type = type;
+    return evalAdopt(eval,out,type,at);
+}
+
+/* `@print`, `@warning`, and `@diagnostic`: the message, written to the
+ * compiler's output, reported as a warning at the application (a law run per
+ * specialization repeats nothing), or ending evaluation as a failure there. */
+static int evalEffect(Eval *eval, EvalFrame *frame, RangeNode *attribute)
+{
+    RangeNode *macro = attribute->resolvedDeclaration;
+    int print = macroBuiltin(macro,"print"), warning = macroBuiltin(macro,"warning");
+    if (!print && !warning && !macroBuiltin(macro,"diagnostic"))
+        return evalFail(eval,attribute,"@%s is not an effect C runs at macro time",attribute->name);
+    if (attribute->itemCount != 1) return evalStop(eval);
+    const char *text; size_t length;
+    int status = evalText(eval,frame,attribute->items[0]->a,&text,&length);
+    if (status) return status;
+    if (warning) {
+        RangeNode *at = eval->application && eval->application->attribute ? eval->application->attribute : attribute;
+        if (eval->vm->report && !eval->vm->skipEmission) sourceDiagnostic(eval->vm->report,at,1,"macro","%.*s",(int)length,text);
+        return EvalNormal;
+    }
+    if (!print) return evalFail(eval,attribute,"%.*s",(int)length,text);
+    printf("%.*s\n",(int)length,text);
+    return EvalNormal;
+}
+
+/* A spliced value becomes the source a person would have written there: a
+ * declaration or a name, a reference; a literal or a scalar, a literal. A
+ * target field spliced alone is the node or the name C holds there. */
+static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **out)
+{
+    RangeArena *arena = eval->vm->arena;
+    RangeValue value;
+    if (at->kind == RangeNodeEnvironment && !at->resolvedDeclaration) {
+        RangeGraphValue raw = rangeGraphStoredField(arena,eval->application->target,at->name);
+        if (raw.kind == RangeGraphNodes) return evalFail(eval,at,"cannot splice a list of %zu declarations",raw.count);
+        value = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.text=raw.text,.length=strlen(raw.text)}
+            : raw.kind == RangeGraphNode ? (RangeValue){.kind=ValueDeclaration,.node=raw.node} : (RangeValue){0};
+    } else {
+        int status = evalExpression(eval,frame,at,&value);
+        if (status) return status;
+    }
+    RangeNode *node = NULL;
+    char spelled[32];
+    int bits = 64, isSigned = 1;
+    switch (value.kind) {
+    case ValueNone: return evalFail(eval,at,"splice has no value");
+    case ValueDeclaration: case ValueText:
+        if (value.kind == ValueText && value.node && value.node->kind == RangeNodeString) break;
+        node = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
+        node->name = value.kind == ValueText ? rangeArenaIntern(arena,value.text,value.length) : value.node->name;
+        if (!node->name) return evalFail(eval,at,"cannot splice an unnamed %s",rangeNodeKindName(value.node->kind));
+        if (value.kind == ValueDeclaration) node->resolvedDeclaration = value.node;
+        break;
+    case ValueLiteral: case ValueScalar:
+        if (value.kind == ValueLiteral && value.node->kind != RangeNodeInteger) break;
+        (void)scalarShape(value.type,&bits,&isSigned);
+        node = rangeNodeCreate(arena,RangeNodeInteger,at->path,at->line,at->column);
+        node->integer = isSigned && value.integer < 0 ? -value.integer : value.integer;
+        snprintf(spelled,sizeof(spelled),isSigned ? "%lld" : "%llu",node->integer);
+        node->name = rangeArenaIntern(arena,spelled,strlen(spelled));
+        if (isSigned && value.integer < 0) {
+            RangeNode *negative = rangeNodeCreate(arena,RangeNodeUnary,at->path,at->line,at->column);
+            negative->name = "-";
+            negative->a = node;
+            node = negative;
+        }
+        break;
+    case ValueCase:
+        if (value.type && value.type->resolvedDeclaration == eval->typer->boolean) {
+            node = rangeNodeCreate(arena,RangeNodeBool,at->path,at->line,at->column);
+            node->integer = value.node->integer;
+            break;
+        }
+        return evalFail(eval,at,"cannot splice a compile-time enum value");
+    default: return evalFail(eval,at,"cannot splice a compile-time %s value",value.kind == ValueClosure ? "closure" : "construct");
+    }
+    if (!node) {
+        // A string or boolean literal, copied where the splice stands.
+        node = rangeArenaAllocate(arena,sizeof(*node));
+        *node = *value.node;
+        node->path = at->path; node->line = at->line; node->column = at->column;
+    }
+    node->emittedBy = eval->application->attribute;
+    *out = node;
+    return EvalNormal;
+}
+
+/* Copy one quoted declaration for this application, filling its splices.
+ * Nested macro declarations keep their own splices for their own runs. */
+static int evalEmitNode(Eval *eval, EvalFrame *frame, RangeNode *node, int splice, RangeNode **out)
+{
+    *out = NULL;
+    if (!node) return EvalNormal;
+    RangeNode *attribute = eval->application->attribute;
+    if (splice && spliceChain(node)) return evalSplice(eval,frame,node,out);
+    if (node->kind == RangeNodeMacro) splice = 0;
+    size_t mask = eval->emittedCapacity - 1, slot = ((uintptr_t)node >> 4) & mask;
+    if (eval->emittedCapacity)
+        for (; eval->emittedFrom[slot]; slot = (slot + 1) & mask)
+            if (eval->emittedFrom[slot] == node) { *out = eval->emittedTo[slot]; return EvalNormal; }
+    if (2 * (eval->emittedCount + 1) > eval->emittedCapacity) {
+        // Grow, keeping every pair.
+        size_t capacity = eval->emittedCapacity ? eval->emittedCapacity * 2 : 256;
+        RangeNode **from = rangeArenaAllocate(eval->vm->arena,capacity * sizeof(*from));
+        RangeNode **to = rangeArenaAllocate(eval->vm->arena,capacity * sizeof(*to));
+        memset(from,0,capacity * sizeof(*from));
+        for (size_t i = 0; i < eval->emittedCapacity; ++i) {
+            if (!eval->emittedFrom[i]) continue;
+            size_t j = ((uintptr_t)eval->emittedFrom[i] >> 4) & (capacity - 1);
+            while (from[j]) j = (j + 1) & (capacity - 1);
+            from[j] = eval->emittedFrom[i]; to[j] = eval->emittedTo[i];
+        }
+        eval->emittedFrom = from; eval->emittedTo = to; eval->emittedCapacity = capacity;
+        mask = capacity - 1;
+        for (slot = ((uintptr_t)node >> 4) & mask; from[slot]; slot = (slot + 1) & mask) {}
+    }
+    RangeNode *copy = rangeArenaAllocate(eval->vm->arena,sizeof(*copy));
+    *copy = *node;
+    eval->emittedFrom[slot] = node; eval->emittedTo[slot] = copy; ++eval->emittedCount;
+    copy->emittedBy = attribute;
+    copy->flags &= ~(RangeFlagTyped | RangeFlagInvalid);
+    copy->resolvedDeclaration = NULL;
+    copy->macroApplication = NULL;
+    copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
+    int status;
+    if ((status = evalEmitNode(eval,frame,node->a,splice,&copy->a))
+        || (status = evalEmitNode(eval,frame,node->b,splice,&copy->b))
+        || (status = evalEmitNode(eval,frame,node->c,splice,&copy->c))
+        || (status = evalEmitNode(eval,frame,node->generics,splice,&copy->generics))
+        || (status = evalEmitNode(eval,frame,node->annotations,splice,&copy->annotations))
+        || (status = evalEmitNode(eval,frame,node->rhsReference,splice,&copy->rhsReference))) return status;
+    for (size_t i = 0; i < node->itemCount; ++i) {
+        RangeNode *item;
+        if ((status = evalEmitNode(eval,frame,node->items[i],splice,&item))) return status;
+        rangeNodeAppend(eval->vm->arena,copy,item);
+    }
+    if (splice) spliceDeclarationType(copy,node);
+    *out = copy;
+    return EvalNormal;
+}
+
+/* A #graph block's declarations, into the running application's output. */
+static int evalEmit(Eval *eval, EvalFrame *frame, RangeNode *emission)
+{
+    for (size_t i = 0; i < emission->b->itemCount; ++i) {
+        // Each emitted declaration is a fresh copy, sharing only within itself.
+        if (eval->emittedCapacity) memset(eval->emittedFrom,0,eval->emittedCapacity * sizeof(*eval->emittedFrom));
+        eval->emittedCount = 0;
+        RangeNode *copy;
+        int status = evalEmitNode(eval,frame,emission->b->items[i],1,&copy);
+        if (status) return status;
+        rangeNodeAppend(eval->vm->arena,eval->vm->emitted,copy);
+    }
+    return EvalNormal;
+}
+
+/* ---- calls ---- */
+
+/* A C primitive a function declares with @builtin, on its receiver: one
+ * byte of the bytes primitive, or the slot primitives on the receiver's one
+ * @many member. */
+static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeValue *arguments, RangeNode *at, RangeValue *out)
+{
+    if (self && self->kind == ValueText && same(function->name,"byte") && function->itemCount == 1) {
+        if (arguments[0].integer < 0 || (size_t)arguments[0].integer >= self->length) return evalFail(eval,at,"byte index is outside the bytes");
+        *out = (RangeValue){.kind=ValueScalar,.type=function->type,.integer=(unsigned char)self->text[arguments[0].integer]};
+        return EvalNormal;
+    }
+    if (!self || self->kind != ValueInstance || !slotPrimitive(function))
+        return evalFail(eval,at,"no C primitive is implemented for builtin function '%s'",function->name);
+    RangeNode *declaration = self->type->resolvedDeclaration;
+    size_t many = SIZE_MAX, found = 0;
+    for (size_t i = 0; i < self->count; ++i)
+        if (rangeNodeDeclaresValue(declaration->items[i]->kind) && (declaration->items[i]->flags & RangeFlagMany)) { many = i; ++found; }
+    if (found != 1) return evalFail(eval,at,"builtin function '%s' requires exactly one @many member in %s",function->name,declaration->name);
+    evalOwn(eval,self);
+    RangeValue *slots = &self->values[many];
+    long long index = arguments[0].integer;
+    if (same(function->name,"resize")) {
+        if (index < 0) return evalFail(eval,at,"resize to a negative slot count");
+        RangeValue *values = evalValues(eval,(size_t)index);
+        memcpy(values,slots->values,((size_t)index < slots->count ? (size_t)index : slots->count) * sizeof(*values));
+        *slots = (RangeValue){.kind=ValueSlots,.values=values,.count=(size_t)index};
+        return EvalNormal;
+    }
+    if (index < 0 || (size_t)index >= slots->count) return evalFail(eval,at,"slot index is outside the @many storage");
+    if (same(function->name,"read")) { *out = slots->values[index]; return EvalNormal; }
+    evalOwn(eval,slots);
+    slots->values[index] = arguments[1];
+    return EvalNormal;
+}
+
+static int typeOnDemand(Typer *, RangeNode *);
+
+/* Run `function` with these arguments, one per parameter in order, on
+ * `self` when it is a method: its body, or the C primitive it declares. */
+static int evalInvoke(Eval *eval, RangeNode *function, RangeValue *self, RangeValue *arguments, RangeNode *at, RangeValue *out)
+{
+    *out = (RangeValue){0};
+    int status;
+    if (!typeOnDemand(eval->typer,function)) return evalStop(eval);
+    for (size_t i = 0; i < function->itemCount; ++i)
+        if ((status = evalAdopt(eval,&arguments[i],function->items[i]->type,at))) return status;
+    if (function->flags & RangeFlagBuiltin) return evalBuiltin(eval,function,self,arguments,at,out);
+    if (!function->a) return evalFail(eval,at,"'%s' has no body to run at macro time",function->name);
+    if (++eval->depth > 64) return evalFail(eval,at,"compile-time call depth exceeded");
+    EvalFrame frame = {.self=self,.function=function,.output=function->type};
+    for (size_t i = 0; i < function->itemCount; ++i) evalBind(eval,&frame,function->items[i],arguments[i]);
+    status = evalStatement(eval,&frame,function->a);
+    --eval->depth;
+    if (status == EvalReturn) { *out = eval->returned; return EvalNormal; }
+    if (status) return status;
+    if (function->type && !unitType(eval->typer,function->type))
+        return evalFail(eval,at,"'%s' ended without returning a value",function->name);
+    return EvalNormal;
+}
+
+/* `where(element)`: the closure's body with its parameters bound, in the
+ * frame where it was written. It yields its one expression, or what `return`
+ * gives; `return` ends the closure only. */
+static int evalCallClosure(Eval *eval, RangeValue *closure, RangeValue *arguments, RangeNode *at, RangeValue *out)
+{
+    RangeNode *literal = closure->node;
+    RangeNode *type = literal->type && literal->type->kind == RangeNodeFunctionType ? literal->type : NULL;
+    if (++eval->depth > 64) return evalFail(eval,at,"compile-time call depth exceeded");
+    EvalFrame frame = {.parent=closure->frame,.self=closure->frame->self,.function=closure->frame->function,
+                       .output=type ? type->a : NULL};
+    int status = EvalNormal;
+    for (size_t i = 0; i < literal->itemCount && !status; ++i) {
+        status = evalAdopt(eval,&arguments[i],literal->items[i]->type,at);
+        evalBind(eval,&frame,literal->items[i],arguments[i]);
+    }
+    if (!status && literal->c) status = evalExpression(eval,&frame,literal->c,out);
+    else if (!status) {
+        *out = (RangeValue){0};
+        status = evalStatement(eval,&frame,literal->a);
+        if (status == EvalReturn) { *out = eval->returned; status = EvalNormal; }
+    }
+    --eval->depth;
+    return status ? status : evalAdopt(eval,out,frame.output,at);
+}
+
+/* A case with its payload, one argument per field in order. */
+static int evalCase(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNode *entry, RangeNode **arguments, size_t count, RangeValue *out)
+{
+    RangeValue *payload = evalValues(eval,count);
+    for (size_t i = 0; i < count; ++i) {
+        int status = evalExpression(eval,frame,arguments[i]->a,&payload[i]);
+        if (!status && type && i < entry->itemCount) status = evalAdopt(eval,&payload[i],caseFieldType(eval->typer,type,entry->items[i]),arguments[i]);
+        if (status) return status;
+    }
+    *out = (RangeValue){.kind=ValueCase,.type=type,.node=entry,.values=payload,.count=count};
+    return EvalNormal;
+}
+
+/* `Point(x: 1)`: each stored member is its argument or its default, which
+ * sees the members before it; @many storage starts with no slots. A scalar's
+ * or a bytes value's single input is the value itself. */
+static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNode **arguments, size_t count, RangeNode *at,
+                         RangeValue *out)
+{
+    if (!type || type->kind != RangeNodeSpecialization) return evalStop(eval);
+    RangeNode *declaration = type->resolvedDeclaration;
+    evalPrepare(eval,declaration);
+    typeMembersOnDemand(eval->typer,declaration);
+    EvalFrame defaults = {0};
+    int status, bits, isSigned;
+    if (bytesDeclaration(declaration) || scalarShape(type,&bits,&isSigned)) {
+        RangeNode *value = count ? arguments[0]->a : NULL;
+        EvalFrame *in = frame;
+        for (size_t i = 0; !value && i < declaration->itemCount; ++i)
+            if (constructionInput(declaration->items[i])) { value = memberDefault(declaration->items[i]); in = &defaults; }
+        status = evalExpression(eval,in,value,out);
+        return status ? status : evalAdopt(eval,out,type,at);
+    }
+    RangeValue instance = {.kind=ValueInstance,.type=type,.count=declaration->itemCount};
+    instance.values = evalValues(eval,instance.count);
+    defaults.self = &instance;
+    for (size_t i = 0; i < instance.count; ++i) {
+        RangeNode *member = declaration->items[i], *value = NULL;
+        if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
+        if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
+        for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
+        if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
+        else if (member->typeName && (member->flags & RangeFlagApplication))
+            status = evalConstruct(eval,&defaults,member->type,member->items,member->itemCount,member,&instance.values[i]);
+        else if ((value = memberDefault(member))) status = evalExpression(eval,&defaults,value,&instance.values[i]);
+        else continue; /* a required input: typing reports it missing */
+        if (!status) status = evalAdopt(eval,&instance.values[i],member->type,value ? value : member);
+        if (status) return status;
+    }
+    *out = instance;
+    return EvalNormal;
+}
+
+/* The value a place names, to change in place: a local, a parameter, or a
+ * member of the receiver, or a member of one of those; NULL for any other
+ * expression. */
+static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
+{
+    if (expr->kind == RangeNodeName) {
+        RangeValue *bound = evalNamed(frame,expr->resolvedDeclaration);
+        if (bound) return bound;
+        size_t member = evalMember(frame->self,expr->resolvedDeclaration);
+        if (member == SIZE_MAX) return NULL;
+        evalOwn(eval,frame->self);
+        return &frame->self->values[member];
+    }
+    if (expr->kind != RangeNodeMemberAccess || (expr->flags & RangeFlagNarrowed)) return NULL;
+    RangeValue *owner = evalPlace(eval,frame,expr->a);
+    size_t member = owner ? evalMember(owner,expr->resolvedDeclaration) : SIZE_MAX;
+    if (member == SIZE_MAX) return NULL;
+    evalOwn(eval,owner);
+    return &owner->values[member];
+}
+
+/* A call: a case with its payload, a construction, a closure a parameter
+ * holds, or the function typing chose, on the receiver it is called on (in
+ * place, so a method changing it changes the place) or, for a sibling, the
+ * running method's. On a value known only at macro time, the function its
+ * type declares with the call's name and labels. */
+static int evalCall(Eval *eval, EvalFrame *frame, RangeNode *call, RangeValue *out)
+{
+    RangeNode *callee = call->a, *target = callee->resolvedDeclaration;
+    if (target && target->kind == RangeNodeEnumCase) return evalCase(eval,frame,call->type,target,call->items,call->itemCount,out);
+    if (target && (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeTypeParameter))
+        return evalConstruct(eval,frame,call->type,call->items,call->itemCount,call,out);
+    RangeValue receiver = {0}, *self = NULL, *arguments = evalValues(eval,call->itemCount);
+    int status;
+    if (callee->kind == RangeNodeMemberAccess) {
+        self = evalPlace(eval,frame,callee->a);
+        if (!self && (status = evalExpression(eval,frame,callee->a,&receiver))) return status;
+        if (!self) self = &receiver;
+    } else if (target && target->kind == RangeNodeFunction && target->typeName) self = frame->self;
+    for (size_t i = 0; i < call->itemCount; ++i)
+        if ((status = evalExpression(eval,frame,call->items[i]->a,&arguments[i]))) return status;
+    if (target && (target->kind == RangeNodeParameter || rangeNodeDeclaresValue(target->kind))) {
+        RangeValue *closure = evalNamed(frame,target);
+        if (!closure || closure->kind != ValueClosure) return evalFail(eval,call,"no closure is bound to '%s' here",callee->name);
+        return evalCallClosure(eval,closure,arguments,call,out);
+    }
+    if (!target && callee->kind == RangeNodeMemberAccess) {
+        char type[160]; describeType(type,sizeof(type),self->type);
+        target = self->type && self->type->kind == RangeNodeSpecialization
+            ? findCalledFunction(self->type->resolvedDeclaration,callee->name,call) : NULL;
+        if (!target) return evalFail(eval,call,"%s has no function '%s'",type,callee->name);
+        if (genericTemplate(target))
+            return evalFail(eval,call,"'%s' of %s is generic; calling it on a value known only at macro time is not implemented",target->name,type);
+    }
+    if (!target || target->kind != RangeNodeFunction) return evalStop(eval);
+    return evalInvoke(eval,target,self,arguments,call,out);
+}
+
+/* ---- operators ---- */
+
+/* `=` on two values: a type with an equality function calls it; any other
+ * value compares structurally, a declaration by identity. A literal takes
+ * the other operand's type first. */
+static int evalEquals(Eval *eval, RangeValue left, RangeValue right, RangeNode *at, int *equal)
+{
+    int status = EvalNormal;
+    *equal = 0;
+    if (left.kind == ValueLiteral && right.kind != ValueLiteral) status = evalAdopt(eval,&left,right.type,at);
+    else if (right.kind == ValueLiteral && left.kind != ValueLiteral) status = evalAdopt(eval,&right,left.type,at);
+    if (status || left.kind != right.kind) return status;
+    RangeNode *function = left.kind == ValueCase || left.kind == ValueInstance ? equalityFunction(left.type) : NULL;
+    if (function) {
+        RangeValue result;
+        status = evalInvoke(eval,function,&left,&right,at,&result);
+        *equal = !status && evalTruth(result);
+        return status;
+    }
+    switch (left.kind) {
+    case ValueNone: *equal = 1; return EvalNormal;
+    case ValueLiteral:
+        *equal = left.node->kind == right.node->kind && left.integer == right.integer && left.length == right.length
+            && (!left.length || !memcmp(left.text,right.text,left.length));
+        return EvalNormal;
+    case ValueScalar: *equal = left.integer == right.integer; return EvalNormal;
+    case ValueText: *equal = left.length == right.length && (!left.length || !memcmp(left.text,right.text,left.length)); return EvalNormal;
+    case ValueDeclaration: *equal = left.node == right.node; return EvalNormal;
+    case ValueClosure: return evalFail(eval,at,"closures are not compared");
+    case ValueCase: if (left.node != right.node) return EvalNormal; break;
+    default: if (left.count != right.count) return EvalNormal; break;
+    }
+    *equal = 1;
+    for (size_t i = 0; *equal && !status && i < left.count && i < right.count; ++i)
+        status = evalEquals(eval,left.values[i],right.values[i],at,equal);
+    return status;
+}
+
+/* A builtin operator's C primitive, by its operand's layout: scalar
+ * arithmetic and comparison, trapping where native code traps, Bool's `!`,
+ * and the join of two bytes values. */
+static int evalPrimitive(Eval *eval, RangeNode *expr, RangeValue left, RangeValue right, RangeValue *out)
+{
+    const char *op = expr->name;
+    char name[160]; describeType(name,sizeof(name),left.type);
+    int bits, isSigned;
+    if (same(op,"!") && left.kind == ValueCase) { *out = evalBool(eval,!evalTruth(left)); return EvalNormal; }
+    if (same(op,"+") && left.kind == ValueText && right.kind == ValueText) {
+        char *joined = rangeArenaAllocate(eval->vm->arena,left.length + right.length + 1);
+        memcpy(joined,left.text,left.length);
+        memcpy(joined + left.length,right.text,right.length);
+        joined[left.length + right.length] = '\0';
+        *out = (RangeValue){.kind=ValueText,.type=left.type,.text=joined,.length=left.length + right.length};
+        return EvalNormal;
+    }
+    if (left.kind != ValueScalar || !scalarShape(left.type,&bits,&isSigned))
+        return evalFail(eval,expr,"no C primitive implements builtin operator '%s' on %s",op,name);
+    __int128 a = scalarValue(left,isSigned), b = scalarValue(right,isSigned), result = 0;
+    if (expr->kind == RangeNodeUnary) result = -a;
+    else if (same(op,"<") || same(op,"<=") || same(op,">") || same(op,">=")) {
+        *out = evalBool(eval,same(op,"<") ? a < b : same(op,"<=") ? a <= b : same(op,">") ? a > b : a >= b);
+        return EvalNormal;
+    } else if (same(op,"+")) result = a + b;
+    else if (same(op,"-")) result = a - b;
+    else if (same(op,"*")) { if (__builtin_mul_overflow(a,b,&result)) return evalFail(eval,expr,"result of '*' does not fit %s",name); }
+    else if (same(op,"/") || same(op,"%")) {
+        if (!b) return evalFail(eval,expr,"division by zero in '%s'",op);
+        result = same(op,"/") ? a / b : a % b;
+    } else return evalFail(eval,expr,"no C primitive implements builtin operator '%s' on %s",op,name);
+    if (!scalarFits(result,bits,isSigned)) return evalFail(eval,expr,"result of '%s' does not fit %s",op,name);
+    *out = (RangeValue){.kind=ValueScalar,.type=left.type,.integer=(long long)result};
+    return EvalNormal;
+}
+
+/* `a op b` and `op a`: the function typing chose for the operator, or, on a
+ * value known only at macro time, the one its type declares. A function with
+ * a body is called; a builtin one is its C primitive. `&` and `|` evaluate
+ * their right operand only when the left does not decide; `=` and `!=`
+ * compare, as every type can. */
+static int evalOperator(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+{
+    const char *op = expr->name;
+    int binary = expr->kind == RangeNodeBinary, status;
+    if (binary && same(op,"..<")) return evalConstruct(eval,frame,expr->type,expr->items,expr->itemCount,expr,out);
+    if (expr->c) return evalExpression(eval,frame,expr->c,out);
+    // `-128` is one literal.
+    if (!binary && same(op,"-") && expr->a && expr->a->kind == RangeNodeInteger) {
+        *out = (RangeValue){.kind=ValueLiteral,.node=expr->a,.integer=-expr->a->integer};
+        return evalAdopt(eval,out,expr->type,expr);
+    }
+    RangeNode *function = expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeFunction ? expr->resolvedDeclaration : NULL;
+    int logic = binary && (same(op,"&") || same(op,"|")), equality = binary && (same(op,"=") || same(op,"!="));
+    RangeValue left, right = {0};
+    if ((status = evalExpression(eval,frame,expr->a,&left))) return status;
+    if (binary && !logic && (status = evalExpression(eval,frame,expr->b,&right))) return status;
+    if (equality) {
+        int equal;
+        status = evalEquals(eval,left,right,expr,&equal);
+        *out = evalBool(eval,equal == same(op,"="));
+        return status;
+    }
+    if (!function) {
+        // Known only now: a literal takes the other operand's type, or its family's.
+        if (left.kind == ValueLiteral)
+            status = evalAdopt(eval,&left,right.kind != ValueLiteral && right.type ? right.type : literalType(eval->typer,left.node),expr);
+        if (!status && right.kind == ValueLiteral) status = evalAdopt(eval,&right,left.type,expr);
+        if (status) return status;
+        function = left.type && left.type->kind == RangeNodeSpecialization ? operatorFunction(left.type->resolvedDeclaration,op,binary) : NULL;
+        char name[160]; describeType(name,sizeof(name),left.type);
+        if (!function) return evalFail(eval,expr,"'%s' is not declared on %s",op,name);
+    }
+    if (logic && shortCircuit(function)) {
+        if (evalTruth(left) == same(op,"|")) { *out = evalBool(eval,evalTruth(left)); return EvalNormal; }
+        if ((status = evalExpression(eval,frame,expr->b,&right))) return status;
+        *out = evalBool(eval,evalTruth(right));
+        return EvalNormal;
+    }
+    if (logic && (status = evalExpression(eval,frame,expr->b,&right))) return status;
+    if (function->flags & RangeFlagBuiltin) return evalPrimitive(eval,expr,left,right,out);
+    return evalInvoke(eval,function,&left,&right,expr,out);
+}
+
+/* ---- expressions ---- */
+
+/* A value generic: the constant of the running function's instance, or of
+ * the receiver's specialization. */
+static RangeNode *evalGeneric(EvalFrame *frame, RangeNode *declaration)
+{
+    if (declaration->kind != RangeNodeLet) return NULL;
+    RangeNode *generics = frame->function && frame->function->kind == RangeNodeFunction ? frame->function->generics : NULL;
+    for (size_t i = 0; generics && i < generics->itemCount; ++i) if (generics->items[i] == declaration) return declaration->a;
+    RangeNode *self = frame->self && frame->self->type && frame->self->type->kind == RangeNodeSpecialization ? frame->self->type : NULL;
+    RangeNode *declared = self ? self->resolvedDeclaration->generics : NULL;
+    for (size_t i = 0; declared && i < declared->itemCount; ++i)
+        if (declared->items[i] == declaration && self->generics && i < self->generics->itemCount) return rangeNodeRHS(self->generics->items[i]);
+    return NULL;
+}
+
+/* A name: a value of the frame, the receiver, a member of it, a value
+ * generic, or a construct or enum, which is the declaration. */
+static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+{
+    RangeNode *declaration = expr->resolvedDeclaration;
+    RangeValue *bound = evalNamed(frame,declaration);
+    if (bound) { *out = *bound; return EvalNormal; }
+    if (declaration && frame->self && frame->function && declaration == frame->function->receiver) { *out = *frame->self; return EvalNormal; }
+    size_t member = evalMember(frame->self,declaration);
+    if (member != SIZE_MAX) { *out = frame->self->values[member]; return EvalNormal; }
+    RangeNode *constant = declaration ? evalGeneric(frame,declaration) : NULL;
+    if (constant) {
+        EvalFrame none = {0};
+        int status = evalExpression(eval,&none,constant,out);
+        return status ? status : evalAdopt(eval,out,declaration->type,expr);
+    }
+    if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
+        *out = (RangeValue){.kind=ValueDeclaration,.node=declaration};
+        return EvalNormal;
+    }
+    return evalFail(eval,expr,"the value of '%s' is not known at macro time",expr->name);
+}
+
+/* `a.name`: a case named through its enum, a narrowed optional's payload, a
+ * member of an instance, a reflection field of a declaration, the byte count
+ * of text, or, on a value known only at macro time, whether it holds a case. */
+static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+{
+    RangeNode *member = expr->resolvedDeclaration;
+    if (member && member->kind == RangeNodeEnumCase && !(expr->flags & RangeFlagNarrowed)) {
+        *out = (RangeValue){.kind=ValueCase,.type=expr->type,.node=member};
+        return EvalNormal;
+    }
+    RangeValue receiver;
+    int status = evalExpression(eval,frame,expr->a,&receiver);
+    if (status) return status;
+    if (expr->flags & RangeFlagNarrowed) {
+        for (size_t i = 0; receiver.kind == ValueCase && i < receiver.count; ++i)
+            if (receiver.node->items[i] == member) { *out = receiver.values[i]; return EvalNormal; }
+        return evalFail(eval,expr,"this narrowed value holds no payload");
+    }
+    RangeNode *declaration = receiver.type && receiver.type->kind == RangeNodeSpecialization ? receiver.type->resolvedDeclaration : NULL;
+    switch (receiver.kind) {
+    case ValueDeclaration: return evalField(eval,receiver.node,expr->name,expr,out);
+    case ValueInstance: {
+        size_t index = evalMember(&receiver,member ? member : declaration ? findMember(declaration,expr->name) : NULL);
+        if (index == SIZE_MAX) break;
+        *out = receiver.values[index];
+        return EvalNormal;
+    }
+    case ValueText:
+        if (!declaration || !same(expr->name,"count") || !findMember(declaration,"count")) break;
+        *out = (RangeValue){.kind=ValueScalar,.integer=(long long)receiver.length,
+            .type=memberType(eval->typer,declaration,findMember(declaration,"count"),receiver.type)};
+        return EvalNormal;
+    case ValueCase:
+        if (!enumCase(declaration,expr->name)) break;
+        *out = evalBool(eval,receiver.node == enumCase(declaration,expr->name));
+        return EvalNormal;
+    default: break;
+    }
+    char type[160]; describeType(type,sizeof(type),receiver.type);
+    return evalFail(eval,expr,"%s has no member '%s'",type,expr->name);
+}
+
+/* Whether `pattern` matches `value`; what it binds joins the frame. A name
+ * bound on the right of `|` is the left side's. */
+static int evalMatch(Eval *eval, EvalFrame *frame, RangeNode *pattern, RangeValue value, int *matched)
+{
+    int status = evalStep(eval,pattern);
+    *matched = 1;
+    if (status) return status;
+    switch (pattern->integer) {
+    case RangePatternAny: return EvalNormal;
+    case RangePatternBind:
+        evalBind(eval,frame,pattern->a->resolvedDeclaration ? pattern->a->resolvedDeclaration : pattern->a,value);
+        return EvalNormal;
+    case RangePatternCase: {
+        RangeNode *declaration = value.kind == ValueCase && value.type ? value.type->resolvedDeclaration : NULL;
+        RangeNode *entry = pattern->resolvedDeclaration ? pattern->resolvedDeclaration : enumCase(declaration,pattern->name);
+        if (value.kind != ValueCase) return evalFail(eval,pattern,"'.%s' matches an enum case; this value is not one",pattern->name);
+        if (!entry) { char type[160]; describeType(type,sizeof(type),value.type); return evalFail(eval,pattern,"%s has no case '%s'",type,pattern->name); }
+        *matched = value.node == entry;
+        for (size_t i = 0; *matched && !status && (pattern->flags & RangeFlagApplication) && i < pattern->itemCount && i < value.count; ++i)
+            status = evalMatch(eval,frame,pattern->items[i]->a,value.values[i],matched);
+        return status;
+    }
+    case RangePatternValue: {
+        RangeValue other;
+        if ((status = evalExpression(eval,frame,pattern->a,&other))) return status;
+        return evalEquals(eval,value,other,pattern,matched);
+    }
+    default: return evalFail(eval,pattern,"this pattern form is not run at macro time");
+    }
+}
+
+/* A switch runs its first arm whose rows match: a row's patterns match the
+ * subjects, and its condition holds. A switch expression is the value its
+ * arm yields; an arm that is a block runs as a statement. */
+static int evalSwitch(Eval *eval, EvalFrame *frame, RangeNode *node, RangeValue *out)
+{
+    size_t width = node->c ? node->c->itemCount : 1;
+    RangeValue *subjects = evalValues(eval,width);
+    RangeNode **vector = rangeArenaAllocate(eval->vm->arena,(width ? width : 1) * sizeof(*vector));
+    int status;
+    *out = (RangeValue){0};
+    for (size_t k = 0; k < width; ++k)
+        if ((status = evalExpression(eval,frame,node->c ? node->c->items[k] : node->a,&subjects[k]))) return status;
+    for (size_t i = 0; i < node->itemCount; ++i) {
+        RangeNode *entry = node->items[i];
+        int chosen = (entry->flags & RangeFlagLiteral) != 0;
+        for (size_t j = 0; !chosen && j < entry->itemCount; ++j) {
+            RangeNode *row = entry->items[j];
+            patternRow(row,vector,width);
+            chosen = 1;
+            for (size_t k = 0; chosen && k < width; ++k)
+                if (vector[k] && (status = evalMatch(eval,frame,vector[k],subjects[k],&chosen))) return status;
+            if (chosen && row->b) {
+                RangeValue condition;
+                if ((status = evalExpression(eval,frame,row->b,&condition))) return status;
+                chosen = evalTruth(condition);
+            }
+        }
+        if (!chosen) continue;
+        if (!entry->a) return evalStatement(eval,frame,entry->b);
+        status = evalExpression(eval,frame,entry->a,out);
+        return status ? status : evalAdopt(eval,out,node->type,entry->a);
+    }
+    return EvalNormal;
+}
+
+/* A literal: the value of the type typing gave it, or a literal of no type. */
+static int evalLiteral(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+{
+    *out = (RangeValue){.kind=ValueLiteral,.node=expr,.integer=expr->integer};
+    if (expr->kind == RangeNodeString) {
+        int status = evalText(eval,frame,expr,&out->text,&out->length);
+        if (status) return status;
+        // Interpolated text is computed: no literal writes it as it is.
+        if (expr->itemCount != 1 || !(expr->items[0]->flags & RangeFlagLiteral))
+            *out = (RangeValue){.kind=ValueText,.type=expr->type,.text=out->text,.length=out->length};
+    }
+    return evalAdopt(eval,out,expr->type,expr);
+}
+
+static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
+{
+    *out = (RangeValue){0};
+    if (!expr) return EvalNormal;
+    int status = evalStep(eval,expr);
+    if (status) return status;
+    switch (expr->kind) {
+    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return evalLiteral(eval,frame,expr,out);
+    case RangeNodeName: return evalName(eval,frame,expr,out);
+    case RangeNodeEnvironment:
+        // A splice of a macro local, or a field of the application's target.
+        if (expr->resolvedDeclaration) return evalName(eval,frame,expr,out);
+        if (!eval->application) return evalFail(eval,expr,"'#%s' is read outside a macro application",expr->name);
+        return evalField(eval,eval->application->target,expr->name,expr,out);
+    case RangeNodeCase:
+        if (!expr->resolvedDeclaration) return evalStop(eval);
+        *out = (RangeValue){.kind=ValueCase,.type=expr->type,.node=expr->resolvedDeclaration};
+        return EvalNormal;
+    case RangeNodeMemberAccess: return evalMemberAccess(eval,frame,expr,out);
+    case RangeNodeCall: return evalCall(eval,frame,expr,out);
+    case RangeNodeCaseTest: {
+        RangeValue subject;
+        int matched;
+        if ((status = evalExpression(eval,frame,expr->a,&subject)) || (status = evalMatch(eval,frame,expr->b,subject,&matched))) return status;
+        *out = evalBool(eval,matched);
+        return EvalNormal;
+    }
+    case RangeNodeClosure:
+        *out = (RangeValue){.kind=ValueClosure,.node=expr,.frame=frame};
+        return EvalNormal;
+    case RangeNodeSwitch: return evalSwitch(eval,frame,expr,out);
+    case RangeNodeUnary: case RangeNodeBinary: return evalOperator(eval,frame,expr,out);
+    case RangeNodeAttribute: return evalEffect(eval,frame,expr);
+    case RangeNodeEmission:
+        // A shape-only block landed before the body ran; a law run emits nothing.
+        if (eval->vm->skipEmission || (expr->flags & RangeFlagShape)) return EvalNormal;
+        return evalEmit(eval,frame,expr);
+    default: return evalFail(eval,expr,"%s expressions are not run at macro time",rangeNodeKindName(expr->kind));
+    }
+}
+
+/* ---- statements ---- */
+
+static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
+{
+    if (!node) return EvalNormal;
+    int status = evalStep(eval,node);
+    if (status) return status;
+    RangeValue value = {0};
+    switch (node->kind) {
+    case RangeNodeBlock:
+        for (size_t i = 0; i < node->itemCount; ++i) if ((status = evalStatement(eval,frame,node->items[i]))) return status;
+        return EvalNormal;
+    case RangeNodeLet: case RangeNodeState: {
+        // `let p: Point(x: 1)` constructs; `let r: step(x: 1)` calls; a bare
+        // name that resolved to a value copies it.
+        RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
+        if (node->typeName && (node->flags & RangeFlagApplication) && !(node->a && node->a->kind == RangeNodeCall))
+            status = evalConstruct(eval,frame,node->type,node->items,node->itemCount,node,&value);
+        else status = evalExpression(eval,frame,!node->typeName || (node->a && node->a->kind == RangeNodeCall) ? rangeNodeRHS(node)
+            : copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL,&value);
+        if (!status) status = evalAdopt(eval,&value,node->type,node);
+        if (!status) evalBind(eval,frame,node,value);
+        return status;
+    }
+    case RangeNodeAssign: {
+        RangeNode *target = node->a->type ? node->a->type : node->a->resolvedDeclaration ? node->a->resolvedDeclaration->type : NULL;
+        if ((status = evalExpression(eval,frame,node->b,&value)) || (status = evalAdopt(eval,&value,target,node->b))) return status;
+        RangeValue *place = evalPlace(eval,frame,node->a);
+        if (!place) return evalStop(eval);
+        *place = value;
+        return EvalNormal;
+    }
+    case RangeNodeWhile:
+        // A while without a condition ends only at break.
+        for (;;) {
+            if (node->a) {
+                if ((status = evalExpression(eval,frame,node->a,&value))) return status;
+                if (!evalTruth(value)) return EvalNormal;
+            }
+            status = evalStatement(eval,frame,node->b);
+            if (status == EvalBreak) return EvalNormal;
+            if (status && status != EvalContinue) return status;
+        }
+    case RangeNodeFor: return evalStatement(eval,frame,node->a); /* the loop it is written as */
+    case RangeNodeBreak: return EvalBreak;
+    case RangeNodeContinue: return EvalContinue;
+    case RangeNodeReturn:
+        if (node->a && ((status = evalExpression(eval,frame,node->a,&value)) || (status = evalAdopt(eval,&value,frame->output,node->a)))) return status;
+        eval->returned = value;
+        return EvalReturn;
+    case RangeNodeSwitch: return evalSwitch(eval,frame,node,&value);
+    case RangeNodeExpressionStatement: return evalExpression(eval,frame,node->a,&value);
+    default: return evalFail(eval,node,"%s statements are not run at macro time",rangeNodeKindName(node->kind));
+    }
+}
+
+static int typeMacroOnDemand(Typer *, RangeMacroApplication *);
+
+/* Run an application against its target: its macro body, or with `shape`
+ * only its shape-only #graph blocks. A failure is the application's (fail
+ * reports it); returns 0 when the body stopped on a problem typing reported. */
+static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
+{
+    Eval eval = {.vm=vm,.typer=vm->typer,.application=app};
+    EvalFrame frame = {0};
+    RangeNode *body = app->declaration->a;
+    int status = EvalNormal;
+    if (shape) {
+        for (size_t i = 0; !status && body && i < body->itemCount; ++i) {
+            RangeNode *emission = body->items[i]->kind == RangeNodeExpressionStatement ? body->items[i]->a : NULL;
+            if (emission && emission->kind == RangeNodeEmission && (emission->flags & RangeFlagShape)) status = evalEmit(&eval,&frame,emission);
+        }
+    } else if (!typeMacroOnDemand(vm->typer,app)) return 0;
+    else status = evalStatement(&eval,&frame,body);
+    if (status == EvalFailed && eval.message) fail(vm,eval.at,"%s",eval.message);
+    return status != EvalFailed;
 }
 
 /* ---- native code -----------------------------------------------------------

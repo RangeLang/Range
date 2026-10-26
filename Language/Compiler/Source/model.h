@@ -82,8 +82,10 @@ enum {
     RangeFlagNarrowed = 1 << 17,   /* member access: the payload of the optional value a, which a test of
                                     * its present case narrowed; resolvedDeclaration is the payload field */
     RangeFlagTyped = 1 << 18,      /* function, macro, entry block, member: typed already, so typing on
-                                    * demand at macro time and typing in order meet once */
-    RangeFlagShape = 1 << 19       /* #graph: a shape-only block, emitted before any macro body runs */
+                                    * demand at macro time and typing in order meet once; local: its
+                                    * declaration was typed, so later statements may read it */
+    RangeFlagShape = 1 << 19,      /* #graph: a shape-only block, emitted before any macro body runs */
+    RangeFlagInvalid = 1 << 20     /* function, macro: typing it reported errors, so it does not run at macro time */
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of
