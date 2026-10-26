@@ -6,6 +6,7 @@
 #define RANGE_COMPILER_MODEL_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 typedef enum {
     RangeNodeUnit,
@@ -85,7 +86,14 @@ enum {
                                     * demand at macro time and typing in order meet once; local: its
                                     * declaration was typed, so later statements may read it */
     RangeFlagShape = 1 << 19,      /* #graph: a shape-only block, emitted before any macro body runs */
-    RangeFlagInvalid = 1 << 20     /* function, macro: typing it reported errors, so it does not run at macro time */
+    RangeFlagInvalid = 1 << 20,    /* function, macro: typing it reported errors, so it does not run at macro time */
+    RangeFlagRequired = 1 << 21    /* let, state: its type path names a type it requires, not a value */
+};
+
+/* Flags the compiler finds; every other flag is written. */
+enum {
+    RangeFlagFacts = RangeFlagChecked | RangeFlagMutating | RangeFlagMutationKnown | RangeFlagTyped
+        | RangeFlagShape | RangeFlagInvalid | RangeFlagRequired
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of
@@ -127,24 +135,45 @@ struct RangeMacroApplication {
 };
 
 struct RangeNode {
+    /* What was written: read once, then never changed. The parser, a parser
+     * desugaring, or a #graph block writes these; the guard in the type
+     * checker proves nothing changes them after they are read. */
     RangeNodeKind kind;
     const char *path;
-    const char *source;    /* unit owns the text; inspected children borrow it */
     int line;
     int column;
     const char *name;      /* interned, NUL terminated */
     const char *typeName;  /* interned, NUL terminated */
-    int flags;
+    int flags;             /* written flags; those in RangeFlagFacts are found later */
     long long integer;
     size_t spanStart;   /* raw source span for retained code */
     size_t spanEnd;
     RangeNode *a;
     RangeNode *b;
     RangeNode *c;
+    RangeNode *annotations;
+    RangeNode *generics; /* declaration Let members or supplied type arguments */
+    RangeNode *rhsReference; /* bare RHS identity, resolved like any name */
+    /* Complete declaration RHS source range, independent of legacy type slots. */
+    size_t rhsStart;
+    size_t rhsEnd;
+    RangeNode **items;
+    size_t itemCount;
+    size_t itemCapacity;
+    RangeNode *emittedBy; /* macro application whose #graph block produced this node */
+
+    /* What the compiler found: beside the written code, never in it. */
+    const char *source;    /* unit owns the text; inspected children borrow it */
     /* Resolution result: declaration identity, never a name-only dispatch. */
     RangeNode *resolvedDeclaration;
     RangeNode *resolvedType; /* resolved literal representation */
-    RangeNode *type; /* the specialization an expression or declaration has */
+    RangeNode *type; /* the specialization an expression or declaration has: after narrowing, before promotion */
+    RangeNode *lowered;  /* what runs in place of the written form: a case test, or a call (an operator with
+                          * a body, the @interval construction, a function-call initializer); on a
+                          * declaration, its value as typing wrote it. Compiler-written, pointing at
+                          * written children, never linked into the tree. */
+    RangeNode *narrowed; /* the @optional present case this read goes through; its one field is the payload */
+    RangeNode *promoted; /* the optional this value is wrapped into where it is used */
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
     int scalarBits, scalarSigned; /* from the builtin storage and signed members; 0 bits if not a scalar */
@@ -157,18 +186,8 @@ struct RangeNode {
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */
     const char *literalPattern; /* validated literal rule, owned by the arena */
     RangeNode *literalDefault; /* unique Core construct for a literal macro */
-    RangeNode *annotations;
-    RangeNode *generics; /* declaration Let members or supplied type arguments */
-    RangeNode *rhsReference; /* bare RHS identity, resolved like any name */
-    RangeNode *emittedBy; /* macro application whose #graph block produced this node */
     RangeNode *receiver; /* method: its implicit receiver declaration, made on first use */
     RangeNode *owner;    /* method: the construct or enum that declares it */
-    /* Complete declaration RHS source range, independent of legacy type slots. */
-    size_t rhsStart;
-    size_t rhsEnd;
-    RangeNode **items;
-    size_t itemCount;
-    size_t itemCapacity;
 };
 
 /* Arena owning every node and interned string for the process lifetime. */
@@ -193,5 +212,6 @@ void rangeGraphInitTypes(RangeArena *arena);
 RangeNode *rangeGraphField(const RangeNode *type, const char *name);
 RangeNode *rangeNodeRHS(RangeNode *node);
 RangeGraphValue rangeGraphStoredField(RangeArena *arena, RangeNode *node, const char *name);
+uint64_t rangeWrittenHash(const RangeNode *node);
 
 #endif

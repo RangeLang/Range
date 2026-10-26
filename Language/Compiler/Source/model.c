@@ -262,3 +262,53 @@ void rangeGraphInitTypes(RangeArena *arena)
     rangeGraphField(rangeGraphType(arena,"Macro"),"body")->a=rangeGraphType(arena,"Block");
     rangeGraphField(rangeGraphType(arena,"Function"),"body")->a=rangeGraphType(arena,"Block");
 }
+
+/* FNV-1a over what a node's author wrote: its kind, written flags, values,
+ * names, location, and written children, each child's presence marked.
+ * Facts the compiler finds beside the code are not part of it. */
+static uint64_t writtenBytes(uint64_t hash, const void *bytes, size_t size)
+{
+    for (size_t i = 0; i < size; ++i) hash = (hash ^ ((const unsigned char *)bytes)[i]) * 1099511628211ull;
+    return hash;
+}
+
+static uint64_t writtenText(uint64_t hash, const char *text)
+{
+    unsigned char present = text != NULL;
+    hash = writtenBytes(hash,&present,1);
+    return text ? writtenBytes(hash,text,strlen(text) + 1) : hash;
+}
+
+static uint64_t writtenNode(uint64_t hash, const RangeNode *node)
+{
+    unsigned char present = node != NULL;
+    hash = writtenBytes(hash,&present,1);
+    if (!node) return hash;
+    int flags = node->flags & ~RangeFlagFacts;
+    hash = writtenBytes(hash,&node->kind,sizeof(node->kind));
+    hash = writtenBytes(hash,&flags,sizeof(flags));
+    hash = writtenBytes(hash,&node->integer,sizeof(node->integer));
+    hash = writtenText(hash,node->name);
+    hash = writtenText(hash,node->typeName);
+    hash = writtenText(hash,node->path);
+    hash = writtenBytes(hash,&node->line,sizeof(node->line));
+    hash = writtenBytes(hash,&node->column,sizeof(node->column));
+    hash = writtenBytes(hash,&node->spanStart,sizeof(node->spanStart));
+    hash = writtenBytes(hash,&node->spanEnd,sizeof(node->spanEnd));
+    hash = writtenBytes(hash,&node->rhsStart,sizeof(node->rhsStart));
+    hash = writtenBytes(hash,&node->rhsEnd,sizeof(node->rhsEnd));
+    hash = writtenNode(hash,node->a);
+    hash = writtenNode(hash,node->b);
+    hash = writtenNode(hash,node->c);
+    hash = writtenNode(hash,node->generics);
+    hash = writtenNode(hash,node->annotations);
+    hash = writtenNode(hash,node->rhsReference);
+    hash = writtenBytes(hash,&node->itemCount,sizeof(node->itemCount));
+    for (size_t i = 0; i < node->itemCount; ++i) hash = writtenNode(hash,node->items[i]);
+    return hash;
+}
+
+uint64_t rangeWrittenHash(const RangeNode *node)
+{
+    return writtenNode(1469598103934665603ull,node);
+}

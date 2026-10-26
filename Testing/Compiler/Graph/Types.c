@@ -12,6 +12,7 @@ typedef struct {
     size_t count;
     RangeNode *project;
     SourceReport report;
+    Typer *typer;
 } Compiled;
 
 /* The compiler's normal order over the real language sources plus a project. */
@@ -50,11 +51,11 @@ static void compile(Compiled *c, const char *project)
     int ok = resolveGraphApplications(&c->arena,c->units,c->count,error,sizeof(error));
     if (!ok) fprintf(stderr,"%s\n",error);
     assert(ok);
-    Typer *typer = diagnoseMacroApplications(&c->report);
+    c->typer = diagnoseMacroApplications(&c->report);
     for (size_t u = 0; u < c->count; ++u) diagnoseSourceNode(&c->report,NULL,c->units[u],0);
     diagnoseDuplicates(&c->report);
     for (size_t u = 0; u < c->count; ++u) diagnoseBuiltinFunctions(&c->report,c->units[u]);
-    typeCheck(typer);
+    typeCheck(c->typer);
 }
 
 static SourceDiagnostic *reported(Compiled *c, const char *category, const char *text)
@@ -183,6 +184,16 @@ int main(void)
         assert(!same(d->category,"layout") || strstr(d->message,"contains itself"));
     rangeArenaDestroy(&c.arena);
 
-    puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout=pass");
+    // Written code is kept as it was read: a change to it is found.
+    compile(&c,"function probe() { let a: 0 let b: a }");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    RangeNode *read = local(&c,"probe","b")->rhsReference;
+    assert(read && same(read->name,"a"));
+    read->name = "c";
+    assert(writtenChanged(c.typer,"Project.range") == named(c.project,"probe"));
+    assert(!writtenChanged(c.typer,"Language/Types/Int.range"));
+    rangeArenaDestroy(&c.arena);
+
+    puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }

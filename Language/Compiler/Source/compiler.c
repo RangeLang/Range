@@ -1094,12 +1094,14 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
 }
 
 static void absentDefaults(RangeArena *, RangeNode *, const char *);
+static void noteWritten(Typer *, RangeNode *);
 
 /* Emitted and written declarations join the graph through the same path as
  * parsed source: shape, grammar identity, macro targets, literal defaults,
  * and the absent case a bare `let v: T?` starts as. */
 static void resolveMergedNode(Resolver *vm, RangeNode *node)
 {
+    if (vm->typer) noteWritten(vm->typer,node);
     validateGraphShape(vm,node,node->source);
     linkGrammarNodes(vm,node);
     resolveSignatureTypes(vm,node,node->kind == RangeNodeFunction ? node->owner : NULL);
@@ -1745,6 +1747,7 @@ static Typer *diagnoseMacroApplications(SourceReport *report)
     *vm = (Resolver){.arena=report->arena,.units=report->units,.count=report->count,
         .error=rangeArenaAllocate(report->arena,512),.errorSize=512,.report=report};
     vm->typer = newTyper(report,vm);
+    for (size_t u = 0; u < report->count; ++u) noteWritten(vm->typer,report->units[u]);
     if (setjmp(vm->failure) == 0) {
         typerLanguage(vm->typer);
         applyMacros(vm,report);
@@ -1969,6 +1972,8 @@ struct Typer {
     /* Laws to run: typing never runs Range code, so a specialization or a
      * literal it meets waits here until typing returns to the top level. */
     struct { RangeNode *type, *value, *at; } *queued; size_t queuedCount, queuedCapacity;
+    /* Written code as it was read: each leaf declaration and its hash. */
+    struct { RangeNode *node; uint64_t hash; } *written; size_t writtenCount, writtenCapacity;
 };
 
 /* What the typer is in the middle of. Typing one declaration from inside
@@ -5510,6 +5515,42 @@ static void absentDefaults(RangeArena *arena, RangeNode *node, const char *absen
     absentDefaults(arena,node->b,absent);
     absentDefaults(arena,node->c,absent);
     for (size_t i = 0; i < node->itemCount; ++i) absentDefaults(arena,node->items[i],absent);
+}
+
+/* ---- written code ----
+ * Written code is read once and never changed: what the compiler finds lives
+ * beside it. Each leaf declaration, a function, a macro, the entry block, a
+ * member, an enum case, or a construct's generics, is kept with the hash of
+ * what was written when it is read: parsed units before any macro runs, and
+ * what a #graph block or an extension adds as it joins. The #graph door adds
+ * declarations to units and constructs, never inside a leaf. */
+static void noteWritten(Typer *typer, RangeNode *node)
+{
+    if (!node || node->kind == RangeNodeExtension) return; /* its members are kept where they land */
+    if (node->kind == RangeNodeUnit || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum) {
+        noteWritten(typer,node->generics);
+        for (size_t i = 0; i < node->itemCount; ++i) noteWritten(typer,node->items[i]);
+        return;
+    }
+    if (typer->writtenCount == typer->writtenCapacity) {
+        typer->writtenCapacity = typer->writtenCapacity ? typer->writtenCapacity * 2 : 256;
+        void *grown = rangeArenaAllocate(typer->report->arena,typer->writtenCapacity * sizeof(*typer->written));
+        if (typer->writtenCount) memcpy(grown,typer->written,typer->writtenCount * sizeof(*typer->written));
+        typer->written = grown;
+    }
+    typer->written[typer->writtenCount].node = node;
+    typer->written[typer->writtenCount++].hash = rangeWrittenHash(node);
+}
+
+/* The first leaf declaration, in `path` or anywhere, whose written code
+ * changed after it was read; NULL when none did. */
+RangeNode *writtenChanged(Typer *typer, const char *path)
+{
+    for (size_t i = 0; i < typer->writtenCount; ++i) {
+        RangeNode *node = typer->written[i].node;
+        if ((!path || same(node->path,path)) && rangeWrittenHash(node) != typer->written[i].hash) return node;
+    }
+    return NULL;
 }
 
 static Typer *newTyper(SourceReport *report, Resolver *vm)
