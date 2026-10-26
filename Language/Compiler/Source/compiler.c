@@ -5834,9 +5834,10 @@ typedef struct RangeValue {
 } RangeValue;
 
 /* The values a running body names, found by the declaration typing resolved
- * each name to: its parameters, locals, and bindings. A closure's frame
- * continues in the one it was written in, which is alive while it runs: a
- * closure runs only while the call it is passed to runs. */
+ * each name to: its parameters, locals, and bindings. A body reads what
+ * typing found under the key it was typed in. A closure's frame continues in
+ * the one it was written in, which is alive while it runs: a closure runs
+ * only while the call it is passed to runs. */
 typedef struct EvalBinding { RangeNode *declaration; RangeValue value; struct EvalBinding *next; } EvalBinding;
 typedef struct EvalFrame {
     struct EvalFrame *parent;
@@ -5844,6 +5845,7 @@ typedef struct EvalFrame {
     RangeValue *self;    /* the receiver of the running method, changed in place */
     RangeNode *function; /* the running function: its receiver and its value generics */
     RangeNode *output;   /* what its `return` gives */
+    RangeNode *key;      /* the specialization its body was typed in, or NULL */
 } EvalFrame;
 
 /* How evaluation goes on: normally, or leaving through return (the value in
@@ -6241,7 +6243,7 @@ static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **o
 {
     RangeArena *arena = eval->vm->arena;
     RangeValue value;
-    if (at->kind == RangeNodeEnvironment && !at->resolvedDeclaration && !at->narrowed) {
+    if (at->kind == RangeNodeEnvironment && !found(frame->key,at)->resolvedDeclaration && !found(frame->key,at)->narrowed) {
         RangeGraphValue raw = rangeGraphStoredField(arena,eval->application->target,at->name);
         if (raw.kind == RangeGraphNodes) return evalFail(eval,at,"cannot splice a list of %zu declarations",raw.count);
         value = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.text=raw.text,.length=strlen(raw.text)}
@@ -6411,18 +6413,19 @@ static int evalInvoke(Eval *eval, RangeNode *function, RangeValue *self, RangeVa
     *out = (RangeValue){0};
     int status;
     if (!typeOnDemand(eval->typer,function)) return evalStop(eval);
+    EvalFrame frame = {.self=self,.function=function};
     for (size_t i = 0; i < function->itemCount; ++i)
-        if ((status = evalAdopt(eval,&arguments[i],function->items[i]->type,at))) return status;
+        if ((status = evalAdopt(eval,&arguments[i],found(frame.key,function->items[i])->type,at))) return status;
     if (function->flags & RangeFlagBuiltin) return evalBuiltin(eval,function,self,arguments,at,out);
     if (!function->a) return evalFail(eval,at,"'%s' has no body to run at macro time",function->name);
     if (++eval->depth > 64) return evalFail(eval,at,"compile-time call depth exceeded");
-    EvalFrame frame = {.self=self,.function=function,.output=function->type};
+    frame.output = found(frame.key,function)->type;
     for (size_t i = 0; i < function->itemCount; ++i) evalBind(eval,&frame,function->items[i],arguments[i]);
     status = evalStatement(eval,&frame,function->a);
     --eval->depth;
     if (status == EvalReturn) { *out = eval->returned; return EvalNormal; }
     if (status) return status;
-    if (function->type && !unitType(eval->typer,function->type))
+    if (frame.output && !unitType(eval->typer,frame.output))
         return evalFail(eval,at,"'%s' ended without returning a value",function->name);
     return EvalNormal;
 }
@@ -6432,17 +6435,17 @@ static int evalInvoke(Eval *eval, RangeNode *function, RangeValue *self, RangeVa
  * gives; `return` ends the closure only. */
 static int evalCallClosure(Eval *eval, RangeValue *closure, RangeValue *arguments, RangeNode *at, RangeValue *out)
 {
-    RangeNode *literal = closure->node;
-    RangeNode *type = literal->type && literal->type->kind == RangeNodeFunctionType ? literal->type : NULL;
+    RangeNode *literal = closure->node, *key = closure->frame->key, *type = found(key,literal)->type;
+    if (type && type->kind != RangeNodeFunctionType) type = NULL;
     if (++eval->depth > 64) return evalFail(eval,at,"compile-time call depth exceeded");
     EvalFrame frame = {.parent=closure->frame,.self=closure->frame->self,.function=closure->frame->function,
-                       .output=type ? type->a : NULL};
+                       .output=type ? type->a : NULL,.key=key};
     int status = EvalNormal;
     for (size_t i = 0; i < literal->itemCount && !status; ++i) {
-        status = evalAdopt(eval,&arguments[i],literal->items[i]->type,at);
+        status = evalAdopt(eval,&arguments[i],found(key,literal->items[i])->type,at);
         evalBind(eval,&frame,literal->items[i],arguments[i]);
     }
-    RangeNode *value = closureResult(eval->typer,NULL,literal);
+    RangeNode *value = closureResult(eval->typer,key,literal);
     if (!status && value) status = evalExpression(eval,&frame,value,out);
     else if (!status) {
         *out = (RangeValue){0};
@@ -6482,7 +6485,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         RangeNode *value = count ? arguments[0]->a : NULL;
         EvalFrame *in = frame;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) { value = declarationValue(NULL,declaration->items[i]); in = &defaults; }
+            if (constructionInput(declaration->items[i])) { value = declarationValue(defaults.key,declaration->items[i]); in = &defaults; }
         status = evalExpression(eval,in,value,out);
         return status ? status : evalAdopt(eval,out,type,at);
     }
@@ -6493,13 +6496,14 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         RangeNode *member = declaration->items[i], *value = NULL;
         if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
         if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
-        for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
+        for (size_t j = 0; j < count; ++j) if (found(frame->key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
+        RangeNode *memberType = found(defaults.key,member)->type;
         if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
-        else if ((value = declarationValue(NULL,member)) == member)
-            status = evalConstruct(eval,&defaults,member->type,member->items,member->itemCount,member,&instance.values[i]);
+        else if ((value = declarationValue(defaults.key,member)) == member)
+            status = evalConstruct(eval,&defaults,memberType,member->items,member->itemCount,member,&instance.values[i]);
         else if (value) status = evalExpression(eval,&defaults,value,&instance.values[i]);
         else continue; /* a required input: typing reports it missing */
-        if (!status) status = evalAdopt(eval,&instance.values[i],member->type,value);
+        if (!status) status = evalAdopt(eval,&instance.values[i],memberType,value);
         if (status) return status;
     }
     *out = instance;
@@ -6511,18 +6515,19 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
  * expression. */
 static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
 {
-    if (expr->lowered || expr->narrowed) return NULL; /* it runs as something else, or reads a payload */
+    RangeFacts *facts = found(frame->key,expr);
+    if (facts->lowered || facts->narrowed) return NULL; /* it runs as something else, or reads a payload */
     if (expr->kind == RangeNodeName) {
-        RangeValue *bound = evalNamed(frame,expr->resolvedDeclaration);
+        RangeValue *bound = evalNamed(frame,facts->resolvedDeclaration);
         if (bound) return bound;
-        size_t member = evalMember(frame->self,expr->resolvedDeclaration);
+        size_t member = evalMember(frame->self,facts->resolvedDeclaration);
         if (member == SIZE_MAX) return NULL;
         evalOwn(eval,frame->self);
         return &frame->self->values[member];
     }
     if (expr->kind != RangeNodeMemberAccess) return NULL;
     RangeValue *owner = evalPlace(eval,frame,expr->a);
-    size_t member = owner ? evalMember(owner,expr->resolvedDeclaration) : SIZE_MAX;
+    size_t member = owner ? evalMember(owner,facts->resolvedDeclaration) : SIZE_MAX;
     if (member == SIZE_MAX) return NULL;
     evalOwn(eval,owner);
     return &owner->values[member];
@@ -6535,10 +6540,10 @@ static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
  * type declares with the call's name and labels. */
 static int evalCall(Eval *eval, EvalFrame *frame, RangeNode *call, RangeValue *out)
 {
-    RangeNode *callee = call->a, *target = callee->resolvedDeclaration;
-    if (target && target->kind == RangeNodeEnumCase) return evalCase(eval,frame,call->type,target,call->items,call->itemCount,out);
+    RangeNode *callee = call->a, *target = found(frame->key,callee)->resolvedDeclaration, *type = found(frame->key,call)->type;
+    if (target && target->kind == RangeNodeEnumCase) return evalCase(eval,frame,type,target,call->items,call->itemCount,out);
     if (target && (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeTypeParameter))
-        return evalConstruct(eval,frame,call->type,call->items,call->itemCount,call,out);
+        return evalConstruct(eval,frame,type,call->items,call->itemCount,call,out);
     RangeValue receiver = {0}, *self = NULL, *arguments = evalValues(eval,call->itemCount);
     int status;
     if (callee->kind == RangeNodeMemberAccess) {
@@ -6651,9 +6656,10 @@ static int evalOperator(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValu
     // `-128` is one literal.
     if (!binary && same(op,"-") && expr->a && expr->a->kind == RangeNodeInteger) {
         *out = (RangeValue){.kind=ValueLiteral,.node=expr->a,.integer=-expr->a->integer};
-        return evalAdopt(eval,out,expr->type,expr);
+        return evalAdopt(eval,out,found(frame->key,expr)->type,expr);
     }
-    RangeNode *function = expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeFunction ? expr->resolvedDeclaration : NULL;
+    RangeNode *function = found(frame->key,expr)->resolvedDeclaration;
+    if (function && function->kind != RangeNodeFunction) function = NULL;
     int logic = binary && (same(op,"&") || same(op,"|")), equality = binary && (same(op,"=") || same(op,"!="));
     RangeValue left, right = {0};
     if ((status = evalExpression(eval,frame,expr->a,&left))) return status;
@@ -6705,7 +6711,7 @@ static RangeNode *evalGeneric(EvalFrame *frame, RangeNode *declaration)
  * generic, or a construct or enum, which is the declaration. */
 static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
-    RangeNode *declaration = expr->resolvedDeclaration;
+    RangeNode *declaration = found(frame->key,expr)->resolvedDeclaration;
     RangeValue *bound = evalNamed(frame,declaration);
     if (bound) { *out = *bound; return EvalNormal; }
     if (declaration && frame->self && frame->function && declaration == frame->function->receiver) { *out = *frame->self; return EvalNormal; }
@@ -6715,7 +6721,7 @@ static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *o
     if (constant) {
         EvalFrame none = {0};
         int status = evalExpression(eval,&none,constant,out);
-        return status ? status : evalAdopt(eval,out,declaration->type,expr);
+        return status ? status : evalAdopt(eval,out,found(frame->key,declaration)->type,expr);
     }
     if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
         *out = (RangeValue){.kind=ValueDeclaration,.node=declaration};
@@ -6728,9 +6734,9 @@ static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *o
  * of text, or, on a value known only at macro time, whether it holds a case. */
 static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
-    RangeNode *member = expr->resolvedDeclaration;
+    RangeNode *member = found(frame->key,expr)->resolvedDeclaration;
     if (member && member->kind == RangeNodeEnumCase) {
-        *out = (RangeValue){.kind=ValueCase,.type=expr->type,.node=member};
+        *out = (RangeValue){.kind=ValueCase,.type=found(frame->key,expr)->type,.node=member};
         return EvalNormal;
     }
     RangeValue receiver;
@@ -6770,11 +6776,11 @@ static int evalMatch(Eval *eval, EvalFrame *frame, RangeNode *pattern, RangeValu
     switch (pattern->integer) {
     case RangePatternAny: return EvalNormal;
     case RangePatternBind:
-        evalBind(eval,frame,pattern->a->resolvedDeclaration ? pattern->a->resolvedDeclaration : pattern->a,value);
+        evalBind(eval,frame,found(frame->key,pattern->a)->resolvedDeclaration ? found(frame->key,pattern->a)->resolvedDeclaration : pattern->a,value);
         return EvalNormal;
     case RangePatternCase: {
         RangeNode *declaration = value.kind == ValueCase && value.type ? value.type->resolvedDeclaration : NULL;
-        RangeNode *entry = pattern->resolvedDeclaration ? pattern->resolvedDeclaration : enumCase(declaration,pattern->name);
+        RangeNode *entry = found(frame->key,pattern)->resolvedDeclaration ? found(frame->key,pattern)->resolvedDeclaration : enumCase(declaration,pattern->name);
         if (value.kind != ValueCase) return evalFail(eval,pattern,"'.%s' matches an enum case; this value is not one",pattern->name);
         if (!entry) { char type[160]; describeType(type,sizeof(type),value.type); return evalFail(eval,pattern,"%s has no case '%s'",type,pattern->name); }
         *matched = value.node == entry;
@@ -6821,7 +6827,7 @@ static int evalSwitch(Eval *eval, EvalFrame *frame, RangeNode *node, RangeValue 
         if (!chosen) continue;
         if (!entry->a) return evalStatement(eval,frame,entry->b);
         status = evalExpression(eval,frame,entry->a,out);
-        return status ? status : evalAdopt(eval,out,node->type,entry->a);
+        return status ? status : evalAdopt(eval,out,found(frame->key,node)->type,entry->a);
     }
     return EvalNormal;
 }
@@ -6835,9 +6841,9 @@ static int evalLiteral(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue
         if (status) return status;
         // Interpolated text is computed: no literal writes it as it is.
         if (expr->itemCount != 1 || !(expr->items[0]->flags & RangeFlagLiteral))
-            *out = (RangeValue){.kind=ValueText,.type=expr->type,.text=out->text,.length=out->length};
+            *out = (RangeValue){.kind=ValueText,.type=found(frame->key,expr)->type,.text=out->text,.length=out->length};
     }
-    return evalAdopt(eval,out,expr->type,expr);
+    return evalAdopt(eval,out,found(frame->key,expr)->type,expr);
 }
 
 /* An expression as written: what its own kind computes. */
@@ -6850,12 +6856,12 @@ static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *
     case RangeNodeName: return evalName(eval,frame,expr,out);
     case RangeNodeEnvironment:
         // A splice of a macro local, or a field of the application's target.
-        if (expr->resolvedDeclaration) return evalName(eval,frame,expr,out);
+        if (found(frame->key,expr)->resolvedDeclaration) return evalName(eval,frame,expr,out);
         if (!eval->application) return evalFail(eval,expr,"'#%s' is read outside a macro application",expr->name);
         return evalField(eval,eval->application->target,expr->name,expr,out);
     case RangeNodeCase:
-        if (!expr->resolvedDeclaration) return evalStop(eval);
-        *out = (RangeValue){.kind=ValueCase,.type=expr->type,.node=expr->resolvedDeclaration};
+        if (!found(frame->key,expr)->resolvedDeclaration) return evalStop(eval);
+        *out = (RangeValue){.kind=ValueCase,.type=found(frame->key,expr)->type,.node=found(frame->key,expr)->resolvedDeclaration};
         return EvalNormal;
     case RangeNodeMemberAccess: return evalMemberAccess(eval,frame,expr,out);
     case RangeNodeCall: return evalCall(eval,frame,expr,out);
@@ -6899,13 +6905,14 @@ static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeVa
 {
     *out = (RangeValue){0};
     if (!expr) return EvalNormal;
-    int status = evalPlain(eval,frame,expr->lowered ? expr->lowered : expr,out);
-    if (!status && expr->narrowed) {
-        if (out->kind != ValueCase || out->node != expr->narrowed || out->count != 1)
+    RangeFacts *facts = found(frame->key,expr);
+    int status = evalPlain(eval,frame,facts->lowered ? facts->lowered : expr,out);
+    if (!status && facts->narrowed) {
+        if (out->kind != ValueCase || out->node != facts->narrowed || out->count != 1)
             return evalFail(eval,expr,"this narrowed value holds no payload");
         *out = out->values[0];
     }
-    if (!status && expr->promoted) status = evalPromote(eval,out,expr->promoted,expr);
+    if (!status && facts->promoted) status = evalPromote(eval,out,facts->promoted,expr);
     return status;
 }
 
@@ -6924,15 +6931,17 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     case RangeNodeLet: case RangeNodeState: {
         // `let p: Point(x: 1)` constructs; `let r: step(x: 1)` calls; a bare
         // name that resolved to a value copies it.
-        RangeNode *initial = declarationValue(NULL,node);
-        if (initial == node) status = evalConstruct(eval,frame,node->type,node->items,node->itemCount,node,&value);
+        RangeNode *initial = declarationValue(frame->key,node), *type = found(frame->key,node)->type;
+        if (initial == node) status = evalConstruct(eval,frame,type,node->items,node->itemCount,node,&value);
         else status = evalExpression(eval,frame,initial,&value);
-        if (!status) status = evalAdopt(eval,&value,node->type,node);
+        if (!status) status = evalAdopt(eval,&value,type,node);
         if (!status) evalBind(eval,frame,node,value);
         return status;
     }
     case RangeNodeAssign: {
-        RangeNode *target = node->a->type ? node->a->type : node->a->resolvedDeclaration ? node->a->resolvedDeclaration->type : NULL;
+        RangeFacts *assigned = found(frame->key,node->a);
+        RangeNode *target = assigned->type ? assigned->type
+            : assigned->resolvedDeclaration ? found(frame->key,assigned->resolvedDeclaration)->type : NULL;
         if ((status = evalExpression(eval,frame,node->b,&value)) || (status = evalAdopt(eval,&value,target,node->b))) return status;
         RangeValue *place = evalPlace(eval,frame,node->a);
         if (!place) return evalStop(eval);
@@ -7006,9 +7015,9 @@ typedef struct { size_t at; uint32_t base; } NativeJump;
 /* An alias slot names another binding's storage; it does not own the value.
  * A packed one is a member inside an aggregate, a scalar at its own size. */
 typedef struct { RangeNode *declaration; int32_t offset; RangeNode *type; int alias, packed; } NativeSlot;
-typedef struct { size_t at; RangeNode *function; RangeNode *self; } NativeCall;
+typedef struct { size_t at; RangeNode *function, *key, *self; } NativeCall;
 typedef struct { size_t at; uint32_t branch; const char *message; } NativeTrap;
-typedef struct { RangeNode *function, *self; size_t offset; int compiled; } NativeInstance;
+typedef struct { RangeNode *function, *key, *self; size_t offset; int compiled; } NativeInstance;
 typedef struct { size_t at; const char *bytes; size_t length; } NativeText;
 /* A temporary that owns references until it is moved into place or its
  * statement ends. */
@@ -7030,11 +7039,12 @@ typedef struct {
     NativeJump *breaks; size_t breakCount, breakCapacity;
 } NativeTarget;
 
-/* What a body runs in: its receiver and its function. A body inlined into
- * another, a callee's or a closure's, runs in its own context; outer is the
- * context it was inlined from, whose receiver substitutes its types too. */
+/* What a body runs in: its receiver, its function, and the key it was typed
+ * under. A body inlined into another, a callee's or a closure's, runs in its
+ * own context; outer is the context it was inlined from, whose receiver
+ * substitutes its types too. */
 typedef struct NativeContext {
-    RangeNode *owner, *self, *function;
+    RangeNode *owner, *self, *function, *key;
     int32_t selfSlot;
     struct NativeContext *outer;
 } NativeContext;
@@ -7066,8 +7076,8 @@ typedef struct {
     Typer *typer;
     RangeMachine machine;
     int failed;
-    /* The function being compiled. */
-    RangeNode *owner, *self, *output, *function;
+    /* The function being compiled, and the key its findings are read under. */
+    RangeNode *owner, *self, *output, *function, *key;
     int32_t frame, selfSlot, resultSlot;
     NativeContext *outer;  /* the context the running body was inlined from */
     NativeRegion *region;  /* the inlined body being compiled, if any */
@@ -7468,7 +7478,7 @@ static RangeNode *nativeVariant(Native *native, RangeNode *at, RangeNode *type, 
     size_t first = nativeFirstField(type->resolvedDeclaration,entry);
     for (size_t j = 0; j < entry->itemCount; ++j) {
         RangeNode *field = entry->items[j], *value = NULL;
-        for (size_t i = 0; i < count; ++i) if (arguments[i]->resolvedDeclaration == field) value = arguments[i]->a;
+        for (size_t i = 0; i < count; ++i) if (found(native->key,arguments[i])->resolvedDeclaration == field) value = arguments[i]->a;
         if (!value || nativeKind(native,type->memberTypes[first + j],field) == NativeNone || !nativeExpression(native,value)) continue;
         nativeStoreField(native,at,type,first + j,destination,nativeTakeTemp(native));
     }
@@ -7492,8 +7502,8 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         native->resultTemp = -1;
         if (count) return nativeExpression(native,arguments[0]->a), type;
         for (size_t i = 0; i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i]) && declarationValue(NULL,declaration->items[i])) {
-                nativeExpression(native,declarationValue(NULL,declaration->items[i]));
+            if (constructionInput(declaration->items[i]) && declarationValue(native->key,declaration->items[i])) {
+                nativeExpression(native,declarationValue(native->key,declaration->items[i]));
                 return type;
             }
         nativeEmit(native,armMovz(0,0,0));
@@ -7506,7 +7516,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         // `String("hi")` is the literal's bytes, and `String()` its default's.
         RangeNode *value = count ? arguments[0]->a : NULL;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) value = declarationValue(NULL,declaration->items[i]);
+            if (constructionInput(declaration->items[i])) value = declarationValue(native->key,declaration->items[i]);
         nativeFrameAddress(native,0,destination);
         nativeZero(native,0,type->size);
         if (value) {
@@ -7548,10 +7558,10 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         }
         previous = i;
         RangeNode *memberType = type->memberTypes[i], *value = NULL;
-        for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
+        for (size_t j = 0; j < count; ++j) if (found(native->key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
         int memberKind = nativeKind(native,memberType,member);
         if (memberKind == NativeNone) continue;
-        if (!value) value = declarationValue(NULL,member);
+        if (!value) value = declarationValue(native->key,member);
         if (value == member) {
             nativeConstruct(native,member,memberType,member->items,member->itemCount,destination + (int32_t)offset);
             if (memberKind == NativeScalar) { nativeFrameAddress(native,1,destination); nativeStoreScalar(native,0,1,offset,memberType); }
@@ -7949,13 +7959,13 @@ static RangeNode *nativeElementOf(Native *native, RangeNode *type, RangeNode *me
     return resolveTypeReference(native->typer,&scope,member->typeName,member->generics,member->flags & ~RangeFlagMany,type,member);
 }
 
-static NativeInstance *nativeInstance(Native *, RangeNode *, RangeNode *);
+static NativeInstance *nativeInstance(Native *, RangeNode *, RangeNode *, RangeNode *);
 
-static void nativeCallFunction(Native *native, RangeNode *function, RangeNode *self)
+static void nativeCallFunction(Native *native, RangeNode *function, RangeNode *key, RangeNode *self)
 {
-    NativeCall site = {.at=nativeEmit(native,armBl(0)),.function=function,.self=self};
+    NativeCall site = {.at=nativeEmit(native,armBl(0)),.function=function,.key=key,.self=self};
     NATIVE_PUSH(native->calls,native->callCount,native->callCapacity,site);
-    nativeInstance(native,function,self);
+    nativeInstance(native,function,key,self);
 }
 
 /* x0 = 1 when the values in x0 and x1 (scalars, or aggregates' addresses) are
@@ -7978,7 +7988,7 @@ static int nativeEquals(Native *native, RangeNode *type, RangeNode *at)
     if (function) {
         // The receiver is an address: a scalar is passed through the stack.
         if (type->scalarBits) { nativeEmit(native,armPush(0)); nativeEmit(native,armAddImm(0,31,0)); }
-        nativeCallFunction(native,function,type);
+        nativeCallFunction(native,function,NULL,type);
         if (type->scalarBits) nativeEmit(native,armAddImm(31,31,16));
         native->resultTemp = -1;
         return 1;
@@ -8211,11 +8221,12 @@ static void nativeHelperBody(Native *native, size_t index)
     nativeEmit(native,armRet());
 }
 
-static NativeInstance *nativeInstance(Native *native, RangeNode *function, RangeNode *self)
+static NativeInstance *nativeInstance(Native *native, RangeNode *function, RangeNode *key, RangeNode *self)
 {
     for (size_t i = 0; i < native->instanceCount; ++i)
-        if (native->instances[i].function == function && native->instances[i].self == self) return &native->instances[i];
-    NativeInstance instance = {.function=function,.self=self};
+        if (native->instances[i].function == function && native->instances[i].key == key && native->instances[i].self == self)
+            return &native->instances[i];
+    NativeInstance instance = {.function=function,.key=key,.self=self};
     NATIVE_PUSH(native->instances,native->instanceCount,native->instanceCapacity,instance);
     return &native->instances[native->instanceCount - 1];
 }
@@ -8324,10 +8335,10 @@ static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *functio
     region.stack = nativeReserve(native,8,8);
     nativeEmit(native,armAddImm(10,31,0)); /* mov x10, sp */
     nativeStore(native,10,region.stack);
-    NativeContext saved = {.owner=native->owner,.self=native->self,.function=native->function,
+    NativeContext saved = {.owner=native->owner,.self=native->self,.function=native->function,.key=native->key,
                            .selfSlot=native->selfSlot,.outer=native->outer};
     native->owner = context->owner; native->self = context->self; native->function = context->function;
-    native->selfSlot = context->selfSlot; native->outer = context->outer;
+    native->key = context->key; native->selfSlot = context->selfSlot; native->outer = context->outer;
     native->region = &region;
     native->valueDepth += 1;
     if (value) {
@@ -8348,7 +8359,7 @@ static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *functio
     native->valueDepth -= 1;
     native->region = region.outer;
     native->owner = saved.owner; native->self = saved.self; native->function = saved.function;
-    native->selfSlot = saved.selfSlot; native->outer = saved.outer;
+    native->key = saved.key; native->selfSlot = saved.selfSlot; native->outer = saved.outer;
     native->resultTemp = -1;
     if (kind == NativeScalar) nativeLoad(native,0,region.result);
     else if (kind == NativeAggregate) { nativeTrackTemp(native,region.result,output); nativeFrameAddress(native,0,region.result); }
@@ -8385,15 +8396,16 @@ static RangeNode *nativeInline(Native *native, RangeNode *call, RangeNode *targe
         self = native->self;
         selfSlot = native->selfSlot;
     }
-    NativeContext caller = {.owner=native->owner,.self=native->self,.function=native->function,
+    NativeContext caller = {.owner=native->owner,.self=native->self,.function=native->function,.key=native->key,
                             .selfSlot=native->selfSlot,.outer=native->outer};
+    RangeNode *key = NULL; /* the callee's own findings */
     size_t slots = native->slotCount, closures = native->closureCount;
     for (size_t i = 0; i < call->itemCount && i < target->itemCount; ++i) {
         RangeNode *parameter = target->items[i], *value = call->items[i]->a;
         if (parameter->flags & RangeFlagFunction) {
             NativeClosure bound = {.parameter=parameter,.closure=value,.context=&caller,.slots=slots,.closures=closures};
             if (value->kind != RangeNodeClosure) {
-                NativeClosure *passed = value->kind == RangeNodeName ? nativeClosureOf(native,value->resolvedDeclaration) : NULL;
+                NativeClosure *passed = value->kind == RangeNodeName ? nativeClosureOf(native,found(native->key,value)->resolvedDeclaration) : NULL;
                 if (!passed) { nativeMissing(native,value,"no closure is bound to '%s' here",value->name ? value->name : "this argument"); return NULL; }
                 bound = *passed;
                 bound.parameter = parameter;
@@ -8401,7 +8413,7 @@ static RangeNode *nativeInline(Native *native, RangeNode *call, RangeNode *targe
             NATIVE_PUSH(native->closures,native->closureCount,native->closureCapacity,bound);
             continue;
         }
-        RangeNode *type = nativeTypeIn(native,parameter->type,self,&caller);
+        RangeNode *type = nativeTypeIn(native,found(key,parameter)->type,self,&caller);
         int kind = nativeKind(native,type,parameter);
         if (kind == NativeNone) return NULL;
         int32_t offset = kind == NativeAggregate ? nativeReserve(native,type->size ? type->size : 1,type->alignment) : nativeReserve(native,8,8);
@@ -8409,9 +8421,9 @@ static RangeNode *nativeInline(Native *native, RangeNode *call, RangeNode *targe
         NativeSlot slot = {.declaration=parameter,.offset=offset,.type=type};
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     }
-    NativeContext context = {.owner=self ? self->resolvedDeclaration : NULL,.self=self,.function=target,
+    NativeContext context = {.owner=self ? self->resolvedDeclaration : NULL,.self=self,.function=target,.key=key,
                              .selfSlot=selfSlot,.outer=&caller};
-    RangeNode *output = target->type ? nativeTypeIn(native,target->type,self,&caller) : NULL;
+    RangeNode *output = found(key,target)->type ? nativeTypeIn(native,found(key,target)->type,self,&caller) : NULL;
     RangeNode *result = nativeRegion(native,call,target,output,&context,target->a,NULL,slots);
     native->closureCount = closures;
     return result;
@@ -8429,7 +8441,7 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
     int32_t offsets[count ? count : 1];
     RangeNode *types[count ? count : 1];
     for (size_t i = 0; i < count && i < call->itemCount; ++i) {
-        types[i] = nativeTypeIn(native,literal->items[i]->type,closure.context->self,closure.context->outer);
+        types[i] = nativeTypeIn(native,found(closure.context->key,literal->items[i])->type,closure.context->self,closure.context->outer);
         int kind = nativeKind(native,types[i],literal->items[i]);
         if (kind == NativeNone) return NULL;
         offsets[i] = kind == NativeAggregate ? nativeReserve(native,types[i]->size ? types[i]->size : 1,types[i]->alignment) : nativeReserve(native,8,8);
@@ -8442,24 +8454,26 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
         NativeSlot slot = {.declaration=literal->items[i],.offset=offsets[i],.type=types[i]};
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     }
-    RangeNode *output = literal->type ? nativeTypeIn(native,literal->type->a,closure.context->self,closure.context->outer) : NULL;
-    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,closureResult(native->typer,NULL,literal),slots);
+    RangeNode *type = found(closure.context->key,literal)->type;
+    RangeNode *output = type ? nativeTypeIn(native,type->a,closure.context->self,closure.context->outer) : NULL;
+    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,
+                                     closureResult(native->typer,closure.context->key,literal),slots);
     native->hiddenCount -= 1;
     return result;
 }
 
 static RangeNode *nativeCall(Native *native, RangeNode *call)
 {
-    RangeNode *callee = call->a, *target = callee ? callee->resolvedDeclaration : NULL;
-    if (target && target->kind == RangeNodeParameter && isFunctionType(target->type)) return nativeCallClosure(native,call,target);
+    RangeNode *callee = call->a, *target = callee ? found(native->key,callee)->resolvedDeclaration : NULL, *key = NULL;
+    if (target && target->kind == RangeNodeParameter && isFunctionType(found(native->key,target)->type)) return nativeCallClosure(native,call,target);
     if (target && target->kind == RangeNodeFunction && !target->typeName && target->generics && native->self) {
         target = nativeGenericTarget(native,target,call);
         if (!target) return NULL;
     }
     if (target && (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeTypeParameter))
-        return nativeConstruct(native,call,nativeType(native,call->type),call->items,call->itemCount,0);
+        return nativeConstruct(native,call,nativeType(native,found(native->key,call)->type),call->items,call->itemCount,0);
     if (target && target->kind == RangeNodeEnumCase)
-        return nativeVariant(native,call,nativeType(native,call->type),target,call->items,call->itemCount,0);
+        return nativeVariant(native,call,nativeType(native,found(native->key,call)->type),target,call->items,call->itemCount,0);
     if (!target || target->kind != RangeNodeFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
     if (nativeInlined(target)) return nativeInline(native,call,target);
     RangeNode *self = NULL;
@@ -8490,7 +8504,7 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
         nativeEmit(native,armLoadSized(1,0,0,1,0));
         nativeEmit(native,armAddImm(31,31,16)); /* drop the receiver */
         native->resultTemp = -1;
-        return nativeSubstitute(native,target->type,self);
+        return nativeSubstitute(native,found(key,target)->type,self);
     }
     if (target->flags & (RangeFlagBuiltin | RangeFlagExtern)) {
         if (!(target->flags & RangeFlagBuiltin) || !slotPrimitive(target) || !hasSelf) {
@@ -8505,15 +8519,13 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
         if (!nativeExpression(native,call->items[i]->a)) return NULL;
         nativeEmit(native,armPush(0));
     }
-    RangeNode *output = nativeSubstitute(native,target->type,self);
+    RangeNode *output = nativeSubstitute(native,found(key,target)->type,self);
     int outputKind = output ? nativeKind(native,output,call) : NativeNone;
     int32_t result = 0;
     if (outputKind == NativeAggregate) result = nativeReserve(native,output->size ? output->size : 1,output->alignment);
     for (size_t i = registers; i-- > 0;) nativeEmit(native,armPop((int)i));
     if (result) nativeFrameAddress(native,8,result);
-    NativeCall site = {.at=nativeEmit(native,armBl(0)),.function=target,.self=self};
-    NATIVE_PUSH(native->calls,native->callCount,native->callCapacity,site);
-    nativeInstance(native,target,self);
+    nativeCallFunction(native,target,key,self);
     native->resultTemp = -1;
     if (result) { nativeTrackTemp(native,result,output); nativeFrameAddress(native,0,result); }
     return output;
@@ -8527,9 +8539,10 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
 {
     *frameSlot = 0;
     // A form that runs as what typing lowered it to is no place: it is materialized below.
-    RangeNodeKind kind = expr->lowered ? expr->lowered->kind : expr->kind;
+    RangeFacts *facts = found(native->key,expr);
+    RangeNodeKind kind = facts->lowered ? facts->lowered->kind : expr->kind;
     if (kind == RangeNodeName) {
-        RangeNode *declaration = expr->resolvedDeclaration;
+        RangeNode *declaration = facts->resolvedDeclaration;
         if (declaration && native->function && declaration == native->function->receiver && native->owner) {
             // The receiver, whose address the method holds.
             nativeLoad(native,0,native->selfSlot);
@@ -8554,17 +8567,17 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
         nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name);
         return NULL;
     }
-    if (kind == RangeNodeMemberAccess && !(expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase)) {
+    RangeNode *member = facts->resolvedDeclaration;
+    if (kind == RangeNodeMemberAccess && !(member && member->kind == RangeNodeEnumCase)) {
         int innerSlot = 0;
         RangeNode *receiver = nativeAddress(native,expr->a,&innerSlot);
         if (!receiver) return NULL;
-        if (bytesType(receiver) && expr->resolvedDeclaration && builtinMember(expr->resolvedDeclaration)
-            && same(expr->resolvedDeclaration->name,"count")) {
+        if (bytesType(receiver) && member && builtinMember(member) && same(member->name,"count")) {
             // The byte count is the bytes primitive's second word.
             nativeEmit(native,armAddImm(0,0,8));
-            return nativeType(native,expr->type);
+            return nativeType(native,facts->type);
         }
-        size_t index = nativeMemberIndex(receiver->resolvedDeclaration,expr->resolvedDeclaration);
+        size_t index = nativeMemberIndex(receiver->resolvedDeclaration,member);
         if (index == SIZE_MAX || !receiver->memberOffsets || receiver->memberOffsets[index] == SIZE_MAX) {
             nativeMissing(native,expr,"native access to member '%s' is not implemented",expr->name);
             return NULL;
@@ -8587,9 +8600,10 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
 static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
 {
     RangeNode *optional = nativePlainAddress(native,expr,frameSlot);
-    if (!optional || !expr->narrowed) return optional;
+    RangeNode *present = found(native->key,expr)->narrowed;
+    if (!optional || !present) return optional;
     *frameSlot = 0;
-    size_t field = nativeFirstField(optional->resolvedDeclaration,expr->narrowed);
+    size_t field = nativeFirstField(optional->resolvedDeclaration,present);
     if (!optional->memberOffsets || optional->memberOffsets[field] == SIZE_MAX) {
         nativeMissing(native,expr,"native access to the narrowed payload is not implemented");
         return NULL;
@@ -8643,12 +8657,13 @@ static RangeNode *nativePromote(Native *native, RangeNode *at, RangeNode *option
  * behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
-    RangeNode *runs = expr && expr->lowered ? expr->lowered : expr;
+    RangeFacts *facts = expr ? found(native->key,expr) : NULL;
+    RangeNode *runs = facts && facts->lowered ? facts->lowered : expr;
     RangeNode *type = nativeExpressionValue(native,runs);
+    RangeNode *resolved = runs ? found(native->key,runs)->resolvedDeclaration : NULL;
     int construction = runs && (runs->kind == RangeNodeCall || runs->kind == RangeNodeSwitch);
-    if (!runs || (!construction && !(runs->resolvedDeclaration
-        && runs->resolvedDeclaration->kind == RangeNodeEnumCase))) native->resultTemp = -1;
-    return type && expr->promoted ? nativePromote(native,expr,nativeType(native,expr->promoted)) : type;
+    if (!runs || (!construction && !(resolved && resolved->kind == RangeNodeEnumCase))) native->resultTemp = -1;
+    return type && facts->promoted ? nativePromote(native,expr,nativeType(native,facts->promoted)) : type;
 }
 
 /* `a + b` on bytes (x0, x1 = their addresses): a new block holding a's bytes
@@ -8703,7 +8718,7 @@ static RangeNode *nativeJoin(Native *native, RangeNode *at, RangeNode *type)
  * the receiver's specialization. Returns 0 when the name is not one. */
 static int nativeValueGeneric(Native *native, RangeNode *expr)
 {
-    RangeNode *declaration = expr->resolvedDeclaration, *value = NULL;
+    RangeNode *declaration = found(native->key,expr)->resolvedDeclaration, *value = NULL;
     if (!declaration || declaration->kind != RangeNodeLet) return 0;
     RangeNode *generics = native->function && native->function->kind == RangeNodeFunction ? native->function->generics : NULL;
     RangeNode *declared = native->owner ? native->owner->generics : NULL;
@@ -8732,12 +8747,13 @@ static RangeNode *nativeCaseTest(Native *, RangeNode *);
 static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
 {
     if (!expr) return NULL;
-    RangeNode *type = nativeType(native,expr->type);
+    RangeFacts *facts = found(native->key,expr);
+    RangeNode *type = nativeType(native,facts->type);
     if (isEnum(type) && isLiteral(expr)) /* a literal naming a case, such as true */
         return nativeVariant(native,expr,type,literalCase(type->resolvedDeclaration,expr),NULL,0,0);
-    if (expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase
+    if (facts->resolvedDeclaration && facts->resolvedDeclaration->kind == RangeNodeEnumCase
         && (expr->kind == RangeNodeCase || expr->kind == RangeNodeMemberAccess))
-        return nativeVariant(native,expr,type,expr->resolvedDeclaration,NULL,0,0);
+        return nativeVariant(native,expr,type,facts->resolvedDeclaration,NULL,0,0);
     switch (expr->kind) {
     case RangeNodeInteger:
         if (nativeKind(native,type,expr) != NativeScalar) return NULL;
@@ -8796,7 +8812,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
     }
     case RangeNodeBinary: {
         const char *op = expr->name;
-        if (shortCircuit(expr->resolvedDeclaration)) {
+        if (shortCircuit(facts->resolvedDeclaration)) {
             nativeExpression(native,expr->a);
             uint32_t base = same(op,"&") ? armCbz(0,0) : armCbnz(0,0);
             size_t skip = nativeEmit(native,base);
@@ -9032,11 +9048,11 @@ static void nativeStatementBody(Native *native, RangeNode *node)
     switch (node->kind) {
     case RangeNodeBlock: nativeBlock(native,node); break;
     case RangeNodeLet: case RangeNodeState: {
-        RangeNode *type = nativeType(native,node->type);
+        RangeNode *type = nativeType(native,found(native->key,node)->type);
         int kind = nativeKind(native,type,node);
         if (kind == NativeNone) break;
         // A bare name that resolved to a value is a copy; to a type, a requirement.
-        RangeNode *value = declarationValue(NULL,node);
+        RangeNode *value = declarationValue(native->key,node);
         int construction = value == node;
         if (kind == NativeScalar) {
             if (construction) nativeConstruct(native,node,type,node->items,node->itemCount,0);
@@ -9218,7 +9234,7 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
         return;
     }
     case RangePatternCase: {
-        RangeNode *entry = pattern->resolvedDeclaration;
+        RangeNode *entry = found(native->key,pattern)->resolvedDeclaration;
         nativePlaceLoad(native,place,type);
         if (type->scalarBits) {
             nativeConstant(native,1,(uint64_t)entry->integer);
@@ -9270,7 +9286,7 @@ static void nativeBindMatch(Native *native, NativeMatch *match, int replace)
 {
     for (size_t b = 0; b < match->bindCount; ++b) {
         NativeBind *bind = &match->binds[b];
-        RangeNode *target = bind->binding->resolvedDeclaration ? bind->binding->resolvedDeclaration : bind->binding;
+        RangeNode *shared = found(native->key,bind->binding)->resolvedDeclaration, *target = shared ? shared : bind->binding;
         NativeSlot *slot = nativeSlotOf(native,target);
         if (!slot) continue;
         int32_t offset = slot->offset;
@@ -9315,7 +9331,7 @@ static RangeNode *nativeCaseTest(Native *native, RangeNode *test)
         nativeEmit(native,armPop(0));
     }
     native->resultTemp = -1;
-    return nativeType(native,test->type);
+    return nativeType(native,found(native->key,test)->type);
 }
 
 /* A switch statement, or a switch expression (RangeFlagValue): each arm that
@@ -9325,7 +9341,7 @@ static RangeNode *nativeCaseTest(Native *native, RangeNode *test)
 static RangeNode *nativeSwitch(Native *native, RangeNode *node)
 {
     int value = (node->flags & RangeFlagValue) != 0;
-    RangeNode *valueType = value ? nativeType(native,node->type) : NULL;
+    RangeNode *valueType = value ? nativeType(native,found(native->key,node)->type) : NULL;
     int valueKind = value ? nativeKind(native,valueType,node) : NativeNone;
     if (value && valueKind == NativeNone) return NULL;
     // Each subject is evaluated once, in order, into its own slot.
@@ -9350,7 +9366,7 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
         RangeNode *entry = node->items[i];
         size_t scope = native->slotCount;
         for (size_t j = 0; entry->c && j < entry->c->itemCount; ++j) {
-            RangeNode *binding = entry->c->items[j], *bindingType = nativeType(native,binding->type);
+            RangeNode *binding = entry->c->items[j], *bindingType = nativeType(native,found(native->key,binding)->type);
             int bindingKind = nativeKind(native,bindingType,binding);
             if (bindingKind == NativeNone) continue;
             int32_t offset = nativeNewSlot(native,binding,bindingType,bindingKind);
@@ -9429,6 +9445,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     instance->offset = native->machine.size;
     instance->compiled = 1;
     native->function = function;
+    native->key = instance->key;
     native->targetCount = 0;
     native->self = instance->self;
     native->owner = instance->self ? instance->self->resolvedDeclaration : NULL;
@@ -9442,7 +9459,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     size_t frameHigh = nativeEmit(native,armSubImmHigh(31,31,0));
     size_t frameLow = nativeEmit(native,armSubImm(31,31,0));
     RangeNode *body = function->kind == RangeNodeMain ? function->a : function->a;
-    native->output = function->kind == RangeNodeMain ? function->type : nativeType(native,function->type);
+    native->output = nativeType(native,found(native->key,function)->type);
     int outputKind = native->output ? nativeKind(native,native->output,function) : NativeScalar;
     if (outputKind == NativeAggregate) { native->resultSlot = nativeReserve(native,8,8); nativeStore(native,8,native->resultSlot); }
     int base = 0;
@@ -9450,7 +9467,7 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     if (function->kind == RangeNodeFunction) {
         if (function->itemCount + (size_t)base > 8) nativeMissing(native,function,"functions with more than 8 parameters are not implemented");
         for (size_t i = 0; i < function->itemCount && i + (size_t)base < 8; ++i) {
-            RangeNode *parameter = function->items[i], *type = nativeType(native,parameter->type);
+            RangeNode *parameter = function->items[i], *type = nativeType(native,found(native->key,parameter)->type);
             int kind = nativeKind(native,type,parameter);
             if (kind == NativeNone) continue;
             int reg = (int)i + base;
@@ -9541,7 +9558,7 @@ static void nativeMethods(Native *native, RangeNode *construct)
             // A type's function '=' is compiled only when the type is compared.
             if (function->kind == RangeNodeFunction && !(function->flags & (RangeFlagBuiltin | RangeFlagExtern))
                 && !same(function->name,"=") && !genericTemplate(function) && !nativeInlined(function))
-                nativeInstance(native,function,self);
+                nativeInstance(native,function,NULL,self);
         }
     }
 }
@@ -9557,12 +9574,12 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
         if (report->units[u]->items[i]->kind == RangeNodeMain) { entry = report->units[u]->items[i]; ++entries; }
     if (entries > 1) { sourceDiagnostic(report,entry,0,"entry","the program has %zu entry blocks; it needs one",entries); return 0; }
-    if (entry) nativeInstance(&native,entry,NULL);
+    if (entry) nativeInstance(&native,entry,NULL,NULL);
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
         RangeNode *item = report->units[u]->items[i];
         if (item->kind == RangeNodeFunction && !(item->flags & (RangeFlagBuiltin | RangeFlagExtern)) && !genericTemplate(item)
             && !nativeInlined(item))
-            nativeInstance(&native,item,NULL);
+            nativeInstance(&native,item,NULL,NULL);
     }
     // Generic functions: one compiled function per concrete instantiation. One
     // typed with an enclosing construct's type parameter is compiled through
@@ -9575,7 +9592,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
             graph |= nativeGraphValues(&native,typer->instances[i].types[k]);
         if (!nativeConcreteInstance(typer,i) || (context && (!nativeConcrete(context) || nativeGraphValues(&native,context)))
             || graph || nativeInlined(typer->instances[i].instance)) continue;
-        nativeInstance(&native,typer->instances[i].instance,context);
+        nativeInstance(&native,typer->instances[i].instance,NULL,context);
     }
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
         if (report->units[u]->items[i]->kind == RangeNodeConstruct || report->units[u]->items[i]->kind == RangeNodeEnum)
@@ -9594,7 +9611,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
         rangePatch(&native.machine,native.helperCalls[i].at,armBl((int32_t)(((int64_t)helper->offset - (int64_t)native.helperCalls[i].at) / 4)));
     }
     for (size_t i = 0; i < native.callCount; ++i) {
-        NativeInstance *instance = nativeInstance(&native,native.calls[i].function,native.calls[i].self);
+        NativeInstance *instance = nativeInstance(&native,native.calls[i].function,native.calls[i].key,native.calls[i].self);
         if (!instance->compiled) continue; /* reported where it was compiled */
         rangePatch(&native.machine,native.calls[i].at,armBl((int32_t)(((int64_t)instance->offset - (int64_t)native.calls[i].at) / 4)));
     }
