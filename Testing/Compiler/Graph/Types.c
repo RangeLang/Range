@@ -223,6 +223,15 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A narrowed read keeps its written form; the present case it reads through is recorded beside it.
+    compile(&c,"function sizes(let a: Int?, let b: Int?): Int { switch { a.present & b.present: return a + b, default: {} } return 0 }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *payload = named(c.project,"sizes")->a->items[0]->items[0]->b->items[0]->a->a;
+    assert(payload->kind == RangeNodeName && same(payload->name,"a") && payload->narrowed && same(payload->narrowed->name,"present"));
+    expectDescription(payload->type,"Int<bits: 64, signed: true>");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }

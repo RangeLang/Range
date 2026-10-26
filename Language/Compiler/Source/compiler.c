@@ -878,21 +878,25 @@ static int stablePath(const RangeNode *path, const RangeNode *bindings)
     return path->kind == RangeNodeMemberAccess && stablePath(path->a,bindings);
 }
 
+/* Two subjects read the same path; a narrowing is one more step of it. */
 static int samePath(const RangeNode *a, const RangeNode *b)
 {
-    if (!a || !b || a->kind != b->kind) return 0;
+    if (!a || !b || a->kind != b->kind || a->narrowed != b->narrowed) return 0;
     if ((a->flags & RangeFlagImplicit) || (b->flags & RangeFlagImplicit)) return (a->flags & RangeFlagImplicit) && (b->flags & RangeFlagImplicit);
     if (!same(a->name,b->name)) return 0;
     return a->kind != RangeNodeMemberAccess || samePath(a->a,b->a);
 }
 
+/* A subject as written, with the case of each narrowing it reads through:
+ * `value.present.bits`. */
 static const char *pathText(RangeArena *arena, const RangeNode *path)
 {
     if (path->flags & RangeFlagImplicit) return "";
     const char *owner = path->kind == RangeNodeMemberAccess ? pathText(arena,path->a) : path->kind == RangeNodeEnvironment ? "#" : "";
-    size_t length = strlen(owner) + strlen(path->name) + 2;
+    const char *narrowed = path->narrowed ? path->narrowed->name : "";
+    size_t length = strlen(owner) + strlen(path->name) + strlen(narrowed) + 3;
     char *text = rangeArenaAllocate(arena,length);
-    snprintf(text,length,"%s%s%s",owner,path->kind == RangeNodeMemberAccess ? "." : "",path->name);
+    snprintf(text,length,"%s%s%s%s%s",owner,path->kind == RangeNodeMemberAccess ? "." : "",path->name,*narrowed ? "." : "",narrowed);
     return text;
 }
 
@@ -1956,7 +1960,7 @@ struct Typer {
     int closures; /* closure bodies being typed in the function being typed */
     /* Values narrowed to their optional's payload where they are read now;
      * the function being typed sees those from narrowedFloor on. */
-    struct { RangeNode *path, *entry, *field, *type; } *narrowed;
+    struct { RangeNode *path, *entry, *type; } *narrowed;
     size_t narrowedCount, narrowedCapacity, narrowedFloor;
     RangeNode *deferred; /* the type of a value known only at macro time */
     RangeNode *macro;    /* the macro whose body is being typed */
@@ -3629,16 +3633,18 @@ static int narrowablePath(const RangeNode *path)
     if (path->kind == RangeNodeEnvironment) return 1;
     if (path->kind == RangeNodeMemberAccess) {
         const RangeNode *member = path->resolvedDeclaration;
-        return ((path->flags & RangeFlagNarrowed) || (member && rangeNodeDeclaresValue(member->kind))) && narrowablePath(path->a);
+        return member && rangeNodeDeclaresValue(member->kind) && narrowablePath(path->a);
     }
     if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit) || !path->resolvedDeclaration) return 0;
     const RangeNode *declaration = path->resolvedDeclaration;
     return declaration->kind == RangeNodeLet || (declaration->kind == RangeNodeParameter && !(declaration->flags & RangeFlagBinding));
 }
 
+/* Two narrowable paths read the same value: each step reads the same
+ * declaration, narrowed alike. */
 static int sameNarrowedPath(const RangeNode *a, const RangeNode *b)
 {
-    if (!a || !b || a->kind != b->kind || (a->flags & RangeFlagNarrowed) != (b->flags & RangeFlagNarrowed)) return 0;
+    if (!a || !b || a->kind != b->kind || a->narrowed != b->narrowed) return 0;
     if (a->kind == RangeNodeName) return a->resolvedDeclaration && a->resolvedDeclaration == b->resolvedDeclaration;
     if (a->kind == RangeNodeEnvironment) return same(a->name,b->name);
     return a->kind == RangeNodeMemberAccess && a->resolvedDeclaration == b->resolvedDeclaration && sameNarrowedPath(a->a,b->a);
@@ -3654,28 +3660,19 @@ static void pushNarrowed(Typer *typer, RangeNode *path, RangeNode *entry, RangeN
     }
     typer->narrowed[typer->narrowedCount].path = path;
     typer->narrowed[typer->narrowedCount].entry = entry;
-    typer->narrowed[typer->narrowedCount].field = entry->items[0];
     typer->narrowed[typer->narrowedCount++].type = type;
 }
 
-/* A read of a narrowed value becomes the read of its payload, in place. */
+/* A read of a narrowed value reads its payload: the present case it goes
+ * through is recorded beside it, and its type is the payload's. */
 static RangeNode *narrowedRead(Typer *typer, RangeNode *expr, RangeNode *type)
 {
-    if (!type || (expr->kind != RangeNodeName && expr->kind != RangeNodeMemberAccess && expr->kind != RangeNodeEnvironment)) return type;
+    if (!type || expr->lowered
+        || (expr->kind != RangeNodeName && expr->kind != RangeNodeMemberAccess && expr->kind != RangeNodeEnvironment)) return type;
     for (size_t i = typer->narrowedCount; i-- > typer->narrowedFloor;) {
         if (!sameNarrowedPath(typer->narrowed[i].path,expr)) continue;
-        RangeArena *arena = typer->report->arena;
-        RangeNode *value = rangeArenaAllocate(arena,sizeof(*value));
-        *value = *expr;
-        value->type = type;
-        RangeNode *read = rangeNodeCreate(arena,RangeNodeMemberAccess,expr->path,expr->line,expr->column);
-        read->a = value;
-        read->name = typer->narrowed[i].entry->name;
-        read->flags = RangeFlagNarrowed;
-        read->resolvedDeclaration = typer->narrowed[i].field;
-        read->type = typer->narrowed[i].type;
-        *expr = *read;
-        return expr->type;
+        expr->narrowed = typer->narrowed[i].entry;
+        return expr->type = typer->narrowed[i].type;
     }
     return type;
 }
@@ -4017,7 +4014,7 @@ static void typeSplices(Typer *typer, SourceScope *scope, RangeNode *node)
 static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
 {
     if (!expr) return NULL;
-    if (expr->flags & RangeFlagNarrowed) return expr->type; /* already read through its narrowing */
+    if (expr->narrowed) return expr->type; /* a read narrowed where it is written keeps that narrowing */
     expr->lowered = NULL; /* typing records it afresh */
     size_t mark = typer->narrowedCount;
     int logic = expr->kind == RangeNodeBinary && (same(expr->name,"&") || same(expr->name,"|"));
@@ -4439,7 +4436,8 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         target->resolvedDeclaration = declaration;
         if (!declaration) break;
         if (declaration->kind != RangeNodeState) { typeError(typer,node,"cannot assign to %s '%s'",rangeNodeKindName(declaration->kind),target->name); break; }
-        RangeNode *expected = declaredType(typer,scope,declaration,context);
+        // The state's type was computed where it was declared; an assignment does not re-derive it.
+        RangeNode *expected = declaration->type ? declaration->type : declaredType(typer,scope,declaration,context);
         RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
         char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",target->name);
         coerce(typer,node->b,expected,actual,what);
@@ -6166,7 +6164,7 @@ static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **o
 {
     RangeArena *arena = eval->vm->arena;
     RangeValue value;
-    if (at->kind == RangeNodeEnvironment && !at->resolvedDeclaration) {
+    if (at->kind == RangeNodeEnvironment && !at->resolvedDeclaration && !at->narrowed) {
         RangeGraphValue raw = rangeGraphStoredField(arena,eval->application->target,at->name);
         if (raw.kind == RangeGraphNodes) return evalFail(eval,at,"cannot splice a list of %zu declarations",raw.count);
         value = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.text=raw.text,.length=strlen(raw.text)}
@@ -6434,7 +6432,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
  * expression. */
 static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
 {
-    if (expr->lowered) return NULL; /* it runs as something else */
+    if (expr->lowered || expr->narrowed) return NULL; /* it runs as something else, or reads a payload */
     if (expr->kind == RangeNodeName) {
         RangeValue *bound = evalNamed(frame,expr->resolvedDeclaration);
         if (bound) return bound;
@@ -6443,7 +6441,7 @@ static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
         evalOwn(eval,frame->self);
         return &frame->self->values[member];
     }
-    if (expr->kind != RangeNodeMemberAccess || (expr->flags & RangeFlagNarrowed)) return NULL;
+    if (expr->kind != RangeNodeMemberAccess) return NULL;
     RangeValue *owner = evalPlace(eval,frame,expr->a);
     size_t member = owner ? evalMember(owner,expr->resolvedDeclaration) : SIZE_MAX;
     if (member == SIZE_MAX) return NULL;
@@ -6647,24 +6645,18 @@ static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *o
     return evalFail(eval,expr,"the value of '%s' is not known at macro time",expr->name);
 }
 
-/* `a.name`: a case named through its enum, a narrowed optional's payload, a
- * member of an instance, a reflection field of a declaration, the byte count
+/* `a.name`: a case named through its enum, a member of an instance, a reflection field of a declaration, the byte count
  * of text, or, on a value known only at macro time, whether it holds a case. */
 static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
     RangeNode *member = expr->resolvedDeclaration;
-    if (member && member->kind == RangeNodeEnumCase && !(expr->flags & RangeFlagNarrowed)) {
+    if (member && member->kind == RangeNodeEnumCase) {
         *out = (RangeValue){.kind=ValueCase,.type=expr->type,.node=member};
         return EvalNormal;
     }
     RangeValue receiver;
     int status = evalExpression(eval,frame,expr->a,&receiver);
     if (status) return status;
-    if (expr->flags & RangeFlagNarrowed) {
-        for (size_t i = 0; receiver.kind == ValueCase && i < receiver.count; ++i)
-            if (receiver.node->items[i] == member) { *out = receiver.values[i]; return EvalNormal; }
-        return evalFail(eval,expr,"this narrowed value holds no payload");
-    }
     RangeNode *declaration = receiver.type && receiver.type->kind == RangeNodeSpecialization ? receiver.type->resolvedDeclaration : NULL;
     switch (receiver.kind) {
     case ValueDeclaration: return evalField(eval,receiver.node,expr->name,expr,out);
@@ -6810,12 +6802,18 @@ static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *
 }
 
 /* An expression's value: what typing lowered it to, if anything, runs in
- * its place. */
+ * its place, and a narrowed read is the payload of the present case it
+ * goes through. */
 static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
     *out = (RangeValue){0};
     if (!expr) return EvalNormal;
-    return evalPlain(eval,frame,expr->lowered ? expr->lowered : expr,out);
+    int status = evalPlain(eval,frame,expr->lowered ? expr->lowered : expr,out);
+    if (status || !expr->narrowed) return status;
+    if (out->kind != ValueCase || out->node != expr->narrowed || out->count != 1)
+        return evalFail(eval,expr,"this narrowed value holds no payload");
+    *out = out->values[0];
+    return EvalNormal;
 }
 
 /* ---- statements ---- */
@@ -8423,10 +8421,11 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     return output;
 }
 
-/* The address of an expression in x0, and its type. A scalar local's address is
- * its frame slot (*frameSlot = 1: it holds a full register). Other values that
- * are not places are materialized into a temporary. */
-static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
+/* The address of what an expression reads, before any narrowing, in x0, and
+ * its type. A scalar local's address is its frame slot (*frameSlot = 1: it
+ * holds a full register). Other values that are not places are materialized
+ * into a temporary. */
+static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frameSlot)
 {
     *frameSlot = 0;
     // A form that runs as what typing lowered it to is no place: it is materialized below.
@@ -8457,30 +8456,6 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
         nativeMissing(native,expr,"native access to '%s' is not implemented",expr->name);
         return NULL;
     }
-    if (kind == RangeNodeMemberAccess && (expr->flags & RangeFlagNarrowed)) {
-        // A narrowed optional's payload: its field, read with no check.
-        int innerSlot = 0;
-        RangeNode *optional = nativeAddress(native,expr->a,&innerSlot);
-        if (!optional) return NULL;
-        RangeNode *declaration = optional->resolvedDeclaration;
-        size_t k = 0, found = SIZE_MAX;
-        for (size_t i = 0; declaration && i < declaration->itemCount && found == SIZE_MAX; ++i) {
-            RangeNode *entry = declaration->items[i];
-            if (entry->kind != RangeNodeEnumCase) continue;
-            for (size_t j = 0; j < entry->itemCount; ++j, ++k) if (entry->items[j] == expr->resolvedDeclaration) { found = k; break; }
-        }
-        if (found == SIZE_MAX || !optional->memberOffsets || optional->memberOffsets[found] == SIZE_MAX) {
-            nativeMissing(native,expr,"native access to the narrowed payload is not implemented");
-            return NULL;
-        }
-        nativeAddOffset(native,0,0,optional->memberOffsets[found]);
-        if (optional->memberBoxed && optional->memberBoxed[found]) {
-            // The field holds its block; the value starts after the block's header.
-            nativeEmit(native,armLdr(0,0,0));
-            nativeEmit(native,armAddImm(0,0,16));
-        }
-        return optional->memberTypes[found];
-    }
     if (kind == RangeNodeMemberAccess && !(expr->resolvedDeclaration && expr->resolvedDeclaration->kind == RangeNodeEnumCase)) {
         int innerSlot = 0;
         RangeNode *receiver = nativeAddress(native,expr->a,&innerSlot);
@@ -8506,6 +8481,28 @@ static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
     nativeFrameAddress(native,0,temporary);
     *frameSlot = 1;
     return type;
+}
+
+/* The address of an expression in x0, and its type: a narrowed read's is its
+ * payload's, the field of the present case it goes through, read with no
+ * check. */
+static RangeNode *nativeAddress(Native *native, RangeNode *expr, int *frameSlot)
+{
+    RangeNode *optional = nativePlainAddress(native,expr,frameSlot);
+    if (!optional || !expr->narrowed) return optional;
+    *frameSlot = 0;
+    size_t field = nativeFirstField(optional->resolvedDeclaration,expr->narrowed);
+    if (!optional->memberOffsets || optional->memberOffsets[field] == SIZE_MAX) {
+        nativeMissing(native,expr,"native access to the narrowed payload is not implemented");
+        return NULL;
+    }
+    nativeAddOffset(native,0,0,optional->memberOffsets[field]);
+    if (optional->memberBoxed && optional->memberBoxed[field]) {
+        // The field holds its block; the value starts after the block's header.
+        nativeEmit(native,armLdr(0,0,0));
+        nativeEmit(native,armAddImm(0,0,16));
+    }
+    return optional->memberTypes[field];
 }
 
 /* Load the value at an address produced by nativeAddress: scalars into x0. */

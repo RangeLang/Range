@@ -80,8 +80,6 @@ enum {
                                     * name: the receiver a bare case name tests */
     RangeFlagEarlier = 1 << 16,    /* name: read to the left of the case test that binds the same name
                                     * in its condition, so it names what it names outside the condition */
-    RangeFlagNarrowed = 1 << 17,   /* member access: the payload of the optional value a, which a test of
-                                    * its present case narrowed; resolvedDeclaration is the payload field */
     RangeFlagTyped = 1 << 18,      /* function, macro, entry block, member: typed already, so typing on
                                     * demand at macro time and typing in order meet once; local: its
                                     * declaration was typed, so later statements may read it */
