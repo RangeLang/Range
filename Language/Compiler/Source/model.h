@@ -2,8 +2,9 @@
  *
  * One node shape with named structural slots. Every node carries its source
  * location so unsupported forms can fail loudly with a real position. Written
- * code is read once and never changed: what the compiler finds lives in fact
- * fields beside it. */
+ * code is read once and never changed: what the compiler finds lives beside
+ * it, in the node's own record of facts, or in the table of the
+ * specialization it was typed for. */
 #ifndef RANGE_COMPILER_MODEL_H
 #define RANGE_COMPILER_MODEL_H
 

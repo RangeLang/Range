@@ -15,6 +15,30 @@ typedef struct {
     Typer *typer;
 } Compiled;
 
+/* Whether `node` is `from` or under it: through what was written, the
+ * receiver a method made, or what typing lowered under `key`. */
+static int within(RangeNode *key, RangeNode *from, RangeNode *node)
+{
+    if (!from) return 0;
+    if (from == node || (from->kind == RangeNodeFunction && from->receiver == node)) return 1;
+    RangeNode *children[] = {from->a,from->b,from->c,from->generics,from->annotations,from->rhsReference,found(key,from)->lowered};
+    for (size_t i = 0; i < sizeof(children)/sizeof(*children); ++i) if (within(key,children[i],node)) return 1;
+    for (size_t i = 0; i < from->itemCount; ++i) if (within(key,from->items[i],node)) return 1;
+    return 0;
+}
+
+/* What typing found under a specialization is about its own declaration's
+ * nodes only: a function's for its template, a construct's or enum's for
+ * that declaration. */
+static void ownRecords(RangeNode *specializations)
+{
+    for (size_t i = 0; i < specializations->itemCount; ++i) {
+        RangeNode *key = specializations->items[i];
+        struct RangeFactTable *table = key->keyed;
+        for (size_t j = 0; table && j < table->capacity; ++j) assert(!table->nodes[j] || within(key,key->resolvedDeclaration,table->nodes[j]));
+    }
+}
+
 /* The compiler's normal order over the real language sources plus a project. */
 static void compile(Compiled *c, const char *project)
 {
@@ -57,6 +81,8 @@ static void compile(Compiled *c, const char *project)
     for (size_t u = 0; u < c->count; ++u) diagnoseBuiltinFunctions(&c->report,c->units[u]);
     typeCheck(c->typer);
     assert(!writtenChanged(c->typer,NULL));
+    ownRecords(c->typer->instances);
+    ownRecords(c->typer->specializations);
 }
 
 static SourceDiagnostic *reported(Compiled *c, const char *category, const char *text)

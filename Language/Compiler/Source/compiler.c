@@ -731,10 +731,11 @@ static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
 
 /* ---- findings ----
  * What typing finds about a node lives beside it: in the node's own record,
- * or, for a generic function's body typed for one specialization, in that
- * specialization's table, keyed by node. A key is that specialization, or
- * NULL for the node's own record. The table holds only what typing found
- * under the key; anything else reads the node's own. */
+ * or in the table of the specialization it was typed for, keyed by node: a
+ * generic function's body for one specialization of the function, or a
+ * construct's members for one specialization of the construct. A key is
+ * that specialization, or NULL for the node's own record. The table holds
+ * only what typing found under the key; anything else reads the node's own. */
 struct RangeFactTable { RangeNode **nodes; RangeFacts **facts; size_t capacity, count; };
 
 static size_t factSlot(const struct RangeFactTable *table, const RangeNode *node)
@@ -1943,7 +1944,8 @@ static void diagnoseDuplicates(SourceReport *report)
 /* ---- types -------------------------------------------------------------
  * A type is a specialization: a construct plus one value per generic. Equal
  * specializations are interned to one node, so type equality is identity.
- * Inside a construct's own bodies its type parameters stand for themselves.
+ * Inside a construct's own bodies its type parameters stand for themselves;
+ * its members, typed for another specialization, are found under that one.
  * Literals take the type their context requires; a construct's laws (its
  * macro applications) run once per distinct specialization and once per
  * supplied literal. Emission stays on the declaration, so those runs only
@@ -1964,7 +1966,7 @@ typedef struct {
 struct Typer {
     SourceReport *report;
     Resolver *vm;                /* applies macros, and runs laws per specialization */
-    RangeNode *specializations;  /* interned RangeNodeSpecialization nodes */
+    RangeNode *specializations;  /* interned specializations of constructs, enums, and macro types */
     RangeNode *integer, *boolean; /* constructs the integer and boolean literal rules select */
     RangeNode *booleanType;
     LawResult *laws; size_t lawCount, lawCapacity;
@@ -2201,14 +2203,6 @@ static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, Ran
     rangeNodeAppend(arena,list,specialization);
     *created = 1;
     return specialization;
-}
-
-/* A copy of a node is new code: what the compiler found about the original
- * is found about it afresh. */
-static void forgetFacts(RangeNode *copy)
-{
-    copy->found = 0;
-    copy->lowered = copy->narrowed = copy->promoted = copy->specialization = NULL;
 }
 
 /* The literal populates the one member whose default the same literal rule
@@ -3207,10 +3201,11 @@ static RangeNode *typeConstruction(Typer *typer, SourceScope *scope, RangeNode *
  * per instantiation, as a construct is: each distinct set of type arguments
  * is one specialization of the declaration, into which its body is typed and
  * compiled with the type parameters naming those types, and the types it
- * mentions run their laws as any specialization does. Arguments are inferred from the call's arguments,
- * then from the type the context expects; `first<Int>(xs: a)` writes them.
- * There are no constraints: a body that uses an operation its types lack
- * fails while that instance is typed, and the error names the instance. */
+ * mentions run their laws as any specialization does. Arguments are
+ * inferred from the call's arguments, then from the type the context
+ * expects; `first<Int>(xs: a)` writes them. There are no constraints: a
+ * body that uses an operation its types lack fails while it is typed for
+ * that specialization, and the error names the specialization. */
 
 static void typeFunction(Typer *, SourceScope *, RangeNode *, RangeNode *);
 static void checkMutations(Typer *, RangeNode *);
@@ -6172,6 +6167,14 @@ static int evalEffect(Eval *eval, EvalFrame *frame, RangeNode *attribute)
     return EvalNormal;
 }
 
+/* A copy #graph emits is new code: what the compiler found about the
+ * original is found about it afresh. */
+static void forgetFacts(RangeNode *copy)
+{
+    copy->found = 0;
+    copy->lowered = copy->narrowed = copy->promoted = copy->specialization = NULL;
+}
+
 /* A spliced value becomes the source a person would have written there: a
  * declaration or a name, a reference; a literal or a scalar, a literal. A
  * target field spliced alone is the node or the name C holds there. */
@@ -6939,7 +6942,9 @@ static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
  * its receiver's address in x0 and parameters after it; scalars pass by value,
  * aggregates by address (the callee copies); an aggregate result is written to
  * the address the caller passes in x8. Generic constructs' methods are compiled
- * once per concrete specialization, with type parameters substituted.
+ * once per concrete specialization, with type parameters substituted; a
+ * generic function once per concrete specialization of it, reading what
+ * typing found under that specialization.
  *
  * Builtin operators are C primitives: each enforces its operand type's range
  * (the @integer law) at runtime where the compiler cannot prove it, writing a
