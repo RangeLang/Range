@@ -284,9 +284,8 @@ static uint64_t writtenNode(uint64_t hash, const RangeNode *node)
     unsigned char present = node != NULL;
     hash = writtenBytes(hash,&present,1);
     if (!node) return hash;
-    int flags = node->flags & ~RangeFlagFacts;
     hash = writtenBytes(hash,&node->kind,sizeof(node->kind));
-    hash = writtenBytes(hash,&flags,sizeof(flags));
+    hash = writtenBytes(hash,&node->flags,sizeof(node->flags));
     hash = writtenBytes(hash,&node->integer,sizeof(node->integer));
     hash = writtenText(hash,node->name);
     hash = writtenText(hash,node->typeName);

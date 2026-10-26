@@ -72,29 +72,27 @@ enum {
     RangeFlagLiteral  = 1 << 7,  /* string part is literal text */
     RangeFlagApplication = 1 << 8, /* explicit parentheses, including () */
     RangeFlagMacroType = 1 << 9,   /* @name type: declarations that applied the macro */
-    RangeFlagChecked = 1 << 10,    /* specialization: its laws have run */
-    RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
-    RangeFlagMutationKnown = 1 << 12,
     RangeFlagValue = 1 << 13,      /* switch: an expression; an arm yields its a, or its block diverges */
     RangeFlagFunction = 1 << 14,   /* written type: a function type, (A, B) -> R; its generics hold the
                                     * parameter types as arguments and the result as a */
     RangeFlagImplicit = 1 << 15,   /* switch arm: a default the compiler wrote for a lowering;
                                     * binding: one a lowering wrote, not a pattern's `let`;
                                     * name: the receiver a bare case name tests */
-    RangeFlagEarlier = 1 << 16,    /* name: read to the left of the case test that binds the same name
+    RangeFlagEarlier = 1 << 16     /* name: read to the left of the case test that binds the same name
                                     * in its condition, so it names what it names outside the condition */
+};
+
+/* What the compiler finds about a node, the bits of its `found`. */
+enum {
+    RangeFlagChecked = 1 << 10,    /* specialization: its laws have run */
+    RangeFlagMutating = 1 << 11,   /* function: changes its receiver's state */
+    RangeFlagMutationKnown = 1 << 12,
     RangeFlagTyped = 1 << 18,      /* function, macro, entry block, member: typed already, so typing on
                                     * demand at macro time and typing in order meet once; local: its
                                     * declaration was typed, so later statements may read it */
     RangeFlagShape = 1 << 19,      /* #graph: a shape-only block, emitted before any macro body runs */
     RangeFlagInvalid = 1 << 20,    /* function, macro: typing it reported errors, so it does not run at macro time */
     RangeFlagRequired = 1 << 21    /* let, state: its type path names a type it requires, not a value */
-};
-
-/* Flags the compiler finds; every other flag is written. */
-enum {
-    RangeFlagFacts = RangeFlagChecked | RangeFlagMutating | RangeFlagMutationKnown | RangeFlagTyped
-        | RangeFlagShape | RangeFlagInvalid | RangeFlagRequired
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of
@@ -126,6 +124,20 @@ typedef struct RangeGraphValue {
     const char *text;
 } RangeGraphValue;
 
+/* What the compiler finds about one node: the declaration a name or call
+ * resolves to, the specialization it has (after narrowing, before
+ * promotion), what runs in place of the written form (a case test, or a
+ * call: an operator with a body, the @interval construction, a function-call
+ * initializer; on a declaration, its value as typing wrote it), the @optional
+ * present case a read goes through, whose one field is the payload, the
+ * optional a value is wrapped into where it is used, and the found bits.
+ * Lowered nodes are compiler-written, point at written children, and are
+ * never linked into the tree. */
+typedef struct RangeFacts {
+    RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted;
+    int found;
+} RangeFacts;
+
 struct RangeMacroApplication {
     RangeNode *declaration;
     RangeNode *target;
@@ -145,7 +157,7 @@ struct RangeNode {
     int column;
     const char *name;      /* interned, NUL terminated */
     const char *typeName;  /* interned, NUL terminated */
-    int flags;             /* written flags; those in RangeFlagFacts are found later */
+    int flags;             /* written flags */
     long long integer;
     size_t spanStart;   /* raw source span for retained code */
     size_t spanEnd;
@@ -165,16 +177,11 @@ struct RangeNode {
 
     /* What the compiler found: beside the written code, never in it. */
     const char *source;    /* unit owns the text; inspected children borrow it */
-    /* Resolution result: declaration identity, never a name-only dispatch. */
-    RangeNode *resolvedDeclaration;
     RangeNode *resolvedType; /* resolved literal representation */
-    RangeNode *type; /* the specialization an expression or declaration has: after narrowing, before promotion */
-    RangeNode *lowered;  /* what runs in place of the written form: a case test, or a call (an operator with
-                          * a body, the @interval construction, a function-call initializer); on a
-                          * declaration, its value as typing wrote it. Compiler-written, pointing at
-                          * written children, never linked into the tree. */
-    RangeNode *narrowed; /* the @optional present case this read goes through; its one field is the payload */
-    RangeNode *promoted; /* the optional this value is wrapped into where it is used */
+    union {
+        RangeFacts facts;  /* the node's own findings */
+        struct { RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted; int found; };
+    };
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
     int scalarBits, scalarSigned; /* from the builtin storage and signed members; 0 bits if not a scalar */

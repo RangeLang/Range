@@ -284,7 +284,7 @@ int main(void)
         "function later(): Int { let i: Outer.Inner return 0 } function early(): Int { let j: Outer.Inner return 0 } "
         "macro calls(): Construct { let n: early() } @calls construct Applied {}");
     RangeNode *inner = named(named(c.project,"Keeps"),"inner");
-    assert((inner->flags & RangeFlagRequired) && !inner->typeName && inner->itemCount == 1);
+    assert((inner->found & RangeFlagRequired) && !inner->typeName && inner->itemCount == 1);
     expectDescription(inner->type,"Inner");
     assert(reported(&c,"type","'i' needs an initial value") && reported(&c,"type","'j' needs an initial value"));
     assert(errorsIn(&c,"type") == 2);

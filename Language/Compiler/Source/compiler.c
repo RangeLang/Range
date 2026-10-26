@@ -369,7 +369,7 @@ static void markShapeBlocks(RangeNode *macro, const RangeNode *shape)
         RangeNode *statement = macro->a->items[i];
         RangeNode *emission = statement->kind == RangeNodeExpressionStatement ? statement->a : NULL;
         if (emission && emission->kind == RangeNodeEmission && shapeSplices(macro,shape,emission->b))
-            emission->flags |= RangeFlagShape;
+            emission->found |= RangeFlagShape;
     }
 }
 
@@ -1494,7 +1494,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         return;
     }
     case RangeNodeConstruct: case RangeNodeEnum: case RangeNodeFunction: case RangeNodeMacro: {
-        if (node->kind == RangeNodeMacro && (node->flags & RangeFlagTyped)) return; /* diagnosed as it was typed, when first applied */
+        if (node->kind == RangeNodeMacro && (node->found & RangeFlagTyped)) return; /* diagnosed as it was typed, when first applied */
         SourceScope declaration = {.owner=node,.parent=scope,.meta=(scope && scope->meta) || node->kind == RangeNodeMacro};
         if (node->kind == RangeNodeFunction)
             (void)sourceReference(report,scope,node,node->typeName,2);
@@ -1542,7 +1542,7 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             : node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
         // A type path is a requirement, recorded beside the declaration; it is not read as a value.
         if (requiredPath(report,scope,node)) {
-            node->flags |= RangeFlagRequired;
+            node->found |= RangeFlagRequired;
             return;
         }
         break;
@@ -2133,7 +2133,7 @@ static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, Ran
  * is found about it afresh. */
 static void forgetFacts(RangeNode *copy)
 {
-    copy->flags &= ~RangeFlagFacts;
+    copy->found = 0;
     copy->lowered = copy->narrowed = copy->promoted = NULL;
 }
 
@@ -2209,8 +2209,8 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
     RangeNode *declaration = specialization->resolvedDeclaration;
     if (!declaration->c || !declaration->c->itemCount) return;
     if (!value) {
-        if (specialization->flags & RangeFlagChecked) return;
-        specialization->flags |= RangeFlagChecked;
+        if (specialization->found & RangeFlagChecked) return;
+        specialization->found |= RangeFlagChecked;
     }
     LawResult *known = value ? lawResult(typer,specialization,value) : NULL;
     if (known && known->failureCount != SIZE_MAX) {
@@ -2395,7 +2395,7 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
     RangeNode *specialization = internSpecialization(typer,declaration,generics,&created);
     if (created) {
         // The declaration's own application already covered its defaults.
-        if (isDefault) specialization->flags |= RangeFlagChecked;
+        if (isDefault) specialization->found |= RangeFlagChecked;
         else queueLaws(typer,specialization,NULL,at);
     }
     return specialization;
@@ -2418,7 +2418,7 @@ static RangeNode *selfSpecialization(Typer *typer, RangeNode *declaration)
     }
     int created = 0;
     RangeNode *specialization = internSpecialization(typer,declaration,generics,&created);
-    specialization->flags |= RangeFlagChecked;
+    specialization->found |= RangeFlagChecked;
     return specialization;
 }
 
@@ -2529,7 +2529,7 @@ static RangeNode *macroTypeNamed(Typer *typer, const char *name, RangeNode *at)
         char spelled[160];
         snprintf(spelled,sizeof(spelled),"@%s",name);
         type->name = rangeArenaIntern(typer->report->arena,spelled,strlen(spelled));
-        type->flags |= RangeFlagChecked; /* the kinds it admits ran their own laws */
+        type->found |= RangeFlagChecked; /* the kinds it admits ran their own laws */
     }
     return type;
 }
@@ -2657,8 +2657,8 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
         return type;
     }
     // `let inner: Outer.Inner` requires the nested type its path names.
-    if ((node->flags & RangeFlagRequired) || requiredPath(typer->report,scope,node)) {
-        node->flags |= RangeFlagRequired;
+    if ((node->found & RangeFlagRequired) || requiredPath(typer->report,scope,node)) {
+        node->found |= RangeFlagRequired;
         return resolveTypeReference(typer,scope,typePathText(typer->report,node->items[0]->a),NULL,node->flags,context,node);
     }
     // A literal member of the construct its literal selects (Int's `value: 0`)
@@ -3052,7 +3052,7 @@ static int optionalWithoutValue(const RangeNode *node)
 static RangeNode *declarationValue(RangeNode *node)
 {
     if (node->lowered) return node->lowered;
-    if (node->flags & RangeFlagRequired) return NULL;
+    if (node->found & RangeFlagRequired) return NULL;
     if (!node->typeName) return rangeNodeRHS(node);
     if (node->flags & RangeFlagApplication) return node;
     RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
@@ -4009,7 +4009,7 @@ static RangeNode *typeExpression(Typer *, SourceScope *, RangeNode *, RangeNode 
  * by their case tests. */
 static int declaredLater(SourceScope *scope, const RangeNode *declaration)
 {
-    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState) || (declaration->flags & RangeFlagTyped)) return 0;
+    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState) || (declaration->found & RangeFlagTyped)) return 0;
     for (; scope; scope = scope->parent)
         if (scope->owner && scope->owner->kind == RangeNodeBlock && !same(scope->owner->name,"bindings"))
             for (size_t i = 0; i < scope->owner->itemCount; ++i) if (scope->owner->items[i] == declaration) return 1;
@@ -4436,7 +4436,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
     typeStatementOnly(typer,scope,node,context,output);
     typer->narrowedCount = mark;
     // A local is declared once its statement is typed: later ones may read it.
-    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) node->flags |= RangeFlagTyped;
+    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) node->found |= RangeFlagTyped;
 }
 
 static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
@@ -4465,7 +4465,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         node->type = declaredType(typer,scope,node,context);
         // A local names a value: `let v: Int` alone states a type, and only a
         // construct's member may leave its value to construction.
-        if ((node->typeName || (node->flags & RangeFlagRequired)) && !(node->flags & RangeFlagApplication)
+        if ((node->typeName || (node->found & RangeFlagRequired)) && !(node->flags & RangeFlagApplication)
             && !declarationValue(node) && !optionalWithoutValue(node))
             typeError(typer,node,"'%s' needs an initial value",node->name);
         break;
@@ -4907,8 +4907,8 @@ static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, Range
 
 static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function, RangeNode *context)
 {
-    if (function->flags & RangeFlagTyped) return;
-    function->flags |= RangeFlagTyped;
+    if (function->found & RangeFlagTyped) return;
+    function->found |= RangeFlagTyped;
     SourceScope scope = {.owner=function,.parent=parent};
     // An operator takes its right operand, or nothing when it is prefix.
     if (function->typeName && operatorName(function->name)) {
@@ -4953,10 +4953,10 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
  * is typed after macro time; the source pass checked it. */
 static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro, int diagnose)
 {
-    if (!macro->a || (macro->flags & RangeFlagTyped)) return; /* a @builtin macro has no body */
+    if (!macro->a || (macro->found & RangeFlagTyped)) return; /* a @builtin macro has no body */
     size_t errors = typer->report->errors;
     if (diagnose) diagnoseSourceNode(typer->report,parent,macro,0);
-    macro->flags |= RangeFlagTyped;
+    macro->found |= RangeFlagTyped;
     SourceScope scope = {.owner=macro,.parent=parent};
     TyperContext outer = typerSave(typer);
     typer->narrowedFloor = typer->narrowedCount;
@@ -4967,7 +4967,7 @@ static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro, int d
     typeBlock(typer,&scope,macro->a,NULL,NULL);
     checkMutations(typer,macro->a);
     typerRestore(typer,outer);
-    if (typer->report->errors != errors) macro->flags |= RangeFlagInvalid;
+    if (typer->report->errors != errors) macro->found |= RangeFlagInvalid;
 }
 
 /* Two written types are the same when they are spelled alike: name, flags,
@@ -5077,8 +5077,8 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
 /* A member's type in its construct's own specialization, once. */
 static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeNode *context)
 {
-    if (item->flags & RangeFlagTyped) return;
-    item->flags |= RangeFlagTyped;
+    if (item->found & RangeFlagTyped) return;
+    item->found |= RangeFlagTyped;
     if (item->typeName && (item->flags & RangeFlagApplication)) {
         // A member initialized by construction, e.g. `state from: Point(x: 0)`.
         if (!lookupFunction(typer->report,scope,item->typeName))
@@ -5400,11 +5400,11 @@ static int mutatesIn(Typer *typer, RangeNode *owner, RangeNode *node)
 
 static int mutates(Typer *typer, RangeNode *function)
 {
-    if (function->flags & RangeFlagMutationKnown) return (function->flags & RangeFlagMutating) != 0;
-    function->flags |= RangeFlagMutationKnown; /* recursion assumes no change until shown */
+    if (function->found & RangeFlagMutationKnown) return (function->found & RangeFlagMutating) != 0;
+    function->found |= RangeFlagMutationKnown; /* recursion assumes no change until shown */
     int result = (function->flags & RangeFlagBuiltin) ? same(function->name,"resize") || same(function->name,"write")
         : mutatesIn(typer,ownerOf(typer,function),function->a);
-    if (result) function->flags |= RangeFlagMutating;
+    if (result) function->found |= RangeFlagMutating;
     return result;
 }
 
@@ -5614,15 +5614,15 @@ static SourceScope *enclosingScope(Typer *typer, RangeNode *declaration, SourceS
  * as typing in order types it. Returns whether it may run. */
 static int typeOnDemand(Typer *typer, RangeNode *function)
 {
-    if (!(function->flags & RangeFlagTyped)) {
+    if (!(function->found & RangeFlagTyped)) {
         SourceScope scopes[33];
         size_t errors = typer->report->errors;
         TyperContext outer = typerTop(typer);
         typeFunction(typer,enclosingScope(typer,function,scopes),function,function->owner ? selfSpecialization(typer,function->owner) : NULL);
         typerRestore(typer,outer);
-        if (typer->report->errors != errors) function->flags |= RangeFlagInvalid;
+        if (typer->report->errors != errors) function->found |= RangeFlagInvalid;
     }
-    return !(function->flags & RangeFlagInvalid);
+    return !(function->found & RangeFlagInvalid);
 }
 
 /* A construct's members, before it is first constructed. */
@@ -5630,7 +5630,7 @@ static void typeMembersOnDemand(Typer *typer, RangeNode *declaration)
 {
     int pending = 0;
     for (size_t i = 0; i < declaration->itemCount; ++i)
-        pending |= rangeNodeDeclaresValue(declaration->items[i]->kind) && !(declaration->items[i]->flags & RangeFlagTyped);
+        pending |= rangeNodeDeclaresValue(declaration->items[i]->kind) && !(declaration->items[i]->found & RangeFlagTyped);
     if (!pending) return;
     SourceScope scopes[33], scope = {.owner=declaration,.parent=enclosingScope(typer,declaration,scopes)};
     TyperContext outer = typerTop(typer);
@@ -5643,7 +5643,7 @@ static void typeMembersOnDemand(Typer *typer, RangeNode *declaration)
 /* A construct's member whose initializer `.value` reads. */
 static void typeValueOnDemand(Typer *typer, RangeNode *member)
 {
-    SourceScope scopes[33], *scope = member->flags & RangeFlagTyped ? NULL : enclosingScope(typer,member,scopes);
+    SourceScope scopes[33], *scope = member->found & RangeFlagTyped ? NULL : enclosingScope(typer,member,scopes);
     if (!scope || scope->owner->kind != RangeNodeConstruct) return; /* only a construct's members are typed on their own */
     TyperContext outer = typerTop(typer);
     typeMember(typer,scope,member,selfSpecialization(typer,scope->owner));
@@ -5654,13 +5654,13 @@ static void typeValueOnDemand(Typer *typer, RangeNode *member)
 static int typeMacroOnDemand(Typer *typer, RangeMacroApplication *app)
 {
     RangeNode *macro = app->declaration;
-    if (!(macro->flags & RangeFlagTyped)) {
+    if (!(macro->found & RangeFlagTyped)) {
         SourceScope unit = {.owner=app->unit};
         TyperContext outer = typerTop(typer);
         typeMacro(typer,&unit,macro,1);
         typerRestore(typer,outer);
     }
-    return !(macro->flags & RangeFlagInvalid);
+    return !(macro->found & RangeFlagInvalid);
 }
 
 /* Type the program, after macro time: what macros left untyped, and the
@@ -5693,8 +5693,8 @@ static void typeCheck(Typer *typer)
                 else if (operatorName(item->name))
                     typeError(typer,item,"'%s' must be declared on the type of its left operand, in the type or an extension of it",item->name);
             }
-            else if (item->kind == RangeNodeMain && !(item->flags & RangeFlagTyped)) {
-                item->flags |= RangeFlagTyped;
+            else if (item->kind == RangeNodeMain && !(item->found & RangeFlagTyped)) {
+                item->found |= RangeFlagTyped;
                 item->type = status;
                 typer->output = status;
                 typeBlock(typer,&unit,item->a,NULL,status);
@@ -6800,7 +6800,7 @@ static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *
     case RangeNodeAttribute: return evalEffect(eval,frame,expr);
     case RangeNodeEmission:
         // A shape-only block landed before the body ran; a law run emits nothing.
-        if (eval->vm->skipEmission || (expr->flags & RangeFlagShape)) return EvalNormal;
+        if (eval->vm->skipEmission || (expr->found & RangeFlagShape)) return EvalNormal;
         return evalEmit(eval,frame,expr);
     default: return evalFail(eval,expr,"%s expressions are not run at macro time",rangeNodeKindName(expr->kind));
     }
@@ -6903,7 +6903,7 @@ static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
     if (shape) {
         for (size_t i = 0; !status && body && i < body->itemCount; ++i) {
             RangeNode *emission = body->items[i]->kind == RangeNodeExpressionStatement ? body->items[i]->a : NULL;
-            if (emission && emission->kind == RangeNodeEmission && (emission->flags & RangeFlagShape)) status = evalEmit(&eval,&frame,emission);
+            if (emission && emission->kind == RangeNodeEmission && (emission->found & RangeFlagShape)) status = evalEmit(&eval,&frame,emission);
         }
     } else if (!typeMacroOnDemand(vm->typer,app)) return 0;
     else status = evalStatement(&eval,&frame,body);
