@@ -106,32 +106,16 @@ enum {
 typedef struct RangeNode RangeNode;
 typedef struct RangeMacroApplication RangeMacroApplication;
 
-/* A compile-time value. Graph nodes, node lists, and text are what C's
- * reflection adapters hold. A case is a value of an enum: node is the case,
- * declaration the enum, values its payload, one per field. An instance is a
- * value of a construct: declaration is the construct, values one per item of
- * the declaration (only stored members are set). Slots are the elements of a
- * @many member: values, count of them. A closure is node, the closure
- * literal, with what it captured; it lives only while the call it was passed
- * to runs. */
-typedef enum { RangeGraphNone, RangeGraphNode, RangeGraphNodes, RangeGraphText,
-               RangeGraphCase, RangeGraphInstance, RangeGraphSlots, RangeGraphClosure } RangeGraphValueKind;
+/* What C's reflection adapter holds in a field of a graph node: a node, a
+ * list of nodes, or text, such as a declaration's name. */
+typedef enum { RangeGraphNone, RangeGraphNode, RangeGraphNodes, RangeGraphText } RangeGraphValueKind;
 typedef struct RangeGraphValue {
     RangeGraphValueKind kind;
     RangeNode *node;
     RangeNode **nodes;
     size_t count;
     const char *text;
-    RangeNode *declaration;
-    struct RangeGraphValue *values;
-    void *closure; /* a closure: what it captured where it was written, for the evaluator */
 } RangeGraphValue;
-
-typedef struct {
-    RangeNode *definition;
-    RangeGraphValue value;
-    int state; /* 0 deferred, 1 resolving, 2 resolved */
-} RangeGraphBinding;
 
 struct RangeMacroApplication {
     RangeNode *declaration;
@@ -140,8 +124,6 @@ struct RangeMacroApplication {
     RangeNode *attribute; /* the application site on the target */
     int applied;          /* each application runs once */
     int shaped;           /* its shape-only #graph blocks have landed */
-    RangeGraphBinding *bindings;
-    size_t count;
 };
 
 struct RangeNode {
@@ -170,7 +152,7 @@ struct RangeNode {
     unsigned char *memberBoxed; /* union specialization: per payload field, stored out of line */
     size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */
     struct RangeNode **memberTypes; /* specialization: type per declaration item; NULL for @many storage */
-    RangeMacroApplication *macroApplication; /* application-specific bindings */
+    RangeMacroApplication *macroApplication; /* the application this attribute writes */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */
     const char *literalPattern; /* validated literal rule, owned by the arena */
@@ -206,7 +188,6 @@ RangeNode *rangeNodeCreate(RangeArena *arena, RangeNodeKind kind,
 void rangeNodeAppend(RangeArena *arena, RangeNode *node, RangeNode *item);
 const char *rangeNodeKindName(RangeNodeKind kind);
 int rangeNodeDeclaresValue(RangeNodeKind kind);
-int rangeNodeHasContextReference(const RangeNode *node);
 RangeNode *rangeGraphType(const RangeArena *arena, const char *name);
 void rangeGraphInitTypes(RangeArena *arena);
 RangeNode *rangeGraphField(const RangeNode *type, const char *name);

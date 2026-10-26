@@ -105,17 +105,6 @@ const char *rangeNodeKindName(RangeNodeKind kind)
     return RANGE_NODE_NAMES[kind];
 }
 
-int rangeNodeHasContextReference(const RangeNode *node)
-{
-    if (!node) return 0;
-    if (node->kind == RangeNodeEnvironment) return 1;
-    if (rangeNodeHasContextReference(node->a) || rangeNodeHasContextReference(node->b)
-        || rangeNodeHasContextReference(node->c) || rangeNodeHasContextReference(node->generics)) return 1;
-    for (size_t i = 0; i < node->itemCount; ++i)
-        if (rangeNodeHasContextReference(node->items[i])) return 1;
-    return 0;
-}
-
 RangeNode *rangeGraphField(const RangeNode *type, const char *name)
 {
     if (type) for (size_t i = 0; i < type->itemCount; ++i)

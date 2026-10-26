@@ -62,5 +62,5 @@ for mode in ordinary sanitized; do
     status=0
     "$compiler" --run start Language/Types > "$work_root/log" 2> "$work_root/error" || status=$?
     [[ "$status" == 64 ]] || fail "$mode retired interpreter command was accepted"
-    echo "compiler graph: $mode contexts=2 reflection=pass deferred=pass normal-resolution=pass rejections=4"
+    echo "compiler graph: $mode contexts=2 reflection=pass normal-resolution=pass rejections=4"
 done

@@ -14,7 +14,7 @@ struct SourceReport;
 static void sourceDiagnostic(struct SourceReport *, RangeNode *, int, const char *, const char *, ...);
 typedef struct Typer Typer;
 
-/* Resolution context; ordinary Range execution is not implemented here. */
+/* Resolution context, in which macro applications also run. */
 typedef struct {
     RangeArena *arena;
     RangeNode **units;
@@ -26,22 +26,12 @@ typedef struct {
     RangeNode *unit;    /* unit holding the running application's target */
     int skipEmission;   /* law runs per specialization check; emission stays on the declaration */
     struct SourceReport *report; /* where @warning reports, when compiling */
-    int deferred; /* a resolution-time binding needs Range code that runs with the application */
     Typer *typer; /* alive from before the first application to the end of type checking */
     const char *absent; /* the @optional enum's case without payload: what `let v: T?` starts as */
     size_t checked; /* applications run */
 } Resolver;
 
 static int same(const char *a, const char *b) { return a && b && !strcmp(a,b); }
-
-/* Migration switch: macro bodies are typed in place and run by the
- * known-value evaluator over typed nodes, unless RANGE_TYPED_MACROS is 0. */
-static int typedMacros(void)
-{
-    static int on = -1;
-    if (on < 0) on = !getenv("RANGE_TYPED_MACROS") || strcmp(getenv("RANGE_TYPED_MACROS"),"0");
-    return on;
-}
 
 _Noreturn static void fail(Resolver *vm, RangeNode *at, const char *format, ...)
 {
@@ -50,92 +40,6 @@ _Noreturn static void fail(Resolver *vm, RangeNode *at, const char *format, ...)
     snprintf(vm->error,vm->errorSize,"%s:%d:%d: %s",
         at ? at->path : "<compiler>",at ? at->line : 1,at ? at->column : 1,detail);
     longjmp(vm->failure,1);
-}
-
-/* Resolve declaration queries without executing the macro's deferred body. */
-static RangeGraphValue graphEval(Resolver *, RangeMacroApplication *, RangeNode *);
-
-static RangeGraphValue graphNode(RangeNode *node)
-{
-    return (RangeGraphValue){.kind=node ? RangeGraphNode : RangeGraphNone,.node=node};
-}
-
-static RangeGraphValue graphBinding(Resolver *vm, RangeMacroApplication *app, RangeGraphBinding *binding)
-{
-    if (binding->state == 2) return binding->value;
-    if (binding->state == 1) fail(vm,binding->definition,"cyclic graph member '%s'",binding->definition->name);
-    RangeNode *rhs = rangeNodeRHS(binding->definition);
-    if (!rhs) fail(vm,binding->definition,"graph member RHS is not supported yet");
-    binding->state = 1;
-    int outer = vm->deferred;
-    vm->deferred = 0;
-    binding->value = graphEval(vm,app,rhs);
-    int deferred = vm->deferred;
-    vm->deferred = outer || deferred;
-    // Calls and collection functions are Range code: such a binding is
-    // evaluated when the application runs, not at resolution.
-    if (deferred) { binding->state = 0; binding->value = (RangeGraphValue){0}; return binding->value; }
-    binding->state = 2;
-    return binding->value;
-}
-
-static RangeGraphValue graphProperty(Resolver *vm, RangeMacroApplication *app,
-                                    RangeGraphValue receiver, const char *name, RangeNode *at)
-{
-    if (receiver.kind == RangeGraphNodes) { vm->deferred = 1; return (RangeGraphValue){0}; }
-    if (receiver.kind != RangeGraphNode) fail(vm,at,"graph value has no property '%s'",name);
-    RangeNode *node = receiver.node;
-    // A macro application, an element of a declaration's `macros`, reads as
-    // the Macro it applies, as the grammar's Array<Macro> says: its name.
-    RangeNode *shape = node->graphType ? node->graphType
-        : node->kind == RangeNodeAttribute ? rangeGraphType(vm->arena,"Macro") : NULL;
-    RangeNode *field = rangeGraphField(shape,name);
-    if (!field || (!node->graphType && !same(name,"name"))) fail(vm,at,"field '%s' is not declared by @type %s",name,
-        shape ? shape->name : rangeNodeKindName(node->kind));
-    // A macro's own locals read their bound value; other declarations their RHS.
-    if (same(name,"value") && rangeNodeDeclaresValue(node->kind))
-        for (size_t i = 0; i < app->count; ++i)
-            if (app->bindings[i].definition == node) return graphBinding(vm,app,&app->bindings[i]);
-    RangeGraphValue value = rangeGraphStoredField(vm->arena,node,name);
-    if (!(field->flags & RangeFlagMany) && value.kind == RangeGraphNodes)
-        return graphNode(value.count ? value.nodes[0] : NULL);
-    return value;
-}
-
-static const char *graphText(Resolver *vm, RangeGraphValue value, RangeNode *at)
-{
-    if (value.kind == RangeGraphText) return value.text;
-    if (value.kind == RangeGraphNode && value.node->kind == RangeNodeString
-        && value.node->itemCount == 1 && (value.node->items[0]->flags & RangeFlagLiteral))
-        return value.node->items[0]->name;
-    fail(vm,at,"a compile-time name requires text or a string literal");
-    return NULL;
-}
-
-static RangeGraphValue graphEval(Resolver *vm, RangeMacroApplication *app, RangeNode *node)
-{
-    switch (node->kind) {
-    case RangeNodeEnvironment:
-        return graphProperty(vm,app,graphNode(app->target),node->name,node);
-    case RangeNodeMemberAccess: {
-        RangeGraphValue receiver = graphEval(vm,app,node->a);
-        if (vm->deferred) return (RangeGraphValue){0};
-        return graphProperty(vm,app,receiver,node->name,node);
-    }
-    case RangeNodeName:
-        for (size_t i = 0; i < app->count; ++i)
-            if (same(app->bindings[i].definition->name,node->name))
-                return graphBinding(vm,app,&app->bindings[i]);
-        fail(vm,node,"unresolved graph member '%s'",node->name);
-        break;
-    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString:
-        return graphNode(node);
-    case RangeNodeCall:
-        vm->deferred = 1;
-        return (RangeGraphValue){0};
-    default: fail(vm,node,"unsupported graph expression '%s'",rangeNodeKindName(node->kind));
-    }
-    return (RangeGraphValue){0};
 }
 
 static RangeNode *graphTypeIdentity(RangeNode *node)
@@ -191,7 +95,7 @@ static RangeNode *grammarDeclaration(Resolver *vm, RangeNode *node)
 }
 
 /* One application site on a target: its macro declaration, selected by name
- * and the target's type, and the bindings its body reads. */
+ * and the target's type. */
 static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attribute)
 {
     RangeNode *unit = NULL;
@@ -204,26 +108,8 @@ static void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attri
         fail(vm,attribute,"parameterized macro graph resolution is not implemented");
     RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
     *app = (RangeMacroApplication){.declaration=macro,.target=target,.unit=unit,.attribute=attribute};
-    if (macro->a) {
-        app->bindings = rangeArenaAllocate(vm->arena,macro->a->itemCount * sizeof(*app->bindings));
-        for (size_t i = 0; i < macro->a->itemCount; ++i) {
-            RangeNode *member = macro->a->items[i];
-            if (!rangeNodeDeclaresValue(member->kind)) continue;
-            for (size_t j = 0; j < app->count; ++j)
-                if (same(app->bindings[j].definition->name,member->name))
-                    fail(vm,member,"duplicate graph member '%s'",member->name);
-            app->bindings[app->count++] = (RangeGraphBinding){.definition=member};
-        }
-    }
     attribute->resolvedDeclaration = macro;
     attribute->macroApplication = app;
-    // A switch is evaluated when the application runs, not at resolution.
-    for (size_t i = 0; !typedMacros() && i < app->count; ++i) {
-        RangeNode *rhs = rangeNodeRHS(app->bindings[i].definition);
-        if (rangeNodeHasContextReference(app->bindings[i].definition) && !(rhs && rhs->kind == RangeNodeSwitch))
-            (void)graphBinding(vm,app,&app->bindings[i]);
-        vm->deferred = 0;
-    }
 }
 
 static void resolveGraphTarget(Resolver *vm, RangeNode *target)
@@ -787,123 +673,6 @@ static int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t
     return ok;
 }
 
-/* Compile-time validation works on graph values, never concrete type names.
- * Runtime execution, construction, and language type checking are separate. */
-typedef struct MetaLocal {
-    const char *name;
-    RangeGraphValue value;
-    int mutable;
-    /* A narrowing, not a name: the value at path holds the payload of its
-     * optional's case `narrowed`, and value is that payload. */
-    RangeNode *path;
-    const char *narrowed;
-    struct MetaLocal *next;
-} MetaLocal;
-typedef struct MetaScope {
-    struct MetaScope *parent;
-    MetaLocal *locals;
-    RangeMacroApplication *application;
-} MetaScope;
-typedef struct {
-    Resolver *vm;
-    unsigned steps;
-    unsigned depth;
-    int splicing; /* evaluating a #name splice inside #graph */
-    /* The enum a `.case` written here belongs to, consumed by the next
-     * expression: the switch subject's type, a function's output, a payload
-     * field's type, the other operand of `=`. */
-    RangeNode *expected;
-    RangeNode *function; /* the running compile-time function, if any */
-    RangeNode *output;   /* the enum it returns, if any */
-    RangeNode *condition, *conditionShape; int conditionKnown;
-    RangeGraphValue *self;    /* the receiver of the running method */
-    int narrowing;            /* evaluating a condition's `&` and `|` chain, whose case tests narrow */
-    RangeNode *narrowingTest; /* the term of that chain being evaluated */
-    RangeGraphValue *pending; /* a first argument already evaluated, for C's own calls */
-    /* Emitted copies by original, so a node quoted code reaches twice (a
-     * for-in's binding is in its pattern and its scope) stays one node. */
-    RangeNode **emittedFrom, **emittedTo; size_t emittedCapacity, emittedCount;
-} MetaEval;
-
-static void metaStep(MetaEval *eval, RangeNode *at)
-{
-    if (++eval->steps > 100000) fail(eval->vm,at,"compile-time evaluation step limit exceeded");
-}
-
-static RangeGraphValue metaScalar(MetaEval *eval, RangeNode *at, RangeNodeKind kind, long long value)
-{
-    RangeNode *node = rangeNodeCreate(eval->vm->arena,kind,at->path,at->line,at->column);
-    node->integer = value;
-    return graphNode(node);
-}
-
-static long long metaNumber(MetaEval *eval, RangeGraphValue value, RangeNode *at)
-{
-    if (value.kind != RangeGraphNode || value.node->kind != RangeNodeInteger)
-        fail(eval->vm,at,"compile-time arithmetic requires numeric graph values");
-    return value.node->integer;
-}
-
-static int metaBoolean(MetaEval *eval, RangeGraphValue value, RangeNode *at)
-{
-    if (value.kind != RangeGraphNode || value.node->kind != RangeNodeBool)
-        fail(eval->vm,at,"compile-time condition requires a boolean graph value");
-    return value.node->integer != 0;
-}
-
-static MetaLocal *metaLocal(MetaScope *scope, const char *name)
-{
-    for (; scope; scope = scope->parent)
-        for (MetaLocal *local = scope->locals; local; local = local->next)
-            if (same(local->name,name)) return local;
-    return NULL;
-}
-
-static void metaBind(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeGraphValue value)
-{
-    if (value.kind == RangeGraphClosure && node->kind != RangeNodeParameter)
-        fail(eval->vm,node,"a closure is an argument for a function-typed parameter; it is not held in '%s'",node->name);
-    for (MetaLocal *local = scope->locals; local; local = local->next)
-        if (same(local->name,node->name)) fail(eval->vm,node,"duplicate compile-time local '%s'",node->name);
-    MetaLocal *local = rangeArenaAllocate(eval->vm->arena,sizeof(*local));
-    *local = (MetaLocal){.name=node->name,.value=value,.mutable=node->kind == RangeNodeState,.next=scope->locals};
-    scope->locals = local;
-}
-
-static RangeNode *metaDeclaration(MetaEval *eval, RangeNode *at, RangeNodeKind kind, const char *name)
-{
-    RangeNode *found = NULL;
-    for (size_t u = 0; u < eval->vm->count; ++u) for (size_t i = 0; i < eval->vm->units[u]->itemCount; ++i) {
-        RangeNode *node = eval->vm->units[u]->items[i];
-        if (node->kind != kind || !same(node->name,name)) continue;
-        if (kind == RangeNodeMacro && node->b) continue; /* standalone effect invocation */
-        if (found) fail(eval->vm,at,"ambiguous compile-time declaration '%s'",name);
-        found = node;
-    }
-    if (!found) fail(eval->vm,at,"unresolved compile-time declaration '%s'",name);
-    at->resolvedDeclaration = found;
-    return found;
-}
-
-static RangeGraphValue metaExpression(MetaEval *, MetaScope *, RangeNode *);
-static int metaHoldsCase(MetaEval *, RangeGraphValue, const char *);
-static RangeGraphValue metaCaseTest(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue);
-static RangeNode *metaPatternCase(MetaEval *, RangeNode *, RangeNode *);
-static void becomeCaseTest(RangeArena *, RangeNode *, RangeNode *, const char *, RangeNode *);
-static int metaStatement(MetaEval *, MetaScope *, RangeNode *, RangeGraphValue *);
-static const char *metaText(MetaEval *, MetaScope *, RangeNode *, RangeNode *);
-static RangeGraphValue metaExpect(MetaEval *, MetaScope *, RangeNode *, RangeNode *);
-static RangeGraphValue metaConvert(MetaEval *, RangeGraphValue, RangeNode *, RangeNode *);
-static RangeNode *metaTypeEnum(MetaEval *, RangeNode *, const char *, int, RangeNode *);
-
-/* A macro's own top-level declarations are bound once per application. */
-static int macroLocal(const RangeMacroApplication *app, const RangeNode *node)
-{
-    for (size_t i = 0; app && i < app->count; ++i)
-        if (app->bindings[i].definition == node) return 1;
-    return 0;
-}
-
 /* A splice is a #name chain such as #element or #element.name; the whole
  * chain runs at macro time. `#name(…)` calls the spliced name where the code
  * lands: only the name is spliced. */
@@ -914,30 +683,6 @@ static int spliceChain(const RangeNode *node)
         node = node->a;
     }
     return node && node->kind == RangeNodeEnvironment;
-}
-
-/* A spliced value becomes the source a person would have written there. */
-static RangeNode *spliceNode(MetaEval *eval, RangeNode *at, RangeGraphValue value)
-{
-    RangeArena *arena = eval->vm->arena;
-    if (value.kind == RangeGraphNodes)
-        fail(eval->vm,at,"cannot splice a list of %zu declarations",value.count);
-    if (value.kind == RangeGraphNone) fail(eval->vm,at,"splice has no value");
-    if (value.kind == RangeGraphCase || value.kind == RangeGraphInstance || value.kind == RangeGraphSlots)
-        fail(eval->vm,at,"cannot splice a compile-time %s value",value.kind == RangeGraphCase ? "enum" : "construct");
-    RangeNode *node = value.kind == RangeGraphNode ? value.node : NULL;
-    if (node && (node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString)) {
-        RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
-        *copy = *node;
-        copy->path = at->path; copy->line = at->line; copy->column = at->column;
-        return copy;
-    }
-    const char *name = value.kind == RangeGraphText ? value.text : node->name;
-    if (!name) fail(eval->vm,at,"cannot splice an unnamed %s",rangeNodeKindName(node->kind));
-    RangeNode *reference = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
-    reference->name = name;
-    reference->resolvedDeclaration = node;
-    return reference;
 }
 
 /* `let x: #element` becomes `let x: Element`: a spliced name in a
@@ -951,224 +696,6 @@ static void spliceDeclarationType(RangeNode *copy, const RangeNode *original)
     copy->typeName = reference->name;
     copy->itemCount = 0;
     if (!copy->flags) copy->rhsReference = reference;
-}
-
-/* Copy one quoted declaration for this application, filling its splices.
- * Nested macro declarations keep their own splices for their own runs. */
-static RangeNode *emitNode(MetaEval *eval, MetaScope *scope, RangeNode *node, int splice)
-{
-    if (!node) return NULL;
-    RangeNode *attribute = scope->application->attribute;
-    if (splice && spliceChain(node)) {
-        int outer = eval->splicing;
-        eval->splicing = 1;
-        RangeGraphValue value = metaExpression(eval,scope,node);
-        eval->splicing = outer;
-        RangeNode *spliced = spliceNode(eval,node,value);
-        spliced->emittedBy = attribute;
-        return spliced;
-    }
-    if (node->kind == RangeNodeMacro) splice = 0;
-    size_t mask = eval->emittedCapacity - 1, slot = ((uintptr_t)node >> 4) & mask;
-    if (eval->emittedCapacity)
-        for (; eval->emittedFrom[slot]; slot = (slot + 1) & mask)
-            if (eval->emittedFrom[slot] == node) return eval->emittedTo[slot];
-    if (2 * (eval->emittedCount + 1) > eval->emittedCapacity) {
-        // Grow, keeping every pair.
-        size_t capacity = eval->emittedCapacity ? eval->emittedCapacity * 2 : 256;
-        RangeNode **from = rangeArenaAllocate(eval->vm->arena,capacity * sizeof(*from));
-        RangeNode **to = rangeArenaAllocate(eval->vm->arena,capacity * sizeof(*to));
-        memset(from,0,capacity * sizeof(*from));
-        for (size_t i = 0; i < eval->emittedCapacity; ++i) {
-            if (!eval->emittedFrom[i]) continue;
-            size_t j = ((uintptr_t)eval->emittedFrom[i] >> 4) & (capacity - 1);
-            while (from[j]) j = (j + 1) & (capacity - 1);
-            from[j] = eval->emittedFrom[i]; to[j] = eval->emittedTo[i];
-        }
-        eval->emittedFrom = from; eval->emittedTo = to; eval->emittedCapacity = capacity;
-        mask = capacity - 1;
-        for (slot = ((uintptr_t)node >> 4) & mask; from[slot]; slot = (slot + 1) & mask) {}
-    }
-    RangeNode *copy = rangeArenaAllocate(eval->vm->arena,sizeof(*copy));
-    *copy = *node;
-    eval->emittedFrom[slot] = node; eval->emittedTo[slot] = copy; ++eval->emittedCount;
-    copy->emittedBy = attribute;
-    copy->flags &= ~RangeFlagTyped;
-    copy->resolvedDeclaration = NULL;
-    copy->macroApplication = NULL;
-    copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
-    copy->a = emitNode(eval,scope,node->a,splice);
-    copy->b = emitNode(eval,scope,node->b,splice);
-    copy->c = emitNode(eval,scope,node->c,splice);
-    copy->generics = emitNode(eval,scope,node->generics,splice);
-    copy->annotations = emitNode(eval,scope,node->annotations,splice);
-    copy->rhsReference = emitNode(eval,scope,node->rhsReference,splice);
-    for (size_t i = 0; i < node->itemCount; ++i)
-        rangeNodeAppend(eval->vm->arena,copy,emitNode(eval,scope,node->items[i],splice));
-    if (splice) spliceDeclarationType(copy,node);
-    return copy;
-}
-
-/* Emit a #graph block's declarations into the running application's output. */
-static void metaEmit(MetaEval *eval, MetaScope *scope, RangeNode *node)
-{
-    if (!scope->application || !eval->vm->emitted)
-        fail(eval->vm,node,"#graph requires a macro application");
-    for (size_t i = 0; i < node->b->itemCount; ++i) {
-        // Each emitted declaration is a fresh copy, sharing only within itself.
-        if (eval->emittedCapacity) memset(eval->emittedFrom,0,eval->emittedCapacity * sizeof(*eval->emittedFrom));
-        eval->emittedCount = 0;
-        rangeNodeAppend(eval->vm->arena,eval->vm->emitted,emitNode(eval,scope,node->b->items[i],1));
-    }
-}
-
-/* ---- construct values at compile time ------------------------------------
- * A value of a construct is an instance: one value per stored member. Its
- * functions run here as their Range bodies; inside one, a bare name is a
- * member of the receiver and a bare call one of its functions. A @many
- * member holds slots, and the slot primitives resize, read, and write act on
- * them, as C implements them on @many storage in compiled code. */
-
-static RangeNode *runMacroApplication(Resolver *, RangeNode *);
-static void mergeEmitted(Resolver *, RangeNode *);
-static int compilerAttribute(RangeNode *, RangeNode *);
-static int slotPrimitive(const RangeNode *);
-
-/* A declaration's members and functions include what its written macros
- * emit, so a compile-time use of it first applies those that have not run:
- * `#cases.first()` needs the functions @collection gives Array. */
-static void metaPrepare(MetaEval *eval, RangeNode *declaration)
-{
-    Resolver *vm = eval->vm;
-    for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i) {
-        RangeNode *attribute = declaration->c->items[i];
-        RangeMacroApplication *app = attribute->macroApplication;
-        if (compilerAttribute(declaration,attribute) || !app || app->applied) continue;
-        app->applied = 1;
-        RangeNode *emitted = vm->emitted, *unit = vm->unit;
-        int skip = vm->skipEmission;
-        vm->unit = app->unit ? app->unit : unit;
-        for (size_t u = 0; u < vm->count; ++u)
-            for (size_t j = 0; j < vm->units[u]->itemCount; ++j)
-                if (vm->units[u]->items[j] == declaration) vm->unit = vm->units[u];
-        vm->skipEmission = 0;
-        mergeEmitted(vm,runMacroApplication(vm,attribute));
-        vm->emitted = emitted; vm->unit = unit; vm->skipEmission = skip;
-    }
-}
-
-static size_t metaMemberIndex(RangeGraphValue instance, const char *name)
-{
-    RangeNode *declaration = instance.declaration;
-    for (size_t i = 0; i < instance.count && i < declaration->itemCount; ++i)
-        if (rangeNodeDeclaresValue(declaration->items[i]->kind) && same(declaration->items[i]->name,name)) return i;
-    return SIZE_MAX;
-}
-
-static int metaManyMember(const RangeNode *member)
-{
-    return (member->flags & RangeFlagMany) || appliesBuiltin(member,"many");
-}
-
-/* Values never change in place: a write copies the instance's members. */
-static void metaSetMember(MetaEval *eval, RangeGraphValue *instance, size_t index, RangeGraphValue value)
-{
-    RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,instance->count * sizeof(*values));
-    memcpy(values,instance->values,instance->count * sizeof(*values));
-    values[index] = value;
-    instance->values = values;
-}
-
-static RangeGraphValue metaInvoke(MetaEval *, MetaScope *, RangeNode *, RangeNode *, RangeGraphValue *);
-static RangeNode *closureValue(RangeNode *);
-
-/* A closure at compile time: what it sees where it is written, and the enum
- * its result is a case of, once a function-typed parameter holds it. It is
- * used only while the call it is passed to runs, so the scopes it holds are
- * alive whenever it runs. */
-typedef struct {
-    MetaScope *scope;
-    RangeGraphValue *self;
-    RangeNode *function, *output;
-} MetaClosure;
-
-/* `where(element)` at compile time: the closure's body with its parameters
- * bound to the arguments, evaluated where the call is, in the scope where the
- * closure is written. It yields its one expression, or what `return` gives. */
-static RangeGraphValue metaCallClosure(MetaEval *eval, MetaScope *scope, RangeNode *call, RangeGraphValue closure)
-{
-    MetaClosure *captured = closure.closure;
-    RangeNode *literal = closure.node;
-    if (call->itemCount != literal->itemCount)
-        fail(eval->vm,call,"this closure takes %zu argument%s; %zu supplied",literal->itemCount,literal->itemCount == 1 ? "" : "s",call->itemCount);
-    if (++eval->depth > 64) fail(eval->vm,call,"compile-time call depth exceeded");
-    MetaScope parameters = {.parent=captured->scope,.application=captured->scope ? captured->scope->application : NULL};
-    for (size_t i = 0; i < call->itemCount; ++i) {
-        if (call->items[i]->name) fail(eval->vm,call->items[i],"a closure's arguments take no labels");
-        metaBind(eval,&parameters,literal->items[i],metaExpression(eval,scope,call->items[i]->a));
-    }
-    RangeGraphValue *self = eval->self;
-    RangeNode *function = eval->function, *output = eval->output;
-    eval->self = captured->self; eval->function = captured->function; eval->output = captured->output;
-    RangeGraphValue result = {0};
-    RangeNode *value = closureValue(literal);
-    if (value) result = metaExpect(eval,&parameters,value,captured->output);
-    else (void)metaStatement(eval,&parameters,literal->a,&result);
-    result = metaConvert(eval,result,captured->output,call);
-    eval->self = self; eval->function = function; eval->output = output;
-    --eval->depth;
-    return result;
-}
-
-/* `Point(x: 1)`: each stored member is its argument or its default, which
- * sees the members before it; a @many member starts with no slots. */
-static RangeGraphValue metaConstruct(MetaEval *eval, MetaScope *scope, RangeNode *declaration, RangeNode **arguments,
-                                     size_t count, RangeNode *at)
-{
-    metaPrepare(eval,declaration);
-    RangeGraphValue instance = {.kind=RangeGraphInstance,.declaration=declaration,.count=declaration->itemCount};
-    instance.values = rangeArenaAllocate(eval->vm->arena,(instance.count ? instance.count : 1) * sizeof(*instance.values));
-    memset(instance.values,0,(instance.count ? instance.count : 1) * sizeof(*instance.values));
-    RangeGraphValue *outer = eval->self;
-    RangeNode *outerFunction = eval->function;
-    for (size_t i = 0; i < declaration->itemCount; ++i) {
-        RangeNode *member = declaration->items[i];
-        if (!rangeNodeDeclaresValue(member->kind)) continue;
-        if (metaManyMember(member)) { instance.values[i] = (RangeGraphValue){.kind=RangeGraphSlots}; continue; }
-        RangeNode *argument = NULL;
-        for (size_t j = 0; j < count; ++j) if (same(arguments[j]->name,member->name)) argument = arguments[j];
-        if (argument) {
-            eval->self = outer; eval->function = outerFunction;
-            instance.values[i] = metaExpect(eval,scope,argument->a,metaTypeEnum(eval,declaration,member->typeName,member->flags,member));
-            continue;
-        }
-        int builtin = 0;
-        for (size_t k = 0; member->c && k < member->c->itemCount; ++k) builtin |= same(member->c->items[k]->name,"builtin");
-        if (builtin) continue; /* a C layout primitive: no value at compile time */
-        if (member->rhsReference) {
-            // `let height: width` copies a member before it; any other bare
-            // name is the member's type, and construction must supply it.
-            size_t earlier = metaMemberIndex(instance,member->rhsReference->name);
-            if (earlier < i) { instance.values[i] = instance.values[earlier]; continue; }
-        }
-        RangeNode *rhs = member->rhsReference ? NULL : rangeNodeRHS(member);
-        if (!rhs && (member->flags & RangeFlagOptional)) {
-            instance.values[i] = metaConvert(eval,(RangeGraphValue){0},metaTypeEnum(eval,declaration,member->typeName,member->flags,member),member);
-            continue;
-        }
-        if (!rhs) fail(eval->vm,at,"constructing %s at compile time requires '%s'",declaration->name,member->name);
-        // A default sees the members before it, as in compiled construction.
-        eval->self = &instance; eval->function = NULL;
-        MetaScope defaults = {0};
-        instance.values[i] = metaExpression(eval,&defaults,rhs);
-    }
-    for (size_t j = 0; j < count; ++j) {
-        RangeGraphValue probe = instance;
-        if (metaMemberIndex(probe,arguments[j]->name) == SIZE_MAX)
-            fail(eval->vm,arguments[j],"%s has no member '%s'",declaration->name,arguments[j]->name ? arguments[j]->name : "");
-    }
-    eval->self = outer; eval->function = outerFunction;
-    return instance;
 }
 
 /* The parameter a trailing closure fills: the function's last function-typed
@@ -1196,21 +723,6 @@ static void labelTrailing(RangeNode *call, const RangeNode *function)
             call->items[i]->name = function->items[i]->name;
 }
 
-/* The function of `declaration` a call names: its name and argument labels. */
-static RangeNode *metaFunction(RangeNode *declaration, const char *name, RangeNode *call)
-{
-    for (size_t i = 0; declaration && i < declaration->itemCount; ++i) {
-        RangeNode *function = declaration->items[i];
-        if (function->kind != RangeNodeFunction || !same(function->name,name) || function->itemCount != call->itemCount) continue;
-        int labels = 1;
-        for (size_t j = 0; j < call->itemCount && labels; ++j) labels = argumentFits(call->items[j],function,j);
-        if (labels) { labelTrailing(call,function); return function; }
-    }
-    return NULL;
-}
-
-static RangeNode *iterationFunction(const RangeNode *, size_t *);
-
 /* The function a construct or enum declares with @insertion, which C calls to
  * build a reflection list; *count is how many it declares. The role, not a
  * name, selects it. */
@@ -1225,452 +737,6 @@ static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
                 ++*count;
             }
     return found;
-}
-
-/* A reflection field holds declarations; as a Range value it is the type its
- * grammar declaration gives it. A list, such as Enum.cases: Array<EnumCase>,
- * becomes that collection, built as Range would build it: constructed, then
- * each declaration added in order with the collection's @insertion function.
- * The collection must declare @iteration as well, so the list can be read. An
- * optional field, such as Function.output, is a case of the optional. */
-static RangeGraphValue metaReflect(MetaEval *eval, RangeNode *owner, const char *name, RangeGraphValue value, RangeNode *at)
-{
-    if (value.kind != RangeGraphNodes && value.kind != RangeGraphNone && value.kind != RangeGraphNode) return value;
-    RangeNode *grammar = owner ? grammarDeclaration(eval->vm,owner) : NULL, *member = NULL;
-    for (size_t i = 0; grammar && i < grammar->itemCount; ++i)
-        if (rangeNodeDeclaresValue(grammar->items[i]->kind) && same(grammar->items[i]->name,name)) member = grammar->items[i];
-    if (!member) {
-        if (value.kind == RangeGraphNodes)
-            fail(eval->vm,at,"reflection field '%s' has no Range type: %s declares no member '%s' in the loaded grammar",
-                 name,grammar ? grammar->name : owner && owner->graphType ? owner->graphType->name : "its kind",name);
-        return value;
-    }
-    if (member->flags & RangeFlagOptional)
-        return metaConvert(eval,value,metaTypeEnum(eval,grammar,member->typeName,member->flags,member),at);
-    if (value.kind != RangeGraphNodes) return value;
-    RangeNode *collection = member->typeName ? namedDeclaration(eval->vm,grammar,member->typeName,0,member,"reflection type") : NULL;
-    if (!collection || collection->kind != RangeNodeConstruct)
-        fail(eval->vm,at,"reflection field %s.%s holds declarations; its type must be a collection construct",grammar->name,name);
-    // The collection's own applications run first: they may emit the
-    // @insertion function, as @collection does for Array.
-    metaPrepare(eval,collection);
-    size_t insertions = 0;
-    RangeNode *append = insertionFunction(collection,&insertions);
-    if (insertions != 1 || append->itemCount != 1)
-        fail(eval->vm,at,"reflection field %s.%s is %s, which %s to build it with%s",grammar->name,name,collection->name,
-             insertions > 1 ? "declares more than one @insertion function"
-             : insertions ? "declares an @insertion function that does not take one element"
-             : "declares no @insertion function",
-             eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
-    // A reflection list is a collection a macro both builds and iterates.
-    size_t iterations = 0;
-    (void)iterationFunction(collection,&iterations);
-    if (iterations != 1)
-        fail(eval->vm,at,"reflection field %s.%s is %s, which %s; a reflection list's collection declares both @iteration and @insertion%s",
-             grammar->name,name,collection->name,
-             iterations ? "declares more than one @iteration function" : "declares no @iteration function",
-             eval->vm->emitted ? "; a macro that defines it cannot reflect through it" : "");
-    RangeGraphValue result = metaConstruct(eval,NULL,collection,NULL,0,at);
-    // The element goes under the insertion function's own parameter label.
-    RangeNode argument = {.kind=RangeNodeArgument,.name=append->items[0]->name,.path=at->path,.line=at->line,.column=at->column};
-    RangeNode call = {.kind=RangeNodeCall,.items=(RangeNode *[]){&argument},.itemCount=1,.path=at->path,.line=at->line,.column=at->column};
-    for (size_t i = 0; i < value.count; ++i) {
-        RangeGraphValue element = graphNode(value.nodes[i]);
-        eval->pending = &element;
-        (void)metaInvoke(eval,NULL,append,&call,&result);
-    }
-    return result;
-}
-
-/* A C primitive a function declares with @builtin, run on the receiver. */
-static RangeGraphValue metaBuiltin(MetaEval *eval, RangeNode *function, RangeGraphValue *self,
-                                   RangeGraphValue *arguments, RangeNode *call)
-{
-    if (!self || self->kind != RangeGraphInstance || !slotPrimitive(function))
-        fail(eval->vm,call,"no compile-time primitive is implemented for builtin function '%s'",function->name);
-    size_t many = SIZE_MAX;
-    for (size_t i = 0; i < self->count; ++i)
-        if (rangeNodeDeclaresValue(self->declaration->items[i]->kind) && metaManyMember(self->declaration->items[i])) {
-            if (many != SIZE_MAX) fail(eval->vm,call,"builtin function '%s' requires exactly one @many member in %s",function->name,self->declaration->name);
-            many = i;
-        }
-    if (many == SIZE_MAX) fail(eval->vm,call,"builtin function '%s' requires exactly one @many member in %s",function->name,self->declaration->name);
-    RangeGraphValue slots = self->values[many];
-    long long index = metaNumber(eval,arguments[0],call);
-    if (same(function->name,"resize")) {
-        if (index < 0) fail(eval->vm,call,"resize to %lld slots",index);
-        RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,(index ? (size_t)index : 1) * sizeof(*values));
-        memset(values,0,(index ? (size_t)index : 1) * sizeof(*values));
-        memcpy(values,slots.values,((size_t)index < slots.count ? (size_t)index : slots.count) * sizeof(*values));
-        metaSetMember(eval,self,many,(RangeGraphValue){.kind=RangeGraphSlots,.values=values,.count=(size_t)index});
-        return (RangeGraphValue){0};
-    }
-    if (index < 0 || (size_t)index >= slots.count)
-        fail(eval->vm,call,"slot %lld is outside the %zu slots of %s",index,slots.count,self->declaration->name);
-    if (same(function->name,"read")) return slots.values[index];
-    RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,slots.count * sizeof(*values));
-    memcpy(values,slots.values,slots.count * sizeof(*values));
-    values[index] = arguments[1];
-    metaSetMember(eval,self,many,(RangeGraphValue){.kind=RangeGraphSlots,.values=values,.count=slots.count});
-    return (RangeGraphValue){0};
-}
-
-/* Run `function` with the call's arguments: a function's body, or the C
- * primitive it declares; `self` is the receiver a method acts on, changed in
- * place when the method changes it. */
-static RangeGraphValue metaInvoke(MetaEval *eval, MetaScope *scope, RangeNode *function, RangeNode *call, RangeGraphValue *self)
-{
-    // A role (@iteration, @insertion) has no compile-time effect, so a
-    // function applying one runs like any other.
-    int effects = 0;
-    for (size_t i = 0; function->c && i < function->c->itemCount; ++i)
-        effects += !roleMacro(function->c->items[i]->resolvedDeclaration);
-    // Compile-time values carry no types, so a type parameter changes nothing.
-    int valueGenerics = 0;
-    for (size_t i = 0; function->generics && i < function->generics->itemCount; ++i)
-        valueGenerics += function->generics->items[i]->kind != RangeNodeTypeParameter;
-    if (valueGenerics || (effects && !(function->flags & RangeFlagBuiltin)))
-        fail(eval->vm,call,"unsupported compile-time function declaration '%s'",function->name);
-    if (call->itemCount != function->itemCount)
-        fail(eval->vm,call,"compile-time call argument count differs from '%s'",function->name);
-    labelTrailing(call,function);
-    if (++eval->depth > 64) fail(eval->vm,call,"compile-time call depth exceeded");
-    RangeNode *owner = function->owner ? function->owner : function;
-    RangeGraphValue *pending = eval->pending;
-    eval->pending = NULL;
-    MetaScope arguments = {0};
-    RangeGraphValue *values = rangeArenaAllocate(eval->vm->arena,(call->itemCount ? call->itemCount : 1) * sizeof(*values));
-    // Evaluate once, in source order. Labels select actual parameter declarations.
-    for (size_t i = 0; i < call->itemCount; ++i) {
-        RangeNode *argument = call->items[i], *parameter = NULL;
-        for (size_t j = 0; j < function->itemCount; ++j)
-            if (same(argument->name,function->items[j]->name)) parameter = function->items[j];
-        if (!parameter || (parameter->flags & ~(RangeFlagOptional | RangeFlagFunction)) || parameter->itemCount)
-            fail(eval->vm,argument,"compile-time call requires an explicit label for each plain parameter");
-        RangeNode *type = parameter->b;
-        if (parameter->flags & RangeFlagFunction) {
-            // A closure, or a parameter holding one: its result is a case of
-            // the enum the function type's result names.
-            values[i] = metaExpression(eval,scope,argument->a);
-            if (values[i].kind != RangeGraphClosure)
-                fail(eval->vm,argument,"'%s' takes a closure, as in { x in … }",parameter->name);
-            RangeNode *result = type && type->generics ? type->generics->a : NULL;
-            ((MetaClosure *)values[i].closure)->output = result ? metaTypeEnum(eval,owner,result->name,result->flags,result) : NULL;
-            metaBind(eval,&arguments,parameter,values[i]);
-            continue;
-        }
-        RangeNode *expected = type ? metaTypeEnum(eval,owner,type->name,parameter->flags,type) : NULL;
-        values[i] = pending && i == 0 ? metaConvert(eval,*pending,expected,argument) : metaExpect(eval,scope,argument->a,expected);
-        metaBind(eval,&arguments,parameter,values[i]);
-    }
-    // A return converts to the declared output: `return 5` from `Int?` is
-    // the present case holding 5, and `.absent` is a case of that output.
-    RangeNode *outer = eval->output, *outerFunction = eval->function;
-    RangeGraphValue *outerSelf = eval->self;
-    RangeNode *output = function->b ? metaTypeEnum(eval,owner,function->b->name,function->b->flags,function->b) : NULL;
-    RangeGraphValue result = {0};
-    if (function->flags & RangeFlagBuiltin) result = metaBuiltin(eval,function,self,values,call);
-    else {
-        if (!function->a) fail(eval->vm,call,"'%s' has no body to run at compile time",function->name);
-        eval->function = function;
-        eval->output = output;
-        eval->self = self;
-        if (!metaStatement(eval,&arguments,function->a,&result) && function->b)
-            fail(eval->vm,function,"compile-time function did not return a value");
-    }
-    result = metaConvert(eval,result,output,call);
-    eval->output = outer;
-    eval->function = outerFunction;
-    eval->self = outerSelf;
-    --eval->depth;
-    return result;
-}
-
-/* A call: a case with its payload, a construction, a top-level function, or
- * a function of the receiver: written before it, or the running method's. */
-static RangeGraphValue metaCall(MetaEval *eval, MetaScope *scope, RangeNode *call)
-{
-    RangeNode *callee = call->a;
-    if (callee && callee->kind == RangeNodeMemberAccess) {
-        // The receiver is changed in place when it is a state local or a
-        // member of the running method's receiver; otherwise a copy is.
-        RangeGraphValue copy, *place = &copy;
-        MetaLocal *local = callee->a->kind == RangeNodeName ? metaLocal(scope,callee->a->name) : NULL;
-        size_t member = !local && callee->a->kind == RangeNodeName && eval->self && eval->self->kind == RangeGraphInstance
-            ? metaMemberIndex(*eval->self,callee->a->name) : SIZE_MAX;
-        if (local && local->mutable) place = &local->value;
-        else if (member != SIZE_MAX) copy = eval->self->values[member];
-        else copy = metaExpression(eval,scope,callee->a);
-        if (local && !local->mutable) copy = local->value;
-        if (metaHoldsCase(eval,*place,callee->name)) {
-            // `phase.failed(let reason)`: a case test with its payload's patterns.
-            RangeGraphValue subject = *place;
-            becomeCaseTest(eval->vm->arena,call,callee->a,callee->name,call);
-            return metaCaseTest(eval,scope,call,subject);
-        }
-        if (place->kind != RangeGraphInstance)
-            fail(eval->vm,call,"compile-time method calls need a construct value; '%s' is called on a %s",callee->name,
-                 place->kind == RangeGraphCase ? "enum value" : place->kind == RangeGraphNode ? "declaration" : "value without functions");
-        RangeNode *function = metaFunction(place->declaration,callee->name,call);
-        if (!function) fail(eval->vm,call,"%s has no function '%s' with these labels",place->declaration->name,callee->name);
-        RangeGraphValue result = metaInvoke(eval,scope,function,call,place);
-        if (member != SIZE_MAX) metaSetMember(eval,eval->self,member,copy);
-        return result;
-    }
-    if (!callee || callee->kind != RangeNodeName || callee->generics)
-        fail(eval->vm,call,"compile-time calls require a plain function reference");
-    MetaLocal *closure = metaLocal(scope,callee->name);
-    if (closure && closure->value.kind == RangeGraphClosure) return metaCallClosure(eval,scope,call,closure->value);
-    if (!metaLocal(scope,callee->name) && eval->self && eval->self->kind == RangeGraphInstance) {
-        RangeNode *function = metaFunction(eval->self->declaration,callee->name,call);
-        if (function) return metaInvoke(eval,scope,function,call,eval->self);
-    }
-    RangeNode *from = eval->function ? eval->function : scope->application ? scope->application->target : NULL;
-    RangeNode *type = namedDeclaration(eval->vm,from,callee->name,0,callee,"compile-time type");
-    if (type && type->kind == RangeNodeConstruct) {
-        callee->resolvedDeclaration = type;
-        return metaConstruct(eval,scope,type,call->items,call->itemCount,call);
-    }
-    RangeNode *function = metaDeclaration(eval,callee,RangeNodeFunction,callee->name);
-    if (function->typeName) fail(eval->vm,call,"'%s' is a method; call it on a value",function->name);
-    return metaInvoke(eval,scope,function,call,NULL);
-}
-
-/* A compile-time message: a string whose interpolated parts are graph text,
- * declaration names, or numbers. */
-static const char *metaText(MetaEval *eval, MetaScope *scope, RangeNode *message, RangeNode *at)
-{
-    if (!message || message->kind != RangeNodeString) return graphText(eval->vm,metaExpression(eval,scope,message),at);
-    char text[512];
-    size_t length = 0;
-    for (size_t i = 0; i < message->itemCount; ++i) {
-        RangeNode *part = message->items[i];
-        char piece[256];
-        const char *value = piece;
-        if (part->flags & RangeFlagLiteral) value = part->name;
-        else {
-            RangeGraphValue v = metaExpression(eval,scope,part->a);
-            if (v.kind == RangeGraphText) value = v.text;
-            else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeBool) value = v.node->integer ? "true" : "false";
-            else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeInteger) snprintf(piece,sizeof(piece),"%lld",v.node->integer);
-            else if (v.kind == RangeGraphNode && v.node->kind == RangeNodeString) value = graphText(eval->vm,v,part->a);
-            else if (v.kind == RangeGraphNode && v.node->name) value = v.node->name;
-            else if (v.kind == RangeGraphCase && !v.count) value = v.node->name;
-            else fail(eval->vm,part->a ? part->a : at,"a compile-time message cannot interpolate this value");
-        }
-        length += (size_t)snprintf(text + length,length < sizeof(text) ? sizeof(text) - length : 0,"%s",value);
-        if (length >= sizeof(text)) { length = sizeof(text) - 1; break; }
-    }
-    text[length] = '\0';
-    return rangeArenaIntern(eval->vm->arena,text,length);
-}
-
-/* `=`, `!=`, and the orderings on compile-time values: 1 or 0, or -1 when
- * `op` is not one of them. Graph values compare by identity: a declaration is
- * equal only to itself. Numbers and booleans compare by value, and text (a
- * name) with a string literal by its characters. */
-static int metaRelation(MetaEval *eval, const char *op, RangeGraphValue left, RangeGraphValue right, RangeNode *at)
-{
-    if ((same(op,"=") || same(op,"!=")) && (left.kind == RangeGraphCase || right.kind == RangeGraphCase)) {
-        // An optional operand promotes the other, as `maybe = 5` does; enum
-        // values are equal when they are the same case with equal payloads.
-        if (left.kind == RangeGraphCase) right = metaConvert(eval,right,left.declaration,at);
-        if (right.kind == RangeGraphCase) left = metaConvert(eval,left,right.declaration,at);
-        if (left.kind != RangeGraphCase || right.kind != RangeGraphCase || left.declaration != right.declaration)
-            fail(eval->vm,at,"operator '%s' requires matching types; one operand is a value of %s",op,
-                 (left.kind == RangeGraphCase ? left : right).declaration->name);
-        int equal = left.node == right.node;
-        for (size_t i = 0; equal && i < left.count; ++i) equal = metaRelation(eval,"=",left.values[i],right.values[i],at);
-        return same(op,"=") ? equal : !equal;
-    }
-    if ((same(op,"=") || same(op,"!=")) && (left.kind == RangeGraphInstance || right.kind == RangeGraphInstance
-        || left.kind == RangeGraphSlots || right.kind == RangeGraphSlots))
-        fail(eval->vm,at,"compile-time '%s' on construct values is not implemented",op);
-    if (same(op,"=") || same(op,"!=")) {
-        int text = left.kind == RangeGraphText || right.kind == RangeGraphText;
-        int equal = left.kind == right.kind;
-        if (text && left.kind != RangeGraphNone && right.kind != RangeGraphNone)
-            equal = same(graphText(eval->vm,left,at),graphText(eval->vm,right,at));
-        else if (equal && left.kind == RangeGraphNode) {
-            RangeNode *a=left.node, *b=right.node;
-            if (a->kind == b->kind && (a->kind == RangeNodeInteger || a->kind == RangeNodeBool))
-                equal = a->integer == b->integer;
-            else equal = a == b;
-        } else if (equal && left.kind != RangeGraphNone)
-            fail(eval->vm,at,"unsupported compile-time equality operands");
-        return same(op,"=") ? equal : !equal;
-    }
-    static const char *const orderings[] = {"<", ">", "<=", ">=", NULL};
-    for (size_t i = 0; orderings[i]; ++i) {
-        if (!same(op,orderings[i])) continue;
-        long long a=metaNumber(eval,left,at), b=metaNumber(eval,right,at);
-        return i == 0 ? a < b : i == 1 ? a > b : i == 2 ? a <= b : a >= b;
-    }
-    return -1;
-}
-
-static const char *literalSpelling(const RangeNode *literal);
-
-static int appliesBuiltin(const RangeNode *, const char *);
-
-/* A compile-time Bool is a C literal node; the case it is, is the one its
- * literal spells, as the @literal rule of the condition type says. */
-static int metaBoolCase(const char *name)
-{
-    for (int value = 0; value < 2; ++value) {
-        RangeNode literal = {.kind=RangeNodeBool,.integer=value};
-        if (same(name,literalSpelling(&literal))) return value;
-    }
-    return -1;
-}
-
-/* The enum the boolean literals select, the condition type. Without one in
- * the loaded sources, a C shape with the two cases the literals spell stands
- * in for it, so switches over comparisons stay checkable. */
-static RangeNode *metaCondition(MetaEval *eval)
-{
-    if (!eval->conditionKnown) {
-        RangeNode literal = {.kind=RangeNodeBool,.integer=1};
-        resolveLiteralDefaults(eval->vm,&literal);
-        eval->condition = literal.resolvedType && literal.resolvedType->kind == RangeNodeEnum ? literal.resolvedType : NULL;
-        eval->conditionKnown = 1;
-    }
-    if (eval->condition) return eval->condition;
-    if (!eval->conditionShape) {
-        RangeArena *arena = eval->vm->arena;
-        RangeNode *shape = rangeNodeCreate(arena,RangeNodeEnum,"<compiler>",1,1);
-        shape->name = "the condition type";
-        for (int value = 0; value < 2; ++value) {
-            RangeNode literal = {.kind=RangeNodeBool,.integer=value};
-            RangeNode *entry = rangeNodeCreate(arena,RangeNodeEnumCase,"<compiler>",1,1);
-            entry->name = literalSpelling(&literal);
-            entry->integer = value;
-            rangeNodeAppend(arena,shape,entry);
-        }
-        eval->conditionShape = shape;
-    }
-    return eval->conditionShape;
-}
-
-static RangeNode *metaCaseNamed(const RangeNode *enumeration, const char *name)
-{
-    for (size_t i = 0; enumeration && name && i < enumeration->itemCount; ++i)
-        if (enumeration->items[i]->kind == RangeNodeEnumCase && same(enumeration->items[i]->name,name))
-            return enumeration->items[i];
-    return NULL;
-}
-
-static int metaLabeled(const RangeNode *field)
-{
-    return field->name && !(field->name[0] >= '0' && field->name[0] <= '9');
-}
-
-/* The enum a written type names, seen from `from`: `T?` is the declaration
- * applying @optional, found by that role; any other name the enum it names.
- * NULL for a type parameter, a construct, or nothing declared: compile-time
- * values carry no static type there. */
-static RangeNode *metaTypeEnum(MetaEval *eval, RangeNode *from, const char *name, int flags, RangeNode *at)
-{
-    if (!name) return NULL;
-    if (!(flags & RangeFlagOptional) && (flags & RangeFlagMacroType)) return NULL;
-    RangeNode *declaration = namedDeclaration(eval->vm,from,name,flags & RangeFlagOptional,at,"compile-time type");
-    return declaration && declaration->kind == RangeNodeEnum ? declaration : NULL;
-}
-
-/* A payload field's enum, as its enum declares it. */
-static RangeNode *metaFieldEnum(MetaEval *eval, RangeNode *enumeration, RangeNode *field)
-{
-    if (!enumeration || enumeration == eval->conditionShape) return NULL;
-    return metaTypeEnum(eval,enumeration,field->typeName,field->flags,field);
-}
-
-/* The enum a compile-time value is a case of. */
-static RangeNode *metaValueEnum(MetaEval *eval, RangeGraphValue value)
-{
-    if (value.kind == RangeGraphCase) return value.declaration;
-    if (value.kind == RangeGraphNode && value.node->kind == RangeNodeBool) return metaCondition(eval);
-    return NULL;
-}
-
-/* A case value. The condition type's cases are C literal nodes, as the
- * literals true and false are. */
-static RangeGraphValue metaCase(MetaEval *eval, RangeNode *enumeration, RangeNode *entry,
-                                RangeGraphValue *payload, RangeNode *at)
-{
-    if (enumeration == metaCondition(eval)) {
-        int which = metaBoolCase(entry->name);
-        if (which < 0 || entry->itemCount) fail(eval->vm,at,"the condition type's case '%s' is not a boolean literal",entry->name);
-        return metaScalar(eval,at,RangeNodeBool,which);
-    }
-    return (RangeGraphValue){.kind=RangeGraphCase,.node=entry,.declaration=enumeration,
-        .values=payload,.count=entry->itemCount};
-}
-
-/* Where `T?` is expected, a value of T is its payload case, as in Swift; a
- * value C's reflection holds as missing is the case without one. Values of
- * any other expected type pass unchanged. */
-static RangeGraphValue metaConvert(MetaEval *eval, RangeGraphValue value, RangeNode *expected, RangeNode *at)
-{
-    if (!expected || !appliesBuiltin(expected,"optional")) return value;
-    if (value.kind == RangeGraphCase && value.declaration == expected) return value;
-    RangeNode *absent = NULL, *present = NULL;
-    for (size_t i = 0; i < expected->itemCount; ++i) {
-        RangeNode *entry = expected->items[i];
-        if (entry->kind != RangeNodeEnumCase) continue;
-        if (!entry->itemCount) absent = absent ? expected : entry;
-        else present = present || entry->itemCount != 1 ? expected : entry;
-    }
-    if (!absent || absent == expected || !present || present == expected)
-        fail(eval->vm,at,"%s applies @optional, so it needs one case without a payload and one with a single payload field",expected->name);
-    if (value.kind == RangeGraphNone) return metaCase(eval,expected,absent,NULL,at);
-    RangeGraphValue *payload = rangeArenaAllocate(eval->vm->arena,sizeof(*payload));
-    *payload = value;
-    return metaCase(eval,expected,present,payload,at);
-}
-
-/* Evaluate an expression where a value of `expected` is wanted. */
-static RangeGraphValue metaExpect(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeNode *expected)
-{
-    eval->expected = expected;
-    RangeGraphValue value = metaExpression(eval,scope,node);
-    eval->expected = NULL;
-    return metaConvert(eval,value,expected,node);
-}
-
-/* `.name`, `.name(…)`, `Type.name`, or `Type.name(…)`: a case of
- * `enumeration`, its payload one argument per field, labeled as the field is. */
-static RangeGraphValue metaConstructCase(MetaEval *eval, MetaScope *scope, RangeNode *enumeration,
-                                         const char *name, RangeNode *call, RangeNode *at)
-{
-    RangeNode *entry = metaCaseNamed(enumeration,name);
-    if (!entry) fail(eval->vm,at,"%s has no case '%s'",enumeration->name,name);
-    if (!call) {
-        if (entry->itemCount) fail(eval->vm,at,"case '%s' carries a payload; write .%s(…)",name,name);
-        return metaCase(eval,enumeration,entry,NULL,at);
-    }
-    if (!entry->itemCount) fail(eval->vm,call,"case '%s' has no payload; write .%s",name,name);
-    if (call->itemCount != entry->itemCount)
-        fail(eval->vm,call,"case '%s' of %s takes %zu payload fields; %zu supplied",name,enumeration->name,entry->itemCount,call->itemCount);
-    RangeGraphValue *payload = rangeArenaAllocate(eval->vm->arena,entry->itemCount * sizeof(*payload));
-    for (size_t i = 0; i < entry->itemCount; ++i) {
-        RangeNode *argument = call->items[i], *field = entry->items[i];
-        if (metaLabeled(field) && !same(argument->name,field->name))
-            fail(eval->vm,argument,"payload field %zu of '%s' requires label '%s'",i + 1,name,field->name);
-        if (!metaLabeled(field) && argument->name)
-            fail(eval->vm,argument,"payload field %zu of '%s' takes no label",i + 1,name);
-        payload[i] = metaExpect(eval,scope,argument->a,metaFieldEnum(eval,enumeration,field));
-    }
-    return metaCase(eval,enumeration,entry,payload,at);
-}
-
-/* `Light` or `Int?` before `.case`: the enum it names, unless the name is a
- * compile-time local. */
-static RangeNode *metaTypePath(MetaEval *eval, MetaScope *scope, RangeNode *path)
-{
-    if (!path || path->kind != RangeNodeName) return NULL;
-    if (!(path->flags & RangeFlagOptional) && metaLocal(scope,path->name)) return NULL;
-    RangeNode *from = scope->application ? scope->application->target : NULL;
-    return metaTypeEnum(eval,eval->function ? eval->function : from,path->name,path->flags,path);
 }
 
 /* ---- case tests ----
@@ -1747,12 +813,12 @@ static void patternRow(RangeNode *row, RangeNode **vector, size_t width)
     for (size_t k = 0; k < width && k < row->itemCount; ++k) vector[k] = row->items[k];
 }
 
-typedef int (*PatternUseful)(void *, RangeNode ***, size_t, RangeNode **, RangeNode **, size_t);
+static int useful(Typer *, RangeNode ***, size_t, RangeNode **, RangeNode **, size_t);
 
 /* The combinations of the subjects' cases that no row covers, written as
  * '.on & .off' into missing; a subject that is not an enum is `_` there.
  * cases[k] declares subject k's cases, or is NULL. Returns how many. */
-static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *context, RangeNode ***rows, size_t count,
+static size_t patternMissing(RangeArena *arena, Typer *typer, RangeNode ***rows, size_t count,
                              RangeNode **types, RangeNode **cases, size_t width, const char **names, char *missing, size_t size)
 {
     size_t *index = rangeArenaAllocate(arena,width * sizeof(*index)), found = 0, length = strlen(missing);
@@ -1773,7 +839,7 @@ static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *co
                 }
             if (!q[k]) valid = 0;
         }
-        if (valid && isUseful(context,rows,count,q,types,width)) {
+        if (valid && useful(typer,rows,count,q,types,width)) {
             char text[256]; size_t used = 0;
             // Named subjects read as the condition that tests them: 'value.present & bits.absent'.
             for (size_t k = 0, written = 0; k < width; ++k) {
@@ -1813,9 +879,6 @@ static size_t patternMissing(RangeArena *arena, PatternUseful isUseful, void *co
 
 static RangeNode *bindingNamed(const RangeNode *, const char *);
 
-/* A case test on a stable subject, as the evaluator or type checker knows it, or NULL. */
-typedef RangeNode *(*CaseTestOf)(void *context, RangeNode *term, RangeNode *bindings);
-
 static int stablePath(const RangeNode *path, const RangeNode *bindings)
 {
     if (!path || path->generics) return 0;
@@ -1849,13 +912,13 @@ typedef struct { ShapeRow *rows; size_t count; } ShapeRows;
 #define RANGE_SHAPE_ROWS 256
 
 /* The condition as alternatives of case tests; *overflow when there are too many to check. */
-static ShapeRows shapeRows(RangeArena *arena, CaseTestOf test, void *context, RangeNode *node, RangeNode *bindings, int *overflow)
+static ShapeRows shapeRows(RangeArena *arena, RangeNode *node, RangeNode *bindings, int *overflow)
 {
     ShapeRows out = {0};
     if (*overflow) return out;
     if (node && node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"))) {
-        ShapeRows left = shapeRows(arena,test,context,node->a,bindings,overflow);
-        ShapeRows right = shapeRows(arena,test,context,node->b,bindings,overflow);
+        ShapeRows left = shapeRows(arena,node->a,bindings,overflow);
+        ShapeRows right = shapeRows(arena,node->b,bindings,overflow);
         size_t count = same(node->name,"|") ? left.count + right.count : left.count * right.count;
         if (*overflow || count > RANGE_SHAPE_ROWS) { *overflow = 1; return out; }
         out.rows = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*out.rows));
@@ -1879,7 +942,7 @@ static ShapeRows shapeRows(RangeArena *arena, CaseTestOf test, void *context, Ra
     out.rows = rangeArenaAllocate(arena,sizeof(*out.rows));
     out.rows[0] = (ShapeRow){0};
     out.count = 1;
-    RangeNode *found = node ? test(context,node,bindings) : NULL;
+    RangeNode *found = node && node->kind == RangeNodeCaseTest && stablePath(node->a,bindings) ? node : NULL;
     if (found) {
         out.rows[0].terms = rangeArenaAllocate(arena,sizeof(*out.rows[0].terms));
         out.rows[0].terms[0] = found;
@@ -1897,7 +960,7 @@ typedef struct {
     RangeNode ***rows; RangeNode **arms; int *guarded; size_t count;
 } ConditionShape;
 
-static void conditionShape(RangeArena *arena, RangeNode *node, CaseTestOf test, void *context, ConditionShape *shape)
+static void conditionShape(RangeArena *arena, RangeNode *node, ConditionShape *shape)
 {
     size_t arms = node->itemCount;
     ShapeRows *each = rangeArenaAllocate(arena,(arms ? arms : 1) * sizeof(*each));
@@ -1906,7 +969,7 @@ static void conditionShape(RangeArena *arena, RangeNode *node, CaseTestOf test, 
         RangeNode *entry = node->items[i];
         int overflow = 0;
         if (entry->flags & RangeFlagLiteral || !entry->itemCount) each[i] = (ShapeRows){0};
-        else each[i] = shapeRows(arena,test,context,entry->items[0]->b,entry->items[0]->c,&overflow);
+        else each[i] = shapeRows(arena,entry->items[0]->b,entry->items[0]->c,&overflow);
         if (overflow) {
             each[i].rows = rangeArenaAllocate(arena,sizeof(*each[i].rows));
             each[i].rows[0] = (ShapeRow){.guarded=1};
@@ -1958,696 +1021,21 @@ static void conditionShape(RangeArena *arena, RangeNode *node, CaseTestOf test, 
 /* Which rows nothing before them leaves anything for (reached[i] = 0), and
  * the combinations no row covers, written into missing; returns whether the
  * arms cover every combination. cases[k] declares subject k's cases. */
-static int conditionCoverage(RangeArena *arena, ConditionShape *shape, PatternUseful isUseful, void *context,
+static int conditionCoverage(RangeArena *arena, Typer *typer, ConditionShape *shape,
                              RangeNode **types, RangeNode **cases, int *reached, char *missing, size_t size)
 {
     RangeNode ***rows = rangeArenaAllocate(arena,(shape->count ? shape->count : 1) * sizeof(*rows));
     size_t count = 0;
     for (size_t i = 0; i < shape->count; ++i) {
-        reached[i] = isUseful(context,rows,count,shape->rows[i],types,shape->width);
+        reached[i] = useful(typer,rows,count,shape->rows[i],types,shape->width);
         if (!shape->guarded[i]) rows[count++] = shape->rows[i];
     }
     RangeNode **wild = rangeArenaAllocate(arena,(shape->width ? shape->width : 1) * sizeof(*wild));
     for (size_t k = 0; k < shape->width; ++k) wild[k] = NULL;
-    if (!isUseful(context,rows,count,wild,types,shape->width)) return 1;
+    if (!useful(typer,rows,count,wild,types,shape->width)) return 1;
     *missing = '\0';
-    if (shape->width) patternMissing(arena,isUseful,context,rows,count,types,cases,shape->width,shape->names,missing,size);
+    if (shape->width) patternMissing(arena,typer,rows,count,types,cases,shape->width,shape->names,missing,size);
     return 0;
-}
-
-/* Whether `pattern` matches `value` at compile time; its bindings join `into`. */
-static int metaMatch(MetaEval *eval, MetaScope *into, RangeNode *pattern, RangeGraphValue value)
-{
-    metaStep(eval,pattern);
-    switch (pattern->integer) {
-    case RangePatternAny: return 1;
-    case RangePatternBind: metaBind(eval,into,pattern->a,value); return 1;
-    case RangePatternCase: {
-        if (value.kind == RangeGraphCase) {
-            RangeNode *entry = metaCaseNamed(value.declaration,pattern->name);
-            if (!entry) fail(eval->vm,pattern,"%s has no case '%s'",value.declaration->name,pattern->name);
-            if (value.node != entry) return 0;
-            if (!(pattern->flags & RangeFlagApplication)) return 1; /* `.value` matches any payload */
-            if (pattern->itemCount != entry->itemCount)
-                fail(eval->vm,pattern,"case '%s' has %zu payload fields; the pattern matches %zu",entry->name,entry->itemCount,pattern->itemCount);
-            for (size_t i = 0; i < pattern->itemCount; ++i)
-                if (!metaMatch(eval,into,pattern->items[i]->a,value.values[i])) return 0;
-            return 1;
-        }
-        if (value.kind != RangeGraphNode || value.node->kind != RangeNodeBool)
-            fail(eval->vm,pattern,"a compile-time case pattern matches an enum value; this value is not one");
-        if (pattern->flags & RangeFlagApplication) fail(eval->vm,pattern,"case '%s' has no payload to match",pattern->name);
-        int which = metaBoolCase(pattern->name);
-        if (which < 0) fail(eval->vm,pattern,"the compile-time Bool has no case '%s'",pattern->name);
-        return which == (value.node->integer != 0);
-    }
-    case RangePatternValue: {
-        RangeGraphValue operand = metaExpect(eval,into,pattern->a,metaValueEnum(eval,value));
-        return metaRelation(eval,"=",value,operand,pattern);
-    }
-    default: fail(eval->vm,pattern,"unsupported compile-time pattern");
-    }
-}
-
-/* Whether a compile-time value holds a case: a case value of an enum that
- * declares it, or a Bool, whose cases are true and false. */
-static int metaHoldsCase(MetaEval *eval, RangeGraphValue value, const char *name)
-{
-    RangeNode *type = metaValueEnum(eval,value);
-    return type && metaCaseNamed(type,name);
-}
-
-/* Narrowing at compile time, as in compiled code: a test of a stable
- * optional value for its present case, with no pattern, narrows the value
- * to its payload to the right of the test in the same `&` chain and in the
- * arm's body. Stable is a let, a parameter, a #reflection value, or a member
- * path of one; a state is not. The optional is the enum applying @optional. */
-static int metaPresentCase(const RangeNode *type, const char *name)
-{
-    if (!type || !appliesBuiltin(type,"optional")) return 0;
-    const RangeNode *payload = NULL;
-    size_t payloads = 0;
-    for (size_t i = 0; i < type->itemCount; ++i) {
-        const RangeNode *entry = type->items[i];
-        if (entry->kind != RangeNodeEnumCase || !entry->itemCount) continue;
-        payloads += entry->itemCount == 1 ? 1 : 2;
-        payload = entry;
-    }
-    return payloads == 1 && same(payload->name,name);
-}
-
-static int metaNarrowable(MetaEval *eval, MetaScope *scope, const RangeNode *path)
-{
-    if (!path || path->generics) return 0;
-    if (path->kind == RangeNodeEnvironment) return 1;
-    if (path->kind == RangeNodeMemberAccess) return metaNarrowable(eval,scope,path->a);
-    if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit)) return 0;
-    for (MetaScope *outer = scope; outer; outer = outer->parent)
-        for (MetaLocal *local = outer->locals; local; local = local->next)
-            if (!local->path && same(local->name,path->name)) return !local->mutable;
-    size_t member = eval->self && eval->self->kind == RangeGraphInstance ? metaMemberIndex(*eval->self,path->name) : SIZE_MAX;
-    return member != SIZE_MAX && eval->self->declaration->items[member]->kind == RangeNodeLet;
-}
-
-/* The payload a narrowed path reads, unless a name declared inside the
- * narrowing hides the path's root. */
-static int metaNarrowed(MetaScope *scope, const RangeNode *node, RangeGraphValue *value)
-{
-    const RangeNode *root = node;
-    while (root && root->kind == RangeNodeMemberAccess) root = root->a;
-    if (!root) return 0;
-    for (; scope; scope = scope->parent)
-        for (MetaLocal *local = scope->locals; local; local = local->next) {
-            if (local->path && samePath(local->path,node)) { *value = local->value; return 1; }
-            if (!local->path && root->kind == RangeNodeName && same(local->name,root->name)) return 0;
-        }
-    return 0;
-}
-
-/* The paths and cases both sides of every `|` in a condition test with no
- * pattern: what a `|` may narrow beyond it. */
-typedef struct { RangeNode *paths[32]; const char *names[32]; size_t count; } MetaNarrowings;
-
-static void metaNarrowings(RangeNode *node, MetaNarrowings *out)
-{
-    if (!node) return;
-    if (node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"))) {
-        if (same(node->name,"&")) { metaNarrowings(node->a,out); metaNarrowings(node->b,out); return; }
-        MetaNarrowings left = {0}, right = {0};
-        metaNarrowings(node->a,&left);
-        metaNarrowings(node->b,&right);
-        for (size_t i = 0; i < left.count; ++i)
-            for (size_t k = 0; k < right.count; ++k)
-                if (out->count < 32 && samePath(left.paths[i],right.paths[k]) && same(left.names[i],right.names[k])) {
-                    out->paths[out->count] = left.paths[i];
-                    out->names[out->count++] = left.names[i];
-                    break;
-                }
-        return;
-    }
-    int test = (node->kind == RangeNodeMemberAccess && !(node->flags & RangeFlagNarrowed))
-        || (node->kind == RangeNodeCaseTest && node->b && !(node->b->flags & RangeFlagApplication));
-    if (test && node->a && out->count < 32) {
-        out->paths[out->count] = node->a;
-        out->names[out->count++] = node->name;
-    }
-}
-
-/* Ends the narrowings added to scope since `before`, except those `kept` holds. */
-static void metaEndNarrowings(MetaScope *scope, MetaLocal *before, const MetaNarrowings *kept)
-{
-    for (MetaLocal **link = &scope->locals; *link && *link != before;) {
-        MetaLocal *local = *link;
-        int keep = !local->path;
-        for (size_t i = 0; kept && i < kept->count && !keep; ++i)
-            keep = samePath(kept->paths[i],local->path) && same(kept->names[i],local->narrowed);
-        if (keep) link = &local->next;
-        else *link = local->next;
-    }
-}
-
-/* A case test at compile time: its bindings join `scope`, replacing what
- * an earlier test of the condition bound under the same names. */
-static RangeGraphValue metaCaseTest(MetaEval *eval, MetaScope *scope, RangeNode *test, RangeGraphValue subject)
-{
-    RangeNode *type = metaValueEnum(eval,subject);
-    if (!type) fail(eval->vm,test,"'%s' reads a case off an enum value; this value is not one",test->name);
-    (void)metaPatternCase(eval,type,test->b);
-    RangeNode *pattern = test->b;
-    int narrows = metaNarrowable(eval,scope,test->a) && metaPresentCase(type,test->name);
-    RangeNode *binding = narrows && (pattern->flags & RangeFlagApplication) && pattern->itemCount == 1 ? pattern->items[0]->a : NULL;
-    if (binding && binding->integer == RangePatternBind && test->a->kind == RangeNodeName && same(binding->a->name,test->a->name))
-        fail(eval->vm,binding->a,"'%s' is already narrowed to the payload here; related: a test of an optional "
-             "value for its present case narrows that value",test->a->name);
-    MetaScope bound = {.parent=scope,.application=scope->application};
-    int matched = metaMatch(eval,&bound,test->b,subject);
-    for (MetaLocal *local = bound.locals, *next; matched && local; local = next) {
-        next = local->next;
-        MetaLocal *existing = NULL;
-        for (MetaLocal *other = scope->locals; other && !existing; other = other->next)
-            if (same(other->name,local->name)) existing = other;
-        if (existing) existing->value = local->value;
-        else { local->next = scope->locals; scope->locals = local; }
-    }
-    if (matched && narrows && eval->narrowingTest == test && !(pattern->flags & RangeFlagApplication)) {
-        MetaLocal *local = rangeArenaAllocate(eval->vm->arena,sizeof(*local));
-        *local = (MetaLocal){.value=subject.values[0],.path=test->a,.narrowed=test->name,.next=scope->locals};
-        scope->locals = local;
-    }
-    return metaScalar(eval,test,RangeNodeBool,matched);
-}
-
-/* Exhaustiveness and reachability, as the type checker decides them for
- * compiled switches: a column's type is the enum its values are cases of, or
- * NULL when nothing is known statically, which only a wildcard covers. */
-static int metaWild(const RangeNode *pattern)
-{
-    return !pattern || pattern->integer == RangePatternAny || pattern->integer == RangePatternBind;
-}
-
-static RangeNode *metaPatternField(const RangeNode *pattern, size_t index)
-{
-    return pattern && (pattern->flags & RangeFlagApplication) && index < pattern->itemCount ? pattern->items[index]->a : NULL;
-}
-
-/* The case a pattern names in a column of `type`, checked as the type
- * checker checks it; NULL when the type is unknown. */
-static RangeNode *metaPatternCase(MetaEval *eval, RangeNode *type, RangeNode *pattern)
-{
-    if (!type || !pattern || pattern->integer != RangePatternCase) return NULL;
-    RangeNode *entry = metaCaseNamed(type,pattern->name);
-    if (!entry) fail(eval->vm,pattern,"%s has no case '%s'",type->name,pattern->name);
-    if (!(pattern->flags & RangeFlagApplication)) return entry;
-    if (!entry->itemCount) fail(eval->vm,pattern,"case '%s' has no payload to match",entry->name);
-    if (pattern->itemCount != entry->itemCount)
-        fail(eval->vm,pattern,"case '%s' has %zu payload fields; the pattern matches %zu",entry->name,entry->itemCount,pattern->itemCount);
-    for (size_t i = 0; i < entry->itemCount; ++i) {
-        RangeNode *argument = pattern->items[i], *field = entry->items[i];
-        if (argument->name && !same(argument->name,field->name))
-            fail(eval->vm,argument,"payload field %zu of '%s' is %s",i + 1,entry->name,metaLabeled(field) ? field->name : "unlabeled");
-    }
-    return entry;
-}
-
-static int metaLiteral(const RangeNode *value, long long *out)
-{
-    if (!value) return 0;
-    if (value->kind == RangeNodeInteger || value->kind == RangeNodeBool) { *out = value->integer; return 1; }
-    if (value->kind == RangeNodeUnary && same(value->name,"-") && value->a && value->a->kind == RangeNodeInteger) {
-        *out = -value->a->integer;
-        return 1;
-    }
-    return 0;
-}
-
-static int metaSameValuePattern(const RangeNode *a, const RangeNode *b)
-{
-    long long x, y;
-    return a && b && a->integer == RangePatternValue && b->integer == RangePatternValue
-        && metaLiteral(a->a,&x) && metaLiteral(b->a,&y) && x == y;
-}
-
-static int metaUseful(MetaEval *, RangeNode ***, size_t, RangeNode **, RangeNode **, size_t);
-
-static int metaUsefulCase(MetaEval *eval, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types,
-                          size_t width, RangeNode *entry)
-{
-    RangeArena *arena = eval->vm->arena;
-    size_t arity = entry->itemCount, w = arity + width - 1;
-    RangeNode **ntypes = rangeArenaAllocate(arena,(w ? w : 1) * sizeof(*ntypes));
-    for (size_t i = 0; i < arity; ++i) ntypes[i] = metaFieldEnum(eval,types[0],entry->items[i]);
-    for (size_t i = 1; i < width; ++i) ntypes[arity + i - 1] = types[i];
-    RangeNode ***nrows = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*nrows));
-    size_t n = 0;
-    for (size_t r = 0; r <= count; ++r) {
-        RangeNode **source = r < count ? rows[r] : q;
-        if (r < count && !metaWild(source[0]) && metaPatternCase(eval,types[0],source[0]) != entry) continue;
-        RangeNode **row = rangeArenaAllocate(arena,(w ? w : 1) * sizeof(*row));
-        for (size_t i = 0; i < arity; ++i) row[i] = metaWild(source[0]) ? NULL : metaPatternField(source[0],i);
-        for (size_t i = 1; i < width; ++i) row[arity + i - 1] = source[i];
-        if (r < count) nrows[n++] = row; else q = row;
-    }
-    return metaUseful(eval,nrows,n,q,ntypes,w);
-}
-
-static int metaUseful(MetaEval *eval, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width)
-{
-    if (!width) return count == 0;
-    RangeNode *head = q[0], *type = types[0];
-    if (head && head->integer == RangePatternCase) {
-        RangeNode *entry = metaPatternCase(eval,type,head);
-        return entry ? metaUsefulCase(eval,rows,count,q,types,width,entry) : 1;
-    }
-    RangeNode ***rest = rangeArenaAllocate(eval->vm->arena,(count ? count : 1) * sizeof(*rest));
-    size_t n = 0;
-    if (!metaWild(head)) {
-        for (size_t r = 0; r < count; ++r)
-            if (metaWild(rows[r][0]) || metaSameValuePattern(rows[r][0],head)) rest[n++] = rows[r] + 1;
-        return metaUseful(eval,rest,n,q + 1,types + 1,width - 1);
-    }
-    if (type) {
-        int complete = 1;
-        size_t cases = 0;
-        for (size_t i = 0; i < type->itemCount; ++i) {
-            RangeNode *entry = type->items[i];
-            if (entry->kind != RangeNodeEnumCase) continue;
-            ++cases;
-            int found = 0;
-            for (size_t r = 0; r < count && !found; ++r) found = metaPatternCase(eval,type,rows[r][0]) == entry;
-            if (!found) complete = 0;
-        }
-        if (!cases) return 0;
-        if (complete) {
-            for (size_t i = 0; i < type->itemCount; ++i)
-                if (type->items[i]->kind == RangeNodeEnumCase
-                    && metaUsefulCase(eval,rows,count,q,types,width,type->items[i])) return 1;
-            return 0;
-        }
-    }
-    for (size_t r = 0; r < count; ++r) if (metaWild(rows[r][0])) rest[n++] = rows[r] + 1;
-    return metaUseful(eval,rest,n,q + 1,types + 1,width - 1);
-}
-
-static int metaUsefulRow(void *eval, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width)
-{
-    return metaUseful(eval,rows,count,q,types,width);
-}
-
-
-/* A compile-time switch over conditions: its stable subjects, each
- * evaluated once to learn which names are case tests and of which enum. */
-typedef struct { MetaEval *eval; MetaScope *scope; RangeNode **paths; RangeGraphValue *values; size_t count, capacity; } MetaShape;
-
-static RangeGraphValue *metaShapeSubject(MetaShape *shape, RangeNode *path)
-{
-    for (size_t i = 0; i < shape->count; ++i) if (samePath(shape->paths[i],path)) return &shape->values[i];
-    if (shape->count == shape->capacity) {
-        size_t capacity = shape->capacity ? shape->capacity * 2 : 8;
-        RangeNode **paths = rangeArenaAllocate(shape->eval->vm->arena,capacity * sizeof(*paths));
-        RangeGraphValue *values = rangeArenaAllocate(shape->eval->vm->arena,capacity * sizeof(*values));
-        if (shape->count) {
-            memcpy(paths,shape->paths,shape->count * sizeof(*paths));
-            memcpy(values,shape->values,shape->count * sizeof(*values));
-        }
-        shape->paths = paths; shape->values = values; shape->capacity = capacity;
-    }
-    shape->paths[shape->count] = path;
-    shape->values[shape->count] = metaExpression(shape->eval,shape->scope,path);
-    return &shape->values[shape->count++];
-}
-
-static RangeNode *metaShapeTest(void *context, RangeNode *term, RangeNode *bindings)
-{
-    MetaShape *shape = context;
-    RangeNode *path = NULL, *call = NULL;
-    const char *name = NULL;
-    if (term->kind == RangeNodeCaseTest) path = term->a, name = term->name;
-    else if (term->kind == RangeNodeMemberAccess) path = term->a, name = term->name;
-    else if (term->kind == RangeNodeCall && term->a && term->a->kind == RangeNodeMemberAccess)
-        path = term->a->a, name = term->a->name, call = term;
-    if (!path || !stablePath(path,bindings) || (path->flags & RangeFlagImplicit)) return NULL;
-    if (term->kind == RangeNodeCaseTest) { (void)metaShapeSubject(shape,path); return term; }
-    if (metaTypePath(shape->eval,shape->scope,path)) return NULL; /* `Light.red` makes a value */
-    if (!metaHoldsCase(shape->eval,*metaShapeSubject(shape,path),name)) return NULL;
-    becomeCaseTest(shape->eval->vm->arena,term,path,name,call);
-    return term;
-}
-
-/* The arm a compile-time switch over conditions runs: the first whose
- * condition holds. As in compiled code, every arm must be reachable, and the
- * arms must cover every combination of their case tests' subjects unless a
- * default ends them. */
-static RangeNode *metaConditionArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
-{
-    RangeArena *arena = eval->vm->arena;
-    for (size_t i = 0; i + 1 < node->itemCount; ++i)
-        if (node->items[i]->flags & RangeFlagLiteral) fail(eval->vm,node->items[i],"'default' must be the last arm of a switch");
-    MetaShape cache = {.eval=eval,.scope=scope};
-    ConditionShape shape;
-    conditionShape(arena,node,metaShapeTest,&cache,&shape);
-    RangeNode **types = rangeArenaAllocate(arena,(shape.width ? shape.width : 1) * sizeof(*types));
-    for (size_t k = 0; k < shape.width; ++k) types[k] = metaValueEnum(eval,*metaShapeSubject(&cache,shape.subjects[k]));
-    int *reached = rangeArenaAllocate(arena,(shape.count ? shape.count : 1) * sizeof(*reached));
-    char missing[512] = "";
-    int complete = conditionCoverage(arena,&shape,metaUsefulRow,eval,types,types,reached,missing,sizeof(missing));
-    for (size_t i = 0; i < shape.count; ++i) {
-        RangeNode *entry = shape.arms[i];
-        if (reached[i]) continue;
-        if (entry->flags & RangeFlagLiteral) fail(eval->vm,entry,"'default' is never reached: the arms above match every value");
-        fail(eval->vm,entry->items[0]->b,"this condition is already handled by earlier arms");
-    }
-    if (!complete) {
-        if (!*missing) fail(eval->vm,node,"compile-time switch must be exhaustive; add a default");
-        int many = strchr(missing,',') != NULL;
-        fail(eval->vm,node,"compile-time switch must be exhaustive: %s %s not handled; add %s or a default",missing,
-             many ? "are" : "is",many ? "arms for them" : "an arm for it");
-    }
-    for (size_t i = 0; i < node->itemCount; ++i) {
-        RangeNode *entry = node->items[i];
-        *arm = (MetaScope){.parent=scope,.application=scope->application};
-        if (entry->flags & RangeFlagLiteral) return entry;
-        RangeNode *condition = entry->items[0]->b;
-        int narrowing = eval->narrowing;
-        eval->narrowing = 1; /* what the condition narrows holds in the arm's body */
-        int holds = metaBoolean(eval,metaExpression(eval,arm,condition),condition);
-        eval->narrowing = narrowing;
-        if (holds) return entry;
-    }
-    fail(eval->vm,node,"compile-time switch has no arm for this value");
-}
-
-/* The arm a compile-time switch runs, its bindings in *arm. Only a switch
- * over conditions is written in source; `for` loops do not run at compile
- * time. */
-static RangeNode *metaArm(MetaEval *eval, MetaScope *scope, RangeNode *node, MetaScope *arm)
-{
-    if (node->c && node->c->itemCount) fail(eval->vm,node,"compile-time 'for' loops are not implemented");
-    return metaConditionArm(eval,scope,node,arm);
-}
-
-static RangeGraphValue metaEvaluate(MetaEval *, MetaScope *, RangeNode *);
-
-/* A compile-time expression's value. Reads of a narrowed value read its
- * payload; a case test narrows beyond itself only through `&` and `|`. */
-static RangeGraphValue metaExpression(MetaEval *eval, MetaScope *scope, RangeNode *node)
-{
-    if (!node) return (RangeGraphValue){0};
-    RangeGraphValue value;
-    if ((node->kind == RangeNodeName || node->kind == RangeNodeMemberAccess || node->kind == RangeNodeEnvironment)
-        && !(node->flags & RangeFlagNarrowed) && metaNarrowed(scope,node,&value)) return value;
-    int spine = eval->narrowing;
-    RangeNode *test = eval->narrowingTest;
-    int logic = node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"));
-    eval->narrowing = spine && logic;
-    eval->narrowingTest = spine && !logic ? node : NULL;
-    if (spine && logic && same(node->name,"|")) {
-        // Each side's narrowing holds within it; what both narrow holds beyond.
-        metaStep(eval,node);
-        MetaLocal *before = scope->locals;
-        int holds = metaBoolean(eval,metaExpression(eval,scope,node->a),node);
-        if (!holds) {
-            metaEndNarrowings(scope,before,NULL);
-            holds = metaBoolean(eval,metaExpression(eval,scope,node->b),node);
-        }
-        MetaNarrowings both = {0};
-        metaNarrowings(node,&both);
-        metaEndNarrowings(scope,before,&both);
-        value = metaScalar(eval,node,RangeNodeBool,holds);
-    } else value = metaEvaluate(eval,scope,node);
-    eval->narrowing = spine;
-    eval->narrowingTest = test;
-    return value;
-}
-
-static RangeGraphValue metaEvaluate(MetaEval *eval, MetaScope *scope, RangeNode *node)
-{
-    RangeNode *expected = eval->expected;
-    eval->expected = NULL;
-    if (!node) return (RangeGraphValue){0};
-    metaStep(eval,node);
-    switch (node->kind) {
-    case RangeNodeSwitch: {
-        // A switch expression is the value its arm yields; an arm that is a
-        // block can only end compile-time evaluation, through @diagnostic.
-        MetaScope arm;
-        RangeNode *entry = metaArm(eval,scope,node,&arm);
-        if (entry->a) return metaExpect(eval,&arm,entry->a,expected);
-        RangeGraphValue returned = {0};
-        if (metaStatement(eval,&arm,entry->b,&returned))
-            fail(eval->vm,entry,"a compile-time switch expression cannot return from an arm");
-        fail(eval->vm,entry,"this arm of a switch expression neither yields a value nor diverges");
-    }
-    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return graphNode(node);
-    case RangeNodeClosure: {
-        MetaClosure *captured = rangeArenaAllocate(eval->vm->arena,sizeof(*captured));
-        *captured = (MetaClosure){.scope=scope,.self=eval->self,.function=eval->function};
-        return (RangeGraphValue){.kind=RangeGraphClosure,.node=node,.closure=captured};
-    }
-    case RangeNodeCase:
-        // `.absent`: a case of the enum the context expects.
-        if (!expected) fail(eval->vm,node,"'.%s' needs a context that names its enum",node->name);
-        return metaConstructCase(eval,scope,expected,node->name,NULL,node);
-    case RangeNodeName: {
-        MetaLocal *local = metaLocal(scope,node->name);
-        if (local) return local->value;
-        // Inside a method, a member of its receiver.
-        size_t member = eval->self && eval->self->kind == RangeGraphInstance ? metaMemberIndex(*eval->self,node->name) : SIZE_MAX;
-        if (member != SIZE_MAX) {
-            if (metaManyMember(eval->self->declaration->items[member]))
-                fail(eval->vm,node,"'%s' holds @many storage and is not a value",node->name);
-            return eval->self->values[member];
-        }
-        // Otherwise a name is the construct or enum it names from the target's
-        // scope, as in code emitted there: `function.output = Bool`.
-        RangeNode *from = eval->function ? eval->function : scope->application ? scope->application->target : NULL;
-        RangeNode *declaration = node->generics || node->flags ? NULL
-            : namedDeclaration(eval->vm,from,node->name,0,node,"compile-time type");
-        if (!declaration) fail(eval->vm,node,"unresolved compile-time local '%s'",node->name);
-        return graphNode(declaration);
-    }
-    case RangeNodeEnvironment: {
-        if (!scope->application) fail(eval->vm,node,"graph context is unavailable in this function");
-        if (!eval->splicing)
-            return metaReflect(eval,scope->application->target,node->name,graphEval(eval->vm,scope->application,node),node);
-        // Inside #graph, #name is a macro local or a target field, never both.
-        MetaLocal *local = metaLocal(scope,node->name);
-        RangeNode *field = rangeGraphField(scope->application->target->graphType,node->name);
-        if (local && field) fail(eval->vm,node,"#%s names both a macro local and a target field",node->name);
-        if (local) return local->value;
-        if (!field) fail(eval->vm,node,"#%s is neither a macro local nor a target field",node->name);
-        return metaReflect(eval,scope->application->target,node->name,graphEval(eval->vm,scope->application,node),node);
-    }
-    case RangeNodeEmission:
-        // A shape-only block landed before the body ran.
-        if (eval->vm->skipEmission || (node->flags & RangeFlagShape)) return (RangeGraphValue){0};
-        metaEmit(eval,scope,node);
-        return (RangeGraphValue){0};
-    case RangeNodeCaseTest: {
-        if (node->a->flags & RangeFlagImplicit) fail(eval->vm,node,"compile-time enum methods are not implemented");
-        return metaCaseTest(eval,scope,node,metaExpression(eval,scope,node->a));
-    }
-    case RangeNodeMemberAccess: {
-        if (node->flags & RangeFlagNarrowed) {
-            // A narrowed optional's payload, as compiled code reads it.
-            RangeGraphValue optional = metaExpression(eval,scope,node->a);
-            for (size_t i = 0; optional.kind == RangeGraphCase && i < optional.node->itemCount; ++i)
-                if (optional.node->items[i] == node->resolvedDeclaration) return optional.values[i];
-            fail(eval->vm,node,"this narrowed value holds no payload");
-        }
-        // `Light.red` and `Int?.absent` are cases.
-        RangeNode *enumeration = metaTypePath(eval,scope,node->a);
-        if (enumeration && metaCaseNamed(enumeration,node->name))
-            return metaConstructCase(eval,scope,enumeration,node->name,NULL,node);
-        RangeGraphValue receiver = metaExpression(eval,scope,node->a);
-        if (metaHoldsCase(eval,receiver,node->name)) {
-            // `phase.loading`: whether the value holds the case.
-            becomeCaseTest(eval->vm->arena,node,node->a,node->name,NULL);
-            return metaCaseTest(eval,scope,node,receiver);
-        }
-        if (receiver.kind == RangeGraphInstance) {
-            size_t member = metaMemberIndex(receiver,node->name);
-            if (member == SIZE_MAX) {
-                RangeNode probe = {.kind=RangeNodeCall};
-                if (metaFunction(receiver.declaration,node->name,&probe))
-                    fail(eval->vm,node,"'%s.%s' is a function; call it",receiver.declaration->name,node->name);
-                fail(eval->vm,node,"%s has no member '%s'",receiver.declaration->name,node->name);
-            }
-            if (metaManyMember(receiver.declaration->items[member]))
-                fail(eval->vm,node,"'%s' holds @many storage and is not a value",node->name);
-            return receiver.values[member];
-        }
-        if (receiver.kind == RangeGraphCase) fail(eval->vm,node,"%s has no case '%s'",receiver.declaration->name,node->name);
-        if (receiver.kind == RangeGraphSlots || receiver.kind == RangeGraphNodes)
-            fail(eval->vm,node,"this compile-time value has no member '%s'",node->name);
-        if (!scope->application && receiver.kind != RangeGraphNode) fail(eval->vm,node,"graph reflection requires a macro context");
-        RangeMacroApplication none = {0};
-        RangeGraphValue value = graphProperty(eval->vm,scope->application ? scope->application : &none,receiver,node->name,node);
-        if (same(node->name,"value") && receiver.kind == RangeGraphNode
-            && rangeNodeDeclaresValue(receiver.node->kind) && value.kind == RangeGraphNode
-            && !macroLocal(scope->application,receiver.node)) {
-            // A declaration initializer is evaluated outside the inspecting
-            // macro's locals. Unsupported declaration-name lookup fails there.
-            MetaScope initializer = {0};
-            RangeGraphValue *self = eval->self;
-            RangeNode *function = eval->function;
-            eval->self = NULL; eval->function = NULL;
-            RangeGraphValue initial = metaExpression(eval,&initializer,value.node);
-            eval->self = self; eval->function = function;
-            return initial;
-        }
-        return metaReflect(eval,receiver.kind == RangeGraphNode ? receiver.node : NULL,node->name,value,node);
-    }
-    case RangeNodeCall:
-        if (node->a && node->a->kind == RangeNodeCase) {
-            if (!expected) fail(eval->vm,node->a,"'.%s' needs a context that names its enum",node->a->name);
-            return metaConstructCase(eval,scope,expected,node->a->name,node,node);
-        }
-        if (node->a && node->a->kind == RangeNodeMemberAccess) {
-            RangeNode *enumeration = metaTypePath(eval,scope,node->a->a);
-            if (enumeration && metaCaseNamed(enumeration,node->a->name))
-                return metaConstructCase(eval,scope,enumeration,node->a->name,node,node);
-        }
-        return metaCall(eval,scope,node);
-    case RangeNodeUnary: {
-        RangeGraphValue operand = metaExpression(eval,scope,node->a);
-        if (same(node->name,"!")) return metaScalar(eval,node,RangeNodeBool,!metaBoolean(eval,operand,node));
-        long long value = metaNumber(eval,operand,node);
-        if (!same(node->name,"-")) fail(eval->vm,node,"unsupported compile-time unary operator");
-        if (value == LLONG_MIN) fail(eval->vm,node,"compile-time numeric storage overflow");
-        return metaScalar(eval,node,RangeNodeInteger,-value);
-    }
-    case RangeNodeBinary: {
-        if (same(node->name,"=") || same(node->name,"!=")) {
-            // A `.case` operand is a case of the other operand's type.
-            int contextual = node->a && (node->a->kind == RangeNodeCase
-                || (node->a->kind == RangeNodeCall && node->a->a && node->a->a->kind == RangeNodeCase));
-            RangeGraphValue left, right;
-            if (contextual) {
-                right = metaExpression(eval,scope,node->b);
-                left = metaExpect(eval,scope,node->a,metaValueEnum(eval,right));
-            } else {
-                left = metaExpression(eval,scope,node->a);
-                right = metaExpect(eval,scope,node->b,metaValueEnum(eval,left));
-            }
-            return metaScalar(eval,node,RangeNodeBool,metaRelation(eval,node->name,left,right,node));
-        }
-        RangeGraphValue left = metaExpression(eval,scope,node->a);
-        if (same(node->name,"&") || same(node->name,"|")) {
-            int value = metaBoolean(eval,left,node);
-            if ((same(node->name,"&") && value) || (same(node->name,"|") && !value))
-                value = metaBoolean(eval,metaExpression(eval,scope,node->b),node);
-            return metaScalar(eval,node,RangeNodeBool,value);
-        }
-        RangeGraphValue right = metaExpression(eval,scope,node->b);
-        int relation = metaRelation(eval,node->name,left,right,node);
-        if (relation >= 0) return metaScalar(eval,node,RangeNodeBool,relation);
-        long long a=metaNumber(eval,left,node), b=metaNumber(eval,right,node), value=0;
-        int overflow = 0;
-        if (same(node->name,"+")) overflow = __builtin_add_overflow(a,b,&value);
-        else if (same(node->name,"-")) overflow = __builtin_sub_overflow(a,b,&value);
-        else if (same(node->name,"*")) overflow = __builtin_mul_overflow(a,b,&value);
-        else if (same(node->name,"/")) {
-            if (!b) fail(eval->vm,node,"compile-time division by zero");
-            if (a == LLONG_MIN && b == -1) overflow = 1;
-            else value = a / b;
-        } else fail(eval->vm,node,"unsupported compile-time binary operator");
-        if (overflow) fail(eval->vm,node,"compile-time numeric storage overflow");
-        return metaScalar(eval,node,RangeNodeInteger,value);
-    }
-    case RangeNodeAttribute: {
-        RangeNode *macro = metaDeclaration(eval,node,RangeNodeMacro,node->name);
-        int print = macroBuiltin(macro,"print"), warning = macroBuiltin(macro,"warning");
-        if ((!macroBuiltin(macro,"diagnostic") && !print && !warning) || macro->a || macro->generics || macro->itemCount != 1)
-            fail(eval->vm,node,"unsupported compile-time macro effect");
-        if (node->itemCount != 1 || (node->items[0]->name && !same(node->items[0]->name,macro->items[0]->name)))
-            fail(eval->vm,node,"%s builtin requires one message argument",macro->name);
-        const char *message = metaText(eval,scope,node->items[0]->a,node);
-        if (warning) {
-            // Reported once, at the application; law runs per specialization repeat nothing.
-            RangeNode *at = scope->application && scope->application->attribute ? scope->application->attribute : node;
-            if (eval->vm->report && !eval->vm->skipEmission) sourceDiagnostic(eval->vm->report,at,1,"macro","%s",message);
-            return (RangeGraphValue){0};
-        }
-        if (!print) fail(eval->vm,node,"%s",message);
-        // Compile-time output: the compiler's standard output, one line per effect.
-        printf("%s\n",message);
-        return (RangeGraphValue){0};
-    }
-    default: fail(eval->vm,node,"unsupported compile-time expression '%s'",rangeNodeKindName(node->kind));
-    }
-}
-
-static int metaStatement(MetaEval *eval, MetaScope *scope, RangeNode *node, RangeGraphValue *returned)
-{
-    if (!node) return 0;
-    metaStep(eval,node);
-    if (node->annotations) fail(eval->vm,node,"statement annotations are not supported in compile-time validation");
-    switch (node->kind) {
-    case RangeNodeBlock: {
-        MetaScope block = {.parent=scope,.application=scope->application};
-        for (size_t i = 0; i < node->itemCount; ++i)
-            if (metaStatement(eval,&block,node->items[i],returned)) return 1;
-        return 0;
-    }
-    case RangeNodeLet: case RangeNodeState: {
-        if (node->flags & ~RangeFlagApplication)
-            fail(eval->vm,node,"unsupported compile-time local declaration");
-        if ((node->flags & RangeFlagApplication) && node->typeName && !node->a) {
-            // Declaration RHS applications use the parser's type-position storage.
-            // Resolve the name as a function; no type-name cast or scalar shortcut.
-            RangeNode target = {.kind=RangeNodeName,.name=node->typeName,.path=node->path,
-                .line=node->line,.column=node->column};
-            if (node->generics) {
-                // `Array<Int>()`: compile-time values carry no type arguments.
-                RangeNode *from = eval->function ? eval->function : scope->application ? scope->application->target : NULL;
-                RangeNode *type = namedDeclaration(eval->vm,from,node->typeName,0,node,"compile-time type");
-                if (!type || type->kind != RangeNodeConstruct) fail(eval->vm,node,"compile-time calls require a plain function reference");
-            }
-            RangeNode call = {.kind=RangeNodeCall,.a=&target,.items=node->items,.itemCount=node->itemCount,
-                .path=node->path,.line=node->line,.column=node->column};
-            metaBind(eval,scope,node,metaCall(eval,scope,&call));
-            return 0;
-        }
-        RangeNode *rhs = rangeNodeRHS(node);
-        if (!rhs) fail(eval->vm,node,"compile-time local requires an expression; construction is not implemented");
-        metaBind(eval,scope,node,metaExpression(eval,scope,rhs));
-        return 0;
-    }
-    case RangeNodeAssign: {
-        if (!node->a || node->a->kind != RangeNodeName) fail(eval->vm,node,"compile-time assignment requires a local name");
-        MetaLocal *local = metaLocal(scope,node->a->name);
-        size_t member = !local && eval->self && eval->self->kind == RangeGraphInstance ? metaMemberIndex(*eval->self,node->a->name) : SIZE_MAX;
-        if (member != SIZE_MAX) {
-            // `count: count + 1` in a method changes its receiver's member.
-            RangeNode *declaration = eval->self->declaration->items[member];
-            RangeGraphValue value = metaExpect(eval,scope,node->b,
-                metaTypeEnum(eval,eval->self->declaration,declaration->typeName,declaration->flags,declaration));
-            metaSetMember(eval,eval->self,member,value);
-            return 0;
-        }
-        if (!local || !local->mutable) fail(eval->vm,node,"compile-time assignment requires a state local");
-        local->value = metaExpression(eval,scope,node->b);
-        if (local->value.kind == RangeGraphClosure)
-            fail(eval->vm,node,"a closure is an argument for a function-typed parameter; it is not held in '%s'",local->name);
-        return 0;
-    }
-    case RangeNodeSwitch: {
-        MetaScope arm;
-        RangeNode *entry = metaArm(eval,scope,node,&arm);
-        return metaStatement(eval,&arm,entry->b,returned);
-    }
-    case RangeNodeWhile:
-        while (metaBoolean(eval,metaExpression(eval,scope,node->a),node))
-            if (metaStatement(eval,scope,node->b,returned)) return 1;
-        return 0;
-    case RangeNodeReturn:
-        *returned = metaExpect(eval,scope,node->a,eval->output);
-        return 1;
-    case RangeNodeExpressionStatement:
-        (void)metaExpression(eval,scope,node->a);
-        return 0;
-    default: fail(eval->vm,node,"unsupported compile-time statement '%s'",rangeNodeKindName(node->kind));
-    }
 }
 
 static int compilerAttribute(RangeNode *target, RangeNode *attribute)
@@ -2658,6 +1046,7 @@ static int compilerAttribute(RangeNode *target, RangeNode *attribute)
 }
 
 static int evalApplication(Resolver *, RangeMacroApplication *, int);
+static void mergeEmitted(Resolver *, RangeNode *);
 
 /* An application's shape-only #graph blocks, emitted and merged once. Shape
  * rounds run them for every application before any macro body runs; an
@@ -2668,16 +1057,10 @@ static void shapeApplication(Resolver *vm, RangeNode *attribute)
     RangeMacroApplication *app = attribute->macroApplication;
     if (!app || app->shaped) return;
     app->shaped = 1;
-    RangeNode *body = app->declaration->a, *outer = vm->emitted;
+    RangeNode *outer = vm->emitted;
     RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
-    MetaEval eval = {.vm=vm};
-    MetaScope scope = {.application=app};
     vm->emitted = emitted;
-    if (typedMacros()) (void)evalApplication(vm,app,1);
-    for (size_t i = 0; !typedMacros() && body && i < body->itemCount; ++i) {
-        RangeNode *emission = body->items[i]->kind == RangeNodeExpressionStatement ? body->items[i]->a : NULL;
-        if (emission && emission->kind == RangeNodeEmission && (emission->flags & RangeFlagShape)) metaEmit(&eval,&scope,emission);
-    }
+    (void)evalApplication(vm,app,1);
     vm->emitted = outer;
     mergeEmitted(vm,emitted);
 }
@@ -2701,24 +1084,11 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
         if (same(app->declaration->c->items[j]->name,"builtin")) {
             if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
                 fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
-            fail(vm,attribute,"builtin target effects are not supported by compile-time validation");
+            fail(vm,attribute,"builtin macro '%s' is an effect C runs where it is written; it applies to no target",app->declaration->name);
         }
-    if (typedMacros()) {
-        // A body that stopped on a problem typing reported emits nothing.
-        vm->emitted = emitted;
-        if (!evalApplication(vm,app,0)) emitted->itemCount = 0;
-        vm->emitted = NULL;
-        return emitted;
-    }
-    // Bindings read the graph as it stands when the application runs, with
-    // every extension merged so far, not as it stood at resolution.
-    for (size_t i = 0; i < app->count; ++i) app->bindings[i].state = 0;
-    vm->deferred = 0;
+    // A body that stopped on a problem typing reported emits nothing.
     vm->emitted = emitted;
-    MetaEval eval = {.vm=vm};
-    MetaScope scope = {.application=app};
-    RangeGraphValue returned = {0};
-    (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
+    if (!evalApplication(vm,app,0)) emitted->itemCount = 0;
     vm->emitted = NULL;
     return emitted;
 }
@@ -2853,7 +1223,7 @@ typedef struct SourceReport {
 typedef struct SourceScope {
     RangeNode *owner;
     struct SourceScope *parent;
-    int meta; /* inside a macro body: compile-time code over graph values */
+    int meta; /* inside a macro body: code that runs at macro time */
 } SourceScope;
 
 static void sourceDiagnostic(SourceReport *report, RangeNode *at, int warning,
@@ -3101,13 +1471,24 @@ static int receiverCaseName(SourceScope *scope, const char *name)
     return 0;
 }
 
+static void diagnoseDuplicate(SourceReport *, RangeNode *, RangeNode *, const char *);
+
 static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *node, int metadata)
 {
     if (!node) return;
     switch (node->kind) {
     case RangeNodeUnit: case RangeNodeBlock: {
         SourceScope block = {.owner=node,.parent=scope,.meta=scope && scope->meta};
-        for (size_t i = 0; i < node->itemCount; ++i) diagnoseSourceNode(report,&block,node->items[i],metadata);
+        for (size_t i = 0; i < node->itemCount; ++i) {
+            RangeNode *item = node->items[i];
+            // A block declares a name once, as a construct does.
+            for (size_t j = 0; node->kind == RangeNodeBlock && rangeNodeDeclaresValue(item->kind) && j < i; ++j)
+                if (rangeNodeDeclaresValue(node->items[j]->kind) && same(node->items[j]->name,item->name)) {
+                    diagnoseDuplicate(report,node->items[j],item,"this block");
+                    break;
+                }
+            diagnoseSourceNode(report,&block,item,metadata);
+        }
         return;
     }
     case RangeNodeConstruct: case RangeNodeEnum: case RangeNodeFunction: case RangeNodeMacro: {
@@ -3211,17 +1592,8 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
         break;
     case RangeNodeUnary: case RangeNodeBinary:
         if (node->kind == RangeNodeBinary && same(node->name,"..<")) break; /* the @interval sugar */
-        // `a = b` calls the function named `=` on a's type; `a != b` is its
-        // negation. In a macro body it compares graph values at compile time.
-        // In a macro body operators act on graph values at compile time, in C.
-        if (scope && scope->meta) {
-            if (node->kind == RangeNodeBinary && (same(node->name,"=") || same(node->name,"!=")))
-                sourceDiagnostic(report,node,1,"C-implementation","compile-time '%s' compares graph values in C: declarations by identity, numbers and booleans by value, names by text",node->name);
-            else sourceDiagnostic(report,node,1,"C-implementation","compile-time '%s' is evaluated in C on graph booleans and numbers",node->name);
-            break;
-        }
-        // At run time an operator calls the function its operand's type
-        // declares; only the grammar of operators is C's.
+        // An operator calls the function its operand's type declares, at run
+        // time and at macro time alike; only the grammar of operators is C's.
         if (node->kind == RangeNodeBinary)
             sourceDiagnostic(report,node,1,"C-implementation",
                 "operator precedence and associativity are fixed in the C parser: prefix '!' and '-', arithmetic, comparisons, '&', then '|'; Range does not declare them yet");
@@ -3885,15 +2257,8 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         jmp_buf outer;
         memcpy(outer,vm->failure,sizeof(outer));
         vm->skipEmission = 1;
-        if (setjmp(vm->failure) == 0) {
-            if (typedMacros()) (void)evalApplication(vm,app,0);
-            else {
-                MetaEval eval = {.vm=vm};
-                MetaScope scope = {.application=app};
-                RangeGraphValue returned = {0};
-                (void)metaStatement(&eval,&scope,app->declaration->a,&returned);
-            }
-        } else {
+        if (setjmp(vm->failure) == 0) (void)evalApplication(vm,app,0);
+        else {
             char type[160], text[768];
             describeType(type,sizeof(type),specialization);
             snprintf(text,sizeof(text),"%s does not satisfy @%s: %s",type,app->declaration->name,vm->error);
@@ -4522,7 +2887,11 @@ static int nativeConcrete(const RangeNode *);
 static void noteEquality(Typer *typer, RangeNode *type, RangeNode *at)
 {
     if (!nativeConcrete(type)) return; /* it mentions a type parameter: checked per specialization */
-    if (macroTimeType(typer,type)) return; /* compared by the evaluator, at macro time */
+    if (macroTimeType(typer,type)) {
+        // Values that exist only up to macro time hold declarations.
+        sourceDiagnostic(typer->report,at,1,"C-implementation","'=' here compares values that exist only up to macro time, in C: declarations by their identity");
+        return;
+    }
     if (typer->equalityCount == typer->equalityCapacity) {
         typer->equalityCapacity = typer->equalityCapacity ? typer->equalityCapacity * 2 : 64;
         void *grown = rangeArenaAllocate(typer->report->arena,typer->equalityCapacity * sizeof(*typer->equalities));
@@ -6186,8 +4555,6 @@ static int sameValuePattern(const RangeNode *a, const RangeNode *b)
         && literalValue(a->a,&x) && literalValue(b->a,&y) && x == y;
 }
 
-static int useful(Typer *, RangeNode ***, size_t, RangeNode **, RangeNode **, size_t);
-
 /* Rows and the vector specialized to one case: its payload fields replace the column. */
 static int usefulCase(Typer *typer, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width,
                       RangeNode *entry)
@@ -6362,22 +4729,11 @@ static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, Range
     return type;
 }
 
-static int typerUseful(void *typer, RangeNode ***rows, size_t count, RangeNode **q, RangeNode **types, size_t width)
-{
-    return useful(typer,rows,count,q,types,width);
-}
-
 /* A row's patterns, each typed with its subject's type. */
 static void typeRow(Typer *typer, SourceScope *scope, RangeNode *row, RangeNode **types, size_t width, RangeNode *context)
 {
     if (row->integer != RangePatternRow) { typePattern(typer,scope,row,types[0],context); return; }
     for (size_t k = 0; k < width && k < row->itemCount; ++k) typePattern(typer,scope,row->items[k],types[k],context);
-}
-
-static RangeNode *typerCaseTest(void *context, RangeNode *term, RangeNode *bindings)
-{
-    (void)context;
-    return term->kind == RangeNodeCaseTest && stablePath(term->a,bindings) ? term : NULL;
 }
 
 /* `switch { condition: body, … }`: every arm must be reachable, and unless
@@ -6387,7 +4743,7 @@ static void typeConditionCoverage(Typer *typer, RangeNode *node)
 {
     RangeArena *arena = typer->report->arena;
     ConditionShape shape;
-    conditionShape(arena,node,typerCaseTest,typer,&shape);
+    conditionShape(arena,node,&shape);
     size_t width = shape.width;
     RangeNode **types = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*types));
     RangeNode **cases = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*cases));
@@ -6397,7 +4753,7 @@ static void typeConditionCoverage(Typer *typer, RangeNode *node)
     }
     int *reached = rangeArenaAllocate(arena,(shape.count ? shape.count : 1) * sizeof(*reached));
     char missing[512] = "";
-    int complete = conditionCoverage(arena,&shape,typerUseful,typer,types,cases,reached,missing,sizeof(missing));
+    int complete = conditionCoverage(arena,typer,&shape,types,cases,reached,missing,sizeof(missing));
     RangeNode *reported = NULL;
     for (size_t i = 0; i < shape.count; ++i) {
         RangeNode *entry = shape.arms[i];
@@ -7550,8 +5906,8 @@ static int evalAdopt(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *
         *value = (RangeValue){.kind=ValueScalar,.type=type,.integer=value->integer};
         return EvalNormal;
     }
-    return evalFail(eval,at,"%s requires a value of its own; found a %s literal",name,
-                    literal->kind == RangeNodeString ? "string" : literal->kind == RangeNodeBool ? "boolean" : "numeric");
+    return evalFail(eval,at,"a %s literal is not a value of %s",
+                    literal->kind == RangeNodeString ? "string" : literal->kind == RangeNodeBool ? "boolean" : "numeric",name);
 }
 
 /* ---- text ---- */
