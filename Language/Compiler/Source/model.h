@@ -196,6 +196,7 @@ struct RangeNode {
     size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */
     struct RangeNode **memberTypes; /* specialization: type per declaration item; NULL for @many storage */
     struct RangeFactTable *keyed; /* specialization: what typing found under it, by node */
+    RangeNode **values;  /* specialization: per generic of its declaration, the type or value it holds */
     RangeNode *outer;    /* specialization of a generic method: its receiver's specialization */
     RangeMacroApplication *macroApplication; /* the application this attribute writes */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */

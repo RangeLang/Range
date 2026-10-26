@@ -2138,15 +2138,14 @@ static void describeType(char *out, size_t size, const RangeNode *type)
         return;
     }
     size_t n = (size_t)snprintf(out,size,"%s",type->name);
-    RangeNode *generics = type->generics;
+    RangeNode *generics = type->kind == RangeNodeSpecialization && type->values ? type->resolvedDeclaration->generics : NULL;
     if (!generics || !generics->itemCount || n >= size) return;
     n += (size_t)snprintf(out + n,size - n,"<");
     for (size_t i = 0; i < generics->itemCount && n < size; ++i) {
-        RangeNode *generic = generics->items[i];
+        RangeNode *generic = generics->items[i], *value = type->values[i];
         char inner[128];
-        if (generic->kind == RangeNodeTypeParameter) describeType(inner,sizeof(inner),generic->resolvedType);
+        if (generic->kind == RangeNodeTypeParameter) describeType(inner,sizeof(inner),value);
         else {
-            RangeNode *value = rangeNodeRHS(generic);
             RangeNodeKind kind; long long integer; const char *text;
             if (!value) snprintf(inner,sizeof(inner),"?");
             else if (!lawInputs(value,&kind,&integer,&text)) snprintf(inner,sizeof(inner),"%s",value->name ? value->name : "?");
@@ -2159,37 +2158,45 @@ static void describeType(char *out, size_t size, const RangeNode *type)
     if (n < size) snprintf(out + n,size - n,">");
 }
 
-static int sameGenericValue(RangeNode *x, RangeNode *y)
+/* Two values of one generic: the same type, or equal literals. */
+static int sameGenericValue(const RangeNode *generic, RangeNode *x, RangeNode *y)
 {
-    if (x->kind == RangeNodeTypeParameter) return y->kind == RangeNodeTypeParameter && x->resolvedType == y->resolvedType;
-    if (y->kind == RangeNodeTypeParameter) return 0;
-    RangeNode *a = rangeNodeRHS(x), *b = rangeNodeRHS(y);
-    return a && b ? sameLiteral(a,b) : a == b;
+    if (generic->kind == RangeNodeTypeParameter) return x == y;
+    return x && y ? sameLiteral(x,y) : x == y;
+}
+
+/* A specialization's values, one per generic of its declaration in order:
+ * the type a type parameter names, or the value a value generic holds. */
+static RangeNode **genericValues(RangeArena *arena, const RangeNode *declaration)
+{
+    size_t count = declaration->generics ? declaration->generics->itemCount : 0;
+    if (!declaration->generics) return NULL;
+    RangeNode **values = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*values));
+    memset(values,0,(count ? count : 1) * sizeof(*values));
+    return values;
 }
 
 /* The one specialization of a declaration for these generic values: of a
  * construct or enum, or of a generic function within `outer`, its receiver's
  * specialization, located where it is first met. */
-static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, RangeNode *generics, RangeNode *outer,
+static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, RangeNode **values, RangeNode *outer,
                                        RangeNode *at, int *created)
 {
     *created = 0;
     RangeNode *list = declaration->kind == RangeNodeFunction ? typer->instances : typer->specializations;
+    size_t count = values ? declaration->generics->itemCount : 0;
     for (size_t i = 0; i < list->itemCount; ++i) {
         RangeNode *candidate = list->items[i];
-        if (candidate->resolvedDeclaration != declaration || candidate->outer != outer) continue;
-        size_t count = generics ? generics->itemCount : 0;
-        if ((candidate->generics ? candidate->generics->itemCount : 0) != count) continue;
+        if (candidate->resolvedDeclaration != declaration || candidate->outer != outer || !candidate->values != !values) continue;
         size_t matched = 0;
-        for (size_t j = 0; j < count; ++j)
-            if (sameGenericValue(candidate->generics->items[j],generics->items[j])) ++matched;
+        while (matched < count && sameGenericValue(declaration->generics->items[matched],candidate->values[matched],values[matched])) ++matched;
         if (matched == count) return candidate;
     }
     RangeArena *arena = typer->report->arena;
     RangeNode *specialization = rangeNodeCreate(arena,RangeNodeSpecialization,at->path,at->line,at->column);
     specialization->name = declaration->name;
     specialization->resolvedDeclaration = declaration;
-    specialization->generics = generics;
+    specialization->values = values;
     specialization->outer = outer;
     rangeNodeAppend(arena,list,specialization);
     *created = 1;
@@ -2202,16 +2209,6 @@ static void forgetFacts(RangeNode *copy)
 {
     copy->found = 0;
     copy->lowered = copy->narrowed = copy->promoted = copy->specialization = NULL;
-}
-
-static RangeNode *copyGeneric(RangeArena *arena, RangeNode *generic)
-{
-    RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
-    *copy = *generic;
-    copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
-    copy->rhsReference = NULL; copy->typeName = NULL; copy->type = NULL;
-    copy->a = generic->kind == RangeNodeTypeParameter ? NULL : rangeNodeRHS(generic);
-    return copy;
 }
 
 /* The literal populates the one member whose default the same literal rule
@@ -2369,14 +2366,14 @@ static void drainLaws(Typer *typer)
     typer->queuedCount = 0;
 }
 
-/* What a specialization, or one it is nested in, holds for a generic of its
- * declaration: the copy that holds its type or value; NULL when none does. */
-static RangeNode *genericSlot(RangeNode *specialization, RangeNode *generic)
+/* Where a specialization, or one it is nested in, holds a generic of its
+ * declaration: its type or value; NULL when none holds it. */
+static RangeNode **genericSlot(RangeNode *specialization, RangeNode *generic)
 {
     for (; specialization; specialization = specialization->outer) {
-        RangeNode *declared = specialization->resolvedDeclaration->generics, *values = specialization->generics;
-        for (size_t i = 0; declared && values && i < declared->itemCount && i < values->itemCount; ++i)
-            if (declared->items[i] == generic) return values->items[i];
+        RangeNode *declared = specialization->resolvedDeclaration->generics;
+        for (size_t i = 0; declared && specialization->values && i < declared->itemCount; ++i)
+            if (declared->items[i] == generic) return &specialization->values[i];
     }
     return NULL;
 }
@@ -2387,12 +2384,10 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
                              RangeNode *arguments, RangeNode *context, RangeNode *at)
 {
     RangeArena *arena = typer->report->arena;
-    RangeNode *declared = declaration->generics, *generics = NULL;
+    RangeNode *declared = declaration->generics, **values = genericValues(arena,declaration);
     int isDefault = 1;
     size_t positional = 0;
     if (declared) {
-        generics = rangeNodeCreate(arena,RangeNodeBlock,declaration->path,declaration->line,declaration->column);
-        generics->name = "genericMembers";
         for (size_t i = 0; i < declared->itemCount; ++i) {
             RangeNode *generic = declared->items[i], *argument = NULL;
             size_t unnamed = 0;
@@ -2401,7 +2396,6 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
                 if (candidate->name ? same(candidate->name,generic->name)
                     : generic->kind == RangeNodeTypeParameter && unnamed++ == positional) { argument = candidate; break; }
             }
-            RangeNode *copy = copyGeneric(arena,generic);
             if (generic->kind == RangeNodeTypeParameter) {
                 ++positional;
                 if (!argument) { typeError(typer,at,"'%s' requires generic %s",declaration->name,generic->name); return NULL; }
@@ -2409,7 +2403,7 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
                 if (!reference || reference->kind != RangeNodeName) { typeError(typer,argument,"generic %s requires a type",generic->name); return NULL; }
                 RangeNode *type = resolveTypeReference(typer,scope,reference->name,reference->generics,reference->flags,context,reference);
                 if (!type) return NULL;
-                copy->resolvedType = type;
+                values[i] = type;
                 isDefault = 0;
             } else if (argument) {
                 SourceScope declarationScope = {.owner=declaration};
@@ -2421,14 +2415,13 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
                     typeError(typer,argument->a,"generic %s requires %s; found %s",generic->name,want,got);
                     return NULL;
                 }
-                copy->a = argument->a;
-                if (!sameGenericValue(copy,generic)) isDefault = 0;
+                values[i] = argument->a;
+                if (!sameGenericValue(generic,values[i],rangeNodeRHS(generic))) isDefault = 0;
             } else if (generic->typeName) {
                 // `<let width: Int>` has no default: each use supplies it.
                 typeError(typer,at,"'%s' requires generic %s",declaration->name,generic->name);
                 return NULL;
-            }
-            rangeNodeAppend(arena,generics,copy);
+            } else values[i] = rangeNodeRHS(generic);
         }
         size_t unnamed = 0;
         if (arguments) for (size_t j = 0; j < arguments->itemCount; ++j) {
@@ -2445,7 +2438,7 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
         return NULL;
     }
     int created = 0;
-    RangeNode *specialization = internSpecialization(typer,declaration,generics,NULL,declaration,&created);
+    RangeNode *specialization = internSpecialization(typer,declaration,values,NULL,declaration,&created);
     if (created) {
         // The declaration's own application already covered its defaults.
         if (isDefault) specialization->found |= RangeFlagChecked;
@@ -2457,20 +2450,14 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
 /* Inside its own bodies, a construct is specialized by its own parameters. */
 static RangeNode *selfSpecialization(Typer *typer, RangeNode *declaration)
 {
-    RangeArena *arena = typer->report->arena;
-    RangeNode *generics = NULL;
-    if (declaration->generics) {
-        generics = rangeNodeCreate(arena,RangeNodeBlock,declaration->path,declaration->line,declaration->column);
-        generics->name = "genericMembers";
-        for (size_t i = 0; i < declaration->generics->itemCount; ++i) {
-            RangeNode *generic = declaration->generics->items[i], *copy = copyGeneric(arena,generic);
-            if (generic->kind == RangeNodeTypeParameter) copy->resolvedType = generic;
-            else if (generic->typeName) copy->a = NULL; /* a required value: none in the bodies' own view */
-            rangeNodeAppend(arena,generics,copy);
-        }
+    RangeNode **values = genericValues(typer->report->arena,declaration);
+    for (size_t i = 0; values && i < declaration->generics->itemCount; ++i) {
+        RangeNode *generic = declaration->generics->items[i];
+        // A required value has none in the bodies' own view.
+        values[i] = generic->kind == RangeNodeTypeParameter ? generic : generic->typeName ? NULL : rangeNodeRHS(generic);
     }
     int created = 0;
-    RangeNode *specialization = internSpecialization(typer,declaration,generics,NULL,declaration,&created);
+    RangeNode *specialization = internSpecialization(typer,declaration,values,NULL,declaration,&created);
     specialization->found |= RangeFlagChecked;
     return specialization;
 }
@@ -2558,10 +2545,9 @@ static int macroTimeType(Typer *typer, const RangeNode *type)
     if (deferredType(typer,type)) return 1;
     if (!type || type->kind != RangeNodeSpecialization) return 0;
     if (isMacroType(type) || graphConstruct(typer,type->resolvedDeclaration)) return 1;
-    for (size_t i = 0; type->generics && i < type->generics->itemCount; ++i) {
-        RangeNode *generic = type->generics->items[i];
-        if (generic->kind == RangeNodeTypeParameter && macroTimeType(typer,generic->resolvedType)) return 1;
-    }
+    RangeNode *declared = type->resolvedDeclaration->generics;
+    for (size_t i = 0; declared && type->values && i < declared->itemCount; ++i)
+        if (declared->items[i]->kind == RangeNodeTypeParameter && macroTimeType(typer,type->values[i])) return 1;
     return 0;
 }
 
@@ -2637,15 +2623,13 @@ static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const c
         return specialize(typer,scope,optional,arguments,context,at);
     }
     if (flags & RangeFlagMacroType) return macroTypeNamed(typer,name,at);
-    if (context && context->generics)
-        for (size_t i = 0; i < context->generics->itemCount; ++i) {
-            RangeNode *generic = context->generics->items[i];
-            if (generic->kind == RangeNodeTypeParameter && same(generic->name,name)) return generic->resolvedType;
-        }
+    RangeNode *declared = context && context->kind == RangeNodeSpecialization && context->values ? context->resolvedDeclaration->generics : NULL;
+    for (size_t i = 0; declared && i < declared->itemCount; ++i)
+        if (declared->items[i]->kind == RangeNodeTypeParameter && same(declared->items[i]->name,name)) return context->values[i];
     RangeNode *declaration = dottedLookup(typer->report,scope,name,2);
     // A generic function's type parameter names the type its specialization binds.
-    RangeNode *slot = declaration && declaration->kind == RangeNodeTypeParameter && !generics ? genericSlot(typer->key,declaration) : NULL;
-    if (slot && slot->resolvedType) return slot->resolvedType;
+    RangeNode **slot = declaration && declaration->kind == RangeNodeTypeParameter && !generics ? genericSlot(typer->key,declaration) : NULL;
+    if (slot && *slot) return *slot;
     if (!declaration || (declaration->kind != RangeNodeConstruct && declaration->kind != RangeNodeEnum))
         return NULL; /* undeclared is reported already */
     // As in Swift, a generic declaration's bare name inside its own bodies is
@@ -2721,9 +2705,6 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
     return rhs ? typeOf(typer,scope,rhs,context,context) : NULL;
 }
 
-/* The declared type of another declaration's generic, member, payload
- * field, or parameter, as typing that declaration finds it, whatever key the
- * code that asks is typed under. */
 /* The key a declaration's members, payload fields, and generics are typed
  * under for `type`: NULL for one that is not a specialization of it, or is
  * its own view, the one its bodies are typed in; else that specialization. */
@@ -2731,9 +2712,9 @@ static RangeNode *keyOf(const RangeNode *declaration, RangeNode *type)
 {
     if (!declaration || !type || type->kind != RangeNodeSpecialization || type->resolvedDeclaration != declaration) return NULL;
     for (size_t i = 0; declaration->generics && i < declaration->generics->itemCount; ++i) {
-        RangeNode *generic = declaration->generics->items[i], *value = type->generics->items[i];
-        if (generic->kind == RangeNodeTypeParameter ? value->resolvedType != generic
-            : generic->typeName ? rangeNodeRHS(value) != NULL : !sameGenericValue(value,generic)) return type;
+        RangeNode *generic = declaration->generics->items[i], *value = type->values[i];
+        if (generic->kind == RangeNodeTypeParameter ? value != generic
+            : generic->typeName ? value != NULL : !sameGenericValue(generic,value,rangeNodeRHS(generic))) return type;
     }
     return NULL;
 }
@@ -3348,15 +3329,14 @@ static int unifyType(Typer *typer, RangeNode *function, const char *name, RangeN
     if (!generics || actual->kind != RangeNodeSpecialization) return 1;
     SourceScope scope = {.owner=function};
     RangeNode *declaration = dottedLookup(typer->report,&scope,name,2);
-    if (!declaration || actual->resolvedDeclaration != declaration || !actual->generics) return 1; /* coercion reports it */
+    if (!declaration || actual->resolvedDeclaration != declaration || !actual->values) return 1; /* coercion reports it */
     size_t position = 0;
     for (size_t i = 0; i < generics->itemCount; ++i) {
         RangeNode *argument = generics->items[i];
         if (argument->name || !argument->a || argument->a->kind != RangeNodeName) continue;
-        for (size_t j = 0, k = 0; j < actual->generics->itemCount; ++j) {
-            RangeNode *slot = actual->generics->items[j];
-            if (slot->kind != RangeNodeTypeParameter || k++ != position) continue;
-            if (!unifyType(typer,function,argument->a->name,argument->a->generics,argument->a->flags,slot->resolvedType,bound,conflict))
+        for (size_t j = 0, k = 0; j < declaration->generics->itemCount; ++j) {
+            if (declaration->generics->items[j]->kind != RangeNodeTypeParameter || k++ != position) continue;
+            if (!unifyType(typer,function,argument->a->name,argument->a->generics,argument->a->flags,actual->values[j],bound,conflict))
                 return 0;
         }
         ++position;
@@ -3377,13 +3357,9 @@ static RangeNode *boundType(Typer *typer, RangeNode *function, const char *name,
     partial->name = function->name;
     partial->resolvedDeclaration = function;
     partial->outer = receiver;
-    partial->generics = rangeNodeCreate(arena,RangeNodeBlock,function->path,function->line,function->column);
-    partial->generics->name = "genericMembers";
-    for (size_t i = 0, k = 0; i < function->generics->itemCount; ++i) {
-        RangeNode *copy = copyGeneric(arena,function->generics->items[i]);
-        if (copy->kind == RangeNodeTypeParameter) copy->resolvedType = bound[k++];
-        rangeNodeAppend(arena,partial->generics,copy);
-    }
+    partial->values = genericValues(arena,function);
+    for (size_t i = 0, k = 0; i < function->generics->itemCount; ++i)
+        if (function->generics->items[i]->kind == RangeNodeTypeParameter) partial->values[i] = bound[k++];
     // A method's types also name its receiver's type parameters.
     SourceScope ownerScope = {.owner=receiver ? receiver->resolvedDeclaration : NULL};
     SourceScope scope = {.owner=function,.parent=receiver ? &ownerScope : NULL};
@@ -3394,19 +3370,21 @@ static RangeNode *boundType(Typer *typer, RangeNode *function, const char *name,
     return type;
 }
 
-/* The specialization of a generic function for these generic values, within
- * its receiver's specialization. Its body is typed into it on first use. */
-static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode *generics, RangeNode *at, RangeNode *receiver)
+/* The specialization of a generic function for these generic values, of
+ * these types for its value generics, within its receiver's specialization.
+ * Its body is typed into it on first use. */
+static RangeNode *instantiate(Typer *typer, RangeNode *function, RangeNode **values, RangeNode **types, RangeNode *at,
+                              RangeNode *receiver)
 {
     int created = 0;
-    RangeNode *specialization = internSpecialization(typer,function,generics,receiver,at,&created);
+    RangeNode *specialization = internSpecialization(typer,function,values,receiver,at,&created);
     if (!created) return specialization;
     // Interned before its body is typed, so a recursive call finds it. A
     // method's specialization is typed in its receiver's.
     TyperContext outer = typerSave(typer);
     typer->key = specialization;
-    for (size_t i = 0; i < generics->itemCount; ++i) /* a value generic is the constant it was made for */
-        if (generics->items[i]->kind != RangeNodeTypeParameter) finding(typer,function->generics->items[i])->type = generics->items[i]->type;
+    for (size_t i = 0; i < function->generics->itemCount; ++i) /* a value generic is the constant it was made for */
+        if (function->generics->items[i]->kind != RangeNodeTypeParameter) finding(typer,function->generics->items[i])->type = types[i];
     SourceScope ownerScope = {.owner=receiver ? receiver->resolvedDeclaration : NULL};
     typeFunction(typer,receiver ? &ownerScope : NULL,function,receiver);
     typerRestore(typer,outer);
@@ -3519,15 +3497,12 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
     // construct's type parameter, as in Box<T>'s methods, gives one typed with
     // that parameter; code is generated per concrete specialization, which
     // substitutes it.
-    RangeNode *generics = rangeNodeCreate(typer->report->arena,RangeNodeBlock,function->path,function->line,function->column);
-    generics->name = "genericMembers";
+    RangeNode **slots = genericValues(typer->report->arena,function), **slotTypes = genericValues(typer->report->arena,function);
     for (size_t i = 0, k = 0, v = 0; i < function->generics->itemCount; ++i) {
-        RangeNode *copy = copyGeneric(typer->report->arena,function->generics->items[i]);
-        if (copy->kind == RangeNodeTypeParameter) copy->resolvedType = bound[k++];
-        else { copy->a = values[v]; copy->type = types[v++]; }
-        rangeNodeAppend(typer->report->arena,generics,copy);
+        if (function->generics->items[i]->kind == RangeNodeTypeParameter) slots[i] = bound[k++];
+        else { slots[i] = values[v]; slotTypes[i] = types[v++]; }
     }
-    RangeNode *specialization = instantiate(typer,function,generics,call,receiver);
+    RangeNode *specialization = instantiate(typer,function,slots,slotTypes,call,receiver);
     finding(typer,callee)->resolvedDeclaration = function;
     finding(typer,callee)->specialization = specialization;
     for (size_t i = 0; i < n; ++i) {
@@ -5121,21 +5096,19 @@ static int builtinMember(const RangeNode *member)
  * @many member is an 8-byte address. C reads widths from the specialization
  * it materialized; it never names a construct or a generic. */
 
+/* A builtin member's value in a specialization: the generic its value
+ * names, as the specialization holds it, or the value written. */
 static RangeNode *builtinValue(RangeNode *specialization, RangeNode *member)
 {
-    RangeNode *value = rangeNodeRHS(member);
-    if (value && value->kind == RangeNodeName && specialization->generics)
-        for (size_t i = 0; i < specialization->generics->itemCount; ++i)
-            if (same(specialization->generics->items[i]->name,value->name)) return rangeNodeRHS(specialization->generics->items[i]);
+    RangeNode *value = rangeNodeRHS(member), *declared = specialization->resolvedDeclaration->generics;
+    for (size_t i = 0; value && value->kind == RangeNodeName && declared && specialization->values && i < declared->itemCount; ++i)
+        if (same(declared->items[i]->name,value->name)) return specialization->values[i];
     return value;
 }
 
 static long long storageBits(Typer *typer, RangeNode *specialization, RangeNode *storage)
 {
-    RangeNode *value = rangeNodeRHS(storage);
-    if (value && value->kind == RangeNodeName && specialization->generics)
-        for (size_t i = 0; i < specialization->generics->itemCount; ++i)
-            if (same(specialization->generics->items[i]->name,value->name)) { value = rangeNodeRHS(specialization->generics->items[i]); break; }
+    RangeNode *value = builtinValue(specialization,storage);
     if (!value || value->kind != RangeNodeInteger) {
         sourceDiagnostic(typer->report,storage,0,"layout","builtin 'storage' requires an integer bit width");
         return 0;
@@ -6061,8 +6034,8 @@ static RangeNode *lawValue(const RangeMacroApplication *law, RangeNode *declarat
 {
     if (!law || !law->specialization) return NULL;
     if (declaration == law->slot) return law->literal;
-    RangeNode *slot = genericSlot(law->specialization,declaration);
-    return slot ? rangeNodeRHS(slot) : NULL;
+    RangeNode **slot = genericSlot(law->specialization,declaration);
+    return slot ? *slot : NULL;
 }
 
 /* `.value` of a member kind: its initializer, known at macro time, or in a
@@ -6666,9 +6639,9 @@ static RangeNode *evalGeneric(EvalFrame *frame, RangeNode *declaration)
 {
     if (declaration->kind != RangeNodeLet) return NULL;
     RangeNode *self = frame->self && frame->self->type && frame->self->type->kind == RangeNodeSpecialization ? frame->self->type : NULL;
-    RangeNode *slot = genericSlot(frame->key,declaration);
+    RangeNode **slot = genericSlot(frame->key,declaration);
     if (!slot) slot = genericSlot(self,declaration);
-    return slot ? rangeNodeRHS(slot) : NULL;
+    return slot ? *slot : NULL;
 }
 
 /* A name: a value of the frame, the receiver, a member of it, a value
@@ -7108,29 +7081,22 @@ static void nativeTrap(Native *native, uint32_t branch, RangeNode *at, const cha
 static RangeNode *nativeSubstitute(Native *native, RangeNode *type, RangeNode *self)
 {
     if (!type || !self || !self->resolvedDeclaration || !self->resolvedDeclaration->generics) return type;
-    RangeNode *declared = self->resolvedDeclaration->generics;
     if (type->kind == RangeNodeTypeParameter) {
-        for (size_t i = 0; i < declared->itemCount && self->generics && i < self->generics->itemCount; ++i)
-            if (declared->items[i] == type) return self->generics->items[i]->resolvedType;
-        return type;
+        RangeNode **slot = genericSlot(self,type);
+        return slot ? *slot : type;
     }
-    if (type->kind != RangeNodeSpecialization || !type->generics) return type;
-    RangeArena *arena = native->report->arena;
-    RangeNode *generics = rangeNodeCreate(arena,RangeNodeBlock,type->path,type->line,type->column);
-    generics->name = "genericMembers";
+    if (type->kind != RangeNodeSpecialization || !type->values) return type;
+    RangeNode *declaration = type->resolvedDeclaration, **values = genericValues(native->report->arena,declaration);
     int changed = 0;
-    for (size_t i = 0; i < type->generics->itemCount; ++i) {
-        RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
-        *copy = *type->generics->items[i];
-        if (copy->kind == RangeNodeTypeParameter) {
-            copy->resolvedType = nativeSubstitute(native,copy->resolvedType,self);
-            changed |= copy->resolvedType != type->generics->items[i]->resolvedType;
-        }
-        rangeNodeAppend(arena,generics,copy);
+    for (size_t i = 0; i < declaration->generics->itemCount; ++i) {
+        values[i] = type->values[i];
+        if (declaration->generics->items[i]->kind != RangeNodeTypeParameter) continue;
+        values[i] = nativeSubstitute(native,values[i],self);
+        changed |= values[i] != type->values[i];
     }
     if (!changed) return type;
     int created = 0;
-    RangeNode *specialization = internSpecialization(native->typer,type->resolvedDeclaration,generics,NULL,type->resolvedDeclaration,&created);
+    RangeNode *specialization = internSpecialization(native->typer,declaration,values,NULL,declaration,&created);
     if (created) checkLaws(native->typer,specialization,NULL,type->resolvedDeclaration);
     return specialization;
 }
@@ -8226,22 +8192,20 @@ static RangeNode *nativeGenericTarget(Native *native, RangeNode *key, RangeNode 
 {
     if (nativeConcrete(key)) return key;
     Typer *typer = native->typer;
-    RangeArena *arena = native->report->arena;
     RangeNode *function = key->resolvedDeclaration;
-    RangeNode *generics = rangeNodeCreate(arena,RangeNodeBlock,function->path,function->line,function->column);
-    generics->name = "genericMembers";
-    for (size_t i = 0; i < key->generics->itemCount; ++i) {
-        RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
-        *copy = *key->generics->items[i];
-        if (copy->kind == RangeNodeTypeParameter && !nativeConcrete(copy->resolvedType = nativeType(native,copy->resolvedType))) {
-            char type[160]; describeType(type,sizeof(type),copy->resolvedType);
+    RangeNode **values = genericValues(native->report->arena,function), **types = genericValues(native->report->arena,function);
+    for (size_t i = 0; i < function->generics->itemCount; ++i) {
+        RangeNode *generic = function->generics->items[i];
+        values[i] = key->values[i];
+        types[i] = found(key,generic)->type;
+        if (generic->kind == RangeNodeTypeParameter && !nativeConcrete(values[i] = nativeType(native,values[i]))) {
+            char type[160]; describeType(type,sizeof(type),values[i]);
             nativeMissing(native,at,"'%s' is called with %s, which no specialization substitutes here",function->name,type);
             return NULL;
         }
-        rangeNodeAppend(arena,generics,copy);
     }
     size_t errors = native->report->errors;
-    RangeNode *specialization = instantiate(typer,function,generics,at,NULL);
+    RangeNode *specialization = instantiate(typer,function,values,types,at,NULL);
     typer->key = specialization;
     checkMutations(typer,function);
     typer->key = NULL;
@@ -8697,10 +8661,10 @@ static int nativeValueGeneric(Native *native, RangeNode *expr)
 {
     RangeNode *declaration = found(native->key,expr)->resolvedDeclaration;
     if (!declaration || declaration->kind != RangeNodeLet) return 0;
-    RangeNode *slot = genericSlot(native->key,declaration);
+    RangeNode **slot = genericSlot(native->key,declaration);
     if (!slot) slot = genericSlot(native->self,declaration);
     if (!slot) return 0;
-    RangeNode *value = rangeNodeRHS(slot);
+    RangeNode *value = *slot;
     RangeNodeKind kind; long long integer; const char *text;
     if (!value || !lawInputs(value,&kind,&integer,&text) || kind == RangeNodeString) {
         nativeMissing(native,expr,"value generic '%s' needs an integer or boolean literal natively",expr->name);
@@ -9497,10 +9461,10 @@ static void nativeTraps(Native *native)
 static int nativeConcrete(const RangeNode *type)
 {
     if (!type || type->kind != RangeNodeSpecialization) return 0;
-    for (size_t i = 0; type->generics && i < type->generics->itemCount; ++i) {
-        RangeNode *generic = type->generics->items[i];
-        if (generic->kind == RangeNodeTypeParameter && !nativeConcrete(generic->resolvedType)) return 0;
-        if (generic->kind != RangeNodeTypeParameter && !rangeNodeRHS(generic)) return 0; /* a required value not supplied */
+    RangeNode *declared = type->resolvedDeclaration->generics;
+    for (size_t i = 0; declared && type->values && i < declared->itemCount; ++i) {
+        if (declared->items[i]->kind == RangeNodeTypeParameter && !nativeConcrete(type->values[i])) return 0;
+        if (declared->items[i]->kind != RangeNodeTypeParameter && !type->values[i]) return 0; /* a required value not supplied */
     }
     return 1;
 }

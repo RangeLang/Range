@@ -365,6 +365,20 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A specialization holds one value per generic, in declaration order: a
+    // value generic's literal, which a negative literal writes as one value.
+    compile(&c,"construct Grid<T, let width: Int> { let cells: 0 } "
+        "function grids(): Int { let a: Grid<Bool, width: 3>() let b: Grid<Int, width: -1>() let d: Grid<Int, width: -1>() return 0 }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *grid = named(c.project,"Grid"), *wide = local(&c,"grids","a")->type, *negative = local(&c,"grids","b")->type;
+    expectDescription(wide,"Grid<T: Bool, width: 3>");
+    expectDescription(negative,"Grid<T: Int<bits: 64, signed: true>, width: -1>");
+    assert(local(&c,"grids","d")->type == negative && wide->values[0] == c.typer->booleanType);
+    assert(genericSlot(wide,grid->generics->items[1]) == &wide->values[1] && wide->values[1]->integer == 3);
+    assert(!selfSpecialization(c.typer,grid)->values[1] && selfSpecialization(c.typer,grid)->values[0] == grid->generics->items[0]);
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
