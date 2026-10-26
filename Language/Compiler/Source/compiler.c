@@ -27,7 +27,6 @@ typedef struct {
     int skipEmission;   /* law runs per specialization check; emission stays on the declaration */
     struct SourceReport *report; /* where @warning reports, when compiling */
     Typer *typer; /* alive from before the first application to the end of type checking */
-    const char *absent; /* the @optional enum's case without payload: what `let v: T?` starts as */
     size_t checked; /* applications run */
 } Resolver;
 
@@ -1088,12 +1087,11 @@ static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     return emitted;
 }
 
-static void absentDefaults(RangeArena *, RangeNode *, const char *);
 static void noteWritten(Typer *, RangeNode *);
 
 /* Emitted and written declarations join the graph through the same path as
- * parsed source: shape, grammar identity, macro targets, literal defaults,
- * and the absent case a bare `let v: T?` starts as. */
+ * parsed source: kept as written, then shape, grammar identity, macro
+ * targets, and literal defaults. */
 static void resolveMergedNode(Resolver *vm, RangeNode *node)
 {
     if (vm->typer) noteWritten(vm->typer,node);
@@ -1102,7 +1100,6 @@ static void resolveMergedNode(Resolver *vm, RangeNode *node)
     resolveSignatureTypes(vm,node,node->kind == RangeNodeFunction ? node->owner : NULL);
     resolveGraphTarget(vm,node);
     resolveLiteralDefaults(vm,node);
-    if (vm->absent) absentDefaults(vm->arena,node,vm->absent);
 }
 
 /* Two applications with the same written arguments, compared as syntax. */
@@ -2590,6 +2587,27 @@ static RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const c
     return specialize(typer,scope,declaration,generics,context,at);
 }
 
+static RangeNode *optionalWrapped(Typer *, RangeNode *, RangeNode **);
+static int optionalWithoutValue(const RangeNode *);
+
+/* The optional's case without a payload, a value written beside `at`: what
+ * `let v: T?` starts as. */
+static RangeNode *absentValue(Typer *typer, RangeNode *at, RangeNode *type)
+{
+    if (!optionalWrapped(typer,type,NULL)) return NULL;
+    RangeNode *declaration = type->resolvedDeclaration;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *entry = declaration->items[i];
+        if (entry->kind != RangeNodeEnumCase || entry->itemCount) continue;
+        RangeNode *value = rangeNodeCreate(typer->report->arena,RangeNodeCase,at->path,at->line,at->column);
+        value->name = entry->name;
+        value->resolvedDeclaration = entry;
+        value->type = type;
+        return value;
+    }
+    return NULL;
+}
+
 static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context)
 {
     if (node->kind == RangeNodeParameter)
@@ -2615,7 +2633,13 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
             return typeOf(typer,scope,node->rhsReference,NULL,context);
         }
     }
-    if (node->typeName) return resolveTypeReference(typer,scope,node->typeName,node->generics,node->flags,context,node);
+    if (node->typeName) {
+        RangeNode *type = resolveTypeReference(typer,scope,node->typeName,node->generics,node->flags,context,node);
+        // An enum's lets are its cases' payload fields: types, not bindings.
+        if (optionalWithoutValue(node) && !(scope && scope->owner && scope->owner->kind == RangeNodeEnum))
+            node->lowered = absentValue(typer,node,type);
+        return type;
+    }
     // A literal member of the construct its literal selects (Int's `value: 0`)
     // has that construct's own specialization.
     RangeNode *rhs = rangeNodeRHS(node);
@@ -2991,14 +3015,27 @@ static int constructionInput(const RangeNode *member)
         && !builtinMember(member) && !(member->flags & RangeFlagMany);
 }
 
-/* The member's default: an inferred RHS, or a construction RHS; a bare type
- * reference is a requirement and supplies nothing. */
-static RangeNode *memberDefault(RangeNode *member)
+/* `let v: T?` written without a value: it starts as the optional's case
+ * without a payload, which typing records beside it. */
+static int optionalWithoutValue(const RangeNode *node)
 {
-    if (!member->typeName) return rangeNodeRHS(member);
-    if (member->flags & RangeFlagApplication) return member;
-    RangeNode *copied = member->rhsReference ? member->rhsReference->resolvedDeclaration : NULL;
-    return copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? member->rhsReference : NULL;
+    return (node->kind == RangeNodeLet || node->kind == RangeNodeState) && node->typeName
+        && (node->flags & RangeFlagOptional) && !(node->flags & (RangeFlagApplication | RangeFlagMacroType))
+        && !node->rhsReference && !node->a && !node->itemCount;
+}
+
+/* A local's value, or a member's default: what typing recorded beside the
+ * declaration; else an inferred RHS; the declaration itself for a
+ * construction; or a copied name. A bare type reference is a requirement
+ * and supplies nothing. */
+static RangeNode *declarationValue(RangeNode *node)
+{
+    if (node->lowered) return node->lowered;
+    if (node->typeName && node->a && node->a->kind == RangeNodeCall) return node->a; /* `let r: step(x: 1)` */
+    if (!node->typeName) return rangeNodeRHS(node);
+    if (node->flags & RangeFlagApplication) return node;
+    RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
+    return copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL;
 }
 
 /* `Point(x: 1, y: 2)`: each argument names the member it populates, and is
@@ -3063,7 +3100,7 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
     }
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
-        if (!constructionInput(member) || memberDefault(member)) continue;
+        if (!constructionInput(member) || declarationValue(member) || optionalWithoutValue(member)) continue;
         int supplied = 0;
         for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) supplied = 1;
         if (!supplied) typeError(typer,at,"%s requires input '%s'",typeName,member->name);
@@ -4399,11 +4436,8 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         node->type = declaredType(typer,scope,node,context);
         // A local names a value: `let v: Int` alone states a type, and only a
         // construct's member may leave its value to construction.
-        if (node->typeName && !(node->flags & RangeFlagApplication)) {
-            RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
-            if (!copied || !(rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter))
-                typeError(typer,node,"'%s' needs an initial value",node->name);
-        }
+        if (node->typeName && !(node->flags & RangeFlagApplication) && !declarationValue(node) && !optionalWithoutValue(node))
+            typeError(typer,node,"'%s' needs an initial value",node->name);
         break;
     case RangeNodeAssign: {
         RangeNode *target = node->a;
@@ -5471,39 +5505,6 @@ static RangeNode *literalFamily(Typer *typer, const char *spelling)
     return NULL;
 }
 
-/* `let v: Int?` with no value is `let v: Int?.absent`: an optional binding
- * starts as the case of the @optional enum that carries no payload. Rewritten
- * before macros run, so locals and construct members (as construction
- * defaults) read it like any written value. A grammar declaration's fields
- * are C's reflection of a node, which macros read by their written types, so
- * they stay as written. */
-static void absentDefaults(RangeArena *arena, RangeNode *node, const char *absent)
-{
-    if (!node || node->kind == RangeNodeEnumCase) return; /* payload fields are types, not bindings */
-    for (size_t i = 0; node->kind == RangeNodeConstruct && i < arena->graphTypes->itemCount; ++i)
-        if (arena->graphTypes->items[i]->resolvedDeclaration == node) return;
-    if ((node->kind == RangeNodeLet || node->kind == RangeNodeState) && node->typeName
-        && (node->flags & RangeFlagOptional) && !(node->flags & (RangeFlagApplication | RangeFlagMacroType))
-        && !node->rhsReference && !node->a && !node->itemCount) {
-        RangeNode *type = rangeNodeCreate(arena,RangeNodeName,node->path,node->line,node->column);
-        type->name = node->typeName;
-        type->generics = node->generics;
-        type->flags = RangeFlagOptional;
-        RangeNode *value = rangeNodeCreate(arena,RangeNodeMemberAccess,node->path,node->line,node->column);
-        value->a = type;
-        value->name = absent;
-        node->a = value;
-        node->typeName = NULL;
-        node->generics = NULL;
-        node->flags &= ~RangeFlagOptional;
-        return;
-    }
-    absentDefaults(arena,node->a,absent);
-    absentDefaults(arena,node->b,absent);
-    absentDefaults(arena,node->c,absent);
-    for (size_t i = 0; i < node->itemCount; ++i) absentDefaults(arena,node->items[i],absent);
-}
-
 /* ---- written code ----
  * Written code is read once and never changed: what the compiler finds lives
  * beside it. Each leaf declaration, a function, a macro, the entry block, a
@@ -5552,21 +5553,10 @@ static Typer *newTyper(SourceReport *report, Resolver *vm)
 }
 
 /* What the language's declarations give the typer before any macro runs:
- * the absent case optionals start as, the integer default, and the
- * condition type. */
+ * the integer default and the condition type. */
 static void typerLanguage(Typer *typer)
 {
     SourceReport *report = typer->report;
-    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
-        RangeNode *candidate = report->units[u]->items[i];
-        if (candidate->kind != RangeNodeEnum || !appliesBuiltin(candidate,"optional")) continue;
-        for (size_t c = 0; c < candidate->itemCount; ++c)
-            if (candidate->items[c]->kind == RangeNodeEnumCase && !candidate->items[c]->itemCount) {
-                typer->vm->absent = candidate->items[c]->name;
-                for (size_t v = 0; v < report->count; ++v) absentDefaults(report->arena,report->units[v],typer->vm->absent);
-            }
-        break;
-    }
     typer->integer = literalFamily(typer,"0");
     typer->boolean = literalFamily(typer,"true");
     if (typer->boolean) typer->booleanType = specialize(typer,NULL,typer->boolean,NULL,NULL,typer->boolean);
@@ -6046,13 +6036,16 @@ static int evalInitializer(Eval *eval, RangeNode *declaration, RangeNode *at, Ra
     RangeGraphValue raw = rangeGraphStoredField(eval->vm->arena,declaration,"value");
     RangeNode *rhs = raw.kind == RangeGraphNode ? raw.node : NULL;
     RangeNodeKind kind; long long integer; const char *text;
-    if (!rhs) return evalFail(eval,at,"the value of '%s' is not known at macro time",declaration->name);
-    if (lawInputs(rhs,&kind,&integer,&text)) {
+    if (rhs && lawInputs(rhs,&kind,&integer,&text)) {
         *out = (RangeValue){.kind=ValueLiteral,.node=rhs->kind == RangeNodeUnary ? rhs->a : rhs,.integer=integer,
                             .text=text,.length=text ? strlen(text) : 0};
         return EvalNormal;
     }
     typeValueOnDemand(eval->typer,declaration);
+    // What typing recorded beside the declaration, such as the absent case
+    // `let v: T?` starts as, else what is written.
+    if (declaration->lowered) rhs = declaration->lowered;
+    if (!rhs) return evalFail(eval,at,"the value of '%s' is not known at macro time",declaration->name);
     EvalFrame none = {0};
     return evalExpression(eval,&none,rhs,out);
 }
@@ -6397,7 +6390,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         RangeNode *value = count ? arguments[0]->a : NULL;
         EvalFrame *in = frame;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) { value = memberDefault(declaration->items[i]); in = &defaults; }
+            if (constructionInput(declaration->items[i])) { value = declarationValue(declaration->items[i]); in = &defaults; }
         status = evalExpression(eval,in,value,out);
         return status ? status : evalAdopt(eval,out,type,at);
     }
@@ -6410,11 +6403,11 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
         for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
         if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
-        else if (member->typeName && (member->flags & RangeFlagApplication))
+        else if ((value = declarationValue(member)) == member)
             status = evalConstruct(eval,&defaults,member->type,member->items,member->itemCount,member,&instance.values[i]);
-        else if ((value = memberDefault(member))) status = evalExpression(eval,&defaults,value,&instance.values[i]);
+        else if (value) status = evalExpression(eval,&defaults,value,&instance.values[i]);
         else continue; /* a required input: typing reports it missing */
-        if (!status) status = evalAdopt(eval,&instance.values[i],member->type,value ? value : member);
+        if (!status) status = evalAdopt(eval,&instance.values[i],member->type,value);
         if (status) return status;
     }
     *out = instance;
@@ -6839,11 +6832,9 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     case RangeNodeLet: case RangeNodeState: {
         // `let p: Point(x: 1)` constructs; `let r: step(x: 1)` calls; a bare
         // name that resolved to a value copies it.
-        RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
-        if (node->typeName && (node->flags & RangeFlagApplication) && !(node->a && node->a->kind == RangeNodeCall))
-            status = evalConstruct(eval,frame,node->type,node->items,node->itemCount,node,&value);
-        else status = evalExpression(eval,frame,!node->typeName || (node->a && node->a->kind == RangeNodeCall) ? rangeNodeRHS(node)
-            : copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL,&value);
+        RangeNode *initial = declarationValue(node);
+        if (initial == node) status = evalConstruct(eval,frame,node->type,node->items,node->itemCount,node,&value);
+        else status = evalExpression(eval,frame,initial,&value);
         if (!status) status = evalAdopt(eval,&value,node->type,node);
         if (!status) evalBind(eval,frame,node,value);
         return status;
@@ -7409,8 +7400,8 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         native->resultTemp = -1;
         if (count) return nativeExpression(native,arguments[0]->a), type;
         for (size_t i = 0; i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i]) && memberDefault(declaration->items[i])) {
-                nativeExpression(native,memberDefault(declaration->items[i]));
+            if (constructionInput(declaration->items[i]) && declarationValue(declaration->items[i])) {
+                nativeExpression(native,declarationValue(declaration->items[i]));
                 return type;
             }
         nativeEmit(native,armMovz(0,0,0));
@@ -7423,7 +7414,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         // `String("hi")` is the literal's bytes, and `String()` its default's.
         RangeNode *value = count ? arguments[0]->a : NULL;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) value = memberDefault(declaration->items[i]);
+            if (constructionInput(declaration->items[i])) value = declarationValue(declaration->items[i]);
         nativeFrameAddress(native,0,destination);
         nativeZero(native,0,type->size);
         if (value) {
@@ -7468,12 +7459,12 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
         int memberKind = nativeKind(native,memberType,member);
         if (memberKind == NativeNone) continue;
-        if (!value && member->typeName && (member->flags & RangeFlagApplication)) {
+        if (!value) value = declarationValue(member);
+        if (value == member) {
             nativeConstruct(native,member,memberType,member->items,member->itemCount,destination + (int32_t)offset);
             if (memberKind == NativeScalar) { nativeFrameAddress(native,1,destination); nativeStoreScalar(native,0,1,offset,memberType); }
             continue;
         }
-        if (!value) value = memberDefault(member);
         if (!value) continue; /* required inputs are enforced by the type checker */
         nativeExpression(native,value);
         int moved = nativeTakeTemp(native);
@@ -8952,11 +8943,9 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         RangeNode *type = nativeType(native,node->type);
         int kind = nativeKind(native,type,node);
         if (kind == NativeNone) break;
-        int construction = node->typeName && (node->flags & RangeFlagApplication) && !(node->a && node->a->kind == RangeNodeCall);
         // A bare name that resolved to a value is a copy; to a type, a requirement.
-        RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
-        RangeNode *value = !node->typeName || (node->a && node->a->kind == RangeNodeCall) ? rangeNodeRHS(node)
-            : copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL;
+        RangeNode *value = declarationValue(node);
+        int construction = value == node;
         if (kind == NativeScalar) {
             if (construction) nativeConstruct(native,node,type,node->items,node->itemCount,0);
             else if (value) nativeExpression(native,value);

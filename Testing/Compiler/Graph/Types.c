@@ -248,6 +248,25 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // `let v: T?` keeps its written form; the absent case it starts as is recorded beside it.
+    compile(&c,"construct Box { let size: Int? let label: Int } "
+        "function boxes(let box: Box?): Int { let empty: Int? let made: Box(label: 1) "
+        "switch { box.present & box.size.present: return 1, box.absent: return 0 } } "
+        "macro probe(): Construct { let first: #members.first() "
+        "switch { first.present(let m) & m.value.absent: @warning(\"starts absent\"), default: {} } } "
+        "@probe construct Starts { let size: Int? }");
+    assert(errorsIn(&c,"type") == 1);
+    assert(reported(&c,"type","switch must be exhaustive: 'box.present & box.present.size.absent' is not handled"));
+    RangeNode *empty = local(&c,"boxes","empty");
+    assert(same(empty->typeName,"Int") && empty->lowered && empty->lowered->kind == RangeNodeCase && same(empty->lowered->name,"absent"));
+    expectDescription(empty->type,"Optional<Wrapped: Int<bits: 64, signed: true>>");
+    assert(named(named(c.project,"Box"),"size")->lowered);
+    int starts = 0;
+    for (SourceDiagnostic *d = c.report.first; d; d = d->next) starts |= d->warning && same(d->message,"starts absent");
+    assert(starts);
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
