@@ -301,6 +301,16 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A closure whose body is one expression yields it; typing does not store it in the closure.
+    compile(&c,"function anyBig(let xs: Array<Int>): Bool { return xs.contains { x in x > 9 } }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *closure = named(c.project,"anyBig")->a->items[0]->a->items[0]->a;
+    assert(closure->kind == RangeNodeClosure && !closure->c);
+    RangeNode *yields = closureResult(c.typer,closure);
+    assert(yields && yields->kind == RangeNodeBinary && same(yields->name,">"));
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }

@@ -3560,6 +3560,14 @@ static RangeNode *closureValue(RangeNode *closure)
     return value && value->kind != RangeNodeAttribute ? value : NULL;
 }
 
+/* What a typed closure yields: its one expression, unless its result is a
+ * unit type; otherwise its body runs and `return` gives the value. */
+static RangeNode *closureResult(Typer *typer, RangeNode *closure)
+{
+    RangeNode *value = closureValue(closure);
+    return value && !(isFunctionType(closure->type) && unitType(typer,closure->type->a)) ? value : NULL;
+}
+
 static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closure, RangeNode *expected, RangeNode *context)
 {
     char t[320]; describeType(t,sizeof(t),expected);
@@ -3590,7 +3598,6 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
         RangeNode *actual = typeOf(typer,&own,value,result,context);
         if (result) coerce(typer,value,result,actual,"the result of this closure");
         else result = actual;
-        closure->c = value;
     } else {
         typeBlock(typer,&own,closure->a,context,result);
         if (!result) result = typer->inferred;
@@ -6341,7 +6348,8 @@ static int evalCallClosure(Eval *eval, RangeValue *closure, RangeValue *argument
         status = evalAdopt(eval,&arguments[i],literal->items[i]->type,at);
         evalBind(eval,&frame,literal->items[i],arguments[i]);
     }
-    if (!status && literal->c) status = evalExpression(eval,&frame,literal->c,out);
+    RangeNode *value = closureResult(eval->typer,literal);
+    if (!status && value) status = evalExpression(eval,&frame,value,out);
     else if (!status) {
         *out = (RangeValue){0};
         status = evalStatement(eval,&frame,literal->a);
@@ -8341,7 +8349,7 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     }
     RangeNode *output = literal->type ? nativeTypeIn(native,literal->type->a,closure.context->self,closure.context->outer) : NULL;
-    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,literal->c,slots);
+    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,closureResult(native->typer,literal),slots);
     native->hiddenCount -= 1;
     return result;
 }
