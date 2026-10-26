@@ -4073,7 +4073,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
         else if (typer->macro && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
             // In a macro a type's name is that declaration, a value of its
-            // grammar kind: `equals.output != Bool` compares declarations.
+            // grammar kind: `written.output != Bool` compares declarations.
             RangeNode *kind = declaration->grammarDefinition;
             if (kind && kind->kind == RangeNodeConstruct) type = specialize(typer,NULL,kind,NULL,NULL,expr);
         } else if (declaration->kind == RangeNodeTypeParameter || declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
@@ -4893,11 +4893,6 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
         && (!(function->flags & RangeFlagBuiltin) || !context || context->resolvedDeclaration != typer->boolean))
         typeError(typer,function,"'%s' is reserved for Bool logic; %s cannot declare it",
                   function->name,function->typeName);
-    // One way to define equality: `=` is built in, and a macro the type
-    // applies may emit another; the type does not write one.
-    if (function->typeName && same(function->name,"=") && !function->emittedBy)
-        typeError(typer,function,"%s declares '=' itself; a type's '=' is the built-in structural comparison, or the one a macro it applies emits",
-                  function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
     if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
     TyperContext outer = typerSave(typer);
@@ -5397,9 +5392,9 @@ static void checkMutations(Typer *typer, RangeNode *node)
     for (size_t i = 0; i < node->itemCount; ++i) checkMutations(typer,node->items[i]);
 }
 
-/* The function `=` calls on values of a type: the `=` with a body that
- * @equatable emits from the type's equals. Without one, `=` is C's built-in
- * structural comparison. */
+/* The function `=` calls on values of a type: the `=` with a body the type
+ * declares, written or emitted. Without one, `=` is C's built-in structural
+ * comparison. */
 static RangeNode *equalityFunction(const RangeNode *type)
 {
     RangeNode *function = type && type->kind == RangeNodeSpecialization ? operatorFunction(type->resolvedDeclaration,"=",1) : NULL;
@@ -9377,7 +9372,7 @@ static int nativeGraphValues(Native *native, const RangeNode *type)
 /* A construct's methods are compiled for each concrete specialization. A
  * construct with type parameters is generic, as a generic function is: its
  * methods are compiled per specialization when called, so Array<Point>'s
- * equals, and Point's `=` with it, exist only if such arrays are compared. */
+ * `=`, and Point's `=` with it, exist only if such arrays are compared. */
 static void nativeMethods(Native *native, RangeNode *construct)
 {
     if (parametric(construct)) return;

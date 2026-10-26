@@ -1,7 +1,7 @@
 // @collection supplies Array's storage members and operations: count,
 // capacity, @many elements, append, read, write, and the @iteration function.
-// Equality comes with @collection: it applies @equatable with its own equals,
-// so `a = b` compares count and elements, never capacity.
+// Equality comes with @collection: it emits Array's own `=`, which compares
+// count and elements, never capacity.
 
 @collection
 construct Array<Element> {}

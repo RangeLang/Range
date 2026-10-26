@@ -14,7 +14,7 @@ macro collection(): Construct {
     // code lands there.
     //
     // @equatable on the extension applies to the target as if the target
-    // wrote it, so every collection compares by the equals emitted beside it.
+    // wrote it, so it checks the `=` emitted beside it.
     #graph {
         @equatable
         extension #name {
@@ -40,9 +40,8 @@ macro collection(): Construct {
 
             // Two collections are equal when they hold equal elements in the
             // same order, each pair compared with Element's own `=`; capacity
-            // is storage, not value, so it never takes part. The @equatable
-            // on this extension makes `=` call this.
-            function equals(let other: #name): Bool {
+            // is storage, not value, so it never takes part.
+            function =(let other: #name): Bool {
                 switch { count != other.count: return false, default: {} }
                 for index in 0..<count {
                     switch { read(at: index) != other.read(at: index): return false, default: {} }

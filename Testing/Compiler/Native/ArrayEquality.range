@@ -1,4 +1,4 @@
-// Array applies @equatable with the equals @collection emits: equal counts,
+// Array compares with the `=` @collection emits: equal counts,
 // then equal elements in order, each pair compared with the element type's
 // own `=`. Capacity is storage, not value.
 construct Point { let x: Int  let y: Int }

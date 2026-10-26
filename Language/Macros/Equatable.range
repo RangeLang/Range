@@ -8,82 +8,62 @@
 // recursively. Its code is generated only for the types, per specialization,
 // that a program compares, and for the field and payload types those reach.
 //
-// A type never writes `=` itself; C reports one written in the type or in an
-// extension of it. Writing @equatable makes `=` call the type's own
-// `function equals(let other: <Type>): Bool` instead, through the `=` this
-// macro emits. Without @equatable, an equals is an ordinary function.
-// `@equatable extension Type { … }` writes it as well: it applies to Type, as
-// written there, and sees the equals declared in that extension. That is how
-// @collection makes every collection compare by the equals it emits.
+// A type replaces it by writing `function =(let other: <Type>): Bool`, in the
+// type or an extension of it. @equatable checks that written `=`: it emits
+// nothing, and a type may write `=` without it. The operator rules check the
+// rest: `=` takes one parameter and is declared on the type it compares.
+// `@equatable extension Type { … }` applies to Type, as written there, and
+// sees the `=` declared in that extension. That is how @collection checks the
+// `=` it emits for every collection.
 macro equatable(): Construct {
-    let equals: #functions.first { candidate in candidate.name = "equals" }
+    let written: #functions.first { candidate in candidate.name = "=" }
 
     switch {
-        equals.present: {
-            switch {
-                equals.parameters.count != 1:
-                    @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
-                default: {}
-            }
-            let parameter: equals.parameters.first()
+        written.present: {
+            let parameter: written.parameters.first()
             switch {
                 parameter.present & parameter.name != "other":
-                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(parameter.name)'"),
+                    @diagnostic("the parameter of \(#name)'s '=' must be labeled 'other', as in 'function =(let other: \(#name)): Bool'; it is labeled '\(parameter.name)'"),
 
-                parameter.present & parameter.type != equals.receiver:
-                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+                parameter.present & parameter.type != written.receiver:
+                    @diagnostic("the parameter of \(#name)'s '=' must be of type \(#name), the type it compares"),
 
                 default: {}
             }
             switch {
-                equals.output != Bool: @diagnostic("\(#name).equals must return Bool"),
+                written.output != Bool: @diagnostic("\(#name)'s '=' must return Bool"),
                 default: {}
-            }
-            #graph {
-                extension #name {
-                    function =(let other: #name): Bool { return equals(other: other) }
-                }
             }
         },
 
-        equals.absent:
-            @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
+        written.absent:
+            @warning("\(#name) applies @equatable but declares no '='; the built-in structural '=' is used")
     }
 }
 
-// The same for an enum: writing @equatable makes `=` call its equals.
+// The same for an enum.
 macro equatable(): Enum {
-    let equals: #functions.first { candidate in candidate.name = "equals" }
+    let written: #functions.first { candidate in candidate.name = "=" }
 
     switch {
-        equals.present: {
-            switch {
-                equals.parameters.count != 1:
-                    @diagnostic("\(#name).equals must take exactly one parameter, as in 'function equals(let other: \(#name)): Bool'; it takes \(equals.parameters.count)"),
-                default: {}
-            }
-            let parameter: equals.parameters.first()
+        written.present: {
+            let parameter: written.parameters.first()
             switch {
                 parameter.present & parameter.name != "other":
-                    @diagnostic("the parameter of \(#name).equals must be labeled 'other', as in 'function equals(let other: \(#name)): Bool'; it is labeled '\(parameter.name)'"),
+                    @diagnostic("the parameter of \(#name)'s '=' must be labeled 'other', as in 'function =(let other: \(#name)): Bool'; it is labeled '\(parameter.name)'"),
 
-                parameter.present & parameter.type != equals.receiver:
-                    @diagnostic("the parameter of \(#name).equals must be of type \(#name), the type it compares"),
+                parameter.present & parameter.type != written.receiver:
+                    @diagnostic("the parameter of \(#name)'s '=' must be of type \(#name), the type it compares"),
 
                 default: {}
             }
             switch {
-                equals.output != Bool: @diagnostic("\(#name).equals must return Bool"),
+                written.output != Bool: @diagnostic("\(#name)'s '=' must return Bool"),
                 default: {}
-            }
-            #graph {
-                extension #name {
-                    function =(let other: #name): Bool { return equals(other: other) }
-                }
             }
         },
 
-        equals.absent:
-            @warning("\(#name) applies @equatable but declares no equals; the default structural equality is used")
+        written.absent:
+            @warning("\(#name) applies @equatable but declares no '='; the built-in structural '=' is used")
     }
 }

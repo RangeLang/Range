@@ -1,7 +1,7 @@
 // `a = b` calls the function `=` declared on a's type. Every construct and
-// enum applies @equatable by default, which emits a structural `=`: a
-// construct member by member, an enum by case, then payload, recursively. A
-// type that writes @equatable and declares equals compares with equals.
+// enum has a built-in structural `=`: a construct member by member, an enum
+// by case, then payload, recursively. A type that writes `=` compares with
+// it; @equatable checks a written `=`.
 construct Point { let x: Int  let y: Int }
 construct Segment { let from: Point  let to: Point }
 enum Shape { case dot(Point), line(Segment), none }
@@ -22,12 +22,12 @@ construct Fraction {
     let numerator: Int
     let denominator: Int
 
-    function equals(let other: Fraction): Bool {
+    function =(let other: Fraction): Bool {
         return numerator * other.denominator = other.numerator * denominator
     }
 }
 
-// Default equality cascades into a field with its own equals.
+// Default equality cascades into a field with its own `=`.
 construct Measure { let amount: Fraction  let unit: String }
 enum Reading { case exact(Fraction), unknown }
 
@@ -36,15 +36,15 @@ enum Reading { case exact(Fraction), unknown }
 enum Parity {
     case even, odd
 
-    function equals(let other: Parity): Bool { return true }
+    function =(let other: Parity): Bool { return true }
 }
 
-// Warned: @equatable without equals keeps the default equality.
+// Warned: @equatable without `=` keeps the built-in equality.
 @equatable
 construct Plain { let n: Int }
 
-// Without @equatable written, equals is an ordinary function: `=` stays
-// structural, so 1/2 and 2/4 differ here.
+// A function named equals is an ordinary function: `=` stays structural, so
+// 1/2 and 2/4 differ here.
 construct LooseFraction {
     let numerator: Int
     let denominator: Int
@@ -52,6 +52,12 @@ construct LooseFraction {
     function equals(let other: LooseFraction): Bool {
         return numerator * other.denominator = other.numerator * denominator
     }
+}
+
+// Without @equatable, a written `=` is used all the same; nothing checks it.
+construct Unmarked {
+    let n: Int
+    function =(let other: Unmarked): Bool { return true }
 }
 
 function classify(let p: Point): Int {
@@ -91,6 +97,7 @@ function half(let f: Fraction): Bool {
     let loose: LooseFraction(numerator: 1, denominator: 2)
     switch { loose = LooseFraction(numerator: 2, denominator: 4) | loose != LooseFraction(numerator: 1, denominator: 2): return 13, default: {} }
     switch { !loose.equals(other: LooseFraction(numerator: 2, denominator: 4)): return 20, default: {} }
+    switch { Unmarked(n: 1) != Unmarked(n: 2): return 21, default: {} }
     switch { classify(p: Point(x: 0, y: 0)) != 0 | classify(p: Point(x: 1, y: 1)) != 1 | classify(p: a) != 2: return 14, default: {} }
     switch { !half(f: half2) | half(f: Fraction(numerator: 2, denominator: 3)): return 15, default: {} }
     let maybe: Point?.present(a)

@@ -13,7 +13,7 @@ construct Plain { let n: Int }
 @equatable
 construct Twice {
     let n: Int
-    function equals(let other: Twice): Bool { return true }
+    function =(let other: Twice): Bool { return true }
 }
 
 // Reports whether @equatable is written, through an extension too.
@@ -36,7 +36,7 @@ macro alwaysEqual(): Enum {
     #graph {
         @equatable
         extension #name {
-            function equals(let other: #name): Bool { return true }
+            function =(let other: #name): Bool { return true }
         }
     }
 }

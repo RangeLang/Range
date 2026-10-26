@@ -1,10 +1,10 @@
 // A macro applied on an extension applies to the extended declaration, as if
 // written there. Each extension here is in another file than its declaration.
 
-// 1/2 = 2/4: @equatable sees the equals declared beside it.
+// 1/2 = 2/4: @equatable sees the `=` declared beside it.
 @equatable
 extension Fraction {
-    function equals(let other: Fraction): Bool {
+    function =(let other: Fraction): Bool {
         return numerator * other.denominator = other.numerator * denominator
     }
 }
@@ -12,10 +12,10 @@ extension Fraction {
 // On an enum: every parity is equal to every other.
 @equatable
 extension Parity {
-    function equals(let other: Parity): Bool { return true }
+    function =(let other: Parity): Bool { return true }
 }
 
-// Warned: @equatable without equals keeps the default equality.
+// Warned: @equatable without `=` keeps the built-in equality.
 @equatable
 extension Plain {}
 

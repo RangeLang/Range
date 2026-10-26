@@ -62,24 +62,24 @@ run logic 42 "" Testing/Compiler/Native/Logic.range
 printf '%s\n' "touched 3" "touched 4" | cmp -s - "$work_root/stdout" || fail "logic short-circuit printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
 run equatable 42 "" Testing/Compiler/Native/Equatable.range
-grep -Fq "Equatable.range:43:1: warning[macro]: Plain applies @equatable but declares no equals; the default structural equality is used" \
-    "$work_root/log" || fail "explicit @equatable without equals was not warned"
-! grep -Fq "LooseFraction" "$work_root/log" || fail "equals without @equatable was warned"
+grep -Fq "Equatable.range:43:1: warning[macro]: Plain applies @equatable but declares no '='; the built-in structural '=' is used" \
+    "$work_root/log" || fail "explicit @equatable without '=' was not warned"
+! grep -Eq "LooseFraction|Unmarked" "$work_root/log" || fail "a type without @equatable was warned"
 run equality-syntax 42 "" Testing/Compiler/Native/EqualitySyntax.range
 run operators 42 "" Testing/Compiler/Native/Operators.range
 run array-equality 42 "" Testing/Compiler/Native/ArrayEquality.range
 # A macro written on an extension applies to the extended declaration, here
 # from another file than the declaration, on constructs, enums, and #graph.
 run extension-equality 42 "" Testing/Compiler/Native/ExtensionTypes.range Testing/Compiler/Native/ExtensionEquality.range
-grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable but declares no equals; the default structural equality is used" \
-    "$work_root/log" || fail "@equatable extension without equals was not warned"
+grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable but declares no '='; the built-in structural '=' is used" \
+    "$work_root/log" || fail "@equatable extension without '=' was not warned"
 grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
     || fail "a second application of @equatable was not noted"
 grep -Fq "ExtensionTypes.range:28:1: warning[macro]: Written writes @equatable" "$work_root/log" \
     || fail "#macros does not list an application written through an extension"
-! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no equals" "$work_root/log" \
-    || fail "@equatable on an extension missed the equals beside it"
-! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its equals"
+! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no" "$work_root/log" \
+    || fail "@equatable on an extension missed the '=' beside it"
+! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its '='"
 run member-defaults 42 "" Testing/Compiler/Native/MemberDefaults.range
 run expressions 42 "" Testing/Compiler/Native/Expressions.range
 run generics 42 "" Testing/Compiler/Native/Generics.range
@@ -615,7 +615,7 @@ reject enum-extension-member "an extension of enum 'Direction' cannot add stored
 extension Direction { let speed: 1 }
 { return 0 }'
 # A type compares only when every field it reaches compares. Array compares
-# through its own equals; raw @many storage has no '=' of its own.
+# through its own `=`; raw @many storage has no '=' of its own.
 raw='construct Raw { @many state slots: Int }
 construct Bag { let items: Raw }'
 reject uncomparable-field "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare" \
@@ -633,39 +633,37 @@ construct Pair<Value> { let first: Value  let second: Value  function same(): Bo
 reject uncomparable-element "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Array<Element: Bag>)" \
     "$raw
 { state xs: Array<Bag>() switch { xs = xs: return 1, default: {} } return 0 }"
-# Demand-driven: an Array's equals, and its element's '=', exist only when
+# Demand-driven: an Array's `=`, and its element's '=', exist only when
 # such arrays are compared, so an array of an uncomparable type compiles.
 run uncompared-element 7 "" "$(case_file uncompared-element "$raw
 { state xs: Array<Bag>() xs.append(value: Bag(items: Raw())) return 6 + xs.count }")"
-# @equatable checks equals in Range before it emits '=' calling it.
-reject equals-label "the parameter of Bad.equals must be labeled 'other', as in 'function equals(let other: Bad): Bool'; it is labeled 'value'" \
+# @equatable checks a written '=' in Range; the operator rules check the rest.
+reject equality-label "the parameter of Bad's '=' must be labeled 'other', as in 'function =(let other: Bad): Bool'; it is labeled 'value'" \
     '@equatable
-construct Bad { let n: Int  function equals(let value: Bad): Bool { return true } }
+construct Bad { let n: Int  function =(let value: Bad): Bool { return true } }
 { return 0 }'
-reject equals-type "the parameter of Bad.equals must be of type Bad, the type it compares" \
+reject equality-type "the parameter of Bad's '=' must be of type Bad, the type it compares" \
     '@equatable
-construct Bad { let n: Int  function equals(let other: Int): Bool { return true } }
+construct Bad { let n: Int  function =(let other: Int): Bool { return true } }
 { return 0 }'
-reject equals-result "Bad.equals must return Bool" \
+reject equality-result "Bad's '=' must return Bool" \
     '@equatable
-construct Bad { let n: Int  function equals(let other: Bad): Int { return 1 } }
+construct Bad { let n: Int  function =(let other: Bad): Int { return 1 } }
 { return 0 }'
-reject equals-count "Bad.equals must take exactly one parameter, as in 'function equals(let other: Bad): Bool'; it takes 2" \
+reject equality-count "operator '=' takes one parameter, the right operand; Bad.= takes 2" \
     '@equatable
-enum Bad { case one, two  function equals(let other: Bad, let again: Bad): Bool { return true } }
+enum Bad { case one, two  function =(let other: Bad, let again: Bad): Bool { return true } }
 { return 0 }'
-reject equals-enum-type "the parameter of Bad.equals must be of type Bad, the type it compares" \
+reject equality-enum-type "the parameter of Bad's '=' must be of type Bad, the type it compares" \
     '@equatable
-enum Bad { case one, two  function equals(let other: Bool): Bool { return true } }
+enum Bad { case one, two  function =(let other: Bool): Bool { return true } }
 { return 0 }'
-# One way to define equality: a type never writes '=' itself.
-reject user-equality "Own declares '=' itself; a type's '=' is the built-in structural comparison, or the one a macro it applies emits" \
-    'construct Own { let n: Int  function =(let other: Own): Bool { return true } }
-{ switch { Own(n: 1) = Own(n: 2): return 1, default: {} } return 0 }'
-reject user-equality-extension "Own declares '=' itself; a type's '=' is the built-in structural comparison, or the one a macro it applies emits" \
-    'enum Own { case one, two }
+# A type may write '=' without @equatable, in the type or an extension.
+run written-equality 0 "" "$(case_file written-equality 'construct Own { let n: Int  function =(let other: Own): Bool { return true } }
+{ switch { Own(n: 1) != Own(n: 2): return 1, default: {} } return 0 }')"
+run written-equality-extension 0 "" "$(case_file written-equality-extension 'enum Own { case one, two }
 extension Own { function =(let other: Own): Bool { return true } }
-{ return 0 }'
+{ switch { Own.one != .two: return 1, default: {} } return 0 }')"
 reject top-level-equality "'=' must be declared on the type it compares, in the type or an extension of it" \
     'function =(let other: Int): Bool { return true }
 { return 0 }'
@@ -789,7 +787,7 @@ ignore='{ let p: make(n: 1) let q: make(n: 2) switch { p.x = q.x: return 1, defa
 unused='construct Unused { let a: Int  let b: Point }
 enum Shape { case dot(Point), line(Point, Point), none }
 @equatable
-construct Custom { let n: Int  function equals(let other: Custom): Bool { return n = other.n } }'
+construct Custom { let n: Int  function =(let other: Custom): Bool { return n = other.n } }'
 loose='construct Custom { let n: Int  function equals(let other: Custom): Bool { return n = other.n } }'
 for variant in compared:"$base
 $compare" ignored:"$base
@@ -804,10 +802,11 @@ $ignore"; do
 done
 [[ "$(text_size "$work_root/demand-compared")" -gt "$(text_size "$work_root/demand-ignored")" ]] \
     || fail "comparing Point emitted no equality code"
-[[ "$(text_size "$work_root/demand-unused")" == "$(text_size "$work_root/demand-loose")" ]] \
+# Custom's written '=' is equality code too: compiled only when compared.
+[[ "$(text_size "$work_root/demand-unused")" == "$(text_size "$work_root/demand-ignored")" ]] \
     || fail "types that are never compared emitted equality code"
 loose_size="$(text_size "$work_root/demand-loose")"; ignored_size="$(text_size "$work_root/demand-ignored")"
-[[ "$loose_size" -gt "$ignored_size" ]] || fail "Custom's own equals method was not compiled"
+[[ "$loose_size" -gt "$ignored_size" ]] || fail "Custom's ordinary equals method was not compiled"
 # Generic functions: a body is checked per instantiation, which the error names.
 reject generic-operation "'+' is not declared on Bool; in sum<T: Bool>, specialized at" \
     'function sum<T>(let a: T, let b: T): T { return a + b }
@@ -993,4 +992,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-echo "compiler native: programs=62 rejections=193 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=64 rejections=191 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
