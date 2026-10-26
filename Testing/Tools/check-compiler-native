@@ -521,13 +521,58 @@ reject macro-narrowing-shadow "'on' is already narrowed to the payload here" \
 @named
 enum Light { case on, off }
 { return 0 }'
-reject macro-narrowing-state "Optional has no case 'name'" \
+reject macro-narrowing-state "Optional<Wrapped: EnumCase> has no case 'name'" \
     'macro named(): Enum {
     state on: #cases.first(where: { c in c.name = "on" })
     switch { on.present: @warning("\(on.name)"), default: {} }
 }
 @named
 enum Light { case on, off }
+{ return 0 }'
+# A macro's body is typed as a function's is: #members is Array<@member>, so
+# a member's name is a String, and the same mistake is the same type error.
+# It replaces the evaluator's failure at the same place.
+reject macro-mismatch "macro-mismatch.range:2:63: error[type]: operator '=' requires matching types; found String and Int<bits: 64, signed: true>" \
+    'macro valued(): Construct {
+    let stored: #members.first(where: { member in member.name = 5 })
+}
+@valued
+construct Box { let value: 1 }
+{ return 0 }'
+! grep -Fq "a compile-time name requires text" "$work_root/log" || fail "a macro's type error was reported twice"
+# @member names a declaration of any kind applying @member: a field none of
+# them declares is an error; one only some declare is known at macro time.
+reject macro-type-member "@member has no member 'nmae'" \
+    'macro named(): Construct {
+    let first: #members.first(where: { member in member.nmae = "value" })
+}
+{ return 0 }'
+reject macro-field "field 'nmae' is not declared by @type Construct" \
+    'macro named(): Construct { let name: #nmae }
+{ return 0 }'
+reject macro-grammar-field "Macro has no member 'target'" \
+    'macro targeted(): Macro { let target: #target }
+{ return 0 }'
+run macro-time-value 0 "" "$(case_file macro-time-value 'macro sized(): Construct {
+    let width: #generics.first(where: { generic in generic.name = "width" })
+    switch {
+        width.present & width.value > 4: @warning("\(#name) is \(width.value) wide"),
+        default: {}
+    }
+}
+@sized
+construct Grid<let width: 8> { let cells: 0 }
+{ return 0 }')"
+grep -Fq "macro-time-value.range:8:1: warning[macro]: Grid is 8 wide" "$work_root/log" \
+    || fail "a value known at macro time did not run: $(grep 'error\[' "$work_root/log")"
+reject macro-local-type "assignment to 'count' requires Int<bits: 64, signed: true>; found String" \
+    'macro counted(): Enum {
+    state count: 0
+    count: "two"
+}
+{ return 0 }'
+reject macro-effect-type "argument 'message' of '@diagnostic' requires String; found Int<bits: 64, signed: true>" \
+    'macro failing(): Enum { @diagnostic(5) }
 { return 0 }'
 
 reject case-test-not-enum "Int<bits: 64, signed: true> has no member 'present'" \
@@ -982,4 +1027,4 @@ grep -Fq "defaults-extension.range:10:1: warning[macro]: Light is announced" "$w
     || fail "@defaults through an extension did not apply"
 core=("${full[@]}")
 
-echo "compiler native: programs=63 rejections=188 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=64 rejections=194 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
