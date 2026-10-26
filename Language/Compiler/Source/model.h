@@ -81,8 +81,9 @@ enum {
                                     * in its condition, so it names what it names outside the condition */
     RangeFlagNarrowed = 1 << 17,   /* member access: the payload of the optional value a, which a test of
                                     * its present case narrowed; resolvedDeclaration is the payload field */
-    RangeFlagTyped = 1 << 18       /* function, macro, entry block, member: typed already, so typing on
+    RangeFlagTyped = 1 << 18,      /* function, macro, entry block, member: typed already, so typing on
                                     * demand at macro time and typing in order meet once */
+    RangeFlagShape = 1 << 19       /* #graph: a shape-only block, emitted before any macro body runs */
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of
@@ -136,6 +137,7 @@ struct RangeMacroApplication {
     RangeNode *unit;
     RangeNode *attribute; /* the application site on the target */
     int applied;          /* each application runs once */
+    int shaped;           /* its shape-only #graph blocks have landed */
     RangeGraphBinding *bindings;
     size_t count;
 };

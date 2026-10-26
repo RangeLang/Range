@@ -442,6 +442,43 @@ static void validateTargetReferences(Resolver *vm, RangeNode *node, RangeNode *t
     for (size_t i = 0; i < node->itemCount; ++i) validateTargetReferences(vm,node->items[i],type,nominal);
 }
 
+static int spliceChain(const RangeNode *);
+
+/* Whether quoted code splices only bare target fields, each a single node
+ * of the target's shape that no parameter or top-level local of the macro
+ * shadows. A nested macro's splices are its own. */
+static int shapeSplices(const RangeNode *macro, const RangeNode *shape, const RangeNode *node)
+{
+    if (!node || node->kind == RangeNodeMacro) return 1;
+    if (spliceChain(node)) {
+        const RangeNode *field = node->kind == RangeNodeEnvironment ? rangeGraphField(shape,node->name) : NULL;
+        if (!field || (field->flags & (RangeFlagMany | RangeFlagOptional))) return 0;
+        for (size_t i = 0; i < macro->itemCount; ++i) if (same(macro->items[i]->name,node->name)) return 0;
+        for (size_t i = 0; i < macro->a->itemCount; ++i)
+            if (rangeNodeDeclaresValue(macro->a->items[i]->kind) && same(macro->a->items[i]->name,node->name)) return 0;
+        return 1;
+    }
+    if (!shapeSplices(macro,shape,node->a) || !shapeSplices(macro,shape,node->b) || !shapeSplices(macro,shape,node->c)
+        || !shapeSplices(macro,shape,node->generics) || !shapeSplices(macro,shape,node->annotations)
+        || !shapeSplices(macro,shape,node->rhsReference)) return 0;
+    for (size_t i = 0; i < node->itemCount; ++i) if (!shapeSplices(macro,shape,node->items[i])) return 0;
+    return 1;
+}
+
+/* A #graph block written as a statement of the macro's body, outside any
+ * switch, loop, or closure, whose splices read only the target's shape:
+ * what it emits depends on nothing the body computes, so it is emitted
+ * before any macro body runs. */
+static void markShapeBlocks(RangeNode *macro, const RangeNode *shape)
+{
+    for (size_t i = 0; shape && macro->a && i < macro->a->itemCount; ++i) {
+        RangeNode *statement = macro->a->items[i];
+        RangeNode *emission = statement->kind == RangeNodeExpressionStatement ? statement->a : NULL;
+        if (emission && emission->kind == RangeNodeEmission && shapeSplices(macro,shape,emission->b))
+            emission->flags |= RangeFlagShape;
+    }
+}
+
 static void linkGrammarNodes(Resolver *vm, RangeNode *node)
 {
     if (!node) return;
@@ -461,6 +498,7 @@ static void linkGrammarNodes(Resolver *vm, RangeNode *node)
             }
         }
         validateTargetReferences(vm,node->a,shape,nominal);
+        markShapeBlocks(node,shape);
     }
     linkGrammarNodes(vm,node->a); linkGrammarNodes(vm,node->b); linkGrammarNodes(vm,node->c);
     linkGrammarNodes(vm,node->generics); linkGrammarNodes(vm,node->annotations);
@@ -960,6 +998,19 @@ static RangeNode *emitNode(MetaEval *eval, MetaScope *scope, RangeNode *node, in
         rangeNodeAppend(eval->vm->arena,copy,emitNode(eval,scope,node->items[i],splice));
     if (splice) spliceDeclarationType(copy,node);
     return copy;
+}
+
+/* Emit a #graph block's declarations into the running application's output. */
+static void metaEmit(MetaEval *eval, MetaScope *scope, RangeNode *node)
+{
+    if (!scope->application || !eval->vm->emitted)
+        fail(eval->vm,node,"#graph requires a macro application");
+    for (size_t i = 0; i < node->b->itemCount; ++i) {
+        // Each emitted declaration is a fresh copy, sharing only within itself.
+        if (eval->emittedCapacity) memset(eval->emittedFrom,0,eval->emittedCapacity * sizeof(*eval->emittedFrom));
+        eval->emittedCount = 0;
+        rangeNodeAppend(eval->vm->arena,eval->vm->emitted,emitNode(eval,scope,node->b->items[i],1));
+    }
 }
 
 /* ---- construct values at compile time ------------------------------------
@@ -2378,15 +2429,9 @@ static RangeGraphValue metaEvaluate(MetaEval *eval, MetaScope *scope, RangeNode 
         return metaReflect(eval,scope->application->target,node->name,graphEval(eval->vm,scope->application,node),node);
     }
     case RangeNodeEmission:
-        if (eval->vm->skipEmission) return (RangeGraphValue){0};
-        if (!scope->application || !eval->vm->emitted)
-            fail(eval->vm,node,"#graph requires a macro application");
-        for (size_t i = 0; i < node->b->itemCount; ++i) {
-            // Each emitted declaration is a fresh copy, sharing only within itself.
-            if (eval->emittedCapacity) memset(eval->emittedFrom,0,eval->emittedCapacity * sizeof(*eval->emittedFrom));
-            eval->emittedCount = 0;
-            rangeNodeAppend(eval->vm->arena,eval->vm->emitted,emitNode(eval,scope,node->b->items[i],1));
-        }
+        // A shape-only block landed before the body ran.
+        if (eval->vm->skipEmission || (node->flags & RangeFlagShape)) return (RangeGraphValue){0};
+        metaEmit(eval,scope,node);
         return (RangeGraphValue){0};
     case RangeNodeCaseTest: {
         if (node->a->flags & RangeFlagImplicit) fail(eval->vm,node,"compile-time enum methods are not implemented");
@@ -2603,12 +2648,36 @@ static int compilerAttribute(RangeNode *target, RangeNode *attribute)
         || macroBuiltin(attribute->resolvedDeclaration,"literal");
 }
 
+/* An application's shape-only #graph blocks, emitted and merged once. Shape
+ * rounds run them for every application before any macro body runs; an
+ * application that joins later runs them just before its body. They land
+ * even when the body then fails. */
+static void shapeApplication(Resolver *vm, RangeNode *attribute)
+{
+    RangeMacroApplication *app = attribute->macroApplication;
+    if (!app || app->shaped) return;
+    app->shaped = 1;
+    RangeNode *body = app->declaration->a, *outer = vm->emitted;
+    RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
+    MetaEval eval = {.vm=vm};
+    MetaScope scope = {.application=app};
+    vm->emitted = emitted;
+    for (size_t i = 0; body && i < body->itemCount; ++i) {
+        RangeNode *emission = body->items[i]->kind == RangeNodeExpressionStatement ? body->items[i]->a : NULL;
+        if (emission && emission->kind == RangeNodeEmission && (emission->flags & RangeFlagShape)) metaEmit(&eval,&scope,emission);
+    }
+    vm->emitted = outer;
+    mergeEmitted(vm,emitted);
+}
+
 /* Run one application. Its #graph output is collected and returned only when
- * the whole body succeeds, so a failed application emits nothing. */
+ * the whole body succeeds, so a failed application emits nothing beyond its
+ * shape-only blocks. */
 static RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
 {
     RangeMacroApplication *app = attribute->macroApplication;
     if (!app) fail(vm,attribute,"macro application was not resolved");
+    shapeApplication(vm,attribute);
     RangeNode *emitted = rangeNodeCreate(vm->arena,RangeNodeBlock,attribute->path,attribute->line,attribute->column);
     // @many marks layout, @optional the `?` sugar's enum, @interval the `..<`
     // sugar's construct, @iteration the function `for … in` calls, and
@@ -3195,7 +3264,9 @@ static void writeSourceDiagnostics(SourceReport *report, FILE *output)
     }
 }
 
-/* Macro application: written extensions merge first, then every application
+/* Macro application: written extensions merge first; then shape rounds emit
+ * every application's shape-only #graph blocks, so declarations have the
+ * members those give them before any macro body runs; then every application
  * runs once and its #graph output merges before the next round. Applications
  * introduced by emitted code run in a later round. This discovery order is a
  * bootstrap stand-in: the accepted design is a Datalog scheduler that orders
@@ -3219,7 +3290,11 @@ static void applyAndMerge(Resolver *vm, RangeNode *attribute)
     mergeEmitted(vm,runMacroApplication(vm,attribute));
 }
 
-static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit, RangeNode *target)
+static void drainLaws(Typer *);
+
+/* One round over a target and its members: in a shape round, the shape
+ * parts not run yet; otherwise the applications not run yet. */
+static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit, RangeNode *target, int shape)
 {
     if (!target->graphType) return 0;
     int ran = 0;
@@ -3228,21 +3303,35 @@ static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit, Rang
         if (compilerAttribute(target,attribute)) continue;
         // An unresolved application here comes from a merge that already failed.
         RangeMacroApplication *app = attribute->macroApplication;
-        if (!app || app->applied) continue;
-        app->applied = 1;
+        if (!app || app->applied || (shape && app->shaped)) continue;
         ran = 1;
-        ++vm->checked;
         vm->unit = unit;
+        if (shape) { guarded(vm,report,"macro-validation",shapeApplication,attribute); continue; }
+        app->applied = 1;
+        ++vm->checked;
         guarded(vm,report,"macro-validation",applyAndMerge,attribute);
     }
     // Members merged during this round wait for the next one.
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
         for (size_t i = 0, n = target->itemCount; i < n; ++i)
-            ran |= applyTarget(vm,report,unit,target->items[i]);
+            ran |= applyTarget(vm,report,unit,target->items[i],shape);
     return ran;
 }
 
-static void drainLaws(Typer *);
+/* Rounds until one runs nothing; whether they settled. */
+static int applyRounds(Resolver *vm, SourceReport *report, int shape)
+{
+    for (int round = 0; round < RangeMacroRounds; ++round) {
+        int ran = 0;
+        for (size_t u = 0; u < vm->count; ++u)
+            for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
+                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i],shape);
+        drainLaws(vm->typer);
+        if (!ran) return 1;
+    }
+    sourceDiagnostic(report,NULL,0,"macro-validation","macro emission did not settle after %d rounds",RangeMacroRounds);
+    return 0;
+}
 
 static void applyMacros(Resolver *vm, SourceReport *report)
 {
@@ -3250,15 +3339,7 @@ static void applyMacros(Resolver *vm, SourceReport *report)
         for (size_t i = 0; i < vm->units[u]->itemCount; ++i)
             if (vm->units[u]->items[i]->kind == RangeNodeExtension)
                 guarded(vm,report,"resolution",mergeExtension,vm->units[u]->items[i]);
-    for (int round = 0; round < RangeMacroRounds; ++round) {
-        int ran = 0;
-        for (size_t u = 0; u < vm->count; ++u)
-            for (size_t i = 0, n = vm->units[u]->itemCount; i < n; ++i)
-                ran |= applyTarget(vm,report,vm->units[u],vm->units[u]->items[i]);
-        drainLaws(vm->typer);
-        if (!ran) return;
-    }
-    sourceDiagnostic(report,NULL,0,"macro-validation","macro emission did not settle after %d rounds",RangeMacroRounds);
+    if (applyRounds(vm,report,1)) (void)applyRounds(vm,report,0);
 }
 
 static Typer *newTyper(SourceReport *, Resolver *);

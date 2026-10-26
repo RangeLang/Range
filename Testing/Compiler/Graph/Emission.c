@@ -114,10 +114,15 @@ int main(void)
     assert(reported(&c,"macro-validation","#name names both a macro local and a target field"));
     assert(!declaration(c.unit,"Clash"));
     rangeArenaDestroy(&c.arena);
+    // A failed application emits nothing from its body. A shape-only block,
+    // which splices only the target's shape, landed before the body ran.
     compile(&c,CORE
-        "macro partial(): Construct { #graph { construct Partial {} } @diagnostic(\"stop\") } "
+        "macro partial(): Construct { let size: 1 #graph { construct Partial { let value: #size } } "
+        "#graph { construct Shaped { let owner: #name } } @diagnostic(\"stop\") } "
         "@partial construct Box {}");
     assert(reported(&c,"macro-validation","stop") && !declaration(c.unit,"Partial"));
+    RangeNode *shaped = declaration(c.unit,"Shaped");
+    assert(shaped && shaped->emittedBy && same(declaration(shaped,"owner")->typeName,"Box"));
     rangeArenaDestroy(&c.arena);
 
     // Emission that keeps producing new applications is reported, not looped.
@@ -147,6 +152,6 @@ int main(void)
     assert(reported(&c,"not-implemented","no C primitive is implemented for builtin function 'helper'"));
     rangeArenaDestroy(&c.arena);
 
-    puts("macro emission: extensions, splices, landing scope, duplicates, rounds, failures, slot builtins=pass");
+    puts("macro emission: extensions, splices, landing scope, duplicates, rounds, failures, shape first, slot builtins=pass");
     return 0;
 }
