@@ -145,6 +145,11 @@ struct RangeMacroApplication {
     RangeNode *attribute; /* the application site on the target */
     int applied;          /* each application runs once */
     int shaped;           /* its shape-only #graph blocks have landed */
+    /* A law run checks the target as one specialization sees it, and emits
+     * nothing: that specialization, the member a supplied literal populates
+     * and the literal, and how many items the target had as the run began. */
+    RangeNode *specialization, *slot, *literal;
+    size_t items;
 };
 
 struct RangeNode {

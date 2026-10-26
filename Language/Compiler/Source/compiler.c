@@ -24,7 +24,6 @@ typedef struct {
     jmp_buf failure;
     RangeNode *emitted; /* declarations emitted by the running application */
     RangeNode *unit;    /* unit holding the running application's target */
-    int skipEmission;   /* law runs per specialization check; emission stays on the declaration */
     struct SourceReport *report; /* where @warning reports, when compiling */
     Typer *typer; /* alive from before the first application to the end of type checking */
     size_t checked; /* applications run */
@@ -2265,8 +2264,10 @@ static LawResult *lawResult(Typer *typer, RangeNode *type, RangeNode *value)
 }
 
 /* Run the construct's macro applications against this specialization, with
- * the supplied literal in place of the member it populates. A literal's
- * outcome is reused for every equal literal of the same type. */
+ * the supplied literal in the member it populates. A run reads the
+ * declaration itself as the specialization sees it: a generic's value is the
+ * specialization's, and that member's is the literal. A literal's outcome is
+ * reused for every equal literal of the same type. */
 static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value, RangeNode *at)
 {
     RangeNode *declaration = specialization->resolvedDeclaration;
@@ -2284,9 +2285,6 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
     size_t failureCount = 0;
     RangeArena *arena = typer->report->arena;
     Resolver *vm = typer->vm;
-    RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
-    *copy = *declaration;
-    copy->generics = specialization->generics;
     RangeNodeKind kind; long long integer; const char *text;
     if (value && lawInputs(value,&kind,&integer,&text)) {
         // The law sees the literal's value alone, as a literal of its own: the
@@ -2303,52 +2301,28 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         }
         value = literal;
     }
+    RangeNode *holder = NULL;
     if (value) {
         size_t holders = 0;
-        RangeNode *holder = literalHolder(declaration,value,&holders);
+        holder = literalHolder(declaration,value,&holders);
         if (holders != 1) {
             sourceDiagnostic(typer->report,at,0,"not-implemented",
                 "literal materialization for '%s' is not implemented: %zu members hold a %s literal",
                 declaration->name,holders,value->resolvedDeclaration->name);
             return;
         }
-        copy->items = rangeArenaAllocate(arena,declaration->itemCount * sizeof(*copy->items));
-        copy->itemCapacity = declaration->itemCount;
-        memcpy(copy->items,declaration->items,declaration->itemCount * sizeof(*copy->items));
-        RangeNode *member = rangeArenaAllocate(arena,sizeof(*member));
-        *member = *holder;
-        member->rhsReference = NULL; member->typeName = NULL; member->a = NULL;
-        member->items = NULL; member->itemCount = 0; member->itemCapacity = 0;
-        forgetFacts(member);
-        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,value->path,value->line,value->column);
-        argument->a = value;
-        rangeNodeAppend(arena,member,argument);
-        for (size_t i = 0; i < copy->itemCount; ++i) if (copy->items[i] == holder) copy->items[i] = member;
     }
+    size_t items = declaration->itemCount;
     for (size_t i = 0; i < declaration->c->itemCount; ++i) {
         RangeNode *attribute = declaration->c->items[i];
         RangeMacroApplication *declared = attribute->macroApplication;
         if (!declared || compilerAttribute(declaration,attribute) || !declared->declaration->a) continue;
         if (macroBuiltin(declared->declaration,"many")) continue;
-        // The application checks the declaration it saw: its own emitted
-        // members are its output, not its input.
-        RangeNode *target = copy;
-        for (size_t k = 0; k < copy->itemCount; ++k) {
-            if (copy->items[k]->emittedBy != attribute) continue;
-            target = rangeArenaAllocate(arena,sizeof(*target));
-            *target = *copy;
-            target->items = rangeArenaAllocate(arena,copy->itemCount * sizeof(*target->items));
-            target->itemCount = 0;
-            target->itemCapacity = copy->itemCount;
-            for (size_t m = 0; m < copy->itemCount; ++m)
-                if (copy->items[m]->emittedBy != attribute) target->items[target->itemCount++] = copy->items[m];
-            break;
-        }
         RangeMacroApplication *app = rangeArenaAllocate(arena,sizeof(*app));
-        *app = (RangeMacroApplication){.declaration=declared->declaration,.target=target,.unit=declared->unit,.attribute=attribute};
+        *app = (RangeMacroApplication){.declaration=declared->declaration,.target=declaration,.unit=declared->unit,
+            .attribute=attribute,.specialization=specialization,.slot=holder,.literal=value,.items=items};
         jmp_buf outer;
         memcpy(outer,vm->failure,sizeof(outer));
-        vm->skipEmission = 1;
         if (setjmp(vm->failure) == 0) (void)evalApplication(vm,app,0);
         else {
             char type[160], text[768];
@@ -2358,7 +2332,6 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
             if (failureCount < sizeof(failures)/sizeof(*failures))
                 failures[failureCount++] = rangeArenaIntern(arena,text,strlen(text));
         }
-        vm->skipEmission = 0;
         memcpy(vm->failure,outer,sizeof(outer));
     }
     if (known) {
@@ -6108,25 +6081,40 @@ static void evalPrepare(Eval *eval, RangeNode *declaration)
         if (compilerAttribute(declaration,attribute) || !app || app->applied) continue;
         app->applied = 1;
         RangeNode *emitted = vm->emitted, *unit = vm->unit;
-        int skip = vm->skipEmission;
         vm->unit = app->unit ? app->unit : unit;
         for (size_t u = 0; u < vm->count; ++u)
             for (size_t j = 0; j < vm->units[u]->itemCount; ++j)
                 if (vm->units[u]->items[j] == declaration) vm->unit = vm->units[u];
-        vm->skipEmission = 0;
         mergeEmitted(vm,runMacroApplication(vm,attribute));
-        vm->emitted = emitted; vm->unit = unit; vm->skipEmission = skip;
+        vm->emitted = emitted; vm->unit = unit;
     }
 }
 
-/* `.value` of a member kind: its initializer, known at macro time. A literal
- * is a value of no type yet, which takes its use's type; anything else is
- * typed where it is declared and run without a receiver, so a read of
- * another member is not known. */
+/* In a law run, the value the checked specialization gives a declaration:
+ * a generic's value there, or the literal in the member it populates; NULL
+ * for any other declaration, or outside a law run. */
+static RangeNode *lawValue(const RangeMacroApplication *law, RangeNode *declaration)
+{
+    if (!law || !law->specialization) return NULL;
+    if (declaration == law->slot) return law->literal;
+    RangeNode *declared = law->target->generics, *values = law->specialization->generics;
+    for (size_t i = 0; declared && values && i < declared->itemCount && i < values->itemCount; ++i)
+        if (declared->items[i] == declaration) return rangeNodeRHS(values->items[i]);
+    return NULL;
+}
+
+/* `.value` of a member kind: its initializer, known at macro time, or in a
+ * law run the value the checked specialization gives it. A literal is a
+ * value of no type yet, which takes its use's type; anything else is typed
+ * where it is declared and run without a receiver, so a read of another
+ * member is not known. */
 static int evalInitializer(Eval *eval, RangeNode *declaration, RangeNode *at, RangeValue *out)
 {
-    RangeGraphValue raw = rangeGraphStoredField(eval->vm->arena,declaration,"value");
-    RangeNode *rhs = raw.kind == RangeGraphNode ? raw.node : NULL;
+    RangeNode *rhs = lawValue(eval->application,declaration);
+    if (!rhs) {
+        RangeGraphValue raw = rangeGraphStoredField(eval->vm->arena,declaration,"value");
+        rhs = raw.kind == RangeGraphNode ? raw.node : NULL;
+    }
     RangeNodeKind kind; long long integer; const char *text;
     if (rhs && lawInputs(rhs,&kind,&integer,&text)) {
         *out = (RangeValue){.kind=ValueLiteral,.node=rhs->kind == RangeNodeUnary ? rhs->a : rhs,.integer=integer,
@@ -6192,6 +6180,18 @@ static int evalField(Eval *eval, RangeNode *owner, const char *name, RangeNode *
         return evalFail(eval,at,"field '%s' is not declared by @type %s",name,shape ? shape->name : rangeNodeKindName(owner->kind));
     if (same(name,"value") && rangeNodeDeclaresValue(owner->kind)) return evalInitializer(eval,owner,at,out);
     RangeGraphValue raw = rangeGraphStoredField(arena,owner,name);
+    const RangeMacroApplication *law = eval->application && eval->application->specialization ? eval->application : NULL;
+    if (law && owner == law->target && raw.kind == RangeGraphNodes
+        && (same(name,"members") || same(name,"functions") || same(name,"cases"))) {
+        // A law run reads the target as it was when the run began, without
+        // what its own application emitted: that is its output, not its input.
+        RangeNode **seen = rangeArenaAllocate(arena,(raw.count ? raw.count : 1) * sizeof(*seen));
+        size_t count = 0;
+        for (size_t i = 0; i < raw.count; ++i)
+            if (raw.nodes[i]->emittedBy != law->attribute && nativeMemberIndex(owner,raw.nodes[i]) < law->items) seen[count++] = raw.nodes[i];
+        raw.nodes = seen;
+        raw.count = count;
+    }
     RangeNode *grammar = owner->graphType ? grammarDeclaration(eval->vm,owner) : shape->resolvedDeclaration;
     RangeNode *member = grammar ? findMember(grammar,name) : NULL;
     if (!member && raw.kind == RangeGraphNodes)
@@ -6228,7 +6228,8 @@ static int evalEffect(Eval *eval, EvalFrame *frame, RangeNode *attribute)
     if (status) return status;
     if (warning) {
         RangeNode *at = eval->application && eval->application->attribute ? eval->application->attribute : attribute;
-        if (eval->vm->report && !eval->vm->skipEmission) sourceDiagnostic(eval->vm->report,at,1,"macro","%.*s",(int)length,text);
+        if (eval->vm->report && !(eval->application && eval->application->specialization))
+            sourceDiagnostic(eval->vm->report,at,1,"macro","%.*s",(int)length,text);
         return EvalNormal;
     }
     if (!print) return evalFail(eval,attribute,"%.*s",(int)length,text);
@@ -6880,7 +6881,7 @@ static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *
     case RangeNodeAttribute: return evalEffect(eval,frame,expr);
     case RangeNodeEmission:
         // A shape-only block landed before the body ran; a law run emits nothing.
-        if (eval->vm->skipEmission || (expr->found & RangeFlagShape)) return EvalNormal;
+        if ((eval->application && eval->application->specialization) || (expr->found & RangeFlagShape)) return EvalNormal;
         return evalEmit(eval,frame,expr);
     default: return evalFail(eval,expr,"%s expressions are not run at macro time",rangeNodeKindName(expr->kind));
     }

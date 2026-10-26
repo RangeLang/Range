@@ -139,6 +139,23 @@ int main(void)
     assert(reported(&c,"law","Int<bits: 8, signed: true> does not satisfy @integer"));
     rangeArenaDestroy(&c.arena);
 
+    // A law reads the declaration itself as the specialization sees it: the
+    // generics' values are the specialization's, and what its own
+    // application emitted is not among the members it sees.
+    compile(&c,"macro sized(): Construct { "
+        "let extra: #members.first(where: { member in member.name = \"extra\" }) "
+        "let n: #generics.first(where: { generic in generic.name = \"n\" }) "
+        "switch { extra.present: @diagnostic(\"sees what it emits\"), n.present & n.value > 2: @diagnostic(\"n is too big\"), default: {} } "
+        "let zero: 0 #graph { extension #name { let extra: #zero } } } "
+        "@sized construct Pair<T, let n: 1> { let first: T } "
+        "function pairs(): Int { let small: Pair<Int, n: 2>(first: 1) let big: Pair<Bool, n: 3>(first: true) return small.extra + big.extra }");
+    assert(!errorsIn(&c,"type"));
+    SourceDiagnostic *big = reported(&c,"law","Pair<T: Bool, n: 3> does not satisfy @sized");
+    assert(big && strstr(big->message,"n is too big"));
+    assert(!reported(&c,"law","sees what it emits") && errorsIn(&c,"law") == 1);
+    assert(named(named(c.project,"Pair"),"extra"));
+    rangeArenaDestroy(&c.arena);
+
     // Refusals: mixed widths, non-Bool conditions, labels, members, generics, storage, immutability.
     compile(&c,"function refuse() { let a: 0 state narrow: Int<bits: 8> "
         "let mixed: (a + narrow) while a {} let neg: -true let nope: (a.missing) "
