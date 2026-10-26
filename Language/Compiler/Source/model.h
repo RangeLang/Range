@@ -50,7 +50,7 @@ typedef enum {
     RangeNodeSwitch,
     RangeNodeSwitchCase,
     RangeNodeExtension,
-    RangeNodeSpecialization, /* a construct plus one value per generic */
+    RangeNodeSpecialization, /* a construct, enum, or function plus one value per generic */
     RangeNodeType,
     RangeNodePattern,        /* a switch arm's pattern; integer is its RangePattern form */
     RangeNodeFor,            /* for-in: a is the loop it lowers to, calling the @iteration function */
@@ -130,11 +130,12 @@ typedef struct RangeGraphValue {
  * call: an operator with a body, the @interval construction, a function-call
  * initializer; on a declaration, its value as typing wrote it), the @optional
  * present case a read goes through, whose one field is the payload, the
- * optional a value is wrapped into where it is used, and the found bits.
+ * optional a value is wrapped into where it is used, for a call of a generic
+ * function the specialization it runs, and the found bits.
  * Lowered nodes are compiler-written, point at written children, and are
  * never linked into the tree. */
 typedef struct RangeFacts {
-    RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted;
+    RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted, *specialization;
     int found;
 } RangeFacts;
 
@@ -185,7 +186,7 @@ struct RangeNode {
     RangeNode *resolvedType; /* resolved literal representation */
     union {
         RangeFacts facts;  /* the node's own findings */
-        struct { RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted; int found; };
+        struct { RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted, *specialization; int found; };
     };
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
@@ -195,6 +196,7 @@ struct RangeNode {
     size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */
     struct RangeNode **memberTypes; /* specialization: type per declaration item; NULL for @many storage */
     struct RangeFactTable *keyed; /* specialization: what typing found under it, by node */
+    RangeNode *outer;    /* specialization of a generic method: its receiver's specialization */
     RangeMacroApplication *macroApplication; /* the application this attribute writes */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */

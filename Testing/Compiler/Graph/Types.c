@@ -329,6 +329,27 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A generic function is typed into each specialization: its own nodes
+    // keep nothing from either, and each specialization finds its own types.
+    compile(&c,"function sum<T>(let a: T, let b: T): T { return a + b } "
+        "function sums(): Int { let small: Int<bits: 8>(1) let narrow: sum(a: small, b: small) return sum(a: 1, b: 2) }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *generic = named(c.project,"sum"), *plus = generic->a->items[0]->a, *specializations[2];
+    size_t count = 0;
+    for (size_t i = 0; i < c.typer->instances->itemCount; ++i)
+        if (c.typer->instances->items[i]->resolvedDeclaration == generic && count < 2) specializations[count++] = c.typer->instances->items[i];
+    assert(count == 2 && !generic->type && !plus->type && !plus->resolvedDeclaration);
+    expectDescription(specializations[0],"sum<T: Int<bits: 8, signed: true>>");
+    expectDescription(specializations[1],"sum<T: Int<bits: 64, signed: true>>");
+    expectDescription(found(specializations[0],plus)->type,"Int<bits: 8, signed: true>");
+    expectDescription(found(specializations[1],plus)->type,"Int<bits: 64, signed: true>");
+    assert(found(specializations[0],generic)->type == found(specializations[0],plus)->type);
+    assert(found(specializations[0],plus)->resolvedDeclaration && same(found(specializations[0],plus)->resolvedDeclaration->name,"+"));
+    RangeNode *narrowed = local(&c,"sums","narrow")->lowered;
+    assert(narrowed->kind == RangeNodeCall && narrowed->a->resolvedDeclaration == generic && narrowed->a->specialization == specializations[0]);
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
