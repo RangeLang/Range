@@ -1355,6 +1355,14 @@ static const char *typePathText(SourceReport *report, RangeNode *expr)
     return text;
 }
 
+/* `let inner: Outer.Inner` parses as an expression; a path that names a
+ * nested type is that type in the type position: a requirement, not a value. */
+static int requiredPath(SourceReport *report, SourceScope *scope, RangeNode *node)
+{
+    return rangeNodeDeclaresValue(node->kind) && !node->typeName && node->itemCount == 1 && node->items[0]->a
+        && node->items[0]->a->kind == RangeNodeMemberAccess && typePath(report,scope,node->items[0]->a);
+}
+
 static RangeNode *sourceReference(SourceReport *report, SourceScope *scope,
                                   RangeNode *at, const char *name, int kind)
 {
@@ -1532,12 +1540,9 @@ static void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNo
             node->flags & RangeFlagMacroType ? 1
             : (node->flags & RangeFlagApplication) && !(node->flags & RangeFlagOptional) ? 0
             : node->generics || (node->flags & RangeFlagOptional) ? 2 : 0);
-        // `let inner: Outer.Inner` parses as an expression; a path that names a
-        // nested type is that type in the type position, a requirement.
-        if (!node->typeName && node->itemCount == 1 && node->items[0]->a
-            && node->items[0]->a->kind == RangeNodeMemberAccess && typePath(report,scope,node->items[0]->a)) {
-            node->typeName = typePathText(report,node->items[0]->a);
-            node->itemCount = 0;
+        // A type path is a requirement, recorded beside the declaration; it is not read as a value.
+        if (requiredPath(report,scope,node)) {
+            node->flags |= RangeFlagRequired;
             return;
         }
         break;
@@ -2640,6 +2645,11 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
             node->lowered = absentValue(typer,node,type);
         return type;
     }
+    // `let inner: Outer.Inner` requires the nested type its path names.
+    if ((node->flags & RangeFlagRequired) || requiredPath(typer->report,scope,node)) {
+        node->flags |= RangeFlagRequired;
+        return resolveTypeReference(typer,scope,typePathText(typer->report,node->items[0]->a),NULL,node->flags,context,node);
+    }
     // A literal member of the construct its literal selects (Int's `value: 0`)
     // has that construct's own specialization.
     RangeNode *rhs = rangeNodeRHS(node);
@@ -3026,11 +3036,12 @@ static int optionalWithoutValue(const RangeNode *node)
 
 /* A local's value, or a member's default: what typing recorded beside the
  * declaration; else an inferred RHS; the declaration itself for a
- * construction; or a copied name. A bare type reference is a requirement
- * and supplies nothing. */
+ * construction; or a copied name. A bare type reference or a type path is a
+ * requirement and supplies nothing. */
 static RangeNode *declarationValue(RangeNode *node)
 {
     if (node->lowered) return node->lowered;
+    if (node->flags & RangeFlagRequired) return NULL;
     if (!node->typeName) return rangeNodeRHS(node);
     if (node->flags & RangeFlagApplication) return node;
     RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
@@ -4436,7 +4447,8 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         node->type = declaredType(typer,scope,node,context);
         // A local names a value: `let v: Int` alone states a type, and only a
         // construct's member may leave its value to construction.
-        if (node->typeName && !(node->flags & RangeFlagApplication) && !declarationValue(node) && !optionalWithoutValue(node))
+        if ((node->typeName || (node->flags & RangeFlagRequired)) && !(node->flags & RangeFlagApplication)
+            && !declarationValue(node) && !optionalWithoutValue(node))
             typeError(typer,node,"'%s' needs an initial value",node->name);
         break;
     case RangeNodeAssign: {

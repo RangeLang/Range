@@ -277,6 +277,19 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A type path is a requirement recorded beside the declaration, the same in
+    // code typed in order and in code a macro runs first.
+    compile(&c,"enum Outer { case a enum Inner { case x } } construct Keeps { let inner: Outer.Inner } "
+        "function later(): Int { let i: Outer.Inner return 0 } function early(): Int { let j: Outer.Inner return 0 } "
+        "macro calls(): Construct { let n: early() } @calls construct Applied {}");
+    RangeNode *inner = named(named(c.project,"Keeps"),"inner");
+    assert((inner->flags & RangeFlagRequired) && !inner->typeName && inner->itemCount == 1);
+    expectDescription(inner->type,"Inner");
+    assert(reported(&c,"type","'i' needs an initial value") && reported(&c,"type","'j' needs an initial value"));
+    assert(errorsIn(&c,"type") == 2);
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
