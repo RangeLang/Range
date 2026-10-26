@@ -267,6 +267,16 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // `let r: step(x: 1)` keeps its written form; the call it makes is recorded beside it.
+    compile(&c,"function step(let x: Int): Int { return x + 1 } function calls(): Int { let r: step(x: 1) return r }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *called = local(&c,"calls","r");
+    assert(same(called->typeName,"step") && called->itemCount == 1 && !called->a);
+    assert(called->lowered && called->lowered->kind == RangeNodeCall && called->lowered->items[0] == called->items[0]);
+    expectDescription(called->type,"Int<bits: 64, signed: true>");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }

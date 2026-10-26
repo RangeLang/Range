@@ -2613,7 +2613,7 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
     if (node->kind == RangeNodeParameter)
         return node->b ? resolveTypeReference(typer,scope,node->b->name,node->b->generics,node->flags,context,node->b) : NULL;
     if (node->flags & RangeFlagMany) return NULL; /* @many storage is not a standalone value */
-    if (node->a && node->a->kind == RangeNodeCall && node->typeName) return node->a->type; /* `let r: step(x: 1)` */
+    if (node->lowered && node->lowered->kind == RangeNodeCall) return node->lowered->type; /* `let r: step(x: 1)` */
     if (node->typeName && (node->flags & RangeFlagApplication) && node->type) {
         // Construction. A generic construct's member, such as Box<T>'s
         // `state items: Array<T>()`, has its type in the specialization asked about.
@@ -3031,7 +3031,6 @@ static int optionalWithoutValue(const RangeNode *node)
 static RangeNode *declarationValue(RangeNode *node)
 {
     if (node->lowered) return node->lowered;
-    if (node->typeName && node->a && node->a->kind == RangeNodeCall) return node->a; /* `let r: step(x: 1)` */
     if (!node->typeName) return rangeNodeRHS(node);
     if (node->flags & RangeFlagApplication) return node;
     RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
@@ -4426,10 +4425,11 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
             RangeNode *callee = rangeNodeCreate(typer->report->arena,RangeNodeName,node->path,node->line,node->column);
             callee->name = node->typeName;
             callee->generics = node->generics;
+            // The call, over the written arguments, is the value typing records beside it.
             RangeNode *call = rangeNodeCreate(typer->report->arena,RangeNodeCall,node->path,node->line,node->column);
             call->a = callee;
             for (size_t i = 0; i < node->itemCount; ++i) rangeNodeAppend(typer->report->arena,call,node->items[i]);
-            node->a = call;
+            node->lowered = call;
             node->type = typeOf(typer,scope,call,NULL,context);
             break;
         }
