@@ -730,6 +730,30 @@ static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
     return found;
 }
 
+/* ---- findings ----
+ * What typing finds about a node lives beside it: in the node's own record,
+ * or, for a generic function's body typed for one specialization, in that
+ * specialization's table, keyed by node. A key is that specialization, or
+ * NULL for the node's own record. The table holds only what typing found
+ * under the key; anything else reads the node's own. */
+struct RangeFactTable { RangeNode **nodes; RangeFacts **facts; size_t capacity, count; };
+
+static size_t factSlot(const struct RangeFactTable *table, const RangeNode *node)
+{
+    size_t mask = table->capacity - 1, at = ((uintptr_t)node >> 4) & mask;
+    while (table->nodes[at] && table->nodes[at] != node) at = (at + 1) & mask;
+    return at;
+}
+
+/* What typing found about `node` under `key`. */
+static RangeFacts *found(RangeNode *key, RangeNode *node)
+{
+    struct RangeFactTable *table = key ? key->keyed : NULL;
+    if (!table) return &node->facts;
+    size_t at = factSlot(table,node);
+    return table->nodes[at] ? table->facts[at] : &node->facts;
+}
+
 /* ---- case tests ----
  * `phase.loading` and `phase.failed(let reason)` read a case off a value: a
  * Bool, true when the value holds that case. Inside the parentheses each
@@ -878,21 +902,22 @@ static int stablePath(const RangeNode *path, const RangeNode *bindings)
 }
 
 /* Two subjects read the same path; a narrowing is one more step of it. */
-static int samePath(const RangeNode *a, const RangeNode *b)
+static int samePath(RangeNode *key, RangeNode *a, RangeNode *b)
 {
-    if (!a || !b || a->kind != b->kind || a->narrowed != b->narrowed) return 0;
+    if (!a || !b || a->kind != b->kind || found(key,a)->narrowed != found(key,b)->narrowed) return 0;
     if ((a->flags & RangeFlagImplicit) || (b->flags & RangeFlagImplicit)) return (a->flags & RangeFlagImplicit) && (b->flags & RangeFlagImplicit);
     if (!same(a->name,b->name)) return 0;
-    return a->kind != RangeNodeMemberAccess || samePath(a->a,b->a);
+    return a->kind != RangeNodeMemberAccess || samePath(key,a->a,b->a);
 }
 
 /* A subject as written, with the case of each narrowing it reads through:
  * `value.present.bits`. */
-static const char *pathText(RangeArena *arena, const RangeNode *path)
+static const char *pathText(RangeArena *arena, RangeNode *key, RangeNode *path)
 {
     if (path->flags & RangeFlagImplicit) return "";
-    const char *owner = path->kind == RangeNodeMemberAccess ? pathText(arena,path->a) : path->kind == RangeNodeEnvironment ? "#" : "";
-    const char *narrowed = path->narrowed ? path->narrowed->name : "";
+    const char *owner = path->kind == RangeNodeMemberAccess ? pathText(arena,key,path->a) : path->kind == RangeNodeEnvironment ? "#" : "";
+    RangeNode *step = found(key,path)->narrowed;
+    const char *narrowed = step ? step->name : "";
     size_t length = strlen(owner) + strlen(path->name) + strlen(narrowed) + 3;
     char *text = rangeArenaAllocate(arena,length);
     snprintf(text,length,"%s%s%s%s%s",owner,path->kind == RangeNodeMemberAccess ? "." : "",path->name,*narrowed ? "." : "",narrowed);
@@ -905,13 +930,13 @@ typedef struct { ShapeRow *rows; size_t count; } ShapeRows;
 #define RANGE_SHAPE_ROWS 256
 
 /* The condition as alternatives of case tests; *overflow when there are too many to check. */
-static ShapeRows shapeRows(RangeArena *arena, RangeNode *node, RangeNode *bindings, int *overflow)
+static ShapeRows shapeRows(RangeArena *arena, RangeNode *key, RangeNode *node, RangeNode *bindings, int *overflow)
 {
     ShapeRows out = {0};
     if (*overflow) return out;
     if (node && node->kind == RangeNodeBinary && (same(node->name,"&") || same(node->name,"|"))) {
-        ShapeRows left = shapeRows(arena,node->a,bindings,overflow);
-        ShapeRows right = shapeRows(arena,node->b,bindings,overflow);
+        ShapeRows left = shapeRows(arena,key,node->a,bindings,overflow);
+        ShapeRows right = shapeRows(arena,key,node->b,bindings,overflow);
         size_t count = same(node->name,"|") ? left.count + right.count : left.count * right.count;
         if (*overflow || count > RANGE_SHAPE_ROWS) { *overflow = 1; return out; }
         out.rows = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*out.rows));
@@ -935,11 +960,10 @@ static ShapeRows shapeRows(RangeArena *arena, RangeNode *node, RangeNode *bindin
     out.rows = rangeArenaAllocate(arena,sizeof(*out.rows));
     out.rows[0] = (ShapeRow){0};
     out.count = 1;
-    RangeNode *test = node && node->lowered ? node->lowered : node;
-    RangeNode *found = test && test->kind == RangeNodeCaseTest && stablePath(test->a,bindings) ? test : NULL;
-    if (found) {
+    RangeNode *test = node && found(key,node)->lowered ? found(key,node)->lowered : node;
+    if (test && test->kind == RangeNodeCaseTest && stablePath(test->a,bindings)) {
         out.rows[0].terms = rangeArenaAllocate(arena,sizeof(*out.rows[0].terms));
-        out.rows[0].terms[0] = found;
+        out.rows[0].terms[0] = test;
         out.rows[0].count = 1;
     } else out.rows[0].guarded = 1;
     return out;
@@ -954,7 +978,7 @@ typedef struct {
     RangeNode ***rows; RangeNode **arms; int *guarded; size_t count;
 } ConditionShape;
 
-static void conditionShape(RangeArena *arena, RangeNode *node, ConditionShape *shape)
+static void conditionShape(RangeArena *arena, RangeNode *key, RangeNode *node, ConditionShape *shape)
 {
     size_t arms = node->itemCount;
     ShapeRows *each = rangeArenaAllocate(arena,(arms ? arms : 1) * sizeof(*each));
@@ -963,7 +987,7 @@ static void conditionShape(RangeArena *arena, RangeNode *node, ConditionShape *s
         RangeNode *entry = node->items[i];
         int overflow = 0;
         if (entry->flags & RangeFlagLiteral || !entry->itemCount) each[i] = (ShapeRows){0};
-        else each[i] = shapeRows(arena,entry->items[0]->b,entry->items[0]->c,&overflow);
+        else each[i] = shapeRows(arena,key,entry->items[0]->b,entry->items[0]->c,&overflow);
         if (overflow) {
             each[i].rows = rangeArenaAllocate(arena,sizeof(*each[i].rows));
             each[i].rows[0] = (ShapeRow){.guarded=1};
@@ -985,10 +1009,10 @@ static void conditionShape(RangeArena *arena, RangeNode *node, ConditionShape *s
             for (size_t t = 0; t < each[i].rows[r].count; ++t) {
                 RangeNode *subject = each[i].rows[r].terms[t]->a;
                 size_t k = 0;
-                while (k < shape->width && !samePath(shape->subjects[k],subject)) ++k;
+                while (k < shape->width && !samePath(key,shape->subjects[k],subject)) ++k;
                 if (k < shape->width) continue;
                 shape->subjects[shape->width] = subject;
-                shape->names[shape->width++] = pathText(arena,subject);
+                shape->names[shape->width++] = pathText(arena,key,subject);
             }
     shape->rows = rangeArenaAllocate(arena,(total ? total : 1) * sizeof(*shape->rows));
     shape->arms = rangeArenaAllocate(arena,(total ? total : 1) * sizeof(*shape->arms));
@@ -1001,7 +1025,7 @@ static void conditionShape(RangeArena *arena, RangeNode *node, ConditionShape *s
             int guarded = row->guarded;
             for (size_t t = 0; t < row->count; ++t) {
                 size_t k = 0;
-                while (!samePath(shape->subjects[k],row->terms[t]->a)) ++k;
+                while (!samePath(key,shape->subjects[k],row->terms[t]->a)) ++k;
                 // A second test of one subject narrows the row as a guard does.
                 if (vector[k]) guarded = 1;
                 else vector[k] = row->terms[t]->b;
@@ -1948,6 +1972,7 @@ struct Typer {
     int loops; /* enclosing loops in this function: the targets of break and continue */
     RangeNode *function; /* the function being typed */
     RangeNode *output;   /* what its `return` gives: the function's result, or the entry block's status */
+    RangeNode *key;      /* whose findings typing writes: the specialization being typed, or NULL */
     /* Values compared with `=`: checked once every type is known. */
     struct { RangeNode *type, *at; const char *in; } *equalities; size_t equalityCount, equalityCapacity;
     /* Generic functions, specialized per instantiation: each instance is a
@@ -1977,7 +2002,7 @@ struct Typer {
  * another saves it first and restores it after, so the outer one goes on as
  * it was. */
 typedef struct {
-    RangeNode *function, *output, *macro, *inferred, *closureSite;
+    RangeNode *function, *output, *macro, *inferred, *closureSite, *key;
     int loops, inferring, closures;
     size_t narrowedFloor, narrowedCount, typingCount;
     const char *instance;
@@ -1986,7 +2011,7 @@ typedef struct {
 static TyperContext typerSave(const Typer *typer)
 {
     return (TyperContext){.function=typer->function,.output=typer->output,.macro=typer->macro,
-        .inferred=typer->inferred,.closureSite=typer->closureSite,.loops=typer->loops,
+        .inferred=typer->inferred,.closureSite=typer->closureSite,.key=typer->key,.loops=typer->loops,
         .inferring=typer->inferring,.closures=typer->closures,.narrowedFloor=typer->narrowedFloor,
         .narrowedCount=typer->narrowedCount,.typingCount=typer->typingCount,.instance=typer->instance};
 }
@@ -1994,7 +2019,7 @@ static TyperContext typerSave(const Typer *typer)
 static void typerRestore(Typer *typer, TyperContext saved)
 {
     typer->function = saved.function; typer->output = saved.output; typer->macro = saved.macro;
-    typer->inferred = saved.inferred; typer->closureSite = saved.closureSite; typer->loops = saved.loops;
+    typer->inferred = saved.inferred; typer->closureSite = saved.closureSite; typer->key = saved.key; typer->loops = saved.loops;
     typer->inferring = saved.inferring; typer->closures = saved.closures;
     typer->narrowedFloor = saved.narrowedFloor; typer->narrowedCount = saved.narrowedCount;
     typer->typingCount = saved.typingCount; typer->instance = saved.instance;
@@ -2006,9 +2031,47 @@ static TyperContext typerTop(Typer *typer)
 {
     TyperContext saved = typerSave(typer);
     typer->function = NULL; typer->output = NULL; typer->macro = NULL; typer->inferred = NULL; typer->closureSite = NULL;
-    typer->loops = 0; typer->inferring = 0; typer->closures = 0;
+    typer->key = NULL; typer->loops = 0; typer->inferring = 0; typer->closures = 0;
     typer->narrowedFloor = typer->narrowedCount; typer->typingCount = 0; typer->instance = NULL;
     return saved;
+}
+
+/* The record typing writes about `node` under the typer's key, made on the
+ * first write from the node's own: its resolution and type, and nothing
+ * else typing finds there. */
+static RangeFacts *finding(Typer *typer, RangeNode *node)
+{
+    RangeNode *key = typer->key;
+    if (!key) return &node->facts;
+    RangeArena *arena = typer->report->arena;
+    struct RangeFactTable *table = key->keyed;
+    if (!table) {
+        table = key->keyed = rangeArenaAllocate(arena,sizeof(*table));
+        *table = (struct RangeFactTable){.capacity=64};
+        table->nodes = rangeArenaAllocate(arena,table->capacity * sizeof(*table->nodes));
+        table->facts = rangeArenaAllocate(arena,table->capacity * sizeof(*table->facts));
+        memset(table->nodes,0,table->capacity * sizeof(*table->nodes));
+    }
+    size_t at = factSlot(table,node);
+    if (table->nodes[at]) return table->facts[at];
+    if (2 * (table->count + 1) > table->capacity) {
+        // Grow, keeping every record.
+        struct RangeFactTable grown = {.capacity=table->capacity * 2,.count=table->count};
+        grown.nodes = rangeArenaAllocate(arena,grown.capacity * sizeof(*grown.nodes));
+        grown.facts = rangeArenaAllocate(arena,grown.capacity * sizeof(*grown.facts));
+        memset(grown.nodes,0,grown.capacity * sizeof(*grown.nodes));
+        for (size_t i = 0; i < table->capacity; ++i) {
+            if (!table->nodes[i]) continue;
+            size_t j = factSlot(&grown,table->nodes[i]);
+            grown.nodes[j] = table->nodes[i]; grown.facts[j] = table->facts[i];
+        }
+        *table = grown;
+        at = factSlot(table,node);
+    }
+    RangeFacts *facts = rangeArenaAllocate(arena,sizeof(*facts));
+    *facts = (RangeFacts){.resolvedDeclaration=node->resolvedDeclaration,.type=node->type};
+    table->nodes[at] = node; table->facts[at] = facts; ++table->count;
+    return facts;
 }
 
 static void diagnoseWritten(Typer *);
@@ -2629,14 +2692,15 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
     if (node->kind == RangeNodeParameter)
         return node->b ? resolveTypeReference(typer,scope,node->b->name,node->b->generics,node->flags,context,node->b) : NULL;
     if (node->flags & RangeFlagMany) return NULL; /* @many storage is not a standalone value */
-    if (node->lowered && node->lowered->kind == RangeNodeCall) return node->lowered->type; /* `let r: step(x: 1)` */
-    if (node->typeName && (node->flags & RangeFlagApplication) && node->type) {
+    RangeFacts *facts = found(typer->key,node);
+    if (facts->lowered && facts->lowered->kind == RangeNodeCall) return found(typer->key,facts->lowered)->type; /* `let r: step(x: 1)` */
+    if (node->typeName && (node->flags & RangeFlagApplication) && facts->type) {
         // Construction. A generic construct's member, such as Box<T>'s
         // `state items: Array<T>()`, has its type in the specialization asked about.
         RangeNode *owner = context && context->kind == RangeNodeSpecialization ? context->resolvedDeclaration : NULL;
         int member = 0;
         for (size_t i = 0; owner && parametric(owner) && i < owner->itemCount; ++i) member |= owner->items[i] == node;
-        if (!member) return node->type;
+        if (!member) return facts->type;
         SourceScope ownerScope = {.owner=owner};
         return resolveTypeReference(typer,&ownerScope,node->typeName,node->generics,node->flags & ~RangeFlagApplication,context,node);
     }
@@ -2645,7 +2709,7 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
     if (node->typeName && node->rhsReference && !node->generics) {
         RangeNode *value = sourceLookup(typer->report,scope,node->typeName,0);
         if (value && (rangeNodeDeclaresValue(value->kind) || value->kind == RangeNodeParameter) && value != node) {
-            node->rhsReference->resolvedDeclaration = value;
+            finding(typer,node->rhsReference)->resolvedDeclaration = value;
             return typeOf(typer,scope,node->rhsReference,NULL,context);
         }
     }
@@ -2653,12 +2717,12 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
         RangeNode *type = resolveTypeReference(typer,scope,node->typeName,node->generics,node->flags,context,node);
         // An enum's lets are its cases' payload fields: types, not bindings.
         if (optionalWithoutValue(node) && !(scope && scope->owner && scope->owner->kind == RangeNodeEnum))
-            node->lowered = absentValue(typer,node,type);
+            finding(typer,node)->lowered = absentValue(typer,node,type);
         return type;
     }
     // `let inner: Outer.Inner` requires the nested type its path names.
-    if ((node->found & RangeFlagRequired) || requiredPath(typer->report,scope,node)) {
-        node->found |= RangeFlagRequired;
+    if ((facts->found & RangeFlagRequired) || requiredPath(typer->report,scope,node)) {
+        finding(typer,node)->found |= RangeFlagRequired;
         return resolveTypeReference(typer,scope,typePathText(typer->report,node->items[0]->a),NULL,node->flags,context,node);
     }
     // A literal member of the construct its literal selects (Int's `value: 0`)
@@ -2801,7 +2865,7 @@ static int parametric(const RangeNode *declaration)
 static RangeNode *caseFieldType(Typer *typer, RangeNode *type, RangeNode *field)
 {
     RangeNode *declaration = type->resolvedDeclaration;
-    if (!parametric(declaration)) return field->type;
+    if (!parametric(declaration)) return found(typer->key,field)->type;
     SourceScope scope = {.owner=declaration};
     return declaredType(typer,&scope,field,type);
 }
@@ -2873,7 +2937,7 @@ static void typePayload(Typer *typer, SourceScope *scope, RangeNode *at, RangeNo
             typeError(typer,argument,"payload field %zu of '%s' requires label '%s'",i + 1,entry->name,field->name);
         else if (!labeledField(field) && argument->name)
             typeError(typer,argument,"payload field %zu of '%s' takes no label",i + 1,entry->name);
-        argument->resolvedDeclaration = field;
+        finding(typer,argument)->resolvedDeclaration = field;
         RangeNode *expected = caseFieldType(typer,type,field);
         char what[200]; snprintf(what,sizeof(what),"payload field %zu of '%s'",i + 1,entry->name);
         coerce(typer,argument->a,expected,typeOf(typer,scope,argument->a,expected,context),what);
@@ -2989,11 +3053,11 @@ static RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **pre
 static void coerce(Typer *typer, RangeNode *expr, RangeNode *expected, RangeNode *actual, const char *what)
 {
     RangeNode *wrapped = NULL;
-    if (expr) expr->promoted = NULL; /* typing records it afresh */
+    if (expr) finding(typer,expr)->promoted = NULL; /* typing records it afresh */
     if (deferredType(typer,expected) || deferredType(typer,actual) || converts(expected,actual)) return;
     if (expr && expected && actual && expected != actual && (wrapped = optionalWrapped(typer,expected,NULL))
         && (wrapped == actual || converts(wrapped,actual))) {
-        expr->promoted = expected;
+        finding(typer,expr)->promoted = expected;
         return;
     }
     expectType(typer,expr,expected,actual,what);
@@ -3023,7 +3087,7 @@ static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value
         if (value != literal || !literalCase(declaration,literal))
             typeError(typer,value,"this literal names no case of %s",declaration->name);
     } else if (type) queueLaws(typer,type,value,value);
-    literal->type = type;
+    finding(typer,literal)->type = type;
     return type;
 }
 
@@ -3049,13 +3113,14 @@ static int optionalWithoutValue(const RangeNode *node)
  * declaration; else an inferred RHS; the declaration itself for a
  * construction; or a copied name. A bare type reference or a type path is a
  * requirement and supplies nothing. */
-static RangeNode *declarationValue(RangeNode *node)
+static RangeNode *declarationValue(RangeNode *key, RangeNode *node)
 {
-    if (node->lowered) return node->lowered;
-    if (node->found & RangeFlagRequired) return NULL;
+    RangeFacts *facts = found(key,node);
+    if (facts->lowered) return facts->lowered;
+    if (facts->found & RangeFlagRequired) return NULL;
     if (!node->typeName) return rangeNodeRHS(node);
     if (node->flags & RangeFlagApplication) return node;
-    RangeNode *copied = node->rhsReference ? node->rhsReference->resolvedDeclaration : NULL;
+    RangeNode *copied = node->rhsReference ? found(key,node->rhsReference)->resolvedDeclaration : NULL;
     return copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL;
 }
 
@@ -3112,8 +3177,8 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
             if (constructionInput(declaration->items[j]) && same(declaration->items[j]->name,argument->name)) member = declaration->items[j];
         if (!member) { typeError(typer,argument,"%s has no input '%s'",typeName,argument->name); continue; }
         for (size_t j = 0; j < i; ++j)
-            if (arguments[j]->resolvedDeclaration == member) typeError(typer,argument,"'%s' is supplied twice",member->name);
-        argument->resolvedDeclaration = member;
+            if (found(typer->key,arguments[j])->resolvedDeclaration == member) typeError(typer,argument,"'%s' is supplied twice",member->name);
+        finding(typer,argument)->resolvedDeclaration = member;
         RangeNode *expected = declaredType(typer,&declarationScope,member,type);
         RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
         char what[200]; snprintf(what,sizeof(what),"input '%s' of %s",member->name,typeName);
@@ -3121,9 +3186,9 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
     }
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
-        if (!constructionInput(member) || declarationValue(member) || optionalWithoutValue(member)) continue;
+        if (!constructionInput(member) || declarationValue(typer->key,member) || optionalWithoutValue(member)) continue;
         int supplied = 0;
-        for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) supplied = 1;
+        for (size_t j = 0; j < count; ++j) if (found(typer->key,arguments[j])->resolvedDeclaration == member) supplied = 1;
         if (!supplied) typeError(typer,at,"%s requires input '%s'",typeName,member->name);
     }
     return type;
@@ -3538,7 +3603,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
     // Box<T>'s methods, gives an instance typed with that parameter; code is
     // generated per concrete specialization, which substitutes it.
     RangeNode *instance = instantiate(typer,function,bound,values,call,receiver);
-    callee->resolvedDeclaration = instance;
+    finding(typer,callee)->resolvedDeclaration = instance;
     for (size_t i = 0; i < n; ++i) {
         char what[160];
         snprintf(what,sizeof(what),"argument '%s' of '%s'",function->items[i]->name,function->name);
@@ -3573,10 +3638,10 @@ static RangeNode *closureValue(RangeNode *closure)
 
 /* What a typed closure yields: its one expression, unless its result is a
  * unit type; otherwise its body runs and `return` gives the value. */
-static RangeNode *closureResult(Typer *typer, RangeNode *closure)
+static RangeNode *closureResult(Typer *typer, RangeNode *key, RangeNode *closure)
 {
-    RangeNode *value = closureValue(closure);
-    return value && !(isFunctionType(closure->type) && unitType(typer,closure->type->a)) ? value : NULL;
+    RangeNode *value = closureValue(closure), *type = found(key,closure)->type;
+    return value && !(isFunctionType(type) && unitType(typer,type->a)) ? value : NULL;
 }
 
 static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closure, RangeNode *expected, RangeNode *context)
@@ -3591,7 +3656,7 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
         for (size_t j = 0; j < i; ++j)
             if (same(closure->items[j]->name,closure->items[i]->name))
                 typeError(typer,closure->items[i],"'%s' names two parameters of this closure",closure->items[i]->name);
-        closure->items[i]->type = expected->items[i];
+        finding(typer,closure->items[i])->type = expected->items[i];
     }
     SourceScope own = {.owner=closure,.parent=scope};
     RangeNode *result = expected->a, *value = closureValue(closure);
@@ -3629,9 +3694,9 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
  * unlabeled argument per parameter of its type. */
 static RangeNode *typeClosureCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *value, RangeNode *context)
 {
-    RangeNode *callee = call->a, *type = value->type;
-    callee->resolvedDeclaration = value;
-    callee->type = type;
+    RangeNode *callee = call->a, *type = found(typer->key,value)->type;
+    finding(typer,callee)->resolvedDeclaration = value;
+    finding(typer,callee)->type = type;
     char t[320]; describeType(t,sizeof(t),type);
     if (callee->generics) typeError(typer,callee,"'%s' is a closure, %s; it takes no type arguments",callee->name,t);
     if (call->itemCount != type->itemCount)
@@ -3662,10 +3727,11 @@ static int receiverCase(Typer *typer, RangeNode *context, const char *name)
 static void typeSharedBindings(Typer *typer, RangeNode *pattern)
 {
     if (!pattern) return;
-    if (pattern->integer == RangePatternBind && pattern->a->resolvedDeclaration) {
-        RangeNode *first = pattern->a->resolvedDeclaration;
-        if (first->type && pattern->a->type && first->type != pattern->a->type) {
-            char f[160], o[160]; describeType(f,sizeof(f),first->type); describeType(o,sizeof(o),pattern->a->type);
+    RangeNode *first = pattern->integer == RangePatternBind ? found(typer->key,pattern->a)->resolvedDeclaration : NULL;
+    if (first) {
+        RangeNode *left = found(typer->key,first)->type, *right = found(typer->key,pattern->a)->type;
+        if (left && right && left != right) {
+            char f[160], o[160]; describeType(f,sizeof(f),left); describeType(o,sizeof(o),right);
             typeError(typer,pattern->a,"both sides of '|' bind '%s' with one type; the left side binds %s, this side %s",
                       pattern->a->name,f,o);
         }
@@ -3686,27 +3752,27 @@ static void typeSharedBindings(Typer *typer, RangeNode *pattern)
  * A value known only at macro time is not narrowed: typing does not know
  * that it holds an optional. */
 
-static int narrowablePath(const RangeNode *path)
+static int narrowablePath(RangeNode *key, RangeNode *path)
 {
     if (!path || path->generics) return 0;
     if (path->kind == RangeNodeEnvironment) return 1;
-    if (path->kind == RangeNodeMemberAccess) {
-        const RangeNode *member = path->resolvedDeclaration;
-        return member && rangeNodeDeclaresValue(member->kind) && narrowablePath(path->a);
-    }
-    if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit) || !path->resolvedDeclaration) return 0;
-    const RangeNode *declaration = path->resolvedDeclaration;
+    const RangeNode *declaration = found(key,path)->resolvedDeclaration;
+    if (path->kind == RangeNodeMemberAccess)
+        return declaration && rangeNodeDeclaresValue(declaration->kind) && narrowablePath(key,path->a);
+    if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit) || !declaration) return 0;
     return declaration->kind == RangeNodeLet || (declaration->kind == RangeNodeParameter && !(declaration->flags & RangeFlagBinding));
 }
 
 /* Two narrowable paths read the same value: each step reads the same
  * declaration, narrowed alike. */
-static int sameNarrowedPath(const RangeNode *a, const RangeNode *b)
+static int sameNarrowedPath(RangeNode *key, RangeNode *a, RangeNode *b)
 {
-    if (!a || !b || a->kind != b->kind || a->narrowed != b->narrowed) return 0;
-    if (a->kind == RangeNodeName) return a->resolvedDeclaration && a->resolvedDeclaration == b->resolvedDeclaration;
+    if (!a || !b || a->kind != b->kind) return 0;
+    RangeFacts *x = found(key,a), *y = found(key,b);
+    if (x->narrowed != y->narrowed) return 0;
+    if (a->kind == RangeNodeName) return x->resolvedDeclaration && x->resolvedDeclaration == y->resolvedDeclaration;
     if (a->kind == RangeNodeEnvironment) return same(a->name,b->name);
-    return a->kind == RangeNodeMemberAccess && a->resolvedDeclaration == b->resolvedDeclaration && sameNarrowedPath(a->a,b->a);
+    return a->kind == RangeNodeMemberAccess && x->resolvedDeclaration == y->resolvedDeclaration && sameNarrowedPath(key,a->a,b->a);
 }
 
 static void pushNarrowed(Typer *typer, RangeNode *path, RangeNode *entry, RangeNode *type)
@@ -3726,12 +3792,12 @@ static void pushNarrowed(Typer *typer, RangeNode *path, RangeNode *entry, RangeN
  * through is recorded beside it, and its type is the payload's. */
 static RangeNode *narrowedRead(Typer *typer, RangeNode *expr, RangeNode *type)
 {
-    if (!type || expr->lowered
+    if (!type || found(typer->key,expr)->lowered
         || (expr->kind != RangeNodeName && expr->kind != RangeNodeMemberAccess && expr->kind != RangeNodeEnvironment)) return type;
     for (size_t i = typer->narrowedCount; i-- > typer->narrowedFloor;) {
-        if (!sameNarrowedPath(typer->narrowed[i].path,expr)) continue;
-        expr->narrowed = typer->narrowed[i].entry;
-        return expr->type = typer->narrowed[i].type;
+        if (!sameNarrowedPath(typer->key,typer->narrowed[i].path,expr)) continue;
+        finding(typer,expr)->narrowed = typer->narrowed[i].entry;
+        return finding(typer,expr)->type = typer->narrowed[i].type;
     }
     return type;
 }
@@ -3752,7 +3818,7 @@ static RangeNode *typeEither(Typer *typer, SourceScope *scope, RangeNode *expr, 
     size_t end = typer->narrowedCount, kept = mark;
     for (size_t i = mark; i < end; ++i) {
         int both = 0;
-        for (size_t k = 0; k < leftCount && !both; ++k) both = sameNarrowedPath(paths[k],typer->narrowed[i].path);
+        for (size_t k = 0; k < leftCount && !both; ++k) both = sameNarrowedPath(typer->key,paths[k],typer->narrowed[i].path);
         if (both) typer->narrowed[kept++] = typer->narrowed[i];
     }
     typer->narrowedCount = kept;
@@ -3764,22 +3830,22 @@ static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test
     RangeNode *subject = test->a, *type;
     size_t mark = typer->narrowedCount;
     if (subject->flags & RangeFlagImplicit) {
-        subject->resolvedDeclaration = methodReceiver(typer->report,typer->function);
-        subject->type = type = context;
+        finding(typer,subject)->resolvedDeclaration = methodReceiver(typer->report,typer->function);
+        finding(typer,subject)->type = type = context;
     } else type = typeOf(typer,scope,subject,NULL,context);
     if (!type) return NULL;
     typePattern(typer,scope,test->b,type,context);
     typeSharedBindings(typer,test->b);
     typer->narrowedCount = mark;
     RangeNode *present = NULL, *payload = optionalWrapped(typer,type,&present), *pattern = test->b;
-    if (payload && pattern->resolvedDeclaration == present && narrowablePath(subject)) {
+    if (payload && found(typer->key,pattern)->resolvedDeclaration == present && narrowablePath(typer->key,subject)) {
         RangeNode *bound = pattern->itemCount == 1 ? pattern->items[0]->a : NULL;
         if (!(pattern->flags & RangeFlagApplication)) pushNarrowed(typer,subject,present,payload);
         else if (subject->kind == RangeNodeName && bound && bound->integer == RangePatternBind && same(bound->a->name,subject->name))
             typeError(typer,bound->a,"'%s' is already narrowed to the payload here; related: a test of an optional "
                       "value for its present case narrows that value",subject->name);
     }
-    return test->type = typer->booleanType;
+    return finding(typer,test)->type = typer->booleanType;
 }
 
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
@@ -3792,7 +3858,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         RangeNode *entry = type ? namedCase(typer,type,callee->name,callee) : NULL;
         if (!entry) return NULL;
         if (!entry->itemCount) { typeError(typer,call,"case '%s' has no payload; write .%s",entry->name,entry->name); return NULL; }
-        callee->resolvedDeclaration = entry;
+        finding(typer,callee)->resolvedDeclaration = entry;
         typePayload(typer,scope,call,type,entry,call->items,call->itemCount,context);
         return type;
     }
@@ -3803,7 +3869,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             // `Outer.Inner(…)` constructs a nested type; `Tree.leaf(value: 1)` a case.
             RangeNode *nested = nestedDeclaration(owner,callee->name,strlen(callee->name));
             if (nested) {
-                callee->resolvedDeclaration = nested;
+                finding(typer,callee)->resolvedDeclaration = nested;
                 return typeConstructionOf(typer,scope,call,specialize(typer,scope,nested,callee->generics,context,call),
                                           call->items,call->itemCount,context);
             }
@@ -3815,7 +3881,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             RangeNode *entry = type ? namedCase(typer,type,callee->name,callee) : NULL;
             if (!entry) return NULL;
             if (!entry->itemCount) { typeError(typer,call,"case '%s' has no payload; write %s.%s",entry->name,owner->name,entry->name); return NULL; }
-            callee->resolvedDeclaration = entry;
+            finding(typer,callee)->resolvedDeclaration = entry;
             typePayload(typer,scope,call,type,entry,call->items,call->itemCount,context);
             return type;
         }
@@ -3824,10 +3890,10 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         // `where(element)` calls the closure a function-typed parameter holds.
         RangeNode *value = sourceLookup(typer->report,scope,callee->name,0);
         if (!value && receiverCase(typer,context,callee->name)) {
-            call->lowered = caseTest(typer->report->arena,call,receiverSubject(typer->report->arena,callee),callee->name,call);
-            return typeCaseTest(typer,scope,call->lowered,context);
+            RangeNode *test = finding(typer,call)->lowered = caseTest(typer->report->arena,call,receiverSubject(typer->report->arena,callee),callee->name,call);
+            return typeCaseTest(typer,scope,test,context);
         }
-        if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(value->type))
+        if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(found(typer->key,value)->type))
             return typeClosureCall(typer,scope,call,value,context);
         function = lookupFunction(typer->report,scope,callee->name);
         if (function && function->owner) function = findCalledFunction(function->owner,callee->name,call);
@@ -3836,7 +3902,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             if (!declaration) declaration = sourceLookup(typer->report,scope,callee->name,2);
             if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum
                                 || declaration->kind == RangeNodeTypeParameter)) {
-                callee->resolvedDeclaration = declaration;
+                finding(typer,callee)->resolvedDeclaration = declaration;
                 return typeConstruction(typer,scope,call,callee->name,callee->generics,callee->flags,call->items,call->itemCount,context);
             }
             if (declaration) typeError(typer,call,"'%s' is not a function",callee->name);
@@ -3871,11 +3937,11 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         }
         if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
             // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
-            call->lowered = caseTest(typer->report->arena,call,callee->a,callee->name,call);
-            return typeCaseTest(typer,scope,call->lowered,context);
+            RangeNode *test = finding(typer,call)->lowered = caseTest(typer->report->arena,call,callee->a,callee->name,call);
+            return typeCaseTest(typer,scope,test,context);
         }
         // A member with no name is one `for … in` resolved by its @iteration role.
-        function = callee->name ? findCalledFunction(receiver->resolvedDeclaration,callee->name,call) : callee->resolvedDeclaration;
+        function = callee->name ? findCalledFunction(receiver->resolvedDeclaration,callee->name,call) : found(typer->key,callee)->resolvedDeclaration;
         if (!function) {
             char type[160]; describeType(type,sizeof(type),receiver);
             typeError(typer,callee,"%s has no function '%s'",type,callee->name);
@@ -3886,7 +3952,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         typeError(typer,call,"call target is not a function");
         return NULL;
     }
-    callee->resolvedDeclaration = function;
+    finding(typer,callee)->resolvedDeclaration = function;
     // A method's signature names types in its owner, such as a nested enum.
     SourceScope ownerScope = {.owner=receiver && receiver->kind == RangeNodeSpecialization ? receiver->resolvedDeclaration : NULL};
     SourceScope functionScope = {.owner=function,.parent=ownerScope.owner ? &ownerScope : NULL};
@@ -3938,7 +4004,7 @@ static RangeNode *typeInterval(Typer *typer, SourceScope *scope, RangeNode *expr
         argument->a = side ? expr->b : expr->a;
         rangeNodeAppend(arena,call,argument);
     }
-    expr->lowered = call;
+    finding(typer,expr)->lowered = call;
     RangeNode *type = specialize(typer,scope,interval,NULL,context,expr);
     return call->type = typeConstructionOf(typer,scope,call,type,call->items,call->itemCount,context);
 }
@@ -3963,7 +4029,7 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
     if ((function->flags & RangeFlagBuiltin) && (same(expr->name,"!") || shortCircuit(function))
         && operand->resolvedDeclaration != typer->boolean)
         typeError(typer,expr,"builtin '%s' is a C primitive of the condition type only; %s declares it",expr->name,t);
-    expr->resolvedDeclaration = function;
+    finding(typer,expr)->resolvedDeclaration = function;
     SourceScope ownerScope = {.owner=operand->resolvedDeclaration};
     SourceScope functionScope = {.owner=function,.parent=&ownerScope};
     if (expr->kind == RangeNodeBinary) {
@@ -3996,7 +4062,7 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
             argument->a = expr->b;
             rangeNodeAppend(arena,call,argument);
         }
-        expr->lowered = call;
+        finding(typer,expr)->lowered = call;
     }
     return type;
 }
@@ -4007,9 +4073,9 @@ static RangeNode *typeExpression(Typer *, SourceScope *, RangeNode *, RangeNode 
 /* A local of a block in scope whose statement is not typed yet: it is
  * declared later than where it is read. Names a pattern binds are declared
  * by their case tests. */
-static int declaredLater(SourceScope *scope, const RangeNode *declaration)
+static int declaredLater(RangeNode *key, SourceScope *scope, RangeNode *declaration)
 {
-    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState) || (declaration->found & RangeFlagTyped)) return 0;
+    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState) || (found(key,declaration)->found & RangeFlagTyped)) return 0;
     for (; scope; scope = scope->parent)
         if (scope->owner && scope->owner->kind == RangeNodeBlock && !same(scope->owner->name,"bindings"))
             for (size_t i = 0; i < scope->owner->itemCount; ++i) if (scope->owner->items[i] == declaration) return 1;
@@ -4018,14 +4084,14 @@ static int declaredLater(SourceScope *scope, const RangeNode *declaration)
 
 /* The local, binding, or parameter a splice `#name` names: one declared, in
  * the scopes the #graph block is written in, before it. */
-static RangeNode *spliceLocal(SourceScope *scope, const char *name)
+static RangeNode *spliceLocal(RangeNode *key, SourceScope *scope, const char *name)
 {
     for (SourceScope *at = scope; at; at = at->parent) {
         RangeNode *owner = at->owner;
         for (size_t i = 0; owner && owner->kind != RangeNodeUnit && i < owner->itemCount; ++i) {
             RangeNode *item = owner->items[i];
             if ((rangeNodeDeclaresValue(item->kind) || item->kind == RangeNodeParameter) && same(item->name,name)
-                && !declaredLater(scope,item)) return item;
+                && !declaredLater(key,scope,item)) return item;
         }
     }
     return NULL;
@@ -4053,12 +4119,12 @@ static void typeSplices(Typer *typer, SourceScope *scope, RangeNode *node)
     if (spliceChain(node)) {
         RangeNode *root = node;
         while (root->kind != RangeNodeEnvironment) root = root->a;
-        RangeNode *local = spliceLocal(scope,root->name);
+        RangeNode *local = spliceLocal(typer->key,scope,root->name);
         int field = targetField(typer->report->arena,typer->macro,root->name);
         if (local && field) typeError(typer,root,"#%s names both a macro local and a target field",root->name);
         else if (!local && !field) typeError(typer,root,"#%s is neither a macro local nor a target field",root->name);
         else {
-            root->resolvedDeclaration = local;
+            finding(typer,root)->resolvedDeclaration = local;
             (void)typeOf(typer,scope,node,NULL,NULL);
         }
         return;
@@ -4073,16 +4139,18 @@ static void typeSplices(Typer *typer, SourceScope *scope, RangeNode *node)
 static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
 {
     if (!expr) return NULL;
-    if (expr->narrowed) return expr->type; /* a read narrowed where it is written keeps that narrowing */
-    expr->lowered = NULL; /* typing records it afresh */
+    RangeFacts *facts = found(typer->key,expr);
+    if (facts->narrowed) return facts->type; /* a read narrowed where it is written keeps that narrowing */
+    finding(typer,expr)->lowered = NULL; /* typing records it afresh */
     size_t mark = typer->narrowedCount;
     int logic = expr->kind == RangeNodeBinary && (same(expr->name,"&") || same(expr->name,"|"));
     RangeNode *type;
     if (logic && same(expr->name,"|")) {
         type = typeEither(typer,scope,expr,context);
-        expr->type = type;
+        finding(typer,expr)->type = type;
     } else type = typeExpression(typer,scope,expr,expected,context);
-    if (!logic && !(expr->lowered && expr->lowered->kind == RangeNodeCaseTest)) typer->narrowedCount = mark;
+    RangeNode *lowered = found(typer->key,expr)->lowered;
+    if (!logic && !(lowered && lowered->kind == RangeNodeCaseTest)) typer->narrowedCount = mark;
     type = narrowedRead(typer,expr,type);
     return type;
 }
@@ -4097,14 +4165,14 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         break;
     case RangeNodeName: {
         RangeNode *declaration = nameLookup(typer->report,scope,expr);
-        expr->resolvedDeclaration = declaration;
-        if (declaration && declaredLater(scope,declaration)) {
+        finding(typer,expr)->resolvedDeclaration = declaration;
+        if (declaration && declaredLater(typer->key,scope,declaration)) {
             typeError(typer,expr,"'%s' is read before its declaration",expr->name);
             break;
         }
         if (!declaration && receiverCase(typer,context,expr->name)) {
-            expr->lowered = caseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
-            type = typeCaseTest(typer,scope,expr->lowered,context);
+            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
+            type = typeCaseTest(typer,scope,test,context);
             break;
         }
         if (!declaration) break;
@@ -4112,7 +4180,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             if (declaration->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
             // The type was computed where the name was declared, in this same
             // context; a use does not re-derive it (or rerun its laws).
-            else if (declaration->type) type = declaration->type;
+            else if (found(typer->key,declaration)->type) type = found(typer->key,declaration)->type;
             else {
                 // `let a: b  let b: a` has no type: each is the other's.
                 size_t depth = typer->typingCount;
@@ -4158,7 +4226,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         RangeNode *entry = enumeration ? namedCase(typer,enumeration,expr->name,expr) : NULL;
         if (!entry) break;
         if (entry->itemCount) { typeError(typer,expr,"case '%s' carries a payload; write .%s(…)",entry->name,entry->name); break; }
-        expr->resolvedDeclaration = entry;
+        finding(typer,expr)->resolvedDeclaration = entry;
         type = enumeration;
         break;
     }
@@ -4176,7 +4244,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             RangeNode *entry = enumeration ? namedCase(typer,enumeration,expr->name,expr) : NULL;
             if (!entry) break;
             if (entry->itemCount) { typeError(typer,expr,"case '%s' carries a payload; write %s.%s(…)",entry->name,owner->name,entry->name); break; }
-            expr->resolvedDeclaration = entry;
+            finding(typer,expr)->resolvedDeclaration = entry;
             type = enumeration;
             break;
         }
@@ -4188,12 +4256,12 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         RangeNode *declaration = receiver->resolvedDeclaration;
         if (isEnum(receiver) && enumCase(declaration,expr->name)) {
             // `phase.loading`: whether phase holds the case.
-            expr->lowered = caseTest(typer->report->arena,expr,expr->a,expr->name,NULL);
-            type = typeCaseTest(typer,scope,expr->lowered,context);
+            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer->report->arena,expr,expr->a,expr->name,NULL);
+            type = typeCaseTest(typer,scope,test,context);
             break;
         }
         RangeNode *member = findMember(declaration,expr->name);
-        expr->resolvedDeclaration = member;
+        finding(typer,expr)->resolvedDeclaration = member;
         if (member) {
             if (member->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
             else type = memberType(typer,declaration,member,receiver);
@@ -4206,7 +4274,8 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         break;
     case RangeNodeEnvironment: {
         // A splice of a macro local is that local.
-        if (expr->resolvedDeclaration) { type = expr->resolvedDeclaration->type; break; }
+        RangeNode *local = found(typer->key,expr)->resolvedDeclaration;
+        if (local) { type = found(typer->key,local)->type; break; }
         // `#cases`: the field the macro's target kind declares. A target
         // with no grammar declaration has fields without Range types; a
         // field C has no adapter for is reported where the macro resolves.
@@ -4293,7 +4362,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     }
     default: break; /* unsupported forms are reported already */
     }
-    expr->type = type;
+    finding(typer,expr)->type = type;
     return type;
 }
 
@@ -4356,8 +4425,8 @@ static void checkIteration(Typer *typer, RangeNode *declaration)
     RangeNode *function = iterationFunction(declaration,&count);
     if (!function) return;
     RangeNode *integer = typer->integer ? specialize(typer,NULL,typer->integer,NULL,NULL,typer->integer) : NULL;
-    RangeNode *output = function->type;
-    int position = function->itemCount == 1 && integer && function->items[0]->type == integer;
+    RangeNode *output = found(typer->key,function)->type;
+    int position = function->itemCount == 1 && integer && found(typer->key,function->items[0])->type == integer;
     int optional = isEnum(output) && appliesBuiltin(output->resolvedDeclaration,"optional");
     if (!position || !optional)
         typeError(typer,function,"@iteration function '%s' of '%s' must take one Int position and return an optional, such as (let at: Int): Element?",
@@ -4378,8 +4447,9 @@ static void checkInsertion(Typer *typer, RangeNode *declaration)
     }
     if (!function) return;
     RangeNode *iteration = iterationFunction(declaration,&count);
-    RangeNode *element = count == 1 && iteration->type ? optionalWrapped(typer,iteration->type,NULL) : NULL;
-    if (function->itemCount != 1 || (element && function->items[0]->type != element)) {
+    RangeNode *yields = count == 1 ? found(typer->key,iteration)->type : NULL;
+    RangeNode *element = yields ? optionalWrapped(typer,yields,NULL) : NULL;
+    if (function->itemCount != 1 || (element && found(typer->key,function->items[0])->type != element)) {
         char t[160] = "one element";
         if (element) { char e[140]; describeType(e,sizeof(e),element); snprintf(t,sizeof(t),"one %s, the element its @iteration function yields",e); }
         typeError(typer,function,"@insertion function '%s' of '%s' must take %s",function->name,declaration->name,t);
@@ -4421,7 +4491,7 @@ static void typeEffect(Typer *typer, SourceScope *scope, RangeNode *attribute, R
         if (type->kind == RangeNodeSpecialization && (type->resolvedDeclaration == typer->integer
             || type->resolvedDeclaration == typer->boolean
             || (isEnum(type) && !enumPayloads(type->resolvedDeclaration))
-            || (message->type && type->resolvedDeclaration == message->type->resolvedDeclaration))) continue;
+            || (found(typer->key,message)->type && type->resolvedDeclaration == found(typer->key,message)->type->resolvedDeclaration))) continue;
         char name[160]; describeType(name,sizeof(name),type);
         typeError(typer,part->a,"@%s cannot write %s",macro->name,name);
     }
@@ -4436,7 +4506,7 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
     typeStatementOnly(typer,scope,node,context,output);
     typer->narrowedCount = mark;
     // A local is declared once its statement is typed: later ones may read it.
-    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) node->found |= RangeFlagTyped;
+    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) finding(typer,node)->found |= RangeFlagTyped;
 }
 
 static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
@@ -4448,7 +4518,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         if (node->typeName && (node->flags & RangeFlagApplication)) {
             // `let r: step(x: 1)` calls a function; a construct here is construction.
             if (!lookupFunction(typer->report,scope,node->typeName)) {
-                node->type = typeConstruction(typer,scope,node,node->typeName,node->generics,node->flags,node->items,node->itemCount,context);
+                finding(typer,node)->type = typeConstruction(typer,scope,node,node->typeName,node->generics,node->flags,node->items,node->itemCount,context);
                 break;
             }
             RangeNode *callee = rangeNodeCreate(typer->report->arena,RangeNodeName,node->path,node->line,node->column);
@@ -4458,15 +4528,15 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
             RangeNode *call = rangeNodeCreate(typer->report->arena,RangeNodeCall,node->path,node->line,node->column);
             call->a = callee;
             for (size_t i = 0; i < node->itemCount; ++i) rangeNodeAppend(typer->report->arena,call,node->items[i]);
-            node->lowered = call;
-            node->type = typeOf(typer,scope,call,NULL,context);
+            finding(typer,node)->lowered = call;
+            finding(typer,node)->type = typeOf(typer,scope,call,NULL,context);
             break;
         }
-        node->type = declaredType(typer,scope,node,context);
+        finding(typer,node)->type = declaredType(typer,scope,node,context);
         // A local names a value: `let v: Int` alone states a type, and only a
         // construct's member may leave its value to construction.
-        if ((node->typeName || (node->found & RangeFlagRequired)) && !(node->flags & RangeFlagApplication)
-            && !declarationValue(node) && !optionalWithoutValue(node))
+        if ((node->typeName || (found(typer->key,node)->found & RangeFlagRequired)) && !(node->flags & RangeFlagApplication)
+            && !declarationValue(typer->key,node) && !optionalWithoutValue(node))
             typeError(typer,node,"'%s' needs an initial value",node->name);
         break;
     case RangeNodeAssign: {
@@ -4474,14 +4544,14 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         if (target && target->kind == RangeNodeMemberAccess) {
             // `p.x: 5` changes a state member of a state value.
             RangeNode *expected = typeOf(typer,scope,target,NULL,context);
-            RangeNode *member = target->resolvedDeclaration, *root = target;
-            while (root->kind == RangeNodeMemberAccess) {
-                if (root->resolvedDeclaration && root->resolvedDeclaration->kind != RangeNodeState)
-                    typeError(typer,node,"cannot assign through %s '%s'",rangeNodeKindName(root->resolvedDeclaration->kind),root->name);
+            RangeNode *member = found(typer->key,target)->resolvedDeclaration, *root = target;
+            for (;;) {
+                RangeNode *through = found(typer->key,root)->resolvedDeclaration;
+                if ((root->kind == RangeNodeMemberAccess || root->kind == RangeNodeName) && through && through->kind != RangeNodeState)
+                    typeError(typer,node,"cannot assign through %s '%s'",rangeNodeKindName(through->kind),root->name);
+                if (root->kind != RangeNodeMemberAccess) break;
                 root = root->a;
             }
-            if (root->kind == RangeNodeName && root->resolvedDeclaration && root->resolvedDeclaration->kind != RangeNodeState)
-                typeError(typer,node,"cannot assign through %s '%s'",rangeNodeKindName(root->resolvedDeclaration->kind),root->name);
             if (member) {
                 RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
                 char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",member->name);
@@ -4491,11 +4561,11 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         }
         if (!target || target->kind != RangeNodeName) { sourceDiagnostic(typer->report,node,0,"not-implemented","assignment to this target is not implemented"); break; }
         RangeNode *declaration = sourceLookup(typer->report,scope,target->name,0);
-        target->resolvedDeclaration = declaration;
+        finding(typer,target)->resolvedDeclaration = declaration;
         if (!declaration) break;
         if (declaration->kind != RangeNodeState) { typeError(typer,node,"cannot assign to %s '%s'",rangeNodeKindName(declaration->kind),target->name); break; }
         // The state's type was computed where it was declared; an assignment does not re-derive it.
-        RangeNode *expected = declaration->type ? declaration->type : declaredType(typer,scope,declaration,context);
+        RangeNode *expected = found(typer->key,declaration)->type ? found(typer->key,declaration)->type : declaredType(typer,scope,declaration,context);
         RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
         char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",target->name);
         coerce(typer,node->b,expected,actual,what);
@@ -4520,7 +4590,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         SourceScope body = {.owner=loop,.parent=scope};
         RangeNode *sequence = loop->items[0];
         typeStatement(typer,&body,sequence,context,output);
-        RangeNode *type = sequence->type;
+        RangeNode *type = found(typer->key,sequence)->type;
         if (!type) break;
         size_t count = 0;
         RangeNode *function = type->kind == RangeNodeSpecialization ? iterationFunction(type->resolvedDeclaration,&count) : NULL;
@@ -4531,7 +4601,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
             break;
         }
         RangeNode *next = loop->items[2]->b->items[0]->a; /* the subject of the switch over the next element */
-        next->a->resolvedDeclaration = function;
+        finding(typer,next->a)->resolvedDeclaration = function;
         typeStatement(typer,&body,loop->items[1],context,output);
         typeStatement(typer,&body,loop->items[2],context,output);
         break;
@@ -4583,9 +4653,9 @@ static int patternWild(const RangeNode *pattern)
     return !pattern || pattern->integer == RangePatternAny || pattern->integer == RangePatternBind;
 }
 
-static RangeNode *patternCase(const RangeNode *pattern)
+static RangeNode *patternCase(RangeNode *key, RangeNode *pattern)
 {
-    return pattern && pattern->integer == RangePatternCase ? pattern->resolvedDeclaration : NULL;
+    return pattern && pattern->integer == RangePatternCase ? found(key,pattern)->resolvedDeclaration : NULL;
 }
 
 static RangeNode *patternField(const RangeNode *pattern, size_t index)
@@ -4624,7 +4694,7 @@ static int usefulCase(Typer *typer, RangeNode ***rows, size_t count, RangeNode *
     size_t n = 0;
     for (size_t r = 0; r <= count; ++r) {
         RangeNode **source = r < count ? rows[r] : q;
-        if (r < count && !patternWild(source[0]) && patternCase(source[0]) != entry) continue;
+        if (r < count && !patternWild(source[0]) && patternCase(typer->key,source[0]) != entry) continue;
         RangeNode **row = rangeArenaAllocate(arena,(w ? w : 1) * sizeof(*row));
         for (size_t i = 0; i < arity; ++i) row[i] = patternWild(source[0]) ? NULL : patternField(source[0],i);
         for (size_t i = 1; i < width; ++i) row[arity + i - 1] = source[i];
@@ -4639,7 +4709,7 @@ static int useful(Typer *typer, RangeNode ***rows, size_t count, RangeNode **q, 
     RangeArena *arena = typer->report->arena;
     RangeNode *head = q[0], *type = types[0];
     if (head && head->integer == RangePatternCase) {
-        RangeNode *entry = patternCase(head);
+        RangeNode *entry = patternCase(typer->key,head);
         return entry ? usefulCase(typer,rows,count,q,types,width,entry) : 1;
     }
     RangeNode ***rest = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*rest));
@@ -4659,7 +4729,7 @@ static int useful(Typer *typer, RangeNode ***rows, size_t count, RangeNode **q, 
             if (entry->kind != RangeNodeEnumCase) continue;
             ++cases;
             int found = 0;
-            for (size_t r = 0; r < count && !found; ++r) found = patternCase(rows[r][0]) == entry;
+            for (size_t r = 0; r < count && !found; ++r) found = patternCase(typer->key,rows[r][0]) == entry;
             if (!found) complete = 0;
         }
         if (!cases) return 0; /* no value to match */
@@ -4677,11 +4747,11 @@ static int useful(Typer *typer, RangeNode ***rows, size_t count, RangeNode **q, 
 static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, RangeNode *type, RangeNode *context)
 {
     if (!pattern) return;
-    pattern->type = type;
+    finding(typer,pattern)->type = type;
     if (deferredType(typer,type)) {
         // Which cases the subject has is known at macro time: what the
         // pattern binds is known then too.
-        if (pattern->integer == RangePatternBind) pattern->a->type = type;
+        if (pattern->integer == RangePatternBind) finding(typer,pattern->a)->type = type;
         else if (pattern->integer == RangePatternValue) (void)typeOf(typer,scope,pattern->a,NULL,context);
         else for (size_t i = 0; i < pattern->itemCount; ++i) typePattern(typer,scope,pattern->items[i]->a,type,context);
         return;
@@ -4689,7 +4759,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
     char t[160]; describeType(t,sizeof(t),type);
     switch (pattern->integer) {
     case RangePatternAny: return;
-    case RangePatternBind: pattern->a->type = type; return;
+    case RangePatternBind: finding(typer,pattern->a)->type = type; return;
     case RangePatternCase: {
         // `.name` is always a case of the subject's type. The case `for … in`
         // writes without a name is the payload case of the @optional
@@ -4704,7 +4774,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
             return;
         } else entry = namedCase(typer,type,pattern->name,pattern);
         if (!entry) return;
-        pattern->resolvedDeclaration = entry;
+        finding(typer,pattern)->resolvedDeclaration = entry;
         if (!(pattern->flags & RangeFlagApplication)) return; /* `.value` matches any payload */
         if (!entry->itemCount) { typeError(typer,pattern,"case '%s' has no payload to match",entry->name); return; }
         if (pattern->itemCount != entry->itemCount) {
@@ -4716,7 +4786,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
             if (argument->name && !same(argument->name,field->name))
                 typeError(typer,argument,"payload field %zu of '%s' is %s",i + 1,entry->name,
                           labeledField(field) ? field->name : "unlabeled");
-            argument->resolvedDeclaration = field;
+            finding(typer,argument)->resolvedDeclaration = field;
             typePattern(typer,scope,argument->a,caseFieldType(typer,type,field),context);
         }
         return;
@@ -4728,8 +4798,9 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
         if (isEnum(type) && actual == type) {
             RangeNode *value = pattern->a, *entry = NULL;
             if (isLiteral(value)) entry = literalCase(type->resolvedDeclaration,value);
-            else if (value->resolvedDeclaration && value->resolvedDeclaration->kind == RangeNodeEnumCase) entry = value->resolvedDeclaration;
-            if (entry) { pattern->integer = RangePatternCase; pattern->resolvedDeclaration = entry; pattern->name = entry->name; return; }
+            else if (found(typer->key,value)->resolvedDeclaration && found(typer->key,value)->resolvedDeclaration->kind == RangeNodeEnumCase)
+                entry = found(typer->key,value)->resolvedDeclaration;
+            if (entry) { pattern->integer = RangePatternCase; finding(typer,pattern)->resolvedDeclaration = entry; pattern->name = entry->name; return; }
         }
         // Any other value is compared with `=`.
         if (actual == type) noteEquality(typer,type,pattern);
@@ -4753,7 +4824,7 @@ static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, Range
         // An earlier arm's value is promoted to the optional this one yields.
         for (size_t i = 0; i < node->itemCount && node->items[i]->a != arm; ++i) {
             RangeNode *earlier = node->items[i]->a;
-            if (earlier && (earlier->promoted ? earlier->promoted : earlier->type) == type)
+            if (earlier && (found(typer->key,earlier)->promoted ? found(typer->key,earlier)->promoted : found(typer->key,earlier)->type) == type)
                 coerce(typer,earlier,actual,type,"an arm of a switch expression");
         }
         return actual;
@@ -4777,12 +4848,12 @@ static void typeConditionCoverage(Typer *typer, RangeNode *node)
 {
     RangeArena *arena = typer->report->arena;
     ConditionShape shape;
-    conditionShape(arena,node,&shape);
+    conditionShape(arena,typer->key,node,&shape);
     size_t width = shape.width;
     RangeNode **types = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*types));
     RangeNode **cases = rangeArenaAllocate(arena,(width ? width : 1) * sizeof(*cases));
     for (size_t k = 0; k < width; ++k) {
-        types[k] = shape.subjects[k]->type;
+        types[k] = found(typer->key,shape.subjects[k])->type;
         cases[k] = isEnum(types[k]) ? types[k]->resolvedDeclaration : NULL;
     }
     int *reached = rangeArenaAllocate(arena,(shape.count ? shape.count : 1) * sizeof(*reached));
@@ -4849,7 +4920,7 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
     }
     if (value && !type && typer->report->errors == errors)
         typeError(typer,node,"no arm of this switch expression yields a value");
-    node->type = type;
+    finding(typer,node)->type = type;
     if (!typed || typer->report->errors != errors) return type;
     if (!width) { typeConditionCoverage(typer,node); return type; }
     // Each row must match something the earlier ones do not; together they
@@ -4907,8 +4978,8 @@ static void typeBlock(Typer *typer, SourceScope *parent, RangeNode *block, Range
 
 static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function, RangeNode *context)
 {
-    if (function->found & RangeFlagTyped) return;
-    function->found |= RangeFlagTyped;
+    if (found(typer->key,function)->found & RangeFlagTyped) return;
+    finding(typer,function)->found |= RangeFlagTyped;
     SourceScope scope = {.owner=function,.parent=parent};
     // An operator takes its right operand, or nothing when it is prefix.
     if (function->typeName && operatorName(function->name)) {
@@ -4926,7 +4997,7 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
         typeError(typer,function,"'%s' is reserved for Bool logic; %s cannot declare it",
                   function->name,function->typeName);
     // A method's receiver is specialized by the receiver's own parameters.
-    if (function->typeName && context) methodReceiver(typer->report,function)->type = context;
+    if (function->typeName && context) finding(typer,methodReceiver(typer->report,function))->type = context;
     TyperContext outer = typerSave(typer);
     typer->narrowedFloor = typer->narrowedCount;
     typer->loops = 0;
@@ -4935,10 +5006,11 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     typer->closureSite = NULL;
     typer->macro = NULL; /* a function a macro instantiates is not macro code */
     typer->function = function;
-    for (size_t i = 0; i < function->itemCount; ++i) function->items[i]->type = declaredType(typer,&scope,function->items[i],context);
+    for (size_t i = 0; i < function->itemCount; ++i)
+        finding(typer,function->items[i])->type = declaredType(typer,&scope,function->items[i],context);
     RangeNode *output = function->b
         ? resolveTypeReference(typer,&scope,function->b->name,function->b->generics,function->b->flags,context,function->b) : NULL;
-    function->type = output;
+    finding(typer,function)->type = output;
     typer->output = output;
     if (function->a) typeBlock(typer,&scope,function->a,context,output);
     typerRestore(typer,outer);
@@ -4963,7 +5035,8 @@ static void typeMacro(Typer *typer, SourceScope *parent, RangeNode *macro, int d
     typer->function = NULL;
     typer->output = NULL;
     typer->macro = macro;
-    for (size_t i = 0; i < macro->itemCount; ++i) macro->items[i]->type = declaredType(typer,&scope,macro->items[i],NULL);
+    typer->key = NULL; /* a macro's body is typed once, in place */
+    for (size_t i = 0; i < macro->itemCount; ++i) finding(typer,macro->items[i])->type = declaredType(typer,&scope,macro->items[i],NULL);
     typeBlock(typer,&scope,macro->a,NULL,NULL);
     checkMutations(typer,macro->a);
     typerRestore(typer,outer);
@@ -4997,7 +5070,7 @@ static void checkOverloads(Typer *typer, RangeNode *owner)
             for (size_t k = 0; k < first->itemCount && !differ; ++k) {
                 RangeNode *x = first->items[k], *y = second->items[k];
                 if (!same(x->name,y->name)) differ = 1;
-                else if (x->type && y->type) differ = x->type != y->type;
+                else if (found(typer->key,x)->type && found(typer->key,y)->type) differ = found(typer->key,x)->type != found(typer->key,y)->type;
                 else differ = (x->flags & ~RangeFlagBinding) != (y->flags & ~RangeFlagBinding) || !sameTypeSyntax(x->b,y->b);
             }
             if (differ) continue;
@@ -5022,7 +5095,7 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
         if (item->kind == RangeNodeEnumCase)
-            for (size_t j = 0; j < item->itemCount; ++j) item->items[j]->type = declaredType(typer,&scope,item->items[j],context);
+            for (size_t j = 0; j < item->itemCount; ++j) finding(typer,item->items[j])->type = declaredType(typer,&scope,item->items[j],context);
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
@@ -5038,16 +5111,16 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
 /* The first member of `declaration`, at `index` or later, that a member
  * default refers to by bare name: defaults run in declaration order, so they
  * see only the members before them. */
-static RangeNode *laterMember(RangeNode *declaration, size_t index, RangeNode *node)
+static RangeNode *laterMember(RangeNode *key, RangeNode *declaration, size_t index, RangeNode *node)
 {
     if (!node || node->kind == RangeNodeFunction || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum) return NULL;
-    RangeNode *target = node->kind == RangeNodeName ? node->resolvedDeclaration : NULL;
+    RangeNode *target = node->kind == RangeNodeName ? found(key,node)->resolvedDeclaration : NULL;
     for (size_t i = index; target && i < declaration->itemCount; ++i)
         if (declaration->items[i] == target) return target;
-    RangeNode *found = laterMember(declaration,index,node->a);
-    if (!found) found = laterMember(declaration,index,node->b);
-    for (size_t i = 0; !found && i < node->itemCount; ++i) found = laterMember(declaration,index,node->items[i]);
-    return found;
+    RangeNode *later = laterMember(key,declaration,index,node->a);
+    if (!later) later = laterMember(key,declaration,index,node->b);
+    for (size_t i = 0; !later && i < node->itemCount; ++i) later = laterMember(key,declaration,index,node->items[i]);
+    return later;
 }
 
 /* `let height: width` and `let area: width * 2` are defaults computed at
@@ -5064,8 +5137,8 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
             RangeNode *named = !member->generics && !(member->flags & RangeFlagOptional) ? findMember(declaration,member->typeName) : NULL;
             for (size_t j = i; named && j < declaration->itemCount; ++j) if (declaration->items[j] == named) later = named;
         } else if (member->typeName) {
-            for (size_t j = 0; !later && j < member->itemCount; ++j) later = laterMember(declaration,i,member->items[j]);
-        } else later = laterMember(declaration,i,rangeNodeRHS(member));
+            for (size_t j = 0; !later && j < member->itemCount; ++j) later = laterMember(typer->key,declaration,i,member->items[j]);
+        } else later = laterMember(typer->key,declaration,i,rangeNodeRHS(member));
         if (later == member)
             typeError(typer,member,"the default of '%s' refers to '%s' itself",member->name,member->name);
         else if (later)
@@ -5077,17 +5150,17 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
 /* A member's type in its construct's own specialization, once. */
 static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeNode *context)
 {
-    if (item->found & RangeFlagTyped) return;
-    item->found |= RangeFlagTyped;
+    if (found(typer->key,item)->found & RangeFlagTyped) return;
+    finding(typer,item)->found |= RangeFlagTyped;
     if (item->typeName && (item->flags & RangeFlagApplication)) {
         // A member initialized by construction, e.g. `state from: Point(x: 0)`.
         if (!lookupFunction(typer->report,scope,item->typeName))
-            item->type = typeConstruction(typer,scope,item,item->typeName,item->generics,item->flags,
+            finding(typer,item)->type = typeConstruction(typer,scope,item,item->typeName,item->generics,item->flags,
                                           item->items,item->itemCount,context);
         else typeError(typer,item,"member '%s' cannot be initialized by calling '%s'",item->name,item->typeName);
         return;
     }
-    item->type = declaredType(typer,scope,item,context);
+    finding(typer,item)->type = declaredType(typer,scope,item,context);
 }
 
 static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declaration)
@@ -5161,7 +5234,7 @@ static RangeNode *memberTypeIn(Typer *typer, RangeNode *type, size_t index)
 {
     RangeNode *declaration = type->resolvedDeclaration, *member = declaration->items[index];
     if (type->layout == 2 && type->memberTypes) return type->memberTypes[index];
-    if (!parametric(declaration)) return member->type;
+    if (!parametric(declaration)) return found(typer->key,member)->type;
     SourceScope scope = {.owner=declaration};
     return declaredType(typer,&scope,member,type);
 }
@@ -5336,7 +5409,7 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
             RangeNode *type = NULL;
             if (member->flags & RangeFlagMany) { memberSize = 8; memberAlignment = 8; }
             else {
-                type = parametric ? declaredType(typer,&scope,member,specialization) : member->type;
+                type = parametric ? declaredType(typer,&scope,member,specialization) : found(typer->key,member)->type;
                 if (!type || type->kind != RangeNodeSpecialization || !layoutOf(typer,type,member)) {
                     known = 0;
                     specialization->integer = 1; /* the cause lies in a member's type, reported there */
@@ -5386,25 +5459,26 @@ static int mutatesIn(Typer *typer, RangeNode *owner, RangeNode *node)
     if (node->kind == RangeNodeAssign) {
         RangeNode *root = node->a;
         while (root && root->kind == RangeNodeMemberAccess) root = root->a;
-        if (root && root->kind == RangeNodeName && memberOf(owner,root->resolvedDeclaration)) return 1;
+        if (root && root->kind == RangeNodeName && memberOf(owner,found(typer->key,root)->resolvedDeclaration)) return 1;
     }
     if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeName) {
-        RangeNode *callee = node->a->resolvedDeclaration;
+        RangeNode *callee = found(typer->key,node->a)->resolvedDeclaration;
         if (callee && callee->kind == RangeNodeFunction && memberOf(owner,callee) && mutates(typer,callee)) return 1;
     }
     if (mutatesIn(typer,owner,node->a) || mutatesIn(typer,owner,node->b) || mutatesIn(typer,owner,node->c)
-        || mutatesIn(typer,owner,node->lowered)) return 1;
+        || mutatesIn(typer,owner,found(typer->key,node)->lowered)) return 1;
     for (size_t i = 0; i < node->itemCount; ++i) if (mutatesIn(typer,owner,node->items[i])) return 1;
     return 0;
 }
 
 static int mutates(Typer *typer, RangeNode *function)
 {
-    if (function->found & RangeFlagMutationKnown) return (function->found & RangeFlagMutating) != 0;
-    function->found |= RangeFlagMutationKnown; /* recursion assumes no change until shown */
+    RangeFacts *facts = found(typer->key,function);
+    if (facts->found & RangeFlagMutationKnown) return (facts->found & RangeFlagMutating) != 0;
+    finding(typer,function)->found |= RangeFlagMutationKnown; /* recursion assumes no change until shown */
     int result = (function->flags & RangeFlagBuiltin) ? same(function->name,"resize") || same(function->name,"write")
         : mutatesIn(typer,ownerOf(typer,function),function->a);
-    if (result) function->found |= RangeFlagMutating;
+    if (result) finding(typer,function)->found |= RangeFlagMutating;
     return result;
 }
 
@@ -5412,17 +5486,17 @@ static void checkMutations(Typer *typer, RangeNode *node)
 {
     if (!node) return;
     if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeMemberAccess) {
-        RangeNode *function = node->a->resolvedDeclaration;
+        RangeNode *function = found(typer->key,node->a)->resolvedDeclaration;
         if (function && function->kind == RangeNodeFunction && mutates(typer,function)) {
             RangeNode *root = node->a->a;
             while (root && root->kind == RangeNodeMemberAccess) root = root->a;
-            RangeNode *declaration = root && root->kind == RangeNodeName ? root->resolvedDeclaration : NULL;
+            RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
             if (!declaration || declaration->kind != RangeNodeState)
                 typeError(typer,node,"'%s' changes its receiver, which must be declared with state",function->name);
         }
     }
     checkMutations(typer,node->a); checkMutations(typer,node->b); checkMutations(typer,node->c);
-    checkMutations(typer,node->lowered);
+    checkMutations(typer,found(typer->key,node)->lowered);
     for (size_t i = 0; i < node->itemCount; ++i) checkMutations(typer,node->items[i]);
 }
 
@@ -6368,7 +6442,7 @@ static int evalCallClosure(Eval *eval, RangeValue *closure, RangeValue *argument
         status = evalAdopt(eval,&arguments[i],literal->items[i]->type,at);
         evalBind(eval,&frame,literal->items[i],arguments[i]);
     }
-    RangeNode *value = closureResult(eval->typer,literal);
+    RangeNode *value = closureResult(eval->typer,NULL,literal);
     if (!status && value) status = evalExpression(eval,&frame,value,out);
     else if (!status) {
         *out = (RangeValue){0};
@@ -6408,7 +6482,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         RangeNode *value = count ? arguments[0]->a : NULL;
         EvalFrame *in = frame;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) { value = declarationValue(declaration->items[i]); in = &defaults; }
+            if (constructionInput(declaration->items[i])) { value = declarationValue(NULL,declaration->items[i]); in = &defaults; }
         status = evalExpression(eval,in,value,out);
         return status ? status : evalAdopt(eval,out,type,at);
     }
@@ -6421,7 +6495,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
         for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
         if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
-        else if ((value = declarationValue(member)) == member)
+        else if ((value = declarationValue(NULL,member)) == member)
             status = evalConstruct(eval,&defaults,member->type,member->items,member->itemCount,member,&instance.values[i]);
         else if (value) status = evalExpression(eval,&defaults,value,&instance.values[i]);
         else continue; /* a required input: typing reports it missing */
@@ -6850,7 +6924,7 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     case RangeNodeLet: case RangeNodeState: {
         // `let p: Point(x: 1)` constructs; `let r: step(x: 1)` calls; a bare
         // name that resolved to a value copies it.
-        RangeNode *initial = declarationValue(node);
+        RangeNode *initial = declarationValue(NULL,node);
         if (initial == node) status = evalConstruct(eval,frame,node->type,node->items,node->itemCount,node,&value);
         else status = evalExpression(eval,frame,initial,&value);
         if (!status) status = evalAdopt(eval,&value,node->type,node);
@@ -7418,8 +7492,8 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         native->resultTemp = -1;
         if (count) return nativeExpression(native,arguments[0]->a), type;
         for (size_t i = 0; i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i]) && declarationValue(declaration->items[i])) {
-                nativeExpression(native,declarationValue(declaration->items[i]));
+            if (constructionInput(declaration->items[i]) && declarationValue(NULL,declaration->items[i])) {
+                nativeExpression(native,declarationValue(NULL,declaration->items[i]));
                 return type;
             }
         nativeEmit(native,armMovz(0,0,0));
@@ -7432,7 +7506,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         // `String("hi")` is the literal's bytes, and `String()` its default's.
         RangeNode *value = count ? arguments[0]->a : NULL;
         for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) value = declarationValue(declaration->items[i]);
+            if (constructionInput(declaration->items[i])) value = declarationValue(NULL,declaration->items[i]);
         nativeFrameAddress(native,0,destination);
         nativeZero(native,0,type->size);
         if (value) {
@@ -7477,7 +7551,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         for (size_t j = 0; j < count; ++j) if (arguments[j]->resolvedDeclaration == member) value = arguments[j]->a;
         int memberKind = nativeKind(native,memberType,member);
         if (memberKind == NativeNone) continue;
-        if (!value) value = declarationValue(member);
+        if (!value) value = declarationValue(NULL,member);
         if (value == member) {
             nativeConstruct(native,member,memberType,member->items,member->itemCount,destination + (int32_t)offset);
             if (memberKind == NativeScalar) { nativeFrameAddress(native,1,destination); nativeStoreScalar(native,0,1,offset,memberType); }
@@ -8369,7 +8443,7 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     }
     RangeNode *output = literal->type ? nativeTypeIn(native,literal->type->a,closure.context->self,closure.context->outer) : NULL;
-    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,closureResult(native->typer,literal),slots);
+    RangeNode *result = nativeRegion(native,call,NULL,output,closure.context,literal->a,closureResult(native->typer,NULL,literal),slots);
     native->hiddenCount -= 1;
     return result;
 }
@@ -8962,7 +9036,7 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         int kind = nativeKind(native,type,node);
         if (kind == NativeNone) break;
         // A bare name that resolved to a value is a copy; to a type, a requirement.
-        RangeNode *value = declarationValue(node);
+        RangeNode *value = declarationValue(NULL,node);
         int construction = value == node;
         if (kind == NativeScalar) {
             if (construction) nativeConstruct(native,node,type,node->items,node->itemCount,0);

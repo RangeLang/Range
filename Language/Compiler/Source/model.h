@@ -189,6 +189,7 @@ struct RangeNode {
     unsigned char *memberBoxed; /* union specialization: per payload field, stored out of line */
     size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */
     struct RangeNode **memberTypes; /* specialization: type per declaration item; NULL for @many storage */
+    struct RangeFactTable *keyed; /* specialization: what typing found under it, by node */
     RangeMacroApplication *macroApplication; /* the application this attribute writes */
     RangeNode *graphType; /* C-owned reflective shape, when applicable */
     RangeNode *grammarDefinition; /* loaded language identity for a C-backed node */

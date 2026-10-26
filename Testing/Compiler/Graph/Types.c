@@ -307,7 +307,7 @@ int main(void)
     assert(!errorsIn(&c,"type"));
     RangeNode *closure = named(c.project,"anyBig")->a->items[0]->a->items[0]->a;
     assert(closure->kind == RangeNodeClosure && !closure->c);
-    RangeNode *yields = closureResult(c.typer,closure);
+    RangeNode *yields = closureResult(c.typer,NULL,closure);
     assert(yields && yields->kind == RangeNodeBinary && same(yields->name,">"));
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
