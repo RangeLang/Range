@@ -3452,6 +3452,16 @@ static void diagnoseBuiltinOperator(SourceReport *report, RangeNode *owner, Rang
     else sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin function '%s' of %s",op,owner->name);
 }
 
+/* A builtin member of a grammar declaration that C reads through its field
+ * adapter for that kind of node, such as Let's value. */
+static int reflectionBuiltin(SourceReport *report, const RangeNode *owner, const RangeNode *member)
+{
+    RangeNode *shapes = report->arena->graphTypes;
+    for (size_t i = 0; shapes && i < shapes->itemCount; ++i)
+        if (shapes->items[i]->resolvedDeclaration == owner) return rangeGraphField(shapes->items[i],member->name) != NULL;
+    return 0;
+}
+
 static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
 {
     size_t slots = 0;
@@ -3462,7 +3472,10 @@ static void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
     for (size_t i = 0; i < owner->itemCount; ++i) {
         RangeNode *item = owner->items[i];
         if (item->kind == RangeNodeConstruct || item->kind == RangeNodeEnum) diagnoseBuiltinFunctions(report,item);
-        if (builtinMember(item) && bytes && same(item->name,"count"))
+        if (builtinMember(item) && reflectionBuiltin(report,owner,item))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin member '%s' of %s is C's reflection of the declaration: "
+                             "a macro reading it gets what C provides, whose type is known only at macro time",item->name,owner->name);
+        else if (builtinMember(item) && bytes && same(item->name,"count"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin member 'count' is the byte count the bytes primitive holds, read in C");
         else if (builtinMember(item) && ((!same(item->name,"storage") && !same(item->name,"signed") && !same(item->name,"bytes"))
             || owner->kind != RangeNodeConstruct))

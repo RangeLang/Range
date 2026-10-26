@@ -60,9 +60,11 @@ assert "no C primitive is implemented for builtin macro 'interval'" not in activ
 # Array<Element> declares a type parameter, so Array<Member> resolves;
 # @boolean and @string declare Bool and String the way @integer declares Int;
 # generics are @generic kinds, and every C graph shape has a grammar declaration.
-# value fields are left undeclared until expressions have a Range type.
+# A member kind's value is a @builtin member: C provides it, and says so.
 for declared in ('Array', 'Bool', 'String', 'Generic', 'Parameter', 'Any'):
     assert f"no declaration for '{declared}'" not in active, active
+assert "builtin member 'value' of Let is C's reflection of the declaration" in active, active
+assert "no C primitive is implemented for builtin member 'value'" not in active, active
 assert "has a C graph shape but no Range declaration" not in active, active
 # The language sources type-check; laws run per specialization without failing.
 assert 'error[type]' not in active and 'error[law]' not in active, active

@@ -1,8 +1,9 @@
-// value is C-backed but not declared here. It holds the right-hand-side
-// expression, but a macro reading `.value` gets that expression evaluated at
-// compile time (a generic's `bits.value` is 64, not an Expression), so
-// declaring it Expression? would misstate what C returns.
+// value is C's: a macro reading `.value` gets the declaration's initializer
+// evaluated at macro time (a generic's `bits.value` is 64, not an
+// Expression), so its type is known only then, from the value it holds. It is
+// a @builtin member without a type; C warns that it provides it.
 @member
 construct Derived {
     let name: String
+    @builtin let value
 }
