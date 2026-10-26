@@ -2211,6 +2211,22 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
     RangeNode *copy = rangeArenaAllocate(arena,sizeof(*copy));
     *copy = *declaration;
     copy->generics = specialization->generics;
+    RangeNodeKind kind; long long integer; const char *text;
+    if (value && lawInputs(value,&kind,&integer,&text)) {
+        // The law sees the literal's value alone, as a literal of its own: the
+        // written one carries what typing found where it is used.
+        RangeNode *literal = rangeNodeCreate(arena,kind,value->path,value->line,value->column);
+        literal->integer = integer;
+        literal->resolvedDeclaration = (value->kind == RangeNodeUnary ? value->a : value)->resolvedDeclaration;
+        if (text) {
+            RangeNode *part = rangeNodeCreate(arena,RangeNodeStringPart,value->path,value->line,value->column);
+            part->flags = RangeFlagLiteral;
+            part->name = text;
+            part->integer = (long long)strlen(text);
+            rangeNodeAppend(arena,literal,part);
+        }
+        value = literal;
+    }
     if (value) {
         size_t holders = 0;
         RangeNode *holder = literalHolder(declaration,value,&holders);
@@ -2276,17 +2292,9 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
     }
 }
 
-/* A law to run once typing is back at the top level. Typing may rewrite a
- * literal in place before then, promoting it into an optional, so the law
- * keeps the literal as it was met. */
+/* A law to run once typing is back at the top level. */
 static void queueLaws(Typer *typer, RangeNode *specialization, RangeNode *value, RangeNode *at)
 {
-    if (value) {
-        RangeNode *kept = rangeArenaAllocate(typer->report->arena,sizeof(*kept));
-        *kept = *value;
-        if (at == value) at = kept;
-        value = kept;
-    }
     if (typer->queuedCount == typer->queuedCapacity) {
         typer->queuedCapacity = typer->queuedCapacity ? typer->queuedCapacity * 2 : 64;
         void *grown = rangeArenaAllocate(typer->report->arena,typer->queuedCapacity * sizeof(*typer->queued));
@@ -2931,27 +2939,16 @@ static RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **pre
 }
 
 /* Optional promotion, as in Swift: where `T?` is expected, a value of T is the
- * present case holding it. The expression becomes `.present(value)` in place. */
+ * present case holding it. The optional is recorded beside the expression,
+ * whose type stays T. */
 static void coerce(Typer *typer, RangeNode *expr, RangeNode *expected, RangeNode *actual, const char *what)
 {
-    RangeNode *present = NULL, *wrapped = NULL;
+    RangeNode *wrapped = NULL;
+    if (expr) expr->promoted = NULL; /* typing records it afresh */
     if (deferredType(typer,expected) || deferredType(typer,actual) || converts(expected,actual)) return;
-    if (expr && expected && actual && expected != actual && (wrapped = optionalWrapped(typer,expected,&present))
+    if (expr && expected && actual && expected != actual && (wrapped = optionalWrapped(typer,expected,NULL))
         && (wrapped == actual || converts(wrapped,actual))) {
-        RangeArena *arena = typer->report->arena;
-        RangeNode *value = rangeArenaAllocate(arena,sizeof(*value));
-        *value = *expr;
-        RangeNode *callee = rangeNodeCreate(arena,RangeNodeCase,expr->path,expr->line,expr->column);
-        callee->name = present->name;
-        callee->resolvedDeclaration = present;
-        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,expr->path,expr->line,expr->column);
-        argument->a = value;
-        argument->resolvedDeclaration = present->items[0];
-        RangeNode *call = rangeNodeCreate(arena,RangeNodeCall,expr->path,expr->line,expr->column);
-        call->a = callee;
-        call->type = expected;
-        rangeNodeAppend(arena,call,argument);
-        *expr = *call;
+        expr->promoted = expected;
         return;
     }
     expectType(typer,expr,expected,actual,what);
@@ -2980,10 +2977,7 @@ static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value
         // The literal is one of the enum's cases; the enum's laws ran on the declaration.
         if (value != literal || !literalCase(declaration,literal))
             typeError(typer,value,"this literal names no case of %s",declaration->name);
-    } else if (type) {
-        if (value != literal) value->resolvedDeclaration = rule;
-        queueLaws(typer,type,value,value);
-    }
+    } else if (type) queueLaws(typer,type,value,value);
     literal->type = type;
     return type;
 }
@@ -4715,11 +4709,11 @@ static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, Range
     }
     if (optionalWrapped(typer,actual,NULL) == type) {
         // An earlier arm's value is promoted to the optional this one yields.
-        for (size_t i = 0; i < node->itemCount && node->items[i]->a != arm; ++i)
-            if (node->items[i]->a && node->items[i]->a->type == type) {
-                coerce(typer,node->items[i]->a,actual,type,"an arm of a switch expression");
-                node->items[i]->a->type = actual;
-            }
+        for (size_t i = 0; i < node->itemCount && node->items[i]->a != arm; ++i) {
+            RangeNode *earlier = node->items[i]->a;
+            if (earlier && (earlier->promoted ? earlier->promoted : earlier->type) == type)
+                coerce(typer,earlier,actual,type,"an arm of a switch expression");
+        }
         return actual;
     }
     char t[160], a[160]; describeType(t,sizeof(t),type); describeType(a,sizeof(a),actual);
@@ -6801,19 +6795,33 @@ static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *
     }
 }
 
+/* A value where typing promoted it to the optional `type`: the present case
+ * holding it, even when it is itself an optional. */
+static int evalPromote(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *at)
+{
+    RangeNode *present = NULL, *wrapped = optionalWrapped(eval->typer,type,&present);
+    RangeValue *payload = evalValues(eval,1);
+    *payload = *value;
+    int status = evalAdopt(eval,payload,wrapped,at);
+    *value = (RangeValue){.kind=ValueCase,.type=type,.node=present,.values=payload,.count=1};
+    return status;
+}
+
 /* An expression's value: what typing lowered it to, if anything, runs in
- * its place, and a narrowed read is the payload of the present case it
- * goes through. */
+ * its place; a narrowed read is the payload of the present case it goes
+ * through; a promoted value is the present case holding it. */
 static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
     *out = (RangeValue){0};
     if (!expr) return EvalNormal;
     int status = evalPlain(eval,frame,expr->lowered ? expr->lowered : expr,out);
-    if (status || !expr->narrowed) return status;
-    if (out->kind != ValueCase || out->node != expr->narrowed || out->count != 1)
-        return evalFail(eval,expr,"this narrowed value holds no payload");
-    *out = out->values[0];
-    return EvalNormal;
+    if (!status && expr->narrowed) {
+        if (out->kind != ValueCase || out->node != expr->narrowed || out->count != 1)
+            return evalFail(eval,expr,"this narrowed value holds no payload");
+        *out = out->values[0];
+    }
+    if (!status && expr->promoted) status = evalPromote(eval,out,expr->promoted,expr);
+    return status;
 }
 
 /* ---- statements ---- */
@@ -7324,6 +7332,38 @@ static size_t nativeUnlessCase(Native *native, int base, RangeNode *type, RangeN
     return nativeEmit(native,armBcond(RangeNE,0));
 }
 
+/* Store the value in x0, a scalar or an aggregate's address, into field k of
+ * the union at frame offset `destination`: inline, or in a block of its own
+ * when the field is stored out of line. A temporary moving into place is not
+ * retained. */
+static void nativeStoreField(Native *native, RangeNode *at, RangeNode *type, size_t k, int32_t destination, int moved)
+{
+    size_t offset = type->memberOffsets[k];
+    RangeNode *fieldType = type->memberTypes[k];
+    if (type->memberBoxed[k]) {
+        nativeEmit(native,armPush(0));            /* the value */
+        nativeConstant(native,0,16 + fieldType->size);
+        rangeCallImport(&native->machine,"_malloc");
+        nativeTrap(native,armCbz(0,0),at,"could not allocate storage for a recursive enum field");
+        nativeEmit(native,armMovz(9,1,0));
+        nativeEmit(native,armStr(9,0,0));         /* one reference */
+        nativeEmit(native,armStr(9,0,8));         /* one slot */
+        nativeEmit(native,armPop(1));
+        nativeEmit(native,armPush(0));            /* the block */
+        nativeEmit(native,armAddImm(0,0,16));
+        if (fieldType->scalarBits) nativeStoreScalar(native,1,0,0,fieldType);
+        else nativeCopyValue(native,0,1,fieldType,!moved);
+        nativeEmit(native,armPop(0));
+        nativeFrameAddress(native,1,destination);
+        nativeAddOffset(native,1,1,offset);
+        nativeEmit(native,armStr(0,1,0));
+    } else {
+        nativeFrameAddress(native,1,destination);
+        if (fieldType->scalarBits) nativeStoreScalar(native,0,1,offset,fieldType);
+        else { nativeAddOffset(native,1,1,offset); nativeCopyValue(native,1,0,fieldType,!moved); }
+    }
+}
+
 /* `.value(number: 7)`: build a case of `type` at frame offset `destination`,
  * or in a temporary; a union without payloads is its tag in x0. */
 static RangeNode *nativeVariant(Native *native, RangeNode *at, RangeNode *type, RangeNode *entry,
@@ -7346,33 +7386,8 @@ static RangeNode *nativeVariant(Native *native, RangeNode *at, RangeNode *type, 
     for (size_t j = 0; j < entry->itemCount; ++j) {
         RangeNode *field = entry->items[j], *value = NULL;
         for (size_t i = 0; i < count; ++i) if (arguments[i]->resolvedDeclaration == field) value = arguments[i]->a;
-        size_t k = first + j, offset = type->memberOffsets[k];
-        RangeNode *fieldType = type->memberTypes[k];
-        int fieldKind = nativeKind(native,fieldType,field);
-        if (!value || fieldKind == NativeNone || !nativeExpression(native,value)) continue;
-        int moved = nativeTakeTemp(native);
-        if (type->memberBoxed[k]) {
-            nativeEmit(native,armPush(0));            /* the value */
-            nativeConstant(native,0,16 + fieldType->size);
-            rangeCallImport(&native->machine,"_malloc");
-            nativeTrap(native,armCbz(0,0),at,"could not allocate storage for a recursive enum field");
-            nativeEmit(native,armMovz(9,1,0));
-            nativeEmit(native,armStr(9,0,0));         /* one reference */
-            nativeEmit(native,armStr(9,0,8));         /* one slot */
-            nativeEmit(native,armPop(1));
-            nativeEmit(native,armPush(0));            /* the block */
-            nativeEmit(native,armAddImm(0,0,16));
-            if (fieldKind == NativeScalar) nativeStoreScalar(native,1,0,0,fieldType);
-            else nativeCopyValue(native,0,1,fieldType,!moved);
-            nativeEmit(native,armPop(0));
-            nativeFrameAddress(native,1,destination);
-            nativeAddOffset(native,1,1,offset);
-            nativeEmit(native,armStr(0,1,0));
-        } else {
-            nativeFrameAddress(native,1,destination);
-            if (fieldKind == NativeScalar) nativeStoreScalar(native,0,1,offset,fieldType);
-            else { nativeAddOffset(native,1,1,offset); nativeCopyValue(native,1,0,fieldType,!moved); }
-        }
+        if (!value || nativeKind(native,type->memberTypes[first + j],field) == NativeNone || !nativeExpression(native,value)) continue;
+        nativeStoreField(native,at,type,first + j,destination,nativeTakeTemp(native));
     }
     if (temporary) nativeTrackTemp(native,destination,type);
     else native->resultTemp = -1;
@@ -8518,18 +8533,39 @@ static RangeNode *nativeLoadPlace(Native *native, RangeNode *type, int frameSlot
 
 static RangeNode *nativeExpressionValue(Native *, RangeNode *);
 
+/* The value in x0, of `type`, promoted to the optional `optional`: the
+ * present case holding it, in a temporary. */
+static RangeNode *nativePromote(Native *native, RangeNode *at, RangeNode *optional)
+{
+    RangeNode *present = NULL;
+    if (!optionalWrapped(native->typer,optional,&present) || nativeKind(native,optional,at) != NativeAggregate) return NULL;
+    int moved = nativeTakeTemp(native);
+    nativeEmit(native,armPush(0));
+    int32_t destination = nativeReserve(native,optional->size,optional->alignment);
+    nativeFrameAddress(native,0,destination);
+    nativeZero(native,0,optional->size);
+    nativeConstant(native,1,(uint64_t)present->integer);
+    nativeEmit(native,armStoreSized((size_t)optional->variantTag,1,0,0));
+    nativeEmit(native,armPop(0));
+    nativeStoreField(native,at,optional,nativeFirstField(optional->resolvedDeclaration,present),destination,moved);
+    nativeTrackTemp(native,destination,optional);
+    nativeFrameAddress(native,0,destination);
+    return optional;
+}
+
 /* What typing lowered an expression to, if anything, is compiled in its
- * place. Only a call, construction, switch expression, or slot read produces
- * a temporary; any other expression reports none, whatever its operands left
+ * place, and a promoted value becomes the present case holding it. Only a
+ * call, construction, switch expression, slot read, or promotion produces a
+ * temporary; any other expression reports none, whatever its operands left
  * behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
-    if (expr && expr->lowered) expr = expr->lowered;
-    RangeNode *type = nativeExpressionValue(native,expr);
-    int construction = expr && (expr->kind == RangeNodeCall || expr->kind == RangeNodeSwitch);
-    if (!expr || (!construction && !(expr->resolvedDeclaration
-        && expr->resolvedDeclaration->kind == RangeNodeEnumCase))) native->resultTemp = -1;
-    return type;
+    RangeNode *runs = expr && expr->lowered ? expr->lowered : expr;
+    RangeNode *type = nativeExpressionValue(native,runs);
+    int construction = runs && (runs->kind == RangeNodeCall || runs->kind == RangeNodeSwitch);
+    if (!runs || (!construction && !(runs->resolvedDeclaration
+        && runs->resolvedDeclaration->kind == RangeNodeEnumCase))) native->resultTemp = -1;
+    return type && expr->promoted ? nativePromote(native,expr,nativeType(native,expr->promoted)) : type;
 }
 
 /* `a + b` on bytes (x0, x1 = their addresses): a new block holding a's bytes

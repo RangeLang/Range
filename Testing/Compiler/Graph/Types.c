@@ -232,6 +232,22 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A promoted value keeps its written form and type; the optional it is promoted to is recorded beside it.
+    compile(&c,"function wrap(let n: Int): Int? { return n } "
+        "function pick(let flag: Bool): Int? { return switch { flag: 1, default: wrap(n: 2) } } "
+        "function equal(let a: Int?): Bool { return a = 5 | a = -5 }");
+    assert(!errorsIn(&c,"type") && !errorsIn(&c,"law"));
+    RangeNode *wrapped = named(c.project,"wrap")->a->items[0]->a;
+    assert(wrapped->kind == RangeNodeName && wrapped->promoted);
+    expectDescription(wrapped->type,"Int<bits: 64, signed: true>");
+    expectDescription(wrapped->promoted,"Optional<Wrapped: Int<bits: 64, signed: true>>");
+    RangeNode *first = named(c.project,"pick")->a->items[0]->a->items[0]->a;
+    assert(first->kind == RangeNodeInteger && first->promoted);
+    RangeNode *five = named(c.project,"equal")->a->items[0]->a->a->b;
+    assert(five->kind == RangeNodeInteger && five->promoted);
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
