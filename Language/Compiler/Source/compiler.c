@@ -715,14 +715,6 @@ static int argumentFits(const RangeNode *argument, const RangeNode *function, si
     return !argument->name && (argument->flags & RangeFlagImplicit) && trailingParameter(function) == index;
 }
 
-/* A trailing closure takes the label of the parameter it fills. */
-static void labelTrailing(RangeNode *call, const RangeNode *function)
-{
-    for (size_t i = 0; i < call->itemCount && i < function->itemCount; ++i)
-        if (!call->items[i]->name && (call->items[i]->flags & RangeFlagImplicit) && trailingParameter(function) == i)
-            call->items[i]->name = function->items[i]->name;
-}
-
 /* The function a construct or enum declares with @insertion, which C calls to
  * build a reflection list; *count is how many it declares. The role, not a
  * name, selects it. */
@@ -2644,7 +2636,7 @@ static RangeNode *findCalledFunction(RangeNode *owner, const char *name, const R
         if (function->kind != RangeNodeFunction || !same(function->name,name) || function->itemCount != call->itemCount) continue;
         int labels = 1;
         for (size_t j = 0; j < call->itemCount && labels; ++j) labels = argumentFits(call->items[j],function,j);
-        if (labels) { labelTrailing((RangeNode *)call,function); return function; }
+        if (labels) return function;
     }
     return findFunction(owner,name);
 }
@@ -3401,9 +3393,8 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
     if (call->itemCount != function->itemCount)
         typeError(typer,call,"'%s' takes %zu arguments; %zu supplied",function->name,function->itemCount,call->itemCount);
     size_t n = call->itemCount < function->itemCount ? call->itemCount : function->itemCount;
-    labelTrailing(call,function);
     for (size_t i = 0; i < n; ++i)
-        if (!call->items[i]->name || !same(call->items[i]->name,function->items[i]->name))
+        if (callee->name && !argumentFits(call->items[i],function,i))
             typeError(typer,call->items[i],"argument %zu of '%s' requires label '%s'",i + 1,function->name,function->items[i]->name);
     // Value generics: written by label, or their defaults.
     size_t valueCount = valueGenericCount(function);
@@ -3785,7 +3776,6 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             return typeClosureCall(typer,scope,call,value,context);
         function = lookupFunction(typer->report,scope,callee->name);
         if (function && function->owner) function = findCalledFunction(function->owner,callee->name,call);
-        if (function) labelTrailing(call,function);
         if (!function) {
             RangeNode *declaration = sourceLookup(typer->report,scope,callee->name,0);
             if (!declaration) declaration = sourceLookup(typer->report,scope,callee->name,2);
@@ -3847,9 +3837,11 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     SourceScope functionScope = {.owner=function,.parent=ownerScope.owner ? &ownerScope : NULL};
     if (call->itemCount != function->itemCount)
         typeError(typer,call,"'%s' takes %zu arguments; %zu supplied",function->name,function->itemCount,call->itemCount);
+    // A function chosen by its role, as `for … in` chooses its @iteration
+    // function, takes its arguments in order, unlabeled.
     for (size_t i = 0; i < call->itemCount && i < function->itemCount; ++i) {
         RangeNode *argument = call->items[i], *parameter = function->items[i];
-        if (!argument->name || !same(argument->name,parameter->name))
+        if (callee->name && !argumentFits(argument,function,i))
             typeError(typer,argument,"argument %zu of '%s' requires label '%s'",i + 1,function->name,parameter->name);
         RangeNode *expected = declaredType(typer,&functionScope,parameter,receiver);
         RangeNode *site = typer->closureSite;
@@ -4464,7 +4456,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
     }
     case RangeNodeFor: {
         // The sequence is typed first: its type's @iteration function is the
-        // member the loop calls, with that function's own parameter label.
+        // member the loop calls, its one argument the position.
         RangeNode *loop = node->a;
         if (!loop || loop->itemCount != 3) break;
         SourceScope body = {.owner=loop,.parent=scope};
@@ -4482,7 +4474,6 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         }
         RangeNode *next = loop->items[2]->b->items[0]->a; /* the subject of the switch over the next element */
         next->a->resolvedDeclaration = function;
-        if (function->itemCount == 1) next->items[0]->name = function->items[0]->name;
         typeStatement(typer,&body,loop->items[1],context,output);
         typeStatement(typer,&body,loop->items[2],context,output);
         break;

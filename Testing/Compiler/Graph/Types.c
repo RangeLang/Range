@@ -194,6 +194,14 @@ int main(void)
     assert(!writtenChanged(c.typer,"Language/Types/Int.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A trailing closure fills the parameter it fits; its label stays as written.
+    compile(&c,"function labels(let xs: Array<Int>): Bool { let flags: xs.map { x in return x > 1 } "
+        "return xs.contains { x in return x > 1 } }");
+    assert(!errorsIn(&c,"type"));
+    expectDescription(local(&c,"labels","flags")->type,"Array<Element: Bool>");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
     return 0;
 }
