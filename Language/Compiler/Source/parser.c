@@ -1242,12 +1242,13 @@ static RangeNode *forSwitch(RangeParser *parser, RangeNode *at, RangeNode *subje
  *   }
  *
  * <present> is the payload case of the optional the function returns; the
- * inner switch is written only for a condition. The parser
- * knows no member or case names: the call's member and label are left empty,
- * and the type checker finds the @iteration function of the sequence's type
- * once that type is known, which takes the position as its one argument. The element binding is a let, so a
- * loop variable cannot be assigned; the position advances before the body, so
- * `continue` advances it too. */
+ * inner switch is written only for a condition. The parser knows no member
+ * or case names: the call's member and label and the case's name are left
+ * empty, and the type checker finds the @iteration function of the
+ * sequence's type once that type is known, which takes the position as its
+ * one argument, and the payload case of the optional it returns. The element
+ * binding is a let, so a loop variable cannot be assigned; the position
+ * advances before the body, so `continue` advances it too. */
 static RangeNode *parseFor(RangeParser *parser)
 {
     RangeNode *node = parserNode(parser, RangeNodeFor);
@@ -1296,7 +1297,7 @@ static RangeNode *parseFor(RangeParser *parser)
      * checker resolves to the payload case of the optional the function returns. */
     RangeNode *bound = forNode(parser, node, RangeNodePattern, NULL);
     bound->integer = RangePatternCase;
-    bound->flags |= RangeFlagImplicit | RangeFlagApplication;
+    bound->flags |= RangeFlagApplication;
     bound->c = forNode(parser, node, RangeNodeBlock, "bindings");
     RangeNode *value = forNode(parser, node, RangeNodeLet, NULL);
     value->name = element;

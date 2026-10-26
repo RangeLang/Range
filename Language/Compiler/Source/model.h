@@ -1,7 +1,9 @@
 /* Shared graph model for the Range compiler.
  *
  * One node shape with named structural slots. Every node carries its source
- * location so unsupported forms can fail loudly with a real position. */
+ * location so unsupported forms can fail loudly with a real position. Written
+ * code is read once and never changed: what the compiler finds lives in fact
+ * fields beside it. */
 #ifndef RANGE_COMPILER_MODEL_H
 #define RANGE_COMPILER_MODEL_H
 
@@ -55,8 +57,9 @@ typedef enum {
     RangeNodeBreak,
     RangeNodeContinue,
     RangeNodeFunctionType,   /* (A, B) -> R: items are the parameter types, a the result */
-    RangeNodeCaseTest,       /* phase.failed(let reason): a Bool, whether the value a holds the case
-                              * its pattern b names; b's `let` arguments bind the payload fields */
+    RangeNodeCaseTest,       /* what typing lowers phase.failed(let reason) to, beside it: a Bool, whether
+                              * the value a holds the case its pattern b names; b's `let` arguments bind
+                              * the payload fields */
     RangeNodeKindCount
 } RangeNodeKind;
 
@@ -77,7 +80,6 @@ enum {
                                     * parameter types as arguments and the result as a */
     RangeFlagImplicit = 1 << 15,   /* switch arm: a default the compiler wrote for a lowering;
                                     * binding: one a lowering wrote, not a pattern's `let`;
-                                    * case pattern: the payload case `for … in` unwraps, unnamed;
                                     * name: the receiver a bare case name tests */
     RangeFlagEarlier = 1 << 16,    /* name: read to the left of the case test that binds the same name
                                     * in its condition, so it names what it names outside the condition */
@@ -104,7 +106,8 @@ enum {
 enum {
     RangePatternAny,      /* _ */
     RangePatternBind,     /* let name: a is the Let it declares */
-    RangePatternCase,     /* .name(…): a case, with one sub-pattern per payload field */
+    RangePatternCase,     /* .name(…): a case, with one sub-pattern per payload field; unnamed, the
+                           * payload case `for … in` unwraps */
     RangePatternValue,    /* a value compared for equality, by its type's `=`: a */
     RangePatternRow       /* a row of a switch over conditions: no items, b its condition */
 };

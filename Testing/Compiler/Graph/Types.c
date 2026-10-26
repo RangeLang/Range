@@ -56,6 +56,7 @@ static void compile(Compiled *c, const char *project)
     diagnoseDuplicates(&c->report);
     for (size_t u = 0; u < c->count; ++u) diagnoseBuiltinFunctions(&c->report,c->units[u]);
     typeCheck(c->typer);
+    assert(!writtenChanged(c->typer,NULL));
 }
 
 static SourceDiagnostic *reported(Compiled *c, const char *category, const char *text)

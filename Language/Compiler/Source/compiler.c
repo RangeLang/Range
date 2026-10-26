@@ -2011,6 +2011,8 @@ static TyperContext typerTop(Typer *typer)
     return saved;
 }
 
+static void diagnoseWritten(Typer *);
+
 /* Macro application as compiling runs it, for tests: the number of
  * applications run, or the first error, located. */
 int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count,
@@ -2018,6 +2020,7 @@ int validateMacroApplications(RangeArena *arena, RangeNode **units, size_t count
 {
     SourceReport report = {.arena=arena,.units=units,.count=count};
     Typer *typer = diagnoseMacroApplications(&report);
+    diagnoseWritten(typer);
     *checked = typer->vm->checked;
     for (SourceDiagnostic *d = report.first; d; d = d->next) {
         if (d->warning) continue;
@@ -2124,6 +2127,14 @@ static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, Ran
     rangeNodeAppend(arena,typer->specializations,specialization);
     *created = 1;
     return specialization;
+}
+
+/* A copy of a node is new code: what the compiler found about the original
+ * is found about it afresh. */
+static void forgetFacts(RangeNode *copy)
+{
+    copy->flags &= ~RangeFlagFacts;
+    copy->lowered = copy->narrowed = copy->promoted = NULL;
 }
 
 static RangeNode *copyGeneric(RangeArena *arena, RangeNode *generic)
@@ -2245,7 +2256,7 @@ static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value,
         *member = *holder;
         member->rhsReference = NULL; member->typeName = NULL; member->a = NULL;
         member->items = NULL; member->itemCount = 0; member->itemCapacity = 0;
-        member->flags &= ~RangeFlagTyped;
+        forgetFacts(member);
         RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,value->path,value->line,value->column);
         argument->a = value;
         rangeNodeAppend(arena,member,argument);
@@ -3327,7 +3338,7 @@ static RangeNode *cloneNode(CloneMap *map, RangeNode *node)
     }
     RangeNode *copy = rangeArenaAllocate(map->arena,sizeof(*copy));
     *copy = *node;
-    copy->flags &= ~RangeFlagTyped;
+    forgetFacts(copy);
     map->from[at] = node; map->to[at] = copy; ++map->count;
     if (node->itemCount) {
         copy->items = rangeArenaAllocate(map->arena,node->itemCount * sizeof(*copy->items));
@@ -5529,13 +5540,21 @@ static void noteWritten(Typer *typer, RangeNode *node)
 
 /* The first leaf declaration, in `path` or anywhere, whose written code
  * changed after it was read; NULL when none did. */
-RangeNode *writtenChanged(Typer *typer, const char *path)
+static RangeNode *writtenChanged(Typer *typer, const char *path)
 {
     for (size_t i = 0; i < typer->writtenCount; ++i) {
         RangeNode *node = typer->written[i].node;
         if ((!path || same(node->path,path)) && rangeWrittenHash(node) != typer->written[i].hash) return node;
     }
     return NULL;
+}
+
+/* A change to written code is C's mistake, reported where it was written. */
+static void diagnoseWritten(Typer *typer)
+{
+    RangeNode *changed = writtenChanged(typer,NULL);
+    if (changed) sourceDiagnostic(typer->report,changed,0,"internal","C changed %s%s%s%s after reading it",
+        rangeNodeKindName(changed->kind),changed->name ? " '" : "",changed->name ? changed->name : "",changed->name ? "'" : "");
 }
 
 static Typer *newTyper(SourceReport *report, Resolver *vm)
@@ -6196,6 +6215,7 @@ static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **o
         // A string or boolean literal, copied where the splice stands.
         node = rangeArenaAllocate(arena,sizeof(*node));
         *node = *value.node;
+        forgetFacts(node);
         node->path = at->path; node->line = at->line; node->column = at->column;
     }
     node->emittedBy = eval->application->attribute;
@@ -6236,7 +6256,7 @@ static int evalEmitNode(Eval *eval, EvalFrame *frame, RangeNode *node, int splic
     *copy = *node;
     eval->emittedFrom[slot] = node; eval->emittedTo[slot] = copy; ++eval->emittedCount;
     copy->emittedBy = attribute;
-    copy->flags &= ~(RangeFlagTyped | RangeFlagInvalid);
+    forgetFacts(copy);
     copy->resolvedDeclaration = NULL;
     copy->macroApplication = NULL;
     copy->items = NULL; copy->itemCount = 0; copy->itemCapacity = 0;
@@ -9679,6 +9699,7 @@ int main(int argc, char **argv)
         if (typer) typeCheck(typer);
         // Native code is generated from a complete, well-typed graph only.
         int written = typer && !report.errors && emitNative(&report,typer,output);
+        if (typer) diagnoseWritten(typer);
         writeSourceDiagnostics(&report,stderr);
         if (report.errors || failures) {
             fprintf(stderr,"compilation failed: %zu errors, %zu C implementation warnings\n",report.errors+(size_t)failures,report.warnings);
