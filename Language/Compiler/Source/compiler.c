@@ -3624,7 +3624,9 @@ static void typeSharedBindings(Typer *typer, RangeNode *pattern)
  * a parameter, a #reflection value, or a member path of one; a state can
  * change and a call is computed again, so neither narrows. A test under `!`
  * or on one side of `|` narrows nothing beyond it, unless both sides of the
- * `|` narrow the same value. The optional is the enum applying @optional. */
+ * `|` narrow the same value. The optional is the enum applying @optional.
+ * A value known only at macro time is not narrowed: typing does not know
+ * that it holds an optional. */
 
 static int narrowablePath(const RangeNode *path)
 {
@@ -5560,7 +5562,9 @@ static void typerLanguage(Typer *typer)
  * typed when it is first called, a construct's members when it is first
  * constructed, a member when `.value` reads its initializer, and a macro's
  * body when it is first applied. Each is typed once, from the top level, in
- * the scopes it is declared in. */
+ * the scopes it is declared in. Typing sees the program as it stands then:
+ * code typed before a later round emits what it names reports it missing,
+ * and keeps that report. */
 
 /* The scopes a declaration sees around it, innermost first: the constructs
  * and enums enclosing it, then its unit; NULL when no unit holds it. */
