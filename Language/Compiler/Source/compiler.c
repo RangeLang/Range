@@ -9712,8 +9712,9 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
     size_t known = nativeKnownArm(native,node,&arm);
     // Each subject is evaluated once, in order, into its own slot.
     size_t width = node->c ? node->c->itemCount : 1;
-    NativePlace places[width];
-    RangeNode *types[width];
+    // A switch over conditions has no subjects; the arrays keep one entry.
+    NativePlace places[width ? width : 1];
+    RangeNode *types[width ? width : 1];
     for (size_t k = 0; known == SIZE_MAX && k < width; ++k) {
         RangeNode *subject = node->c ? node->c->items[k] : node->a;
         types[k] = nativeExpression(native,subject);
@@ -9750,7 +9751,7 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
         size_t bodyCount = 0, bodyCapacity = 0;
         int fallible = known == SIZE_MAX && !(entry->flags & RangeFlagLiteral);
         for (size_t j = 0; fallible && j < entry->itemCount; ++j) {
-            RangeNode *pattern = entry->items[j], *patterns[width];
+            RangeNode *pattern = entry->items[j], *patterns[width ? width : 1];
             NativeMatch match = {0};
             patternRow(pattern,patterns,width);
             for (size_t k = 0; k < width; ++k) nativeMatch(native,&match,patterns[k],places[k],types[k]);
