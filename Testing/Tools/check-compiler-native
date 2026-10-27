@@ -832,24 +832,30 @@ enum Shape { case dot(Point), line(Point, Point), none }
 @equatable
 construct Custom { let n: Int  function =(let other: Custom): Bool { return n = other.n } }'
 loose='construct Custom { let n: Int  function equals(let other: Custom): Bool { return n = other.n } }'
-for variant in compared:"$base
+for mode in --as-written ""; do
+    for variant in compared:"$base
 $compare" ignored:"$base
 $ignore" unused:"$base
 $unused
 $ignore" loose:"$base
 $loose
 $ignore"; do
-    name="demand-${variant%%:*}"
-    "$compiler" -o "$work_root/$name" "${core[@]}" "$(case_file "$name" "${variant#*:}")" > /dev/null 2> "$work_root/log" \
-        || fail "$name did not compile: $(grep 'error\[' "$work_root/log")"
+        name="demand-${variant%%:*}"
+        "$compiler" $mode -o "$work_root/$name$mode" "${core[@]}" "$(case_file "$name" "${variant#*:}")" > /dev/null 2> "$work_root/log" \
+            || fail "$name $mode did not compile: $(grep 'error\[' "$work_root/log")"
+    done
+    [[ "$(text_size "$work_root/demand-compared$mode")" -gt "$(text_size "$work_root/demand-ignored$mode")" ]] \
+        || fail "comparing Point $mode emitted no equality code"
+    # Custom's written '=' is equality code too: compiled only when compared.
+    [[ "$(text_size "$work_root/demand-unused$mode")" == "$(text_size "$work_root/demand-ignored$mode")" ]] \
+        || fail "types that are never compared $mode emitted equality code"
 done
-[[ "$(text_size "$work_root/demand-compared")" -gt "$(text_size "$work_root/demand-ignored")" ]] \
-    || fail "comparing Point emitted no equality code"
-# Custom's written '=' is equality code too: compiled only when compared.
-[[ "$(text_size "$work_root/demand-unused")" == "$(text_size "$work_root/demand-ignored")" ]] \
-    || fail "types that are never compared emitted equality code"
-loose_size="$(text_size "$work_root/demand-loose")"; ignored_size="$(text_size "$work_root/demand-ignored")"
-[[ "$loose_size" -gt "$ignored_size" ]] || fail "Custom's ordinary equals method was not compiled"
+# Custom's ordinary method is compiled as written, though nothing calls it;
+# otherwise only what the entry block reaches is compiled.
+[[ "$(text_size "$work_root/demand-loose--as-written")" -gt "$(text_size "$work_root/demand-ignored--as-written")" ]] \
+    || fail "Custom's ordinary equals method was not compiled as written"
+[[ "$(text_size "$work_root/demand-loose")" == "$(text_size "$work_root/demand-ignored")" ]] \
+    || fail "Custom's equals method was compiled though nothing calls it"
 # Generic functions: a body is checked per instantiation, which the error names.
 reject generic-operation "'+' is not declared on Bool; in sum<T: Bool>, specialized at" \
     'function sum<T>(let a: T, let b: T): T { return a + b }

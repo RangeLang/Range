@@ -7116,12 +7116,14 @@ static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
  * stays unknown: each expression first asks the evaluator for its value.
  * Builtin operators are C primitives: each enforces its operand type's range
  * (the @integer law) at runtime where the compiler cannot prove it, writing a
- * located message and exiting 134. Operators with bodies are calls. Every
- * function is compiled, reached or not, so each missing mechanism is
- * reported; forms not lowered yet are reported as not implemented. An arm
- * a known condition never takes is not compiled: compiled as written
- * (--as-written), where only leaves, literals and the like, are asked for
- * their values, every arm is, and every missing mechanism is reported. */
+ * located message and exiting 134. Operators with bodies are calls. Only
+ * what the entry block reaches is compiled: a function, or a generic one's
+ * instance, when emitted code calls it, so one whose every call was filled
+ * in is not, nor an arm a known condition never takes; forms not lowered yet
+ * are reported as not implemented. Compiled as written (--as-written), where
+ * only leaves, literals and the like, are asked for their values, every arm
+ * and every function is, reached or not, and every missing mechanism is
+ * reported. */
 
 /* A branch to patch once its target is known: its position and encoding. */
 typedef struct { size_t at; uint32_t base; } NativeJump;
@@ -9921,10 +9923,12 @@ static void nativeMethods(Native *native, RangeNode *construct)
     }
 }
 
-/* Compile the entry block, every function, and every method of every concrete
- * specialization; write the executable when nothing is missing. With
- * `asWritten`, every expression is compiled as written: nothing is filled
- * in before run. Returns 1 when an executable was written. */
+/* Compile the entry block and every function and specialization instance its
+ * emitted code calls; write the executable when nothing is missing. With
+ * `asWritten`, or without an entry block, every function and every method of
+ * every concrete specialization is compiled, reached or not; with
+ * `asWritten`, every expression is compiled as written: nothing is filled in
+ * before run. Returns 1 when an executable was written. */
 static int emitNative(SourceReport *report, Typer *typer, const char *path, int asWritten)
 {
     Native native = {.report=report,.typer=typer,.asWritten=asWritten};
@@ -9934,26 +9938,31 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path, int 
         if (report->units[u]->items[i]->kind == RangeNodeMain) { entry = report->units[u]->items[i]; ++entries; }
     if (entries > 1) { sourceDiagnostic(report,entry,0,"entry","the program has %zu entry blocks; it needs one",entries); return 0; }
     if (entry) nativeInstance(&native,entry,NULL,NULL);
-    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
-        RangeNode *item = report->units[u]->items[i];
-        if (item->kind == RangeNodeFunction && !(item->flags & (RangeFlagBuiltin | RangeFlagExtern)) && !genericTemplate(item)
-            && !nativeInlined(item))
-            nativeInstance(&native,item,NULL,NULL);
+    // Compiled as written, or without an entry block, every function is
+    // compiled, reached or not; otherwise only what the entry block reaches.
+    if (asWritten || !entry) {
+        for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i) {
+            RangeNode *item = report->units[u]->items[i];
+            if (item->kind == RangeNodeFunction && !(item->flags & (RangeFlagBuiltin | RangeFlagExtern)) && !genericTemplate(item)
+                && !nativeInlined(item))
+                nativeInstance(&native,item,NULL,NULL);
+        }
+        // Generic functions: one compiled function per specialization. A
+        // generic method's is compiled for its receiver's specialization; one a
+        // macro calls with its graph values runs only at macro time.
+        for (size_t i = 0; i < typer->instances->itemCount; ++i) {
+            RangeNode *key = typer->instances->items[i], *context = key->outer;
+            if (nativeGraphValues(&native,key) || (context && nativeGraphValues(&native,context))
+                || nativeInlined(key->resolvedDeclaration)) continue;
+            nativeInstance(&native,key->resolvedDeclaration,key,context);
+        }
+        for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
+            if (report->units[u]->items[i]->kind == RangeNodeConstruct || report->units[u]->items[i]->kind == RangeNodeEnum)
+                nativeMethods(&native,report->units[u]->items[i]);
     }
-    // Generic functions: one compiled function per specialization. A
-    // generic method's is compiled for its receiver's specialization; one a
-    // macro calls with its graph values runs only at macro time.
-    for (size_t i = 0; i < typer->instances->itemCount; ++i) {
-        RangeNode *key = typer->instances->items[i], *context = key->outer;
-        if (nativeGraphValues(&native,key) || (context && nativeGraphValues(&native,context))
-            || nativeInlined(key->resolvedDeclaration)) continue;
-        nativeInstance(&native,key->resolvedDeclaration,key,context);
-    }
-    for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
-        if (report->units[u]->items[i]->kind == RangeNodeConstruct || report->units[u]->items[i]->kind == RangeNodeEnum)
-            nativeMethods(&native,report->units[u]->items[i]);
-    // Compiling may reach new instances and subroutines, and a subroutine may
-    // reach further ones of both; the entry block stays first.
+    // Compiling may reach new instances and subroutines, each where emitted
+    // code calls it, and a subroutine may reach further ones of both; the
+    // entry block stays first.
     for (int progress = 1; progress;) {
         progress = 0;
         for (size_t i = 0; i < native.instanceCount; ++i)
