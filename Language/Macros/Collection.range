@@ -3,9 +3,9 @@
 // the compiler reports that where the emitted code lands.
 macro collection(): Construct {
     // A collection names its element type Element: the code emitted below
-    // refers to it, and the type checker reports a target without one. This
-    // macro cannot inspect #generics to say so earlier: reflection lists are
-    // collections, and their functions are the ones this macro is emitting.
+    // refers to it, and typing reports a target without one, per specialization
+    // of a generic target. This macro cannot inspect #generics first: reflection
+    // lists are collections, built with the functions it is emitting.
 
     // The construct itself holds the header; count and capacity are ordinary
     // members, and only the element slots use the @many primitive. The slot
