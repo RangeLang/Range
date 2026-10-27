@@ -5766,8 +5766,11 @@ typedef struct EvalFrame {
 } EvalFrame;
 
 /* How evaluation goes on: normally, or leaving through return (the value in
- * returned), break, continue, or a failure (the message at, or none). */
-enum { EvalNormal, EvalReturn, EvalBreak, EvalContinue, EvalFailed };
+ * returned), break, continue, or a failure (the message at, or none); or,
+ * folding, on a value that is not known before run. */
+enum { EvalNormal, EvalReturn, EvalBreak, EvalContinue, EvalFailed, EvalUnknown };
+
+struct Native;
 
 typedef struct {
     Resolver *vm;
@@ -5779,6 +5782,10 @@ typedef struct {
     /* Emitted copies by original, so a node quoted code reaches twice (a
      * for-in's binding is in its pattern and its scope) stays one node. */
     RangeNode **emittedFrom, **emittedTo; size_t emittedCapacity, emittedCount;
+    /* Folding: native code asks what a body it compiles knows before run.
+     * Root is that body's frame, whose names native code holds. */
+    struct Native *outside;
+    EvalFrame *root;
 } Eval;
 
 static size_t nativeMemberIndex(RangeNode *, RangeNode *);
@@ -6320,9 +6327,44 @@ static int evalEmit(Eval *eval, EvalFrame *frame, RangeNode *emission)
 
 /* ---- calls ---- */
 
+/* The element type of `member`, @many storage of `type`. */
+static RangeNode *manyElement(Typer *typer, RangeNode *type, RangeNode *member)
+{
+    SourceScope scope = {.owner=type->resolvedDeclaration};
+    return resolveTypeReference(typer,&scope,member->typeName,member->generics,member->flags & ~RangeFlagMany,type,member);
+}
+
+/* The value of `type` that zeroed storage holds, as native code zero-fills
+ * new slots: a scalar 0, no bytes, an enum's tag-0 case with zero fields,
+ * or a construct with zero members and no slots. A field stored out of
+ * line, as one holding its own enum is, holds no value then. */
+static RangeValue evalZero(Eval *eval, RangeNode *type, unsigned depth)
+{
+    int bits, isSigned;
+    if (!type || type->kind != RangeNodeSpecialization || depth > 16) return (RangeValue){0};
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (scalarShape(type,&bits,&isSigned)) return (RangeValue){.kind=ValueScalar,.type=type};
+    if (bytesDeclaration(declaration)) return (RangeValue){.kind=ValueText,.type=type,.text=""};
+    int variant = declaration->kind == RangeNodeEnum;
+    RangeValue zero = {.kind=variant ? ValueCase : ValueInstance,.type=type,.count=variant ? 0 : declaration->itemCount};
+    for (size_t i = 0; variant && !zero.node && i < declaration->itemCount; ++i)
+        if (declaration->items[i]->kind == RangeNodeEnumCase && !declaration->items[i]->integer) {
+            zero.node = declaration->items[i];
+            zero.count = zero.node->itemCount;
+        }
+    zero.values = evalValues(eval,zero.count);
+    for (size_t i = 0; i < zero.count; ++i) {
+        RangeNode *member = variant ? zero.node->items[i] : declaration->items[i];
+        if (!variant && (!rangeNodeDeclaresValue(member->kind) || builtinMember(member))) continue;
+        zero.values[i] = member->flags & RangeFlagMany ? (RangeValue){.kind=ValueSlots}
+            : evalZero(eval,memberTypeIn(eval->typer,type,member),depth + 1);
+    }
+    return zero;
+}
+
 /* A C primitive a function declares with @builtin, on its receiver: one
  * byte of the bytes primitive, or the slot primitives on the receiver's one
- * @many member. */
+ * @many member, whose new slots hold zero values. Each new slot is a step. */
 static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeValue *arguments, RangeNode *at, RangeValue *out)
 {
     if (self && self->kind == ValueText && same(function->name,"byte") && function->itemCount == 1) {
@@ -6342,8 +6384,13 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
     long long index = arguments[0].integer;
     if (same(function->name,"resize")) {
         if (index < 0) return evalFail(eval,at,"resize to a negative slot count");
-        RangeValue *values = evalValues(eval,(size_t)index);
-        memcpy(values,slots->values,((size_t)index < slots->count ? (size_t)index : slots->count) * sizeof(*values));
+        size_t kept = (size_t)index < slots->count ? (size_t)index : slots->count;
+        eval->steps += (size_t)index - kept < 100000 ? (unsigned)((size_t)index - kept) : 100000;
+        int status = evalStep(eval,at);
+        if (status) return status;
+        RangeValue *values = evalValues(eval,(size_t)index), zero = evalZero(eval,manyElement(eval->typer,self->type,declaration->items[many]),0);
+        memcpy(values,slots->values,kept * sizeof(*values));
+        for (size_t i = kept; i < (size_t)index; ++i) values[i] = zero;
         *slots = (RangeValue){.kind=ValueSlots,.values=values,.count=(size_t)index};
         return EvalNormal;
     }
@@ -6421,9 +6468,33 @@ static int evalCase(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNode *en
     return EvalNormal;
 }
 
+/* The value a construction gives a member, in both walkers: the argument
+ * naming it, read under `key`; NULL when none does, and the member takes
+ * its default. */
+static RangeNode *constructionArgument(RangeNode *key, RangeNode *member, RangeNode **arguments, size_t count)
+{
+    RangeNode *value = NULL;
+    for (size_t j = 0; j < count; ++j) if (found(key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
+    return value;
+}
+
+/* A scalar's or a bytes value's single input, the value itself: the
+ * argument, else, *defaulted, the default of its first construction input
+ * that has one, read under `own`; NULL for neither, and the value is zero. */
+static RangeNode *constructionSingle(RangeNode *own, RangeNode *declaration, RangeNode **arguments, size_t count, int *defaulted)
+{
+    *defaulted = !count;
+    if (count) return arguments[0]->a;
+    for (size_t i = 0; i < declaration->itemCount; ++i)
+        if (constructionInput(declaration->items[i]) && declarationValue(own,declaration->items[i]))
+            return declarationValue(own,declaration->items[i]);
+    return NULL;
+}
+
 /* `Point(x: 1)`: each stored member is its argument or its default, which
  * sees the members before it; @many storage starts with no slots. A scalar's
- * or a bytes value's single input is the value itself. */
+ * or a bytes value's single input is the value itself, and an enum's the
+ * case value given. */
 static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNode **arguments, size_t count, RangeNode *at,
                          RangeValue *out)
 {
@@ -6431,27 +6502,27 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
     RangeNode *declaration = type->resolvedDeclaration;
     evalPrepare(eval,declaration);
     EvalFrame defaults = {.key=keyOf(declaration,type)};
-    int status, bits, isSigned;
+    int status, bits, isSigned, defaulted;
     if (bytesDeclaration(declaration) || scalarShape(type,&bits,&isSigned)) {
-        RangeNode *value = count ? arguments[0]->a : NULL;
-        EvalFrame *in = frame;
-        for (size_t i = 0; !value && i < declaration->itemCount; ++i) {
-            if (!constructionInput(declaration->items[i])) continue;
-            (void)memberTypeIn(eval->typer,type,declaration->items[i]); /* its default, as this specialization has it */
-            value = declarationValue(defaults.key,declaration->items[i]);
-            in = &defaults;
-        }
-        status = evalExpression(eval,in,value,out);
+        for (size_t i = 0; i < declaration->itemCount; ++i)
+            if (constructionInput(declaration->items[i])) (void)memberTypeIn(eval->typer,type,declaration->items[i]); /* its default, as this specialization has it */
+        RangeNode *value = constructionSingle(defaults.key,declaration,arguments,count,&defaulted);
+        if (!value) { *out = evalZero(eval,type,0); return EvalNormal; }
+        status = evalExpression(eval,defaulted ? &defaults : frame,value,out);
+        return status ? status : evalAdopt(eval,out,type,at);
+    }
+    if (declaration->kind == RangeNodeEnum) {
+        if (count != 1) return evalStop(eval);
+        status = evalExpression(eval,frame,arguments[0]->a,out);
         return status ? status : evalAdopt(eval,out,type,at);
     }
     RangeValue instance = {.kind=ValueInstance,.type=type,.count=declaration->itemCount};
     instance.values = evalValues(eval,instance.count);
     defaults.self = &instance;
     for (size_t i = 0; i < instance.count; ++i) {
-        RangeNode *member = declaration->items[i], *value = NULL;
+        RangeNode *member = declaration->items[i], *value = constructionArgument(frame->key,member,arguments,count);
         if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
         if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
-        for (size_t j = 0; j < count; ++j) if (found(frame->key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
         RangeNode *memberType = memberTypeIn(eval->typer,type,member);
         if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
         else if ((value = declarationValue(defaults.key,member)) == member)
@@ -6488,28 +6559,41 @@ static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
     return &owner->values[member];
 }
 
-/* A call: a case with its payload, a construction, a closure a parameter
- * holds, or the function typing chose, on the receiver it is called on (in
- * place, so a method changing it changes the place) or, for a sibling, the
- * running method's. On a value known only at macro time, the function its
- * type declares with the call's name and labels. */
+/* What a call runs, in both walkers, by the declaration typing resolved its
+ * callee to: a case with its payload, a construction, the closure a
+ * parameter holds, or a function. */
+enum { CallCase, CallConstruct, CallClosure, CallFunction, CallOther };
+
+static int callForm(const RangeNode *target)
+{
+    if (!target) return CallOther;
+    if (target->kind == RangeNodeEnumCase) return CallCase;
+    if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeTypeParameter) return CallConstruct;
+    if (target->kind == RangeNodeParameter || rangeNodeDeclaresValue(target->kind)) return CallClosure;
+    return target->kind == RangeNodeFunction ? CallFunction : CallOther;
+}
+
+/* A call, on the receiver it is called on (in place, so a method changing it
+ * changes the place) or, for a sibling, the running method's. On a value
+ * known only at macro time, the function its type declares with the call's
+ * name and labels. */
 static int evalCall(Eval *eval, EvalFrame *frame, RangeNode *call, RangeValue *out)
 {
     RangeFacts *facts = found(frame->key,call->a);
     RangeNode *callee = call->a, *target = facts->resolvedDeclaration, *type = found(frame->key,call)->type;
-    if (target && target->kind == RangeNodeEnumCase) return evalCase(eval,frame,type,target,call->items,call->itemCount,out);
-    if (target && (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeTypeParameter))
-        return evalConstruct(eval,frame,type,call->items,call->itemCount,call,out);
+    int form = callForm(target);
+    if (form == CallCase) return evalCase(eval,frame,type,target,call->items,call->itemCount,out);
+    if (form == CallConstruct) return evalConstruct(eval,frame,type,call->items,call->itemCount,call,out);
     RangeValue receiver = {0}, *self = NULL, *arguments = evalValues(eval,call->itemCount);
     int status;
     if (callee->kind == RangeNodeMemberAccess) {
         self = evalPlace(eval,frame,callee->a);
         if (!self && (status = evalExpression(eval,frame,callee->a,&receiver))) return status;
         if (!self) self = &receiver;
-    } else if (target && target->kind == RangeNodeFunction && target->typeName) self = frame->self;
+    } else if (form == CallFunction && target->typeName) self = frame->self;
     for (size_t i = 0; i < call->itemCount; ++i)
         if ((status = evalExpression(eval,frame,call->items[i]->a,&arguments[i]))) return status;
-    if (target && (target->kind == RangeNodeParameter || rangeNodeDeclaresValue(target->kind))) {
+    if (form == CallClosure) {
         RangeValue *closure = evalNamed(frame,target);
         if (!closure || closure->kind != ValueClosure) return evalFail(eval,call,"no closure is bound to '%s' here",callee->name);
         return evalCallClosure(eval,closure,arguments,call,out);
@@ -6564,6 +6648,21 @@ static int evalEquals(Eval *eval, RangeValue left, RangeValue right, RangeNode *
     return status;
 }
 
+/* How an operator runs, in both walkers, by the function typing chose and
+ * whether its left operand is bytes: `&` and `|` decide on their left
+ * operand when they can, `=` and `!=` compare by the operands' type's `=`,
+ * `+` on bytes joins them, and any other is the operand's scalar primitive,
+ * or Bool's `!`, or a call. */
+enum { OperatorShortCircuit, OperatorEquality, OperatorJoin, OperatorScalar };
+
+static int operatorForm(const RangeNode *expr, const RangeNode *function, int bytes)
+{
+    int binary = expr->kind == RangeNodeBinary;
+    if (binary && shortCircuit(function)) return OperatorShortCircuit;
+    if (binary && (same(expr->name,"=") || same(expr->name,"!="))) return OperatorEquality;
+    return binary && same(expr->name,"+") && bytes ? OperatorJoin : OperatorScalar;
+}
+
 /* A builtin operator's C primitive, by its operand's layout: scalar
  * arithmetic and comparison, trapping where native code traps, Bool's `!`,
  * and the join of two bytes values. */
@@ -6573,7 +6672,7 @@ static int evalPrimitive(Eval *eval, RangeNode *expr, RangeValue left, RangeValu
     char name[160]; describeType(name,sizeof(name),left.type);
     int bits, isSigned;
     if (same(op,"!") && left.kind == ValueCase) { *out = evalBool(eval,!evalTruth(left)); return EvalNormal; }
-    if (same(op,"+") && left.kind == ValueText && right.kind == ValueText) {
+    if (operatorForm(expr,NULL,left.kind == ValueText) == OperatorJoin && right.kind == ValueText) {
         char *joined = rangeArenaAllocate(eval->vm->arena,left.length + right.length + 1);
         memcpy(joined,left.text,left.length);
         memcpy(joined + left.length,right.text,right.length);
@@ -6616,11 +6715,11 @@ static int evalOperator(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValu
     }
     RangeNode *function = found(frame->key,expr)->resolvedDeclaration;
     if (function && function->kind != RangeNodeFunction) function = NULL;
-    int logic = binary && (same(op,"&") || same(op,"|")), equality = binary && (same(op,"=") || same(op,"!="));
+    int logic = binary && (same(op,"&") || same(op,"|"));
     RangeValue left, right = {0};
     if ((status = evalExpression(eval,frame,expr->a,&left))) return status;
     if (binary && !logic && (status = evalExpression(eval,frame,expr->b,&right))) return status;
-    if (equality) {
+    if (operatorForm(expr,function,left.kind == ValueText) == OperatorEquality) {
         int equal;
         status = evalEquals(eval,left,right,expr,&equal);
         *out = evalBool(eval,equal == same(op,"="));
@@ -6636,7 +6735,7 @@ static int evalOperator(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValu
         char name[160]; describeType(name,sizeof(name),left.type);
         if (!function) return evalFail(eval,expr,"'%s' is not declared on %s",op,name);
     }
-    if (logic && shortCircuit(function)) {
+    if (operatorForm(expr,function,0) == OperatorShortCircuit) {
         if (evalTruth(left) == same(op,"|")) { *out = evalBool(eval,evalTruth(left)); return EvalNormal; }
         if ((status = evalExpression(eval,frame,expr->b,&right))) return status;
         *out = evalBool(eval,evalTruth(right));
@@ -6748,39 +6847,52 @@ static int evalMatch(Eval *eval, EvalFrame *frame, RangeNode *pattern, RangeValu
     }
 }
 
-/* A switch runs its first arm whose rows match: a row's patterns match the
- * subjects, and its condition holds. A switch expression is the value its
- * arm yields; an arm that is a block runs as a statement. */
-static int evalSwitch(Eval *eval, EvalFrame *frame, RangeNode *node, RangeValue *out)
+/* The arm a switch runs, in both walkers: its first whose rows match, a
+ * row's patterns matching the subjects and its condition holding; *chosen
+ * is its index, or the arm count when none does. The arm runs in `arm`, a
+ * frame inside `frame` that holds what its row binds. */
+static int evalChoose(Eval *eval, EvalFrame *frame, RangeNode *node, EvalFrame *arm, size_t *chosen)
 {
     size_t width = node->c ? node->c->itemCount : 1;
     RangeValue *subjects = evalValues(eval,width);
     RangeNode **vector = rangeArenaAllocate(eval->vm->arena,(width ? width : 1) * sizeof(*vector));
     int status;
-    *out = (RangeValue){0};
+    *arm = (EvalFrame){.parent=frame,.self=frame->self,.function=frame->function,.output=frame->output,.key=frame->key};
     for (size_t k = 0; k < width; ++k)
         if ((status = evalExpression(eval,frame,node->c ? node->c->items[k] : node->a,&subjects[k]))) return status;
-    for (size_t i = 0; i < node->itemCount; ++i) {
-        RangeNode *entry = node->items[i];
-        int chosen = (entry->flags & RangeFlagLiteral) != 0;
-        for (size_t j = 0; !chosen && j < entry->itemCount; ++j) {
+    for (*chosen = 0; *chosen < node->itemCount; ++*chosen) {
+        RangeNode *entry = node->items[*chosen];
+        int matched = (entry->flags & RangeFlagLiteral) != 0;
+        for (size_t j = 0; !matched && j < entry->itemCount; ++j) {
             RangeNode *row = entry->items[j];
             patternRow(row,vector,width);
-            chosen = 1;
-            for (size_t k = 0; chosen && k < width; ++k)
-                if (vector[k] && (status = evalMatch(eval,frame,vector[k],subjects[k],&chosen))) return status;
-            if (chosen && row->b) {
+            matched = 1;
+            for (size_t k = 0; matched && k < width; ++k)
+                if (vector[k] && (status = evalMatch(eval,arm,vector[k],subjects[k],&matched))) return status;
+            if (matched && row->b) {
                 RangeValue condition;
-                if ((status = evalExpression(eval,frame,row->b,&condition))) return status;
-                chosen = evalTruth(condition);
+                if ((status = evalExpression(eval,arm,row->b,&condition))) return status;
+                matched = evalTruth(condition);
             }
         }
-        if (!chosen) continue;
-        if (!entry->a) return evalStatement(eval,frame,entry->b);
-        status = evalExpression(eval,frame,entry->a,out);
-        return status ? status : evalAdopt(eval,out,found(frame->key,node)->type,entry->a);
+        if (matched) break;
     }
     return EvalNormal;
+}
+
+/* A switch expression is the value its arm yields; an arm that is a block
+ * runs as a statement. */
+static int evalSwitch(Eval *eval, EvalFrame *frame, RangeNode *node, RangeValue *out)
+{
+    EvalFrame arm;
+    size_t chosen;
+    int status = evalChoose(eval,frame,node,&arm,&chosen);
+    *out = (RangeValue){0};
+    if (status || chosen == node->itemCount) return status;
+    RangeNode *entry = node->items[chosen];
+    if (!entry->a) return evalStatement(eval,&arm,entry->b);
+    status = evalExpression(eval,&arm,entry->a,out);
+    return status ? status : evalAdopt(eval,out,found(frame->key,node)->type,entry->a);
 }
 
 /* A literal: the value of the type typing gave it, or a literal of no type. */
@@ -7425,14 +7537,12 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
     RangeNode *declaration = type->resolvedDeclaration, *key = keyOf(declaration,type);
     if (kind == NativeScalar) {
         // A scalar's single input is the value itself.
+        int defaulted;
+        RangeNode *value = constructionSingle(key,declaration,arguments,count,&defaulted);
         native->resultTemp = -1;
-        if (count) return nativeExpression(native,arguments[0]->a), type;
-        for (size_t i = 0; i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i]) && declarationValue(key,declaration->items[i])) {
-                nativeDefault(native,type,declarationValue(key,declaration->items[i]));
-                return type;
-            }
-        nativeEmit(native,armMovz(0,0,0));
+        if (!value) nativeEmit(native,armMovz(0,0,0));
+        else if (defaulted) nativeDefault(native,type,value);
+        else nativeExpression(native,value);
         return type;
     }
     int temporary = !destination;
@@ -7440,10 +7550,8 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
     if (bytesType(type)) {
         // Like a scalar, a bytes construct's single input is the value itself:
         // `String("hi")` is the literal's bytes, and `String()` its default's.
-        RangeNode *value = count ? arguments[0]->a : NULL;
-        int defaulted = !value;
-        for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) value = declarationValue(key,declaration->items[i]);
+        int defaulted;
+        RangeNode *value = constructionSingle(key,declaration,arguments,count,&defaulted);
         nativeFrameAddress(native,0,destination);
         nativeZero(native,0,type->size);
         if (value) {
@@ -7484,8 +7592,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
             NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,alias);
         }
         previous = i;
-        RangeNode *memberType = type->memberTypes[i], *value = NULL;
-        for (size_t j = 0; j < count; ++j) if (found(native->key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
+        RangeNode *memberType = type->memberTypes[i], *value = constructionArgument(native->key,member,arguments,count);
         int memberKind = nativeKind(native,memberType,member);
         if (memberKind == NativeNone) continue;
         if (value) nativeExpression(native,value);
@@ -7604,9 +7711,7 @@ static int nativeSlotsOf(Native *native, RangeNode *self, RangeNode *at, NativeS
         nativeMissing(native,at,"slot builtins need exactly one @many member with a layout");
         return 0;
     }
-    SourceScope scope = {.owner=declaration};
-    RangeNode *element = resolveTypeReference(native->typer,&scope,member->typeName,member->generics,
-                                              member->flags & ~RangeFlagMany,self,member);
+    RangeNode *element = manyElement(native->typer,self,member);
     if (nativeKind(native,element,member) == NativeNone) return 0;
     slots->offset = self->memberOffsets[index];
     slots->element = element;
@@ -7882,12 +7987,6 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
     return NULL;
 }
 
-static RangeNode *nativeElementOf(Native *native, RangeNode *type, RangeNode *member)
-{
-    SourceScope scope = {.owner=type->resolvedDeclaration};
-    return resolveTypeReference(native->typer,&scope,member->typeName,member->generics,member->flags & ~RangeFlagMany,type,member);
-}
-
 static NativeInstance *nativeInstance(Native *, RangeNode *, RangeNode *, RangeNode *);
 
 static void nativeCallFunction(Native *native, RangeNode *function, RangeNode *key, RangeNode *self)
@@ -8086,7 +8185,7 @@ static void nativeHelperBody(Native *native, size_t index)
             if (!type->memberOffsets || type->memberOffsets[i] == SIZE_MAX) continue;
             RangeNode *member = declaration->items[i];
             if (member->flags & RangeFlagMany) {
-                RangeNode *element = nativeElementOf(native,type,member);
+                RangeNode *element = manyElement(native->typer,type,member);
                 if (!element || nativeKind(native,element,member) == NativeNone) continue;
                 nativeEmit(native,armLdr(0,31,0));
                 nativeAddOffset(native,0,0,type->memberOffsets[i]);
@@ -8344,12 +8443,11 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     RangeNode *callee = call->a;
     RangeFacts *facts = callee ? found(native->key,callee) : NULL;
     RangeNode *target = facts ? facts->resolvedDeclaration : NULL, *key = facts ? facts->specialization : NULL;
-    if (target && target->kind == RangeNodeParameter && isFunctionType(found(native->key,target)->type)) return nativeCallClosure(native,call,target);
-    if (target && (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeTypeParameter))
-        return nativeConstruct(native,call,found(native->key,call)->type,call->items,call->itemCount,0);
-    if (target && target->kind == RangeNodeEnumCase)
-        return nativeVariant(native,call,found(native->key,call)->type,target,call->items,call->itemCount,0);
-    if (!target || target->kind != RangeNodeFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
+    int form = callForm(target);
+    if (form == CallClosure) return nativeCallClosure(native,call,target);
+    if (form == CallConstruct) return nativeConstruct(native,call,found(native->key,call)->type,call->items,call->itemCount,0);
+    if (form == CallCase) return nativeVariant(native,call,found(native->key,call)->type,target,call->items,call->itemCount,0);
+    if (form != CallFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
     if (nativeInlined(target)) return nativeInline(native,call,target,key);
     RangeNode *self = NULL;
     int hasSelf = 0;
@@ -8668,10 +8766,13 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         // The builtin `!` of the condition type: tags 0 and 1 swap.
         if (same(expr->name,"!")) { nativeEmit(native,armCmpImm(0,0)); nativeEmit(native,armCset(0,RangeEQ)); return type; }
         if (nativeKind(native,type,expr) != NativeScalar) return NULL;
+        char name[160]; describeType(name,sizeof(name),type);
         if (type->scalarBits == 64 && type->scalarSigned) {
-            char name[160]; describeType(name,sizeof(name),type);
             nativeEmit(native,armNegs(0,0));
             nativeTrap(native,armBcond(RangeVS,0),expr,"result of '-' does not fit %s",name);
+        } else if (type->scalarBits == 64) {
+            // Only zero negates to an unsigned value.
+            nativeTrap(native,armCbnz(0,0),expr,"result of '-' does not fit %s",name);
         } else {
             nativeEmit(native,armNeg(0,0));
             nativeFits(native,type,expr,"-");
@@ -8680,7 +8781,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
     }
     case RangeNodeBinary: {
         const char *op = expr->name;
-        if (shortCircuit(facts->resolvedDeclaration)) {
+        if (operatorForm(expr,facts->resolvedDeclaration,0) == OperatorShortCircuit) {
             nativeExpression(native,expr->a);
             uint32_t base = same(op,"&") ? armCbz(0,0) : armCbnz(0,0);
             size_t skip = nativeEmit(native,base);
@@ -8695,15 +8796,13 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         nativeEmit(native,armPop(0));
         if (!operand) return NULL;
         if (nativeKind(native,operand,expr) == NativeNone) return NULL;
-        if (same(op,"=") || same(op,"!=")) {
+        int form = operatorForm(expr,facts->resolvedDeclaration,bytesType(operand));
+        if (form == OperatorEquality) {
             nativeEquals(native,operand);
             if (same(op,"!=")) { nativeEmit(native,armCmpImm(0,0)); nativeEmit(native,armCset(0,RangeEQ)); }
             return type;
         }
-        // A builtin operator is the C primitive its name selects for its
-        // operand's layout: joining for bytes, arithmetic and comparison on
-        // a scalar's storage.
-        if (nativeKind(native,operand,expr) != NativeScalar && same(op,"+") && bytesType(operand)) return nativeJoin(native,expr,operand);
+        if (form == OperatorJoin) return nativeJoin(native,expr,operand);
         if (nativeKind(native,operand,expr) != NativeScalar) {
             char name[160]; describeType(name,sizeof(name),operand);
             nativeMissing(native,expr,"no C primitive implements builtin operator '%s' on %s",op,name);
