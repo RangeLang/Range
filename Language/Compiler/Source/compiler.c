@@ -733,7 +733,8 @@ static RangeNode *insertionFunction(const RangeNode *declaration, size_t *count)
  * What typing finds about a node lives beside it: in the node's own record,
  * or in the table of the specialization it was typed for, keyed by node: a
  * generic function's body for one specialization of the function, or a
- * construct's members for one specialization of the construct. A key is
+ * generic construct's or enum's members, payload fields, and method bodies
+ * for one specialization of the declaration. A key is
  * that specialization, or NULL for the node's own record. The table holds
  * only what typing found under the key; anything else reads the node's own. */
 struct RangeFactTable { RangeNode **nodes; RangeFacts **facts; size_t capacity, count; };
@@ -2111,10 +2112,10 @@ static void typeError(Typer *typer, RangeNode *at, const char *format, ...)
     if (app && app->target && length < sizeof(text))
         snprintf(text + length,sizeof(text) - length,"; in the code @%s emits for %s at %s:%d",
                  emitter->name,app->target->name,app->target->path,app->target->line);
-    // Code typed for one specialization of a generic function names it.
+    // Code typed for one specialization of a generic declaration names it.
     RangeNode *key = typer->key;
     length = strlen(text);
-    if (key && key->resolvedDeclaration->kind == RangeNodeFunction && length < sizeof(text)) {
+    if (key && length < sizeof(text)) {
         char name[512]; describeType(name,sizeof(name),key);
         snprintf(text + length,sizeof(text) - length,"; in %s, specialized at %s:%d:%d",name,key->path,key->line,key->column);
     }
@@ -2432,7 +2433,7 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
         return NULL;
     }
     int created = 0;
-    RangeNode *specialization = internSpecialization(typer,declaration,values,NULL,declaration,&created);
+    RangeNode *specialization = internSpecialization(typer,declaration,values,NULL,at,&created);
     if (created) {
         // The declaration's own application already covered its defaults.
         if (isDefault) specialization->found |= RangeFlagChecked;
@@ -2441,17 +2442,15 @@ static RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declar
     return specialization;
 }
 
-/* Inside its own bodies, a construct is specialized by its own parameters. */
-static RangeNode *selfSpecialization(Typer *typer, RangeNode *declaration)
+/* A construct or enum without generics has one specialization, its own:
+ * its bodies are typed there once, in order, in place. NULL for a generic
+ * declaration: its bodies are typed only for the specializations the
+ * program uses, each under its key, as they are used. */
+static RangeNode *ownSpecialization(Typer *typer, RangeNode *declaration)
 {
-    RangeNode **values = genericValues(typer->report->arena,declaration);
-    for (size_t i = 0; values && i < declaration->generics->itemCount; ++i) {
-        RangeNode *generic = declaration->generics->items[i];
-        // A required value has none in the bodies' own view.
-        values[i] = generic->kind == RangeNodeTypeParameter ? generic : generic->typeName ? NULL : rangeNodeRHS(generic);
-    }
+    if (declaration->generics && declaration->generics->itemCount) return NULL;
     int created = 0;
-    RangeNode *specialization = internSpecialization(typer,declaration,values,NULL,declaration,&created);
+    RangeNode *specialization = internSpecialization(typer,declaration,genericValues(typer->report->arena,declaration),NULL,declaration,&created);
     specialization->found |= RangeFlagChecked;
     return specialization;
 }
@@ -2662,16 +2661,7 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
     if (node->flags & RangeFlagMany) return NULL; /* @many storage is not a standalone value */
     RangeFacts *facts = found(typer->key,node);
     if (facts->lowered && facts->lowered->kind == RangeNodeCall) return found(typer->key,facts->lowered)->type; /* `let r: step(x: 1)` */
-    if (node->typeName && (node->flags & RangeFlagApplication) && facts->type) {
-        // Construction. A generic construct's member, such as Box<T>'s
-        // `state items: Array<T>()`, has its type in the specialization asked about.
-        RangeNode *owner = context && context->kind == RangeNodeSpecialization ? context->resolvedDeclaration : NULL;
-        int member = 0;
-        for (size_t i = 0; owner && parametric(owner) && i < owner->itemCount; ++i) member |= owner->items[i] == node;
-        if (!member) return facts->type;
-        SourceScope ownerScope = {.owner=owner};
-        return resolveTypeReference(typer,&ownerScope,node->typeName,node->generics,node->flags & ~RangeFlagApplication,context,node);
-    }
+    if (node->typeName && (node->flags & RangeFlagApplication) && facts->type) return facts->type; /* construction */
     // A bare name's resolved declaration decides its meaning: a value is
     // copied, a construct is a requirement.
     if (node->typeName && node->rhsReference && !node->generics) {
@@ -2699,31 +2689,47 @@ static RangeNode *declaredType(Typer *typer, SourceScope *scope, RangeNode *node
     return rhs ? typeOf(typer,scope,rhs,context,context) : NULL;
 }
 
-/* The key a declaration's members, payload fields, and generics are typed
- * under for `type`: NULL for one that is not a specialization of it, or is
- * its own view, the one its bodies are typed in; else that specialization. */
+/* The key a declaration's members, payload fields, and methods are typed
+ * under for `type`, a specialization of it: that specialization when the
+ * declaration is generic; NULL for one that is not, typed in place. */
 static RangeNode *keyOf(const RangeNode *declaration, RangeNode *type)
 {
-    if (!declaration || !type || type->kind != RangeNodeSpecialization || type->resolvedDeclaration != declaration) return NULL;
-    for (size_t i = 0; declaration->generics && i < declaration->generics->itemCount; ++i) {
-        RangeNode *generic = declaration->generics->items[i], *value = type->values[i];
-        if (generic->kind == RangeNodeTypeParameter ? value != generic
-            : generic->typeName ? value != NULL : !sameGenericValue(generic,value,rangeNodeRHS(generic))) return type;
-    }
-    return NULL;
+    return declaration && declaration->generics && declaration->generics->itemCount && type
+        && type->kind == RangeNodeSpecialization && type->resolvedDeclaration == declaration ? type : NULL;
 }
 
-/* The declared type of a declaration's generic, member, payload field, or
- * parameter, for `context`: typed under that declaration's key, whatever key
- * the code that asks is typed under, so each specialization keeps its own
+static int memberOf(const RangeNode *, const RangeNode *);
+
+/* The declared type of a generic, member, or parameter, for `context`: a
+ * member of context's declaration is typed under its key, whatever key the
+ * code that asks is typed under, so each specialization keeps its own
  * findings about the declaration's nodes. */
 static RangeNode *declaredTypeIn(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context)
 {
     RangeNode *key = typer->key;
-    typer->key = keyOf(scope ? scope->owner : NULL,context);
+    typer->key = context && memberOf(context->resolvedDeclaration,node) ? keyOf(context->resolvedDeclaration,context) : NULL;
     RangeNode *type = declaredType(typer,scope,node,context);
     typer->key = key;
     return type;
+}
+
+static void typeMember(Typer *, SourceScope *, RangeNode *, RangeNode *);
+static SourceScope *enclosingScope(Typer *, RangeNode *, SourceScope[33]);
+
+/* A member's or payload field's type in `type`, a specialization of its
+ * declaration: typed under that specialization's key, from the top level,
+ * the first time it is asked for, wherever that is. */
+static RangeNode *memberTypeIn(Typer *typer, RangeNode *type, RangeNode *member)
+{
+    RangeNode *declaration = type->resolvedDeclaration, *key = keyOf(declaration,type);
+    if (!(found(key,member)->found & RangeFlagTyped)) {
+        SourceScope scopes[33], scope = {.owner=declaration,.parent=enclosingScope(typer,declaration,scopes)};
+        TyperContext outer = typerTop(typer);
+        typer->key = key;
+        typeMember(typer,&scope,member,type);
+        typerRestore(typer,outer);
+    }
+    return found(key,member)->type;
 }
 
 static RangeNode *findMember(RangeNode *declaration, const char *name)
@@ -2762,8 +2768,7 @@ static RangeNode *findCalledFunction(RangeNode *owner, const char *name, const R
 static RangeNode *memberType(Typer *typer, RangeNode *declaration, RangeNode *member, RangeNode *receiver)
 {
     if (builtinMember(member) && !member->typeName && graphConstruct(typer,declaration)) return typer->deferred;
-    SourceScope scope = {.owner=declaration};
-    return declaredTypeIn(typer,&scope,member,receiver);
+    return memberTypeIn(typer,receiver,member);
 }
 
 /* The kinds a macro type admits: the constructs and enums applying its macro. */
@@ -2791,7 +2796,9 @@ static RangeNode *macroTypeMember(Typer *typer, RangeNode *type, const char *nam
         RangeNode *member = findMember(kinds[i],name);
         if (!member) { function |= findFunction(kinds[i],name) != NULL; continue; }
         if (member->flags & RangeFlagMany) { typeError(typer,at,"'%s' holds @many storage and is not a value",name); return NULL; }
-        RangeNode *field = memberType(typer,kinds[i],member,selfSpecialization(typer,kinds[i]));
+        // A generic kind's field has a type only per specialization.
+        RangeNode *own = ownSpecialization(typer,kinds[i]);
+        RangeNode *field = own ? memberType(typer,kinds[i],member,own) : typer->deferred;
         if (!declaring++) found = field;
         else if (field != found) agree = 0;
     }
@@ -2854,15 +2861,6 @@ static int parametric(const RangeNode *declaration)
     for (size_t i = 0; declaration->generics && i < declaration->generics->itemCount; ++i)
         if (declaration->generics->items[i]->kind == RangeNodeTypeParameter) return 1;
     return 0;
-}
-
-/* A payload field's type in this specialization of its enum. */
-static RangeNode *caseFieldType(Typer *typer, RangeNode *type, RangeNode *field)
-{
-    RangeNode *declaration = type->resolvedDeclaration;
-    if (!parametric(declaration)) return found(typer->key,field)->type;
-    SourceScope scope = {.owner=declaration};
-    return declaredTypeIn(typer,&scope,field,type);
 }
 
 /* A literal of an enum names the case spelled like it: `true` is case true. */
@@ -2933,7 +2931,7 @@ static void typePayload(Typer *typer, SourceScope *scope, RangeNode *at, RangeNo
         else if (!labeledField(field) && argument->name)
             typeError(typer,argument,"payload field %zu of '%s' takes no label",i + 1,entry->name);
         finding(typer,argument)->resolvedDeclaration = field;
-        RangeNode *expected = caseFieldType(typer,type,field);
+        RangeNode *expected = memberTypeIn(typer,type,field);
         char what[200]; snprintf(what,sizeof(what),"payload field %zu of '%s'",i + 1,entry->name);
         coerce(typer,argument->a,expected,typeOf(typer,scope,argument->a,expected,context),what);
     }
@@ -3004,6 +3002,9 @@ static void noteEquality(Typer *typer, RangeNode *type, RangeNode *at)
         sourceDiagnostic(typer->report,at,1,"C-implementation","'=' here compares values that exist only up to macro time, in C: declarations by their identity");
         return;
     }
+    // A generic body typed for several specializations compares one type there once.
+    for (size_t i = 0; i < typer->equalityCount; ++i)
+        if (typer->equalities[i].type == type && typer->equalities[i].at == at) return;
     if (typer->equalityCount == typer->equalityCapacity) {
         typer->equalityCapacity = typer->equalityCapacity ? typer->equalityCapacity * 2 : 64;
         void *grown = rangeArenaAllocate(typer->report->arena,typer->equalityCapacity * sizeof(*typer->equalities));
@@ -3039,7 +3040,7 @@ static RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **pre
     }
     if (payloads != 1) return NULL;
     if (present) *present = payload;
-    return caseFieldType(typer,type,payload->items[0]);
+    return memberTypeIn(typer,type,payload->items[0]);
 }
 
 /* Optional promotion, as in Swift: where `T?` is expected, a value of T is the
@@ -3125,7 +3126,6 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
                                      RangeNode **arguments, size_t count, RangeNode *context)
 {
     if (!type) return NULL;
-    if (type->kind == RangeNodeTypeParameter) { typeError(typer,at,"type parameter %s cannot be constructed",type->name); return NULL; }
     RangeNode *declaration = type->resolvedDeclaration;
     if (declaration->kind == RangeNodeEnum) {
         // `Int?(maybe)` copies the enum value given, promoted if it is a Wrapped.
@@ -3161,7 +3161,6 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
     RangeNode *only = NULL;
     for (size_t i = 0; i < declaration->itemCount; ++i)
         if (constructionInput(declaration->items[i])) { ++inputs; only = declaration->items[i]; }
-    SourceScope declarationScope = {.owner=declaration};
     char typeName[160]; describeType(typeName,sizeof(typeName),type);
     for (size_t i = 0; i < count; ++i) {
         RangeNode *argument = arguments[i], *member = NULL;
@@ -3174,14 +3173,16 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
         for (size_t j = 0; j < i; ++j)
             if (found(typer->key,arguments[j])->resolvedDeclaration == member) typeError(typer,argument,"'%s' is supplied twice",member->name);
         finding(typer,argument)->resolvedDeclaration = member;
-        RangeNode *expected = declaredTypeIn(typer,&declarationScope,member,type);
+        RangeNode *expected = memberTypeIn(typer,type,member);
         RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
         char what[200]; snprintf(what,sizeof(what),"input '%s' of %s",member->name,typeName);
         coerce(typer,argument->a,expected,actual,what);
     }
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
-        if (!constructionInput(member) || declarationValue(keyOf(declaration,type),member) || optionalWithoutValue(member)) continue;
+        if (!constructionInput(member)) continue;
+        (void)memberTypeIn(typer,type,member); /* its default, as this specialization has it */
+        if (declarationValue(keyOf(declaration,type),member) || optionalWithoutValue(member)) continue;
         int supplied = 0;
         for (size_t j = 0; j < count; ++j) if (found(typer->key,arguments[j])->resolvedDeclaration == member) supplied = 1;
         if (!supplied) typeError(typer,at,"%s requires input '%s'",typeName,member->name);
@@ -3488,10 +3489,8 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
         expectType(typer,values[v],want,types[v],what);
         if (!types[v] || (want && types[v] != want)) return NULL;
     }
-    // The specialization these make. A type that mentions an enclosing
-    // construct's type parameter, as in Box<T>'s methods, gives one typed with
-    // that parameter; code is generated per concrete specialization, which
-    // substitutes it.
+    // The specialization these make, within the receiver's: a method of
+    // Box<T> is typed per specialization of Box, so its types are known.
     RangeNode **slots = genericValues(typer->report->arena,function), **slotTypes = genericValues(typer->report->arena,function);
     for (size_t i = 0, k = 0, v = 0; i < function->generics->itemCount; ++i) {
         if (function->generics->items[i]->kind == RangeNodeTypeParameter) slots[i] = bound[k++];
@@ -3744,6 +3743,8 @@ static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test
     return finding(typer,test)->type = typer->booleanType;
 }
 
+static RangeNode *typeOnDemand(Typer *, RangeNode *, RangeNode *);
+
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
 {
     RangeNode *callee = call->a, *function = NULL, *receiver = NULL;
@@ -3810,7 +3811,6 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     } else if (callee->kind == RangeNodeMemberAccess) {
         receiver = typeOf(typer,scope,callee->a,NULL,context);
         if (!receiver) return NULL;
-        if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,callee,"type parameter %s has no functions",receiver->name); return NULL; }
         if (macroOperand(typer,receiver)) {
             // Which function this calls depends on the declaration the value
             // holds: its result is known at macro time.
@@ -3849,6 +3849,8 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         return NULL;
     }
     finding(typer,callee)->resolvedDeclaration = function;
+    // A method of a generic declaration runs in its receiver's specialization.
+    if (keyOf(function->owner,receiver)) finding(typer,callee)->specialization = typeOnDemand(typer,function,receiver);
     // A method's signature names types in its owner, such as a nested enum.
     SourceScope ownerScope = {.owner=receiver && receiver->kind == RangeNodeSpecialization ? receiver->resolvedDeclaration : NULL};
     SourceScope functionScope = {.owner=function,.parent=ownerScope.owner ? &ownerScope : NULL};
@@ -3949,6 +3951,7 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
         callee->a = expr->a;
         callee->resolvedDeclaration = function;
         callee->type = type;
+        if (keyOf(function->owner,operand)) callee->specialization = typeOnDemand(typer,function,operand);
         RangeNode *call = rangeNodeCreate(arena,RangeNodeCall,expr->path,expr->line,expr->column);
         call->a = callee;
         call->type = type;
@@ -4147,7 +4150,6 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         RangeNode *receiver = typeOf(typer,scope,expr->a,NULL,context);
         if (!receiver) break;
         if (deferredType(typer,receiver)) { type = receiver; break; }
-        if (receiver->kind == RangeNodeTypeParameter) { typeError(typer,expr,"type parameter %s has no members",receiver->name); break; }
         if (isMacroType(receiver)) { type = macroTypeMember(typer,receiver,expr->name,expr); break; }
         RangeNode *declaration = receiver->resolvedDeclaration;
         if (isEnum(receiver) && enumCase(declaration,expr->name)) {
@@ -4184,7 +4186,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         if (!target || target->kind != RangeNodeConstruct) break;
         RangeNode *member = findMember(target,expr->name);
         if (!member) { typeError(typer,expr,"%s has no member '%s'",target->name,expr->name); break; }
-        type = memberType(typer,target,member,selfSpecialization(typer,target));
+        type = memberType(typer,target,member,ownSpecialization(typer,target));
         break;
     }
     case RangeNodeEmission:
@@ -4306,23 +4308,31 @@ static RangeNode *iterationFunction(const RangeNode *declaration, size_t *count)
     return found;
 }
 
+/* A method's parameter's type, or its result's without one, in `view`, a
+ * specialization of its owner: what a call on that receiver sees. */
+static RangeNode *signatureType(Typer *typer, RangeNode *function, RangeNode *parameter, RangeNode *view)
+{
+    SourceScope ownerScope = {.owner=view->resolvedDeclaration}, scope = {.owner=function,.parent=&ownerScope};
+    if (parameter) return declaredTypeIn(typer,&scope,parameter,view);
+    RangeNode *output = function->b;
+    return output ? resolveTypeReference(typer,&scope,output->name,output->generics,output->flags,view,output) : NULL;
+}
+
 /* The @iteration law, checked in C: a type declares at most one such function,
- * and it takes one Int position and returns an optional (the enum applying
- * @optional), absent past the end. The function's own types are known. */
-static void checkIteration(Typer *typer, RangeNode *declaration)
+ * and, in `view`, each specialization of the type, it takes one Int position
+ * and returns an optional (the enum applying @optional), absent past the
+ * end. The count is checked once, in the declaration's own typing. */
+static void checkIteration(Typer *typer, RangeNode *declaration, RangeNode *view)
 {
     size_t count = 0;
-    (void)iterationFunction(declaration,&count);
-    if (count > 1) {
+    RangeNode *function = iterationFunction(declaration,&count);
+    if (count > 1 && !typer->key)
         typeError(typer,declaration,"%s '%s' declares %zu @iteration functions; a type declares exactly one",
             rangeNodeKindName(declaration->kind),declaration->name,count);
-        return;
-    }
-    RangeNode *function = iterationFunction(declaration,&count);
-    if (!function) return;
+    if (count != 1 || !view) return;
     RangeNode *integer = typer->integer ? specialize(typer,NULL,typer->integer,NULL,NULL,typer->integer) : NULL;
-    RangeNode *output = found(typer->key,function)->type;
-    int position = function->itemCount == 1 && integer && found(typer->key,function->items[0])->type == integer;
+    RangeNode *output = signatureType(typer,function,NULL,view);
+    int position = function->itemCount == 1 && integer && signatureType(typer,function,function->items[0],view) == integer;
     int optional = isEnum(output) && appliesBuiltin(output->resolvedDeclaration,"optional");
     if (!position || !optional)
         typeError(typer,function,"@iteration function '%s' of '%s' must take one Int position and return an optional, such as (let at: Int): Element?",
@@ -4331,21 +4341,20 @@ static void checkIteration(Typer *typer, RangeNode *declaration)
 
 /* The @insertion law, checked in C: a type declares at most one such function,
  * and it takes one element and adds it. When the type also declares an
- * @iteration function, the element is the type that function yields. */
-static void checkInsertion(Typer *typer, RangeNode *declaration)
+ * @iteration function, the element is the type that function yields in
+ * `view`, each specialization of the type. */
+static void checkInsertion(Typer *typer, RangeNode *declaration, RangeNode *view)
 {
     size_t count = 0;
     RangeNode *function = insertionFunction(declaration,&count);
-    if (count > 1) {
+    if (count > 1 && !typer->key)
         typeError(typer,declaration,"%s '%s' declares %zu @insertion functions; a type declares at most one",
             rangeNodeKindName(declaration->kind),declaration->name,count);
-        return;
-    }
-    if (!function) return;
+    if (count != 1 || !view) return;
     RangeNode *iteration = iterationFunction(declaration,&count);
-    RangeNode *yields = count == 1 ? found(typer->key,iteration)->type : NULL;
+    RangeNode *yields = count == 1 ? signatureType(typer,iteration,NULL,view) : NULL;
     RangeNode *element = yields ? optionalWrapped(typer,yields,NULL) : NULL;
-    if (function->itemCount != 1 || (element && found(typer->key,function->items[0])->type != element)) {
+    if (function->itemCount != 1 || (element && signatureType(typer,function,function->items[0],view) != element)) {
         char t[160] = "one element";
         if (element) { char e[140]; describeType(e,sizeof(e),element); snprintf(t,sizeof(t),"one %s, the element its @iteration function yields",e); }
         typeError(typer,function,"@insertion function '%s' of '%s' must take %s",function->name,declaration->name,t);
@@ -4584,7 +4593,7 @@ static int usefulCase(Typer *typer, RangeNode ***rows, size_t count, RangeNode *
     RangeArena *arena = typer->report->arena;
     size_t arity = entry->itemCount, w = arity + width - 1;
     RangeNode **ntypes = rangeArenaAllocate(arena,(w ? w : 1) * sizeof(*ntypes));
-    for (size_t i = 0; i < arity; ++i) ntypes[i] = caseFieldType(typer,types[0],entry->items[i]);
+    for (size_t i = 0; i < arity; ++i) ntypes[i] = memberTypeIn(typer,types[0],entry->items[i]);
     for (size_t i = 1; i < width; ++i) ntypes[arity + i - 1] = types[i];
     RangeNode ***nrows = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*nrows));
     size_t n = 0;
@@ -4683,7 +4692,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
                 typeError(typer,argument,"payload field %zu of '%s' is %s",i + 1,entry->name,
                           labeledField(field) ? field->name : "unlabeled");
             finding(typer,argument)->resolvedDeclaration = field;
-            typePattern(typer,scope,argument->a,caseFieldType(typer,type,field),context);
+            typePattern(typer,scope,argument->a,memberTypeIn(typer,type,field),context);
         }
         return;
     }
@@ -4981,26 +4990,27 @@ static void checkOverloads(Typer *typer, RangeNode *owner)
 }
 
 static void typeConstruct(Typer *, SourceScope *, RangeNode *);
+static void typeLaws(Typer *, RangeNode *, RangeNode *);
 
-/* A case's payload fields are typed in the enum, specialized by its own
- * parameters; its methods see that specialization as `self`. */
+/* A case's payload fields are typed in the enum's own specialization; its
+ * methods see that specialization as `self`. A generic enum's are typed per
+ * specialization the program uses, as they are used. */
 static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
 {
-    RangeNode *context = selfSpecialization(typer,declaration);
+    RangeNode *context = ownSpecialization(typer,declaration);
     SourceScope scope = {.owner=declaration,.parent=parent};
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
-        if (item->kind == RangeNodeEnumCase)
-            for (size_t j = 0; j < item->itemCount; ++j) finding(typer,item->items[j])->type = declaredType(typer,&scope,item->items[j],context);
+        if (item->kind == RangeNodeEnumCase && context)
+            for (size_t j = 0; j < item->itemCount; ++j) typeMember(typer,&scope,item->items[j],context);
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
     // Methods are typed once every case's payload is; a generic one per specialization.
-    for (size_t i = 0; i < declaration->itemCount; ++i)
+    for (size_t i = 0; context && i < declaration->itemCount; ++i)
         if (declaration->items[i]->kind == RangeNodeFunction && !genericTemplate(declaration->items[i]))
             typeFunction(typer,&scope,declaration->items[i],context);
-    checkIteration(typer,declaration);
-    checkInsertion(typer,declaration);
+    typeLaws(typer,declaration,context);
     checkOverloads(typer,declaration);
 }
 
@@ -5043,7 +5053,26 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
     }
 }
 
-/* A member's type in its construct's own specialization, once. */
+/* The C laws on a construct's or enum's members and functions, in `view`,
+ * one of its specializations, under its key, with every member and payload
+ * field typed there: its own as typing in order reaches it, any other once
+ * typing is done. Without a view, only what holds for every specialization. */
+static void typeLaws(Typer *typer, RangeNode *declaration, RangeNode *view)
+{
+    TyperContext outer = typerTop(typer);
+    typer->key = keyOf(declaration,view);
+    for (size_t i = 0; view && i < declaration->itemCount; ++i) {
+        RangeNode *item = declaration->items[i];
+        if (rangeNodeDeclaresValue(item->kind)) (void)memberTypeIn(typer,view,item);
+        for (size_t j = 0; item->kind == RangeNodeEnumCase && j < item->itemCount; ++j) (void)memberTypeIn(typer,view,item->items[j]);
+    }
+    if (view) checkMemberDefaults(typer,declaration);
+    checkIteration(typer,declaration,view);
+    checkInsertion(typer,declaration,view);
+    typerRestore(typer,outer);
+}
+
+/* A member's type in a specialization of its construct, once. */
 static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeNode *context)
 {
     if (found(typer->key,item)->found & RangeFlagTyped) return;
@@ -5059,20 +5088,21 @@ static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeN
     finding(typer,item)->type = declaredType(typer,scope,item,context);
 }
 
+/* A construct's members and methods are typed in its own specialization,
+ * in order; a generic construct's per specialization the program uses, as
+ * they are used. */
 static void typeConstruct(Typer *typer, SourceScope *parent, RangeNode *declaration)
 {
-    RangeNode *context = selfSpecialization(typer,declaration);
+    RangeNode *context = ownSpecialization(typer,declaration);
     SourceScope scope = {.owner=declaration,.parent=parent};
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
-        if (rangeNodeDeclaresValue(item->kind)) typeMember(typer,&scope,item,context);
-        else if (item->kind == RangeNodeFunction && !genericTemplate(item)) typeFunction(typer,&scope,item,context);
+        if (rangeNodeDeclaresValue(item->kind) && context) typeMember(typer,&scope,item,context);
+        else if (item->kind == RangeNodeFunction && !genericTemplate(item) && context) typeFunction(typer,&scope,item,context);
         else if (item->kind == RangeNodeConstruct) typeConstruct(typer,&scope,item);
         else if (item->kind == RangeNodeEnum) typeEnum(typer,&scope,item);
     }
-    checkMemberDefaults(typer,declaration);
-    checkIteration(typer,declaration);
-    checkInsertion(typer,declaration);
+    typeLaws(typer,declaration,context);
     checkOverloads(typer,declaration);
 }
 
@@ -5123,16 +5153,6 @@ static int graphConstruct(Typer *typer, const RangeNode *declaration)
 
 static int layoutOf(Typer *, RangeNode *, RangeNode *);
 
-/* A member's type in a specialization of a construct. */
-static RangeNode *memberTypeIn(Typer *typer, RangeNode *type, size_t index)
-{
-    RangeNode *declaration = type->resolvedDeclaration, *member = declaration->items[index];
-    if (type->layout == 2 && type->memberTypes) return type->memberTypes[index];
-    if (!parametric(declaration)) return found(typer->key,member)->type;
-    SourceScope scope = {.owner=declaration};
-    return declaredTypeIn(typer,&scope,member,type);
-}
-
 /* Whether a value of `type` holds a value of `target` in its own bytes,
  * through construct members and enum payloads stored inline. */
 typedef struct { RangeNode *seen[64]; size_t count; } Containment;
@@ -5153,12 +5173,10 @@ static int containsInline(Typer *typer, RangeNode *type, RangeNode *target, Cont
             if (item->kind != RangeNodeEnumCase) continue;
             for (size_t j = 0; j < item->itemCount; ++j, ++field) {
                 if (type->layout == 2 && type->memberBoxed && type->memberBoxed[field]) continue;
-                RangeNode *fieldType = type->layout == 2 && type->memberTypes ? type->memberTypes[field]
-                    : caseFieldType(typer,type,item->items[j]);
-                if (containsInline(typer,fieldType,target,visit)) return 1;
+                if (containsInline(typer,memberTypeIn(typer,type,item->items[j]),target,visit)) return 1;
             }
         } else if (rangeNodeDeclaresValue(item->kind) && !builtinMember(item) && !(item->flags & RangeFlagMany)
-                   && containsInline(typer,memberTypeIn(typer,type,i),target,visit)) return 1;
+                   && containsInline(typer,memberTypeIn(typer,type,item),target,visit)) return 1;
     }
     return 0;
 }
@@ -5194,7 +5212,7 @@ static int layoutVariant(Typer *typer, RangeNode *specialization, RangeNode *at)
         RangeNode *entry = declaration->items[i];
         if (entry->kind != RangeNodeEnumCase) continue;
         for (size_t j = 0; j < entry->itemCount; ++j, ++k) {
-            RangeNode *type = caseFieldType(typer,specialization,entry->items[j]);
+            RangeNode *type = memberTypeIn(typer,specialization,entry->items[j]);
             specialization->memberTypes[k] = type;
             specialization->memberOffsets[k] = SIZE_MAX;
             Containment visit = {.count=0};
@@ -5282,12 +5300,6 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
             size = alignment; /* a scalar occupies its aligned width */
         }
     } else {
-        // Member types computed for the declaration hold for every
-        // specialization unless a type parameter is involved.
-        int parametric = 0;
-        if (declaration->generics) for (size_t i = 0; i < declaration->generics->itemCount; ++i)
-            if (declaration->generics->items[i]->kind == RangeNodeTypeParameter) parametric = 1;
-        SourceScope scope = {.owner=declaration};
         RangeArena *arena = typer->report->arena;
         size_t items = declaration->itemCount ? declaration->itemCount : 1;
         specialization->memberOffsets = rangeArenaAllocate(arena,items * sizeof(size_t));
@@ -5303,7 +5315,7 @@ static int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
             RangeNode *type = NULL;
             if (member->flags & RangeFlagMany) { memberSize = 8; memberAlignment = 8; }
             else {
-                type = parametric ? declaredTypeIn(typer,&scope,member,specialization) : found(typer->key,member)->type;
+                type = memberTypeIn(typer,specialization,member);
                 if (!type || type->kind != RangeNodeSpecialization || !layoutOf(typer,type,member)) {
                     known = 0;
                     specialization->integer = 1; /* the cause lies in a member's type, reported there */
@@ -5418,8 +5430,12 @@ static int comparable(Typer *typer, RangeNode *type, Comparing *visit, char *why
 {
     char name[160]; describeType(name,sizeof(name),type);
     if (!type || type->kind != RangeNodeSpecialization) { snprintf(why,size,"%s is not a value type",name); return 0; }
-    RangeNode *declaration = type->resolvedDeclaration;
-    if (equalityFunction(type)) return 1;
+    RangeNode *declaration = type->resolvedDeclaration, *function = equalityFunction(type);
+    if (function) {
+        // The `=` it calls is typed in its specialization, as a call would type it.
+        if (keyOf(function->owner,type)) (void)typeOnDemand(typer,function,type);
+        return 1;
+    }
     for (size_t i = 0; i < visit->count; ++i) if (visit->seen[i] == type) return 1;
     if (visit->count == sizeof(visit->seen)/sizeof(*visit->seen)) { snprintf(why,size,"%s nests too deeply to compare",name); return 0; }
     visit->seen[visit->count++] = type;
@@ -5565,10 +5581,12 @@ static void typerLanguage(Typer *typer)
  * Macro time runs code before typing in order reaches it: a function is
  * typed when it is first called, a construct's members when it is first
  * constructed, a member when `.value` reads its initializer, and a macro's
- * body when it is first applied. Each is typed once, from the top level, in
- * the scopes it is declared in. Typing sees the program as it stands then:
- * code typed before a later round emits what it names reports it missing,
- * and keeps that report. */
+ * body when it is first applied. A generic declaration's members and
+ * methods are typed this way at any time, per specialization, as they are
+ * used. Each is typed once, from the top level, in the scopes it is
+ * declared in. Typing sees the program as it stands then: code typed before
+ * a later round emits what it names reports it missing, and keeps that
+ * report. */
 
 /* The scopes a declaration sees around it, innermost first: the constructs
  * and enums enclosing it, then its unit; NULL when no unit holds it. */
@@ -5585,44 +5603,34 @@ static SourceScope *enclosingScope(Typer *typer, RangeNode *declaration, SourceS
     return NULL;
 }
 
-/* A function the evaluator calls, typed in its owner's own specialization
- * as typing in order types it. Returns whether it may run. */
-static int typeOnDemand(Typer *typer, RangeNode *function)
+/* A function, before it is called or runs: typed in its owner's own
+ * specialization, as typing in order types it, or, a method of a generic
+ * declaration, in its receiver's specialization, under that key, the first
+ * time it is used there. Code that does not type does not run at macro
+ * time. Returns the key it is typed under. */
+static RangeNode *typeOnDemand(Typer *typer, RangeNode *function, RangeNode *receiver)
 {
-    if (!(function->found & RangeFlagTyped)) {
+    RangeNode *key = keyOf(function->owner,receiver);
+    if (!(found(key,function)->found & RangeFlagTyped)) {
         SourceScope scopes[33];
         size_t errors = typer->report->errors;
         TyperContext outer = typerTop(typer);
-        typeFunction(typer,enclosingScope(typer,function,scopes),function,function->owner ? selfSpecialization(typer,function->owner) : NULL);
+        typer->key = key;
+        typeFunction(typer,enclosingScope(typer,function,scopes),function,
+                     key ? receiver : function->owner ? ownSpecialization(typer,function->owner) : NULL);
+        if (typer->report->errors != errors) finding(typer,function)->found |= RangeFlagInvalid;
         typerRestore(typer,outer);
-        if (typer->report->errors != errors) function->found |= RangeFlagInvalid;
     }
-    return !(function->found & RangeFlagInvalid);
+    return key;
 }
 
-/* A construct's members, before it is first constructed. */
-static void typeMembersOnDemand(Typer *typer, RangeNode *declaration)
-{
-    int pending = 0;
-    for (size_t i = 0; i < declaration->itemCount; ++i)
-        pending |= rangeNodeDeclaresValue(declaration->items[i]->kind) && !(declaration->items[i]->found & RangeFlagTyped);
-    if (!pending) return;
-    SourceScope scopes[33], scope = {.owner=declaration,.parent=enclosingScope(typer,declaration,scopes)};
-    TyperContext outer = typerTop(typer);
-    RangeNode *context = selfSpecialization(typer,declaration);
-    for (size_t i = 0; i < declaration->itemCount; ++i)
-        if (rangeNodeDeclaresValue(declaration->items[i]->kind)) typeMember(typer,&scope,declaration->items[i],context);
-    typerRestore(typer,outer);
-}
-
-/* A construct's member whose initializer `.value` reads. */
+/* A member whose initializer `.value` reads: a non-generic construct's, in
+ * its own specialization; only a construct's members are typed on their own. */
 static void typeValueOnDemand(Typer *typer, RangeNode *member)
 {
     SourceScope scopes[33], *scope = member->found & RangeFlagTyped ? NULL : enclosingScope(typer,member,scopes);
-    if (!scope || scope->owner->kind != RangeNodeConstruct) return; /* only a construct's members are typed on their own */
-    TyperContext outer = typerTop(typer);
-    typeMember(typer,scope,member,selfSpecialization(typer,scope->owner));
-    typerRestore(typer,outer);
+    RangeNode *own = scope && scope->owner->kind == RangeNodeConstruct ? ownSpecialization(typer,scope->owner) : NULL;
+    if (own) (void)memberTypeIn(typer,own,member);
 }
 
 /* A macro's body, before its first application runs it. Returns whether it may run. */
@@ -5640,8 +5648,7 @@ static int typeMacroOnDemand(Typer *typer, RangeMacroApplication *app)
 
 /* Type the program, after macro time: what macros left untyped, and the
  * checks that need every declaration. The typer is kept for code
- * generation: generic methods are lowered per concrete specialization, which
- * substitutes and lays out new types. */
+ * generation, which lays out the types it meets. */
 static void typeCheck(Typer *typer)
 {
     SourceReport *report = typer->report;
@@ -5679,21 +5686,31 @@ static void typeCheck(Typer *typer)
     }
     drainLaws(typer); /* the specializations and literals typing met */
     for (size_t u = 0; u < report->count; ++u) checkOverloads(typer,report->units[u]);
+    checkEqualities(typer);
+    // Every type the program mentions is typed in its specialization and
+    // gets a layout, or a reason it has none.
+    for (size_t i = 0; i < typer->specializations->itemCount; ++i) {
+        RangeNode *specialization = typer->specializations->items[i], *declaration = specialization->resolvedDeclaration;
+        if (keyOf(declaration,specialization)) typeLaws(typer,declaration,specialization);
+        if (specialization->layout == 2 || layoutOf(typer,specialization,declaration) || specialization->integer) continue;
+        char name[160]; describeType(name,sizeof(name),specialization);
+        sourceDiagnostic(report,declaration,0,"layout","%s has no layout",name);
+    }
+    // Every body as it was typed: in place, per generic function
+    // specialization, and per specialization of a generic declaration.
     for (size_t u = 0; u < report->count; ++u) checkMutations(typer,report->units[u]);
     for (size_t i = 0; i < typer->instances->itemCount; ++i) {
         typer->key = typer->instances->items[i];
         checkMutations(typer,typer->key->resolvedDeclaration);
     }
-    typer->key = NULL;
-    checkEqualities(typer);
-    // Every type the program mentions gets a layout, or a reason it has none.
     for (size_t i = 0; i < typer->specializations->itemCount; ++i) {
-        RangeNode *specialization = typer->specializations->items[i];
-        if (specialization->layout == 2 || layoutOf(typer,specialization,specialization->resolvedDeclaration)
-            || specialization->integer) continue;
-        char name[160]; describeType(name,sizeof(name),specialization);
-        sourceDiagnostic(report,specialization->resolvedDeclaration,0,"layout","%s has no layout",name);
+        RangeNode *declaration = typer->specializations->items[i]->resolvedDeclaration;
+        typer->key = keyOf(declaration,typer->specializations->items[i]);
+        for (size_t j = 0; typer->key && j < declaration->itemCount; ++j)
+            if (declaration->items[j]->kind == RangeNodeFunction && (found(typer->key,declaration->items[j])->found & RangeFlagTyped))
+                checkMutations(typer,declaration->items[j]);
     }
+    typer->key = NULL;
     drainLaws(typer); /* the specializations comparing and layout met */
 }
 
@@ -5997,7 +6014,6 @@ static int evalText(Eval *eval, EvalFrame *frame, RangeNode *node, const char **
 
 /* ---- the macro-only inputs ---- */
 
-static void typeMembersOnDemand(Typer *, RangeNode *);
 static void typeValueOnDemand(Typer *, RangeNode *);
 
 /* A declaration's members and functions include what its written macros
@@ -6127,7 +6143,7 @@ static int evalField(Eval *eval, RangeNode *owner, const char *name, RangeNode *
     if (!member && raw.kind == RangeGraphNodes)
         return evalFail(eval,at,"reflection field '%s' has no Range type: %s declares no member '%s' in the loaded grammar",
                         name,grammar ? grammar->name : shape->name,name);
-    RangeNode *type = member ? memberType(eval->typer,grammar,member,selfSpecialization(eval->typer,grammar)) : NULL;
+    RangeNode *type = member ? memberType(eval->typer,grammar,member,ownSpecialization(eval->typer,grammar)) : NULL;
     if (raw.kind == RangeGraphNodes) return evalList(eval,grammar,name,type,raw,at,out);
     *out = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.node=owner,.text=raw.text,.length=strlen(raw.text)}
         : raw.kind == RangeGraphNode ? (RangeValue){.kind=ValueDeclaration,.node=raw.node} : (RangeValue){0};
@@ -6343,18 +6359,17 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
     return EvalNormal;
 }
 
-static int typeOnDemand(Typer *, RangeNode *);
-
 /* Run `function`, as typed under `key`, with these arguments, one per
  * parameter in order, on `self` when it is a method: its body, or the C
  * primitive it declares. A generic function's specialization was typed as
- * it was made. */
+ * it was made; without a key, the function is typed for its receiver first. */
 static int evalInvoke(Eval *eval, RangeNode *function, RangeNode *key, RangeValue *self, RangeValue *arguments, RangeNode *at,
                       RangeValue *out)
 {
     *out = (RangeValue){0};
     int status;
-    if (!key && !typeOnDemand(eval->typer,function)) return evalStop(eval);
+    if (!key) key = typeOnDemand(eval->typer,function,self ? self->type : NULL);
+    if (found(key,function)->found & RangeFlagInvalid) return evalStop(eval);
     EvalFrame frame = {.self=self,.function=function,.key=key};
     for (size_t i = 0; i < function->itemCount; ++i)
         if ((status = evalAdopt(eval,&arguments[i],found(frame.key,function->items[i])->type,at))) return status;
@@ -6404,7 +6419,7 @@ static int evalCase(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNode *en
     RangeValue *payload = evalValues(eval,count);
     for (size_t i = 0; i < count; ++i) {
         int status = evalExpression(eval,frame,arguments[i]->a,&payload[i]);
-        if (!status && type && i < entry->itemCount) status = evalAdopt(eval,&payload[i],caseFieldType(eval->typer,type,entry->items[i]),arguments[i]);
+        if (!status && type && i < entry->itemCount) status = evalAdopt(eval,&payload[i],memberTypeIn(eval->typer,type,entry->items[i]),arguments[i]);
         if (status) return status;
     }
     *out = (RangeValue){.kind=ValueCase,.type=type,.node=entry,.values=payload,.count=count};
@@ -6420,14 +6435,17 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
     if (!type || type->kind != RangeNodeSpecialization) return evalStop(eval);
     RangeNode *declaration = type->resolvedDeclaration;
     evalPrepare(eval,declaration);
-    typeMembersOnDemand(eval->typer,declaration);
     EvalFrame defaults = {.key=keyOf(declaration,type)};
     int status, bits, isSigned;
     if (bytesDeclaration(declaration) || scalarShape(type,&bits,&isSigned)) {
         RangeNode *value = count ? arguments[0]->a : NULL;
         EvalFrame *in = frame;
-        for (size_t i = 0; !value && i < declaration->itemCount; ++i)
-            if (constructionInput(declaration->items[i])) { value = declarationValue(defaults.key,declaration->items[i]); in = &defaults; }
+        for (size_t i = 0; !value && i < declaration->itemCount; ++i) {
+            if (!constructionInput(declaration->items[i])) continue;
+            (void)memberTypeIn(eval->typer,type,declaration->items[i]); /* its default, as this specialization has it */
+            value = declarationValue(defaults.key,declaration->items[i]);
+            in = &defaults;
+        }
         status = evalExpression(eval,in,value,out);
         return status ? status : evalAdopt(eval,out,type,at);
     }
@@ -6439,7 +6457,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
         if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
         if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
         for (size_t j = 0; j < count; ++j) if (found(frame->key,arguments[j])->resolvedDeclaration == member) value = arguments[j]->a;
-        RangeNode *memberType = found(defaults.key,member)->type;
+        RangeNode *memberType = memberTypeIn(eval->typer,type,member);
         if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
         else if ((value = declarationValue(defaults.key,member)) == member)
             status = evalConstruct(eval,&defaults,memberType,member->items,member->itemCount,member,&instance.values[i]);
@@ -6941,10 +6959,9 @@ static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
  * carry its address. Calling convention, internal to Range: a method receives
  * its receiver's address in x0 and parameters after it; scalars pass by value,
  * aggregates by address (the callee copies); an aggregate result is written to
- * the address the caller passes in x8. Generic constructs' methods are compiled
- * once per concrete specialization, with type parameters substituted; a
- * generic function once per concrete specialization of it, reading what
- * typing found under that specialization.
+ * the address the caller passes in x8. A generic function, and a generic
+ * construct's or enum's method, is compiled once per specialization it is
+ * called in, reading what typing found under that specialization.
  *
  * Builtin operators are C primitives: each enforces its operand type's range
  * (the @integer law) at runtime where the compiler cannot prove it, writing a
@@ -7947,7 +7964,7 @@ static int nativeEquals(Native *native, RangeNode *type, RangeNode *at)
     if (function) {
         // The receiver is an address: a scalar is passed through the stack.
         if (type->scalarBits) { nativeEmit(native,armPush(0)); nativeEmit(native,armAddImm(0,31,0)); }
-        nativeCallFunction(native,function,NULL,type);
+        nativeCallFunction(native,function,keyOf(function->owner,type),type);
         if (type->scalarBits) nativeEmit(native,armAddImm(31,31,16));
         native->resultTemp = -1;
         return 1;
@@ -9482,23 +9499,20 @@ static int nativeGraphValues(Native *native, const RangeNode *type)
     return macroTimeType(native->typer,type);
 }
 
-/* A construct's methods are compiled for each concrete specialization. A
- * construct with type parameters is generic, as a generic function is: its
- * methods are compiled per specialization when called, so Array<Point>'s
+/* A construct's methods are compiled for its own specialization, as they
+ * were typed there. A generic construct's, as a generic function's, are
+ * compiled per specialization when called, under its key, so Array<Point>'s
  * `=`, and Point's `=` with it, exist only if such arrays are compared. */
 static void nativeMethods(Native *native, RangeNode *construct)
 {
-    if (parametric(construct)) return;
-    for (size_t i = 0; i < native->typer->specializations->itemCount; ++i) {
-        RangeNode *self = native->typer->specializations->items[i];
-        if (self->resolvedDeclaration != construct || !nativeConcrete(self) || nativeGraphValues(native,self)) continue;
-        for (size_t j = 0; j < construct->itemCount; ++j) {
-            RangeNode *function = construct->items[j];
-            // A type's function '=' is compiled only when the type is compared.
-            if (function->kind == RangeNodeFunction && !(function->flags & (RangeFlagBuiltin | RangeFlagExtern))
-                && !same(function->name,"=") && !genericTemplate(function) && !nativeInlined(function))
-                nativeInstance(native,function,NULL,self);
-        }
+    RangeNode *self = ownSpecialization(native->typer,construct);
+    if (!self || nativeGraphValues(native,self)) return;
+    for (size_t j = 0; j < construct->itemCount; ++j) {
+        RangeNode *function = construct->items[j];
+        // A type's function '=' is compiled only when the type is compared.
+        if (function->kind == RangeNodeFunction && !(function->flags & (RangeFlagBuiltin | RangeFlagExtern))
+            && !same(function->name,"=") && !genericTemplate(function) && !nativeInlined(function))
+            nativeInstance(native,function,NULL,self);
     }
 }
 

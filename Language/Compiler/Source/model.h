@@ -132,7 +132,8 @@ typedef struct RangeGraphValue {
  * initializer; on a declaration, its value as typing wrote it), the @optional
  * present case a read goes through, whose one field is the payload, the
  * optional a value is wrapped into where it is used, for a call of a generic
- * function the specialization it runs, and the found bits.
+ * function or of a generic declaration's method the specialization it runs
+ * in, and the found bits.
  * Lowered nodes are compiler-written, point at written children, and are
  * never linked into the tree. */
 typedef struct RangeFacts {

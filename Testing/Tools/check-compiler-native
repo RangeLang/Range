@@ -114,6 +114,7 @@ done
 ! grep -Eq "'(a|x)' is bound but never used" "$work_root/log" || fail "a binding read in a condition or body was warned"
 ! grep -Fq "warning[unused]" <(grep -v "unused-bindings.range" "$work_root/log") || fail "the language sources bind names they never use"
 run generic-methods 42 "" Testing/Compiler/Native/GenericMethods.range
+run generic-bodies 42 "" Testing/Compiler/Native/GenericBodies.range
 # Closures: functions that take them are compiled inline, and so are they.
 run closures 42 "" Testing/Compiler/Native/Closures.range
 [[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"
@@ -183,7 +184,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
-                   bytes control evaluation identity-references subjects case-tests closures collections generic-methods; do
+                   bytes control evaluation identity-references subjects case-tests closures collections generic-methods generic-bodies; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
         leaks --atExit -- "$work_root/$program" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" \
@@ -626,11 +627,11 @@ reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case
 enum Place { case at(Bag), nowhere }
 function f(let p: Place): Int { switch { p.nowhere: return 0, default: return 1 } }
 { let p: Place.nowhere switch { p = .nowhere: return 1, default: {} } return 0 }"
-reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Pair<Value: Bag>)" \
+reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare; in Pair<Value: Bag>, specialized at" \
     "$raw
 construct Pair<Value> { let first: Value  let second: Value  function same(): Bool { return first = second } }
 { let a: Bag(items: Raw()) switch { Pair<Bag>(first: a, second: a).same(): return 1, default: {} } return 0 }"
-reject uncomparable-element "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare (in Array<Element: Bag>)" \
+reject uncomparable-element "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare; in Array<Element: Bag>, specialized at" \
     "$raw
 { state xs: Array<Bag>() switch { xs = xs: return 1, default: {} } return 0 }"
 # Demand-driven: an Array's `=`, and its element's '=', exist only when
@@ -815,6 +816,10 @@ reject generic-equality "'=' cannot compare Bag: field 'items' is Raw, and field
     "$raw
 function same<T>(let a: T, let b: T): Bool { return a = b }
 { let b: Bag(items: Raw()) switch { same(a: b, b: b): return 1, default: {} } return 0 }"
+# A generic construct's method is checked per specialization too.
+reject generic-construct-operation "generic-construct-operation.range:1:71: error[type]: '+' is not declared on Bool; in Box<T: Bool>, specialized at" \
+    'construct Box<T> { let a: T  let b: T  function total(): T { return a + b } }
+{ let flags: Box<Bool>(a: true, b: false) switch { flags.total(): return 1, default: {} } return Box<Int>(a: 1, b: 2).total() }'
 reject generic-uninferred "cannot infer type parameter Value of 'nothing'; write it, as in nothing<…>(…)" \
     'function nothing<Value>(): Value? { return .absent }
 { let x: nothing() return 0 }'
@@ -992,4 +997,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-echo "compiler native: programs=64 rejections=191 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=65 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

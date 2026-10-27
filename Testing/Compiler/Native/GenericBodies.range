@@ -1,0 +1,43 @@
+// A generic construct's or enum's bodies are typed per specialization the
+// program uses, as a generic function's are: with Box<Int>, T is Int, so
+// `a + b` adds Ints and `T(a)` constructs an Int. A body no specialization
+// uses is checked only for names and syntax, so Unused<Bool> compiles
+// although Bool declares no '+'.
+construct Box<T> {
+    let a: T
+    let b: T
+    function total(): T { return a + b }
+    function both(): T { return total() }
+    function made(): T { return T(a) }
+    function same(): Bool { return a = b }
+    // A generic method called from the construct's own body runs in the
+    // receiver's specialization.
+    function picked(): Bool { return pick(other: a, mine: true) }
+    function pick<U>(let other: U, let mine: Bool): Bool { return mine }
+}
+
+construct Unused<T> {
+    let item: T
+    function doubled(): T { return item + item }
+}
+
+enum Either<L, R> {
+    case left(L), right(R)
+    function sum(let other: L): L {
+        return switch { left(let v): v + other, default: other }
+    }
+}
+
+{
+    let ints: Box<Int>(a: 1, b: 2)
+    switch { ints.total() != 3: return 1, default: {} }
+    let small: Box<Int<bits: 8>>(a: 10, b: 20)
+    switch { small.both() != 30: return 2, default: {} }
+    switch { ints.made() != 1 | !ints.picked() | ints.same(): return 3, default: {} }
+    let flags: Box<Bool>(a: true, b: true)
+    switch { !flags.same(): return 4, default: {} }
+    let unused: Unused<Bool>(item: true)
+    let either: Either<Int, Bool>.left(4)
+    switch { either.sum(other: 1) != 5: return 5, default: {} }
+    return 42
+}

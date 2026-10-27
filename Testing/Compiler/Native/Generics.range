@@ -51,8 +51,8 @@ function orDefault<Value>(let maybe: Value?, let fallback: Value): Value {
 // The type comes only from the expected result.
 function nothing<Value>(): Value? { return .absent }
 
-// Inside a generic construct, arguments mention its type parameter: the call
-// is checked with T, and each specialization calls the instance for its type.
+// A generic construct's methods are typed per specialization, as they are
+// used: with Box<Int>, T is Int, and each calls the instance for its type.
 construct Box<T> {
     state items: Array<T>()
     function head(): T? { return first(xs: items) }

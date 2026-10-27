@@ -8,8 +8,8 @@ enum Shape { case dot(Point), line(Segment), none }
 enum Tree { case leaf(Int), node(left: Tree, right: Tree) }
 construct Box<Value> { let value: Value }
 
-// In a generic body, `=` on a type parameter compares through each
-// specialization's own equality.
+// A generic body is typed per specialization: `=` on Value compares with
+// that specialization's own equality.
 construct Pair<Value> {
     let first: Value
     let second: Value

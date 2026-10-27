@@ -136,7 +136,8 @@ int main(void)
         RangeNode *array = named(c.units[u],"Array");
         if (array && array->kind == RangeNodeConstruct) append = named(array,"append");
     }
-    assert(append && append->items[0]->type && append->items[0]->type->kind == RangeNodeTypeParameter);
+    // Array's methods are typed only per specialization, so its own nodes hold no types.
+    assert(append && !append->items[0]->type);
     rangeArenaDestroy(&c.arena);
 
     // Literals take the type their context requires; the law runs on the supplied value.
@@ -153,7 +154,7 @@ int main(void)
     assert(errorsIn(&c,"type") == 0);
     rangeArenaDestroy(&c.arena);
 
-    // Specialization substitutes type parameters through members and calls.
+    // A generic construct's members and methods are typed per specialization.
     compile(&c,"function arrays() { state xs: Array<Int>() xs.append(value: 7) "
         "let n: (xs.count) let r: (xs.read(at: 0) + 1) let e: (xs.isEmpty()) "
         "state narrow: Array<Int<bits: 8>>() narrow.append(value: 300) }");
@@ -376,6 +377,21 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
+    // A generic construct's method is typed per specialization it is called
+    // on, under that specialization's key: its own nodes keep nothing, and a
+    // call records the specialization its callee runs in.
+    compile(&c,"construct Box<T> { let a: T  let b: T  function total(): T { return a + b } } "
+        "function totals(): Int { let narrow: Box<Int<bits: 8>>(a: 1, b: 2).total() let wide: Box<Int>(a: 1, b: 2) return wide.total() }");
+    assert(!errorsIn(&c,"type"));
+    RangeNode *method = named(named(c.project,"Box"),"total"), *added = method->a->items[0]->a;
+    RangeNode *narrowBox = rangeNodeRHS(local(&c,"totals","narrow"))->a->specialization, *wideBox = local(&c,"totals","wide")->type;
+    assert(!method->type && !added->type && !added->resolvedDeclaration);
+    expectDescription(narrowBox,"Box<T: Int<bits: 8, signed: true>>");
+    expectDescription(found(narrowBox,added)->type,"Int<bits: 8, signed: true>");
+    expectDescription(found(wideBox,added)->type,"Int<bits: 64, signed: true>");
+    assert(!writtenChanged(c.typer,"Project.range"));
+    rangeArenaDestroy(&c.arena);
+
     // A generic construct's member is typed per specialization it is read in:
     // each keeps the absent case its optional starts as.
     compile(&c,"construct Box<T> { let v: T? } "
@@ -385,7 +401,7 @@ int main(void)
     RangeNode *ints = boxes->items[0]->type, *bools = boxes->items[1]->type;
     expectDescription(ints,"Box<T: Int<bits: 64, signed: true>>");
     expectDescription(bools,"Box<T: Bool>");
-    expectDescription(v->lowered->type,"Optional<Wrapped: T>");
+    assert(!v->lowered); /* a generic construct's own nodes are typed only per specialization */
     expectDescription(found(ints,v)->lowered->type,"Optional<Wrapped: Int<bits: 64, signed: true>>");
     expectDescription(found(bools,v)->lowered->type,"Optional<Wrapped: Bool>");
     assert(!writtenChanged(c.typer,"Project.range"));
@@ -401,10 +417,10 @@ int main(void)
     expectDescription(negative,"Grid<T: Int<bits: 64, signed: true>, width: -1>");
     assert(local(&c,"grids","d")->type == negative && wide->values[0] == c.typer->booleanType);
     assert(genericSlot(wide,grid->generics->items[1]) == &wide->values[1] && wide->values[1]->integer == 3);
-    assert(!selfSpecialization(c.typer,grid)->values[1] && selfSpecialization(c.typer,grid)->values[0] == grid->generics->items[0]);
+    assert(!ownSpecialization(c.typer,grid)); /* its bodies have no specialization of their own */
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
-    puts("types: language sources, contextual literals, laws per specialization, substitution, refusals, layout, written code=pass");
+    puts("types: language sources, contextual literals, laws per specialization, generic bodies, refusals, layout, written code=pass");
     return 0;
 }
