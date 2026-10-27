@@ -1,5 +1,5 @@
 #define main rangeCompilerMain
-#include "../../../Language/Compiler/Source/compiler.c"
+#include "../WholeCompiler.c"
 #undef main
 #include <assert.h>
 #include <dirent.h>

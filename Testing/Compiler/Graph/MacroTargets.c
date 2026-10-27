@@ -1,6 +1,6 @@
 /* Target identity selects the declaration and supplies every #field lookup. */
 #define main rangeCompilerMain
-#include "../../../Language/Compiler/Source/compiler.c"
+#include "../WholeCompiler.c"
 #undef main
 #include <assert.h>
 

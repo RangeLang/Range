@@ -1,7 +1,7 @@
 /* Types: interned specializations, contextual literals, laws per
  * specialization, and checked calls, operators, and assignments. */
 #define main rangeCompilerMain
-#include "../../../Language/Compiler/Source/compiler.c"
+#include "../WholeCompiler.c"
 #undef main
 #include <assert.h>
 #include <unistd.h>

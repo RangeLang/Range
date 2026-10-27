@@ -1,6 +1,6 @@
 /* Each member keyword is its own node kind; @member names any kind that applied it. */
 #define main rangeCompilerMain
-#include "../../../Language/Compiler/Source/compiler.c"
+#include "../WholeCompiler.c"
 #undef main
 #include <assert.h>
 

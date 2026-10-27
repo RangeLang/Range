@@ -1,6 +1,6 @@
 /* #graph emission: macros add ordinary code, which is checked where it lands. */
 #define main rangeCompilerMain
-#include "../../../Language/Compiler/Source/compiler.c"
+#include "../WholeCompiler.c"
 #undef main
 #include <assert.h>
 
