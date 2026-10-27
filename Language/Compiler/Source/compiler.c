@@ -7452,70 +7452,154 @@ static int nativeKnownName(Native *native, RangeNode *declaration, RangeValue *o
 }
 
 static size_t nativeFirstField(const RangeNode *, const RangeNode *);
+static void nativeTrackTemp(Native *, int32_t, RangeNode *);
 
-/* A known aggregate as its bytes, the image native code copies into place,
- * and the bytes values in it, whose addresses are patched in after. */
-typedef struct {
+/* A known aggregate as its bytes, the image native code copies into place;
+ * the bytes values in it, whose addresses in __text are patched in after;
+ * and the blocks it holds, @many storage or a field stored out of line, each
+ * allocated and filled from an image of its own, its address patched in.
+ * Without bytes, an image notes only whether native code builds the value. */
+typedef struct NativeImage {
+    Typer *typer;
     unsigned char *bytes;
+    size_t size;
     NativeText *texts; size_t textCount, textCapacity; /* at: the offset of the address */
+    struct NativeBlock *blocks; size_t blockCount, blockCapacity;
 } NativeImage;
+typedef struct NativeBlock { size_t at; NativeImage image; const char *message; } NativeBlock;
+
+static int nativeImage(NativeImage *, const RangeValue *, RangeNode *, size_t);
+
+/* Frees what an image holds; returns how many addresses it patches in. */
+static size_t nativeImageFree(NativeImage *image)
+{
+    size_t patches = image->textCount + image->blockCount;
+    for (size_t i = 0; i < image->blockCount; ++i) patches += nativeImageFree(&image->blocks[i].image);
+    free(image->texts); free(image->blocks);
+    return patches;
+}
+
+/* A block of `count` values of `element` after its header, one reference
+ * and the count, as native code allocates them; its address goes at `at`. */
+static int nativeImageBlock(NativeImage *image, size_t at, const RangeValue *values, size_t count, RangeNode *element,
+                            const char *message)
+{
+    NativeBlock block = {.at=at,.message=message,.image={.typer=image->typer,.size=16 + count * element->size}};
+    if (image->bytes) {
+        block.image.bytes = rangeArenaAllocate(image->typer->report->arena,block.image.size);
+        memset(block.image.bytes,0,block.image.size);
+        for (size_t i = 0; i < 8; ++i) block.image.bytes[8 + i] = (unsigned char)(count >> (8 * i));
+        block.image.bytes[0] = 1;
+    }
+    NATIVE_PUSH(image->blocks,image->blockCount,image->blockCapacity,block);
+    for (size_t i = 0; i < count; ++i)
+        if (!nativeImage(&image->blocks[image->blockCount - 1].image,&values[i],element,16 + i * element->size)) return 0;
+    return 1;
+}
 
 /* Lay out a known value of `type` at `offset`: a scalar as stored, a case
  * by its tag and its fields, an instance by its stored members, bytes by
- * their count (their address noted), and @many storage without slots as no
- * block. With no image, only whether native code builds the value this way. */
+ * their count and their address, @many storage by its block, or none
+ * without slots. */
 static int nativeImage(NativeImage *image, const RangeValue *value, RangeNode *type, size_t offset)
 {
-    if (!type || type->kind != RangeNodeSpecialization || value->type != type) return 0;
+    if (!type || type->kind != RangeNodeSpecialization || value->type != type || macroTimeType(image->typer,type)
+        || !layoutOf(image->typer,type,NULL)) return 0;
     RangeNode *declaration = type->resolvedDeclaration;
     uint64_t scalar = (uint64_t)(value->kind == ValueCase ? value->node->integer : value->integer);
     if (type->scalarBits && (value->kind == ValueScalar || (value->kind == ValueCase && !value->count))) {
-        for (size_t i = 0; image && i < type->size; ++i) image->bytes[offset + i] = (unsigned char)(scalar >> (8 * i));
+        for (size_t i = 0; image->bytes && i < type->size; ++i) image->bytes[offset + i] = (unsigned char)(scalar >> (8 * i));
         return 1;
     }
     if (bytesType(type) && value->kind == ValueText) {
-        if (!image) return 1;
-        for (size_t i = 0; i < 8; ++i) image->bytes[offset + 8 + i] = (unsigned char)(value->length >> (8 * i));
+        for (size_t i = 0; image->bytes && i < 8; ++i) image->bytes[offset + 8 + i] = (unsigned char)(value->length >> (8 * i));
         NativeText text = {.at=offset,.bytes=value->text,.length=value->length};
         NATIVE_PUSH(image->texts,image->textCount,image->textCapacity,text);
         return 1;
     }
     if (type->variantTag && value->kind == ValueCase) {
-        for (size_t i = 0; image && i < (size_t)type->variantTag; ++i) image->bytes[offset + i] = (unsigned char)(scalar >> (8 * i));
-        size_t first = nativeFirstField(declaration,value->node);
-        for (size_t j = 0; j < value->count; ++j)
-            if (type->memberBoxed[first + j]
-                || !nativeImage(image,&value->values[j],type->memberTypes[first + j],offset + type->memberOffsets[first + j])) return 0;
+        for (size_t i = 0; image->bytes && i < (size_t)type->variantTag; ++i) image->bytes[offset + i] = (unsigned char)(scalar >> (8 * i));
+        for (size_t j = 0, k = nativeFirstField(declaration,value->node); j < value->count; ++j, ++k)
+            if (type->memberBoxed[k] ? !nativeImageBlock(image,offset + type->memberOffsets[k],&value->values[j],1,type->memberTypes[k],
+                                                         "could not allocate storage for a recursive enum field")
+                : !nativeImage(image,&value->values[j],type->memberTypes[k],offset + type->memberOffsets[k])) return 0;
         return 1;
     }
     if (value->kind != ValueInstance || !type->memberOffsets || value->count != declaration->itemCount) return 0;
     for (size_t i = 0; i < value->count; ++i) {
         if (type->memberOffsets[i] == SIZE_MAX) continue;
-        if (declaration->items[i]->flags & RangeFlagMany) { if (value->values[i].count) return 0; continue; }
-        if (!nativeImage(image,&value->values[i],type->memberTypes[i],offset + type->memberOffsets[i])) return 0;
+        RangeNode *member = declaration->items[i], *element = member->flags & RangeFlagMany ? manyElement(image->typer,type,member) : NULL;
+        if (element && value->values[i].count && (macroTimeType(image->typer,element) || !layoutOf(image->typer,element,NULL)
+            || !nativeImageBlock(image,offset + type->memberOffsets[i],value->values[i].values,value->values[i].count,element,
+                                 "could not allocate @many storage"))) return 0;
+        if (!element && !nativeImage(image,&value->values[i],type->memberTypes[i],offset + type->memberOffsets[i])) return 0;
     }
     return 1;
 }
 
-/* Whether native code builds a known value of `type`. */
+/* Whether native code builds a known value of `type`: 0 when it does not,
+ * 1 when the value holds no block, 2 when it holds blocks. Each address
+ * patched in, of bytes or of a block, is code; a value needing more than
+ * 16 is compiled as written. */
 static int nativeBuilds(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
 {
     if (!type || macroTimeType(native->typer,type) || !layoutOf(native->typer,type,at)) return 0;
-    return nativeImage(NULL,value,type,0);
+    NativeImage image = {.typer=native->typer};
+    int builds = nativeImage(&image,value,type,0) ? 1 + !!image.blockCount : 0;
+    return nativeImageFree(&image) > 16 ? 0 : builds;
 }
 
-/* Emit a known value of `type` as an expression leaves it: a scalar in x0;
- * an aggregate in a temporary that holds no block, its address in x0, copied
- * from its image in __text. Bytes point at their text in __text, as a
- * literal's do. Returns 0, emitting nothing, for one native code does not
- * build. */
-static int nativeKnownValue(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
+/* The address of where an image goes: x29 + base, or, indirect, the
+ * address the frame slot at base holds. */
+static void nativeImageAddress(Native *native, int rd, int32_t base, int indirect)
 {
-    if (!nativeBuilds(native,value,type,at)) return 0;
+    if (indirect) nativeLoad(native,rd,base);
+    else nativeFrameAddress(native,rd,base);
+}
+
+/* Copy an image into place, then patch in the addresses of its bytes and
+ * of its blocks, each allocated and filled in turn. */
+static void nativeStoreImage(Native *native, const NativeImage *image, int32_t base, int indirect, RangeNode *at)
+{
+    int zero = 1;
+    for (size_t i = 0; i < image->size && zero; ++i) zero = !image->bytes[i];
+    nativeImageAddress(native,0,base,indirect);
+    if (zero) nativeZero(native,0,image->size);
+    else {
+        NativeText bytes = {.at=nativeEmit(native,armAdr(1,0)),.bytes=(const char *)image->bytes,.length=image->size};
+        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,bytes);
+        nativeCopy(native,0,1,image->size);
+    }
+    for (size_t i = 0; i < image->textCount; ++i) {
+        NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=image->texts[i].bytes,.length=image->texts[i].length};
+        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
+        nativeAddOffset(native,10,0,image->texts[i].at);
+        nativeEmit(native,armStr(1,10,0));
+    }
+    for (size_t i = 0; i < image->blockCount; ++i) {
+        const NativeBlock *block = &image->blocks[i];
+        int32_t slot = nativeReserve(native,8,8);
+        nativeConstant(native,0,block->image.size);
+        rangeCallImport(&native->machine,"_malloc");
+        nativeTrap(native,armCbz(0,0),at,"%s",block->message);
+        nativeStore(native,0,slot);
+        nativeImageAddress(native,1,base,indirect);
+        nativeAddOffset(native,1,1,block->at);
+        nativeEmit(native,armStr(0,1,0));
+        nativeStoreImage(native,&block->image,slot,1,at);
+    }
+}
+
+/* Emit a known value of `type`, which native code builds, as an expression
+ * leaves it: a scalar in x0; an aggregate in a temporary, its address in x0,
+ * copied from its image in __text, a temporary that owns the blocks built
+ * for it. Bytes point at their text in __text, as a literal's do. */
+static void nativeKnownValue(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
+{
     native->resultTemp = -1;
     if (type->scalarBits) {
         nativeConstant(native,0,(uint64_t)(value->kind == ValueCase ? value->node->integer : value->integer));
-        return 1;
+        return;
     }
     int32_t temporary = nativeReserve(native,type->size ? type->size : 1,type->alignment);
     if (value->kind == ValueText) {
@@ -7527,41 +7611,38 @@ static int nativeKnownValue(Native *native, const RangeValue *value, RangeNode *
         nativeEmit(native,armStr(1,0,0));
         nativeEmit(native,armStr(2,0,8));
         nativeEmit(native,armStr(31,0,16));
-        return 1;
+        return;
     }
-    NativeImage image = {.bytes=rangeArenaAllocate(native->report->arena,type->size)};
+    NativeImage image = {.typer=native->typer,.bytes=rangeArenaAllocate(native->report->arena,type->size),.size=type->size};
     memset(image.bytes,0,type->size);
     nativeImage(&image,value,type,0);
-    int zero = 1;
-    for (size_t i = 0; i < type->size && zero; ++i) zero = !image.bytes[i];
+    nativeStoreImage(native,&image,temporary,0,at);
+    if (image.blockCount) nativeTrackTemp(native,temporary,type);
+    nativeImageFree(&image);
     nativeFrameAddress(native,0,temporary);
-    if (zero) nativeZero(native,0,type->size);
-    else {
-        NativeText bytes = {.at=nativeEmit(native,armAdr(1,0)),.bytes=(const char *)image.bytes,.length=type->size};
-        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,bytes);
-        nativeCopy(native,0,1,type->size);
-    }
-    for (size_t i = 0; i < image.textCount; ++i) {
-        NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=image.texts[i].bytes,.length=image.texts[i].length};
-        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
-        nativeAddOffset(native,10,0,image.texts[i].at);
-        nativeEmit(native,armStr(1,10,0));
-    }
-    free(image.texts);
-    return 1;
 }
 
-/* A declaration whose value is known: a slot naming the value, without
- * storage; each read fills it in. Returns 0 for a value native code does
- * not build. */
+/* A declaration whose value is known: a slot naming the value. One that
+ * holds no block has no storage, and each read fills it in; returns 0,
+ * adding none, for any other. */
 static int nativeKnownSlot(Native *native, RangeNode *declaration, RangeNode *type, const RangeValue *value)
 {
-    if (!nativeBuilds(native,value,type,declaration)) return 0;
+    if (nativeBuilds(native,value,type,declaration) != 1) return 0;
     RangeValue *known = rangeArenaAllocate(native->report->arena,sizeof(*known));
     *known = *value;
     NativeSlot slot = {.declaration=declaration,.type=type,.known=known};
     NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     return 1;
+}
+
+/* The value of the slot just made for `declaration`, built where it was
+ * declared, is known too: a let holding blocks, read in place. */
+static void nativeKnownStorage(Native *native, RangeNode *declaration, const RangeValue *value)
+{
+    NativeSlot *slot = native->slotCount ? &native->slots[native->slotCount - 1] : NULL;
+    if (!slot || slot->declaration != declaration || !slot->offset || nativeBuilds(native,value,slot->type,declaration) != 2) return;
+    slot->known = rangeArenaAllocate(native->report->arena,sizeof(*slot->known));
+    *slot->known = *value;
 }
 
 /* ---- expressions: a scalar in x0, or an aggregate's address in x0 ---- */
@@ -8623,11 +8704,13 @@ static RangeNode *nativeInline(Native *native, RangeNode *call, RangeNode *targe
         if (kind == NativeNone) return NULL;
         // A known argument is known in the body inlined here.
         RangeValue known;
-        if (nativeKnown(native,value,&known) && nativeKnownSlot(native,parameter,type,&known)) continue;
+        int argument = nativeKnown(native,value,&known);
+        if (argument && nativeKnownSlot(native,parameter,type,&known)) continue;
         int32_t offset = kind == NativeAggregate ? nativeReserve(native,type->size ? type->size : 1,type->alignment) : nativeReserve(native,8,8);
         if (!nativeArgument(native,value,type,kind,offset)) return NULL;
         NativeSlot slot = {.declaration=parameter,.offset=offset,.type=type};
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
+        if (argument) nativeKnownStorage(native,parameter,&known);
     }
     NativeContext context = {.owner=self ? self->resolvedDeclaration : NULL,.self=self,.function=target,.key=key,
                              .selfSlot=selfSlot};
@@ -8655,7 +8738,8 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
         if (kind == NativeNone) return NULL;
         // A known argument is known in the closure's body.
         offsets[i] = 0;
-        if (nativeKnown(native,call->items[i]->a,&known[i]) && nativeBuilds(native,&known[i],types[i],literal->items[i])) continue;
+        if (!nativeKnown(native,call->items[i]->a,&known[i])) known[i].kind = ValueNone;
+        else if (nativeBuilds(native,&known[i],types[i],literal->items[i]) == 1) continue;
         offsets[i] = kind == NativeAggregate ? nativeReserve(native,types[i]->size ? types[i]->size : 1,types[i]->alignment) : nativeReserve(native,8,8);
         if (!nativeArgument(native,call->items[i]->a,types[i],kind,offsets[i])) return NULL;
     }
@@ -8666,6 +8750,7 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
         if (!offsets[i]) { nativeKnownSlot(native,literal->items[i],types[i],&known[i]); continue; }
         NativeSlot slot = {.declaration=literal->items[i],.offset=offsets[i],.type=types[i]};
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
+        nativeKnownStorage(native,literal->items[i],&known[i]);
     }
     RangeNode *type = found(closure.context->key,literal)->type;
     RangeNode *output = type ? type->a : NULL;
@@ -8870,19 +8955,23 @@ static RangeNode *nativePromote(Native *native, RangeNode *at, RangeNode *option
     return optional;
 }
 
-/* A value known before run is emitted as it is. Otherwise what typing
- * lowered an expression to, if anything, is compiled in its place, and a
- * promoted value becomes the present case holding it. Only a call,
- * construction, switch expression, slot read, or promotion produces a
- * temporary; any other expression reports none, whatever its operands left
- * behind. */
+/* A value known before run is emitted as it is, unless it holds blocks
+ * and a place holds it already. Otherwise what typing lowered an expression
+ * to, if anything, is compiled in its place, and a promoted value becomes
+ * the present case holding it. Only a call, construction, switch
+ * expression, slot read, known value holding blocks, or promotion produces
+ * a temporary; any other expression reports none, whatever its operands
+ * left behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
     RangeFacts *facts = expr ? found(native->key,expr) : NULL;
-    RangeValue known;
-    if (nativeKnown(native,expr,&known) && nativeKnownValue(native,&known,facts->promoted ? facts->promoted : facts->type,expr))
-        return facts->promoted ? facts->promoted : facts->type;
-    RangeNode *runs = facts && facts->lowered ? facts->lowered : expr;
+    RangeNode *runs = facts && facts->lowered ? facts->lowered : expr, *known = facts ? facts->promoted ? facts->promoted : facts->type : NULL;
+    RangeValue value;
+    int builds = nativeKnown(native,expr,&value) ? nativeBuilds(native,&value,known,expr) : 0;
+    if (builds == 1 || (builds == 2 && runs->kind != RangeNodeName && runs->kind != RangeNodeMemberAccess)) {
+        nativeKnownValue(native,&value,known,expr);
+        return known;
+    }
     RangeNode *type = nativeExpressionValue(native,runs);
     RangeNode *resolved = runs ? found(native->key,runs)->resolvedDeclaration : NULL;
     int construction = runs && (runs->kind == RangeNodeCall || runs->kind == RangeNodeSwitch);
@@ -9290,13 +9379,15 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         RangeNode *type = found(native->key,node)->type;
         int kind = nativeKind(native,type,node);
         if (kind == NativeNone) break;
-        // A let known before run names its value. A bare name that resolved
-        // to a value is a copy; to a type, a requirement.
+        // A let known before run names its value, or, holding blocks, is
+        // built where it is declared and read in place. A bare name that
+        // resolved to a value is a copy; to a type, a requirement.
         EvalFrame root;
         Eval eval = nativeEval(native,&root);
         RangeValue known;
-        if (node->kind == RangeNodeLet && !native->asWritten && evalDeclared(&eval,&root,node,&known) == EvalNormal
-            && nativeKnownSlot(native,node,type,&known)) break;
+        int builds = node->kind == RangeNodeLet && !native->asWritten && evalDeclared(&eval,&root,node,&known) == EvalNormal
+            ? nativeBuilds(native,&known,type,node) : 0;
+        if (builds == 1 && nativeKnownSlot(native,node,type,&known)) break;
         RangeNode *value = declarationValue(native->key,node);
         int construction = value == node;
         if (kind == NativeScalar) {
@@ -9312,15 +9403,16 @@ static void nativeStatementBody(Native *native, RangeNode *node)
             nativeConstruct(native,node,type,node->items,node->itemCount,offset);
             NativeSlot slot = {.declaration=node,.offset=offset,.type=type};
             NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
-            break;
+        } else {
+            int32_t offset = nativeNewSlot(native,node,type,kind);
+            if (!value) nativeMissing(native,node,"'%s' has no initial value",node->name); /* the type checker rejects it */
+            else if (nativeExpression(native,value)) {
+                int moved = nativeTakeTemp(native);
+                nativeFrameAddress(native,1,offset);
+                nativeCopyValue(native,1,0,type,!moved);
+            }
         }
-        int32_t offset = nativeNewSlot(native,node,type,kind);
-        if (value) {
-            if (!nativeExpression(native,value)) break;
-            int moved = nativeTakeTemp(native);
-            nativeFrameAddress(native,1,offset);
-            nativeCopyValue(native,1,0,type,!moved);
-        } else nativeMissing(native,node,"'%s' has no initial value",node->name); /* the type checker rejects it */
+        if (builds == 2) nativeKnownStorage(native,node,&known);
         break;
     }
     case RangeNodeAssign: {
@@ -9601,7 +9693,7 @@ static size_t nativeKnownArm(Native *native, RangeNode *node, EvalFrame *arm)
     for (size_t j = 0; entry->c && j < entry->c->itemCount; ++j) {
         RangeNode *binding = entry->c->items[j], *type = found(native->key,binding)->type;
         RangeValue *value = evalNamed(arm,binding);
-        if (!value || !nativeBuilds(native,value,type,binding)) return SIZE_MAX;
+        if (!value || nativeBuilds(native,value,type,binding) != 1) return SIZE_MAX;
     }
     return chosen;
 }
@@ -9777,14 +9869,16 @@ static void nativeFunction(Native *native, NativeInstance *instance)
 }
 
 /* Trap stubs: write the message to stderr, then exit with status 134, as an
- * abort would, without the delay of a crash report. */
+ * abort would, without the delay of a crash report. Text and known values
+ * follow; a branch or adr reaches them within 1 MB. */
 static void nativeTraps(Native *native)
 {
-    size_t *messages = calloc(native->trapCount ? native->trapCount : 1,sizeof(*messages));
+    size_t *messages = calloc(native->trapCount ? native->trapCount : 1,sizeof(*messages)), far = 0;
     if (!messages) abort();
     for (size_t i = 0; i < native->trapCount; ++i) {
         NativeTrap *trap = &native->traps[i];
         int32_t words = (int32_t)((native->machine.size - trap->at) / 4);
+        if (native->machine.size - trap->at > far) far = native->machine.size - trap->at;
         rangePatch(&native->machine,trap->at,trap->branch | ((uint32_t)words & 0x7FFFFu) << 5);
         messages[i] = nativeEmit(native,armAdr(1,0));
         nativeEmit(native,armMovz(0,2,0));
@@ -9800,7 +9894,9 @@ static void nativeTraps(Native *native)
     for (size_t i = 0; i < native->textCount; ++i) {
         size_t text = rangeEmitBytes(&native->machine,native->texts[i].bytes,native->texts[i].length);
         rangePatch(&native->machine,native->texts[i].at,armAdr(1,(int32_t)(text - native->texts[i].at)));
+        if (text - native->texts[i].at > far) far = text - native->texts[i].at;
     }
+    if (far >= (size_t)1 << 20) nativeMissing(native,NULL,"executables whose code reaches a trap or its data more than 1 MB away are not implemented");
     free(messages);
 }
 

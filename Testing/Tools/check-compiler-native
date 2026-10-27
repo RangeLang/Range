@@ -188,9 +188,23 @@ done
 run strings-native 42 "" Testing/Compiler/Native/Strings.range
 printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_root/stdout" \
     || fail "strings printed: $(cat "$work_root/stdout")"
+# A known value holding blocks is built from its image where it is used: an
+# array and a recursive enum; a let holding one is built once and read in place.
+run known-blocks 0 "" "$(case_file known-blocks 'enum Tree { case leaf(Int), node(Tree, Tree) }
+function sum(let t: Tree): Int { switch { t.leaf(let v): return v, t.node(let a, let b): return sum(t: a) + sum(t: b) } }
+function words(): Array<String> { state ws: Array<String>()  ws.append(value: "one")  ws.append(value: "two")  return ws }
+{
+    let ws: words()
+    state copy: ws
+    copy.write(at: 0, value: "three")
+    let tree: Tree.node(.leaf(ws.count), .node(.leaf(3), .leaf(4)))
+    @print("\(ws.read(at: 0)) \(copy.read(at: 0)) \(words().count) \(sum(t: tree))")
+    return 0
+}')"
+[[ "$(cat "$work_root/stdout")" == "one three 2 9" ]] || fail "known blocks printed: $(cat "$work_root/stdout")"
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
-    for program in arrays copy-on-write lifetimes payloads patterns recursive-enums nested-enums optionals \
+    for program in arrays copy-on-write lifetimes known-blocks payloads patterns recursive-enums nested-enums optionals \
                    loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
                    bytes control evaluation identity-references subjects case-tests closures collections generic-methods generic-bodies; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
@@ -1025,4 +1039,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-echo "compiler native: programs=68 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=69 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
