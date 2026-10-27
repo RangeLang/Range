@@ -5723,7 +5723,13 @@ static void typeCheck(Typer *typer)
  * emission, and the applications a use of a declaration needs first, is
  * reached through those nodes alone; outside an application they are not
  * known. Evaluation stops with a message, which the application reports, or
- * with none when typing reported the problem already. */
+ * with none when typing reported the problem already.
+ *
+ * Native code runs the same evaluator on the body it compiles, folding: the
+ * root frame is that body's, whose names native code holds, and a value is
+ * known before run only when everything it reaches is. What is known only at
+ * run, an effect, a trap, a limit, or typing that has not run leaves it
+ * unknown, and native code compiles it as written. */
 
 typedef enum {
     ValueNone, ValueLiteral, ValueScalar, ValueText, ValueCase, ValueInstance, ValueSlots,
@@ -7106,11 +7112,16 @@ static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
  * construct's or enum's method, is compiled once per specialization it is
  * called in, reading what typing found under that specialization.
  *
+ * Native code fills in every value known before run and compiles only what
+ * stays unknown: each expression first asks the evaluator for its value.
  * Builtin operators are C primitives: each enforces its operand type's range
  * (the @integer law) at runtime where the compiler cannot prove it, writing a
- * located message and exiting 134. Operators with bodies are calls. Every function is compiled, reached or not,
- * so each missing mechanism is reported; forms not lowered yet are reported as
- * not implemented. */
+ * located message and exiting 134. Operators with bodies are calls. Every
+ * function is compiled, reached or not, so each missing mechanism is
+ * reported; forms not lowered yet are reported as not implemented. An arm
+ * a known condition never takes is not compiled: compiled as written
+ * (--as-written), where only leaves, literals and the like, are asked for
+ * their values, every arm is, and every missing mechanism is reported. */
 
 /* A branch to patch once its target is known: its position and encoding. */
 typedef struct { size_t at; uint32_t base; } NativeJump;
@@ -7393,7 +7404,8 @@ static void nativeZero(Native *native, int base, size_t size)
  * a name at run (a parameter, the receiver, a state, what a condition
  * binds), makes an effect, traps, exceeds the evaluator's limits, or needs
  * typing that has not run is not known. What the evaluator finds about an
- * expression at the root of the body is kept, so each is evaluated once. */
+ * expression at the root of the body is kept, so each is evaluated once.
+ * Compiled as written, no expression asks; only leaves do (nativeLeaf). */
 
 static size_t nativeFoldAt(const Native *native, const RangeNode *node, const RangeNode *key, size_t serial)
 {
@@ -7781,18 +7793,12 @@ static void nativeStoreField(Native *native, RangeNode *at, RangeNode *type, siz
     }
 }
 
-/* `.value(number: 7)`: build a case of `type` at frame offset `destination`,
- * or in a temporary; a union without payloads is its tag in x0. */
+/* `.value(number: 7)`: build a case of a union `type` at frame offset
+ * `destination`, or in a temporary. */
 static RangeNode *nativeVariant(Native *native, RangeNode *at, RangeNode *type, RangeNode *entry,
                                 RangeNode **arguments, size_t count, int32_t destination)
 {
-    int kind = nativeKind(native,type,at);
-    if (kind == NativeNone || !entry) return NULL;
-    if (kind == NativeScalar) {
-        nativeConstant(native,0,(uint64_t)entry->integer);
-        native->resultTemp = -1;
-        return type;
-    }
+    if (nativeKind(native,type,at) == NativeNone || !entry) return NULL;
     int temporary = !destination;
     if (temporary) destination = nativeReserve(native,type->size,type->alignment);
     nativeFrameAddress(native,0,destination);
@@ -9027,24 +9033,23 @@ static RangeNode *nativeJoin(Native *native, RangeNode *at, RangeNode *type)
     return type;
 }
 
-/* A value generic in a body: the constant of the specialization it was typed
- * in, or of one it is typed within, its receiver's. Returns 0 when the name is
- * not one. */
-static int nativeValueGeneric(Native *native, RangeNode *expr)
+/* A leaf, compiled as written in either mode: a boolean or string literal,
+ * but a string with interpolated values, which is built at run; the name of
+ * a value generic, the constant of the specialization the body was typed
+ * in, or of one it is typed within, its receiver's; or a case of a scalar
+ * enum named without payload. Its value is what the evaluator finds. */
+static int nativeLeaf(Native *native, RangeNode *expr, RangeValue *value)
 {
-    RangeNode *declaration = found(native->key,expr)->resolvedDeclaration;
-    if (!declaration || declaration->kind != RangeNodeLet) return 0;
-    RangeNode **slot = genericSlot(native->key,declaration);
-    if (!slot) return 0;
-    RangeNode *value = *slot;
-    RangeNodeKind kind; long long integer; const char *text;
-    if (!value || !lawInputs(value,&kind,&integer,&text) || kind == RangeNodeString) {
-        nativeMissing(native,expr,"value generic '%s' needs an integer or boolean literal natively",expr->name);
-        return 1;
-    }
-    nativeConstant(native,0,(uint64_t)integer);
-    native->resultTemp = -1;
-    return 1;
+    RangeFacts *facts = found(native->key,expr);
+    RangeNode *declaration = facts->resolvedDeclaration, *type = facts->type;
+    int leaf = expr->kind == RangeNodeBool
+        || (expr->kind == RangeNodeString && expr->itemCount == 1 && (expr->items[0]->flags & RangeFlagLiteral))
+        || (expr->kind == RangeNodeName && declaration && declaration->kind == RangeNodeLet && genericSlot(native->key,declaration))
+        || (declaration && declaration->kind == RangeNodeEnumCase && expr->kind != RangeNodeCall && type
+            && !macroTimeType(native->typer,type) && layoutOf(native->typer,type,expr) && type->scalarBits);
+    EvalFrame root;
+    Eval eval = nativeEval(native,&root);
+    return leaf && evalPlain(&eval,&root,expr,value) == EvalNormal && nativeBuilds(native,value,type,expr) == 1;
 }
 
 static RangeNode *nativeSwitch(Native *, RangeNode *);
@@ -9055,42 +9060,33 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
     if (!expr) return NULL;
     RangeFacts *facts = found(native->key,expr);
     RangeNode *type = facts->type;
-    if (isEnum(type) && isLiteral(expr)) /* a literal naming a case, such as true */
-        return nativeVariant(native,expr,type,literalCase(type->resolvedDeclaration,expr),NULL,0,0);
+    RangeValue value;
+    if (nativeLeaf(native,expr,&value)) { nativeKnownValue(native,&value,type,expr); return type; }
     if (facts->resolvedDeclaration && facts->resolvedDeclaration->kind == RangeNodeEnumCase
         && (expr->kind == RangeNodeCase || expr->kind == RangeNodeMemberAccess))
         return nativeVariant(native,expr,type,facts->resolvedDeclaration,NULL,0,0);
     switch (expr->kind) {
     case RangeNodeInteger:
+        // An operand's bits, as written: `-128` negates 128, which Int<bits: 8> holds only negated.
         if (nativeKind(native,type,expr) != NativeScalar) return NULL;
         nativeConstant(native,0,(uint64_t)expr->integer);
         return type;
     case RangeNodeBool:
-        nativeConstant(native,0,expr->integer ? 1 : 0);
-        return type;
-    case RangeNodeString: {
-        // A literal is its UTF-8 bytes in __text: the value holds their
-        // address and count, the layout the bytes primitive declares.
-        if (expr->itemCount != 1 || !(expr->items[0]->flags & RangeFlagLiteral)) {
+        (void)nativeKind(native,type,expr); /* a type without native values is reported */
+        return NULL;
+    case RangeNodeString:
+        // A literal is its UTF-8 bytes in __text, in the layout the bytes
+        // primitive declares.
+        if (expr->itemCount != 1 || !(expr->items[0]->flags & RangeFlagLiteral))
             nativeMissing(native,expr,"runtime string interpolation is not implemented");
-            return NULL;
-        }
-        if (nativeKind(native,type,expr) != NativeAggregate || !bytesType(type)) {
+        else if (nativeKind(native,type,expr) != NativeAggregate || !bytesType(type))
             nativeMissing(native,expr,"string literals need a construct with the bytes primitive");
+        return NULL;
+    case RangeNodeName: case RangeNodeMemberAccess: {
+        if (expr->kind == RangeNodeName && facts->resolvedDeclaration && genericSlot(native->key,facts->resolvedDeclaration)) {
+            nativeMissing(native,expr,"value generic '%s' needs an integer or boolean literal natively",expr->name);
             return NULL;
         }
-        int32_t value = nativeReserve(native,type->size,8);
-        NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=expr->items[0]->name,.length=(size_t)expr->items[0]->integer};
-        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
-        nativeConstant(native,2,text.length);
-        nativeFrameAddress(native,0,value);
-        nativeEmit(native,armStr(1,0,0));
-        nativeEmit(native,armStr(2,0,8));
-        nativeEmit(native,armStr(31,0,16)); /* no block: the bytes are in the executable */
-        return type;
-    }
-    case RangeNodeName: case RangeNodeMemberAccess: {
-        if (expr->kind == RangeNodeName && nativeValueGeneric(native,expr)) return type;
         int frameSlot = 0;
         RangeNode *placed = nativeAddress(native,expr,&frameSlot);
         return placed ? nativeLoadPlace(native,placed,frameSlot,expr) : NULL;
