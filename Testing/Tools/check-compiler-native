@@ -793,6 +793,19 @@ reject comparison-statement "comparison-statement.range:1:25: the result of this
 reject comparison-arm "the result of this comparison is unused" \
     'function f(let n: Int): Int { state m: n  switch { n = 0: m < 1, default: {} } return m }
 { return f(n: 1) }'
+# Text known before run is written as it reads; an interpolated string of
+# known values is filled in, though one built at run is not implemented yet.
+run known-text 0 "" "$(case_file known-text 'construct Tag { let name: String  let size: Int }
+{ let tag: Tag(name: "box", size: 3)  state n: 4  @print("\(tag.name) holds \(tag.size), then \(n)")  return 0 }')"
+[[ "$(cat "$work_root/stdout")" == "box holds 3, then 4" ]] || fail "known text printed: $(cat "$work_root/stdout")"
+source="$(case_file known-interpolation '{ let k: 7  let label: "k is \(k)"  @print(label)  return 0 }')"
+"$compiler" -o "$work_root/known-interpolation" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" \
+    || fail "known-interpolation did not compile: $(grep 'error\[' "$work_root/log")"
+[[ "$("$work_root/known-interpolation")" == "k is 7" ]] || fail "known interpolation printed: $("$work_root/known-interpolation")"
+status=0
+"$compiler" --as-written -o "$work_root/known-interpolation" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" || status=$?
+[[ "$status" == 65 ]] && grep -Fq "runtime string interpolation is not implemented" "$work_root/log" \
+    || fail "interpolation compiled as written was not reported"
 # Equality code is emitted on demand: only for the types a program compares
 # (here Point), never for types it only declares or constructs.
 text_size() { size -m "$1" | awk '/Section __text:/ { print $3 }'; }
@@ -1012,4 +1025,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-echo "compiler native: programs=65 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=68 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

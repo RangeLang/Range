@@ -4056,6 +4056,9 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     switch (expr->kind) {
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString:
         type = typeLiteral(typer,expr,expr,expected);
+        // An interpolated value is typed where it is written.
+        for (size_t i = 0; expr->kind == RangeNodeString && i < expr->itemCount; ++i)
+            if (!(expr->items[i]->flags & RangeFlagLiteral)) (void)typeOf(typer,scope,expr->items[i]->a,NULL,context);
         break;
     case RangeNodeName: {
         RangeNode *declaration = nameLookup(typer->report,scope,expr);
@@ -4384,7 +4387,7 @@ static void typeEffect(Typer *typer, SourceScope *scope, RangeNode *attribute, R
     for (size_t i = 0; i < message->itemCount; ++i) {
         RangeNode *part = message->items[i];
         if (part->flags & RangeFlagLiteral) continue;
-        RangeNode *type = typeOf(typer,scope,part->a,NULL,context);
+        RangeNode *type = found(typer->key,part->a)->type; /* typed with the message */
         if (!type) continue;
         // At macro time a declaration is written as its name.
         if (typer->macro && macroTimeType(typer,type)) continue;
@@ -7448,21 +7451,103 @@ static int nativeKnownName(Native *native, RangeNode *declaration, RangeValue *o
     return EvalNormal;
 }
 
-/* Whether native code builds a known value of `type`: a scalar, Bool or a
- * case without payloads among them. */
-static int nativeBuilds(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
+static size_t nativeFirstField(const RangeNode *, const RangeNode *);
+
+/* A known aggregate as its bytes, the image native code copies into place,
+ * and the bytes values in it, whose addresses are patched in after. */
+typedef struct {
+    unsigned char *bytes;
+    NativeText *texts; size_t textCount, textCapacity; /* at: the offset of the address */
+} NativeImage;
+
+/* Lay out a known value of `type` at `offset`: a scalar as stored, a case
+ * by its tag and its fields, an instance by its stored members, bytes by
+ * their count (their address noted), and @many storage without slots as no
+ * block. With no image, only whether native code builds the value this way. */
+static int nativeImage(NativeImage *image, const RangeValue *value, RangeNode *type, size_t offset)
 {
-    if (!type || value->type != type || macroTimeType(native->typer,type) || !layoutOf(native->typer,type,at)) return 0;
-    return type->scalarBits && (value->kind == ValueScalar || (value->kind == ValueCase && !value->count));
+    if (!type || type->kind != RangeNodeSpecialization || value->type != type) return 0;
+    RangeNode *declaration = type->resolvedDeclaration;
+    uint64_t scalar = (uint64_t)(value->kind == ValueCase ? value->node->integer : value->integer);
+    if (type->scalarBits && (value->kind == ValueScalar || (value->kind == ValueCase && !value->count))) {
+        for (size_t i = 0; image && i < type->size; ++i) image->bytes[offset + i] = (unsigned char)(scalar >> (8 * i));
+        return 1;
+    }
+    if (bytesType(type) && value->kind == ValueText) {
+        if (!image) return 1;
+        for (size_t i = 0; i < 8; ++i) image->bytes[offset + 8 + i] = (unsigned char)(value->length >> (8 * i));
+        NativeText text = {.at=offset,.bytes=value->text,.length=value->length};
+        NATIVE_PUSH(image->texts,image->textCount,image->textCapacity,text);
+        return 1;
+    }
+    if (type->variantTag && value->kind == ValueCase) {
+        for (size_t i = 0; image && i < (size_t)type->variantTag; ++i) image->bytes[offset + i] = (unsigned char)(scalar >> (8 * i));
+        size_t first = nativeFirstField(declaration,value->node);
+        for (size_t j = 0; j < value->count; ++j)
+            if (type->memberBoxed[first + j]
+                || !nativeImage(image,&value->values[j],type->memberTypes[first + j],offset + type->memberOffsets[first + j])) return 0;
+        return 1;
+    }
+    if (value->kind != ValueInstance || !type->memberOffsets || value->count != declaration->itemCount) return 0;
+    for (size_t i = 0; i < value->count; ++i) {
+        if (type->memberOffsets[i] == SIZE_MAX) continue;
+        if (declaration->items[i]->flags & RangeFlagMany) { if (value->values[i].count) return 0; continue; }
+        if (!nativeImage(image,&value->values[i],type->memberTypes[i],offset + type->memberOffsets[i])) return 0;
+    }
+    return 1;
 }
 
-/* Emit a known value of `type` as an expression leaves it: a scalar in x0.
- * Returns 0, emitting nothing, for one native code does not build. */
+/* Whether native code builds a known value of `type`. */
+static int nativeBuilds(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
+{
+    if (!type || macroTimeType(native->typer,type) || !layoutOf(native->typer,type,at)) return 0;
+    return nativeImage(NULL,value,type,0);
+}
+
+/* Emit a known value of `type` as an expression leaves it: a scalar in x0;
+ * an aggregate in a temporary that holds no block, its address in x0, copied
+ * from its image in __text. Bytes point at their text in __text, as a
+ * literal's do. Returns 0, emitting nothing, for one native code does not
+ * build. */
 static int nativeKnownValue(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
 {
     if (!nativeBuilds(native,value,type,at)) return 0;
-    nativeConstant(native,0,(uint64_t)(value->kind == ValueCase ? value->node->integer : value->integer));
     native->resultTemp = -1;
+    if (type->scalarBits) {
+        nativeConstant(native,0,(uint64_t)(value->kind == ValueCase ? value->node->integer : value->integer));
+        return 1;
+    }
+    int32_t temporary = nativeReserve(native,type->size ? type->size : 1,type->alignment);
+    if (value->kind == ValueText) {
+        // An address and a count, and no block: the bytes are in the executable.
+        NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=value->text,.length=value->length};
+        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
+        nativeConstant(native,2,text.length);
+        nativeFrameAddress(native,0,temporary);
+        nativeEmit(native,armStr(1,0,0));
+        nativeEmit(native,armStr(2,0,8));
+        nativeEmit(native,armStr(31,0,16));
+        return 1;
+    }
+    NativeImage image = {.bytes=rangeArenaAllocate(native->report->arena,type->size)};
+    memset(image.bytes,0,type->size);
+    nativeImage(&image,value,type,0);
+    int zero = 1;
+    for (size_t i = 0; i < type->size && zero; ++i) zero = !image.bytes[i];
+    nativeFrameAddress(native,0,temporary);
+    if (zero) nativeZero(native,0,type->size);
+    else {
+        NativeText bytes = {.at=nativeEmit(native,armAdr(1,0)),.bytes=(const char *)image.bytes,.length=type->size};
+        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,bytes);
+        nativeCopy(native,0,1,type->size);
+    }
+    for (size_t i = 0; i < image.textCount; ++i) {
+        NativeText text = {.at=nativeEmit(native,armAdr(1,0)),.bytes=image.texts[i].bytes,.length=image.texts[i].length};
+        NATIVE_PUSH(native->texts,native->textCount,native->textCapacity,text);
+        nativeAddOffset(native,10,0,image.texts[i].at);
+        nativeEmit(native,armStr(1,10,0));
+    }
+    free(image.texts);
     return 1;
 }
 
@@ -9034,17 +9119,41 @@ static void nativeWriteText(Native *native, int fd, const char *bytes, size_t le
     rangeCallImport(&native->machine,"_write");
 }
 
-/* Stream a message to fd: literal parts as bytes, interpolated integers in
- * decimal, enum values without payloads (booleans among them) as their case
- * names, strings as their bytes. */
-static void nativeWriteMessage(Native *native, int fd, RangeNode *message)
+/* Write the text known so far, if any. */
+static void nativeFlushText(Native *native, int fd, const char *text, size_t *length)
+{
+    if (*length) nativeWriteText(native,fd,rangeArenaIntern(native->report->arena,text,*length),*length);
+    *length = 0;
+}
+
+/* Stream a message to fd, after `prefix` and before a newline: literal
+ * parts as bytes, interpolated integers in decimal, enum values without
+ * payloads (booleans among them) as their case names, strings as their
+ * bytes. What is known before run, the literal parts and the values known
+ * with them, is written as the evaluator writes it, each run of it at once. */
+static void nativeWriteMessage(Native *native, int fd, const char *prefix, RangeNode *message)
 {
     int literal = message->kind == RangeNodeString;
-    size_t parts = literal ? message->itemCount : 1;
-    for (size_t i = 0; i < parts; ++i) {
-        RangeNode *part = literal ? message->items[i] : NULL;
-        if (part && (part->flags & RangeFlagLiteral)) { nativeWriteText(native,fd,part->name,(size_t)part->integer); continue; }
-        RangeNode *value = part ? part->a : message;
+    size_t parts = literal ? message->itemCount : 1, length = 0, capacity = 64;
+    char *known = malloc(capacity);
+    if (!known) abort();
+    EvalFrame root;
+    Eval eval = nativeEval(native,&root);
+    for (size_t i = 0; i < parts + 2; ++i) {
+        // The prefix, the parts, then the newline.
+        RangeNode *part = literal && i && i <= parts ? message->items[i - 1] : NULL, *value = part ? part->a : message;
+        const char *piece = !i ? prefix : i > parts ? "\n" : part && (part->flags & RangeFlagLiteral) ? part->name : NULL;
+        size_t size = piece ? (part ? (size_t)part->integer : strlen(piece)) : 0;
+        RangeValue written;
+        if (!piece && nativeKnown(native,value,&written) && evalWrite(&eval,written,value,&piece,&size) != EvalNormal) piece = NULL;
+        if (piece && native->asWritten) { nativeWriteText(native,fd,piece,size); continue; }
+        if (piece) {
+            while (length + size > capacity) if (!(known = realloc(known,capacity *= 2))) abort();
+            memcpy(known + length,piece,size);
+            length += size;
+            continue;
+        }
+        nativeFlushText(native,fd,known,&length);
         RangeNode *type = nativeExpression(native,value);
         if (!type) continue;
         if (isEnum(type) && type->scalarBits) {
@@ -9079,6 +9188,8 @@ static void nativeWriteMessage(Native *native, int fd, RangeNode *message)
             nativeMissing(native,value,"writing %s is not implemented",name);
         }
     }
+    nativeFlushText(native,fd,known,&length);
+    free(known);
 }
 
 /* @print writes to standard output; @diagnostic writes a located message to
@@ -9092,14 +9203,9 @@ static void nativeEffect(Native *native, RangeNode *node, RangeNode *attribute)
         return;
     }
     if (attribute->itemCount != 1) return; /* reported by the type checker */
-    if (!print) {
-        char location[512];
-        snprintf(location,sizeof(location),"%s:%d:%d: ",attribute->path,attribute->line,attribute->column);
-        const char *prefix = rangeArenaIntern(native->report->arena,location,strlen(location));
-        nativeWriteText(native,2,prefix,strlen(prefix));
-    }
-    nativeWriteMessage(native,print ? 1 : 2,attribute->items[0]->a);
-    nativeWriteText(native,print ? 1 : 2,"\n",1);
+    char location[512] = "";
+    if (!print) snprintf(location,sizeof(location),"%s:%d:%d: ",attribute->path,attribute->line,attribute->column);
+    nativeWriteMessage(native,print ? 1 : 2,rangeArenaIntern(native->report->arena,location,strlen(location)),attribute->items[0]->a);
     if (!print) {
         nativeEmit(native,armMovz(0,134,0));
         rangeCallImport(&native->machine,"_exit");
