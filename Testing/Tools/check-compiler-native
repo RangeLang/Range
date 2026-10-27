@@ -15,18 +15,26 @@ Language/Compiler/Tools/build-range-compiler "$compiler"
 core=(Language/Grammar Language/Macros Language/Types)
 
 # run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE...
+# Each program is compiled as written, then with every value known before
+# run filled in; both executables must report, write, and exit the same.
 run() {
-    local name="$1" status="$2" message="$3" program="$work_root/$1"
+    local name="$1" status="$2" message="$3" program="$work_root/$1" mode actual
     shift 3
-    "$compiler" -o "$program" "${core[@]}" "$@" > "$work_root/out" 2> "$work_root/log" \
-        || fail "$name did not compile: $(grep -v 'warning\[' "$work_root/log")"
-    grep -q "^wrote $program" "$work_root/log" || fail "$name claimed no executable"
-    codesign -v "$program" 2> /dev/null || fail "$name signature does not verify"
-    local actual=0
-    perl -e 'alarm 10; exec @ARGV' "$program" > "$work_root/stdout" 2> "$work_root/stderr" || actual=$?
-    [[ "$actual" == "$status" ]] || fail "$name exited $actual, expected $status: $(cat "$work_root/stderr")"
-    if [[ -n "$message" ]]; then grep -Fq "$message" "$work_root/stderr" || fail "$name wrong message: $(cat "$work_root/stderr")"
-    else [[ ! -s "$work_root/stderr" ]] || fail "$name wrote to stderr: $(cat "$work_root/stderr")"; fi
+    for mode in --as-written ""; do
+        "$compiler" $mode -o "$program" "${core[@]}" "$@" > "$work_root/out" 2> "$work_root/log" \
+            || fail "$name $mode did not compile: $(grep -v 'warning\[' "$work_root/log")"
+        grep -q "^wrote $program" "$work_root/log" || fail "$name $mode claimed no executable"
+        codesign -v "$program" 2> /dev/null || fail "$name $mode signature does not verify"
+        actual=0
+        perl -e 'alarm 10; exec @ARGV' "$program" > "$work_root/stdout" 2> "$work_root/stderr" || actual=$?
+        [[ "$actual" == "$status" ]] || fail "$name $mode exited $actual, expected $status: $(cat "$work_root/stderr")"
+        if [[ -n "$message" ]]; then grep -Fq "$message" "$work_root/stderr" || fail "$name $mode wrong message: $(cat "$work_root/stderr")"
+        else [[ ! -s "$work_root/stderr" ]] || fail "$name $mode wrote to stderr: $(cat "$work_root/stderr")"; fi
+        [[ -z "$mode" ]] || for file in log stdout stderr; do cp "$work_root/$file" "$work_root/written-$file"; done
+    done
+    for file in log stdout stderr; do
+        cmp -s "$work_root/$file" "$work_root/written-$file" || fail "$name $file differs from the program compiled as written"
+    done
 }
 case_file() { printf '%s\n' "$2" > "$work_root/$1.range"; echo "$work_root/$1.range"; }
 
@@ -221,7 +229,8 @@ run unsigned-negation 134 "result of '-' does not fit Int<bits: 64, signed: fals
 run constant-overflow 134 "result of '+' does not fit Int<bits: 64, signed: true>" "$(case_file constant-overflow \
     '{ return 9223372036854775807 + 1 }')"
 run constant-division 134 "division by zero in '/'" "$(case_file constant-division '{ return 4 / 0 }')"
-locals="{ $(for i in $(seq 1 40); do printf 'let v%s: %s ' "$i" "$i"; done) return (v40 - v1) }"
+# States are cells at run, so each takes a frame slot.
+locals="{ $(for i in $(seq 1 40); do printf 'state v%s: %s ' "$i" "$i"; done) return (v40 - v1) }"
 run large-frame 39 "" "$(case_file large-frame "$locals")"
 
 # The law rejects a literal at compile time; nothing is written.
@@ -235,11 +244,14 @@ grep -q "does not satisfy @integer" "$work_root/log" || fail "literal law report
 # Matching is checked before code is generated: nothing is written.
 # reject NAME EXPECTED-ERROR SOURCE
 reject() {
-    local status=0 source
+    local status source mode
     source="$(case_file "$1" "$3")"
-    "$compiler" -o "$work_root/$1" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" || status=$?
-    [[ "$status" == 65 && ! -e "$work_root/$1" ]] || fail "$1 compiled"
-    grep -Fq "$2" "$work_root/log" || fail "$1 reported wrongly: $(grep 'error\[' "$work_root/log")"
+    for mode in --as-written ""; do
+        status=0
+        "$compiler" $mode -o "$work_root/$1" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" || status=$?
+        [[ "$status" == 65 && ! -e "$work_root/$1" ]] || fail "$1 $mode compiled"
+        grep -Fq "$2" "$work_root/log" || fail "$1 $mode reported wrongly: $(grep 'error\[' "$work_root/log")"
+    done
 }
 reject non-exhaustive "switch must be exhaustive: 'd.west' is not handled; add an arm for it or a default" \
     'enum Direction { case north, east, south, west }
@@ -786,8 +798,8 @@ reject comparison-arm "the result of this comparison is unused" \
 text_size() { size -m "$1" | awk '/Section __text:/ { print $3 }'; }
 base='construct Point { let x: Int  let y: Int }
 function make(let n: Int): Point { return Point(x: n, y: n) }'
-compare='{ let p: make(n: 1) let q: make(n: 2) switch { p = q: return 1, default: {} } return 0 }'
-ignore='{ let p: make(n: 1) let q: make(n: 2) switch { p.x = q.x: return 1, default: {} } return 0 }'
+compare='{ state p: make(n: 1) state q: make(n: 2) switch { p = q: return 1, default: {} } return 0 }'
+ignore='{ state p: make(n: 1) state q: make(n: 2) switch { p.x = q.x: return 1, default: {} } return 0 }'
 unused='construct Unused { let a: Int  let b: Point }
 enum Shape { case dot(Point), line(Point, Point), none }
 @equatable

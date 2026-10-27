@@ -5789,6 +5789,8 @@ typedef struct {
 } Eval;
 
 static size_t nativeMemberIndex(RangeNode *, RangeNode *);
+static int nativeKnownName(struct Native *, RangeNode *, RangeValue *);
+static void nativeRemember(struct Native *, RangeNode *, int, const RangeValue *);
 static int evalExpression(Eval *, EvalFrame *, RangeNode *, RangeValue *);
 static int evalStatement(Eval *, EvalFrame *, RangeNode *);
 static int evalInvoke(Eval *, RangeNode *, RangeNode *, RangeValue *, RangeValue *, RangeNode *, RangeValue *);
@@ -5810,9 +5812,27 @@ static int evalStop(Eval *eval)
     return EvalFailed;
 }
 
+/* A limit a macro reports; folding, the value is left to run. */
+static int evalLimit(Eval *eval, RangeNode *at, const char *message)
+{
+    return eval->outside ? EvalUnknown : evalFail(eval,at,"%s",message);
+}
+
 static int evalStep(Eval *eval, RangeNode *at)
 {
-    return ++eval->steps > 100000 ? evalFail(eval,at,"compile-time evaluation step limit exceeded") : EvalNormal;
+    return ++eval->steps > 100000 ? evalLimit(eval,at,"compile-time evaluation step limit exceeded") : EvalNormal;
+}
+
+static int evalDeeper(Eval *eval, RangeNode *at)
+{
+    return ++eval->depth > 64 ? evalLimit(eval,at,"compile-time call depth exceeded") : EvalNormal;
+}
+
+/* Whether a frame is the body native code compiles, or one inside it. */
+static int evalRooted(const Eval *eval, const EvalFrame *frame)
+{
+    for (; eval->outside && frame; frame = frame->parent) if (frame == eval->root) return 1;
+    return 0;
 }
 
 static RangeValue *evalNamed(EvalFrame *frame, const RangeNode *declaration)
@@ -6025,6 +6045,7 @@ static void typeValueOnDemand(Typer *, RangeNode *);
 static void evalPrepare(Eval *eval, RangeNode *declaration)
 {
     Resolver *vm = eval->vm;
+    if (eval->outside) return; /* folding: every application has run */
     for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i) {
         RangeNode *attribute = declaration->c->items[i];
         RangeMacroApplication *app = attribute->macroApplication;
@@ -6123,6 +6144,7 @@ static int evalList(Eval *eval, RangeNode *grammar, const char *name, RangeNode 
 static int evalField(Eval *eval, RangeNode *owner, const char *name, RangeNode *at, RangeValue *out)
 {
     RangeArena *arena = eval->vm->arena;
+    if (eval->outside) return EvalUnknown; /* declarations are values of macros only */
     RangeNode *shape = owner->graphType ? owner->graphType : owner->kind == RangeNodeAttribute ? rangeGraphType(arena,"Macro") : NULL;
     if (!rangeGraphField(shape,name) || (!owner->graphType && !same(name,"name")))
         return evalFail(eval,at,"field '%s' is not declared by @type %s",name,shape ? shape->name : rangeNodeKindName(owner->kind));
@@ -6170,6 +6192,7 @@ static int evalEffect(Eval *eval, EvalFrame *frame, RangeNode *attribute)
     int print = macroBuiltin(macro,"print"), warning = macroBuiltin(macro,"warning");
     if (!print && !warning && !macroBuiltin(macro,"diagnostic"))
         return evalFail(eval,attribute,"@%s is not an effect C runs at macro time",attribute->name);
+    if (eval->outside) return EvalUnknown; /* folding: effects happen at run */
     if (attribute->itemCount != 1) return evalStop(eval);
     const char *text; size_t length;
     int status = evalText(eval,frame,attribute->items[0]->a,&text,&length);
@@ -6410,14 +6433,17 @@ static int evalInvoke(Eval *eval, RangeNode *function, RangeNode *key, RangeValu
 {
     *out = (RangeValue){0};
     int status;
-    if (!key) key = typeOnDemand(eval->typer,function,self ? self->type : NULL);
+    if (!key && !eval->outside) key = typeOnDemand(eval->typer,function,self ? self->type : NULL);
+    else if (!key) key = keyOf(function->owner,self ? self->type : NULL);
     if (found(key,function)->found & RangeFlagInvalid) return evalStop(eval);
     EvalFrame frame = {.self=self,.function=function,.key=key};
     for (size_t i = 0; i < function->itemCount; ++i)
         if ((status = evalAdopt(eval,&arguments[i],found(frame.key,function->items[i])->type,at))) return status;
     if (function->flags & RangeFlagBuiltin) return evalBuiltin(eval,function,self,arguments,at,out);
     if (!function->a) return evalFail(eval,at,"'%s' has no body to run at macro time",function->name);
-    if (++eval->depth > 64) return evalFail(eval,at,"compile-time call depth exceeded");
+    // Folding, typing never runs: a body not typed yet is left to run.
+    if (eval->outside && !(found(key,function)->found & RangeFlagTyped)) return EvalUnknown;
+    if ((status = evalDeeper(eval,at))) return status;
     frame.output = found(frame.key,function)->type;
     for (size_t i = 0; i < function->itemCount; ++i) evalBind(eval,&frame,function->items[i],arguments[i]);
     status = evalStatement(eval,&frame,function->a);
@@ -6436,10 +6462,10 @@ static int evalCallClosure(Eval *eval, RangeValue *closure, RangeValue *argument
 {
     RangeNode *literal = closure->node, *key = closure->frame->key, *type = found(key,literal)->type;
     if (type && type->kind != RangeNodeFunctionType) type = NULL;
-    if (++eval->depth > 64) return evalFail(eval,at,"compile-time call depth exceeded");
+    int status = evalDeeper(eval,at);
+    if (status) return status;
     EvalFrame frame = {.parent=closure->frame,.self=closure->frame->self,.function=closure->frame->function,
                        .output=type ? type->a : NULL,.key=key};
-    int status = EvalNormal;
     for (size_t i = 0; i < literal->itemCount && !status; ++i) {
         status = evalAdopt(eval,&arguments[i],found(key,literal->items[i])->type,at);
         evalBind(eval,&frame,literal->items[i],arguments[i]);
@@ -6591,6 +6617,10 @@ static int evalCall(Eval *eval, EvalFrame *frame, RangeNode *call, RangeValue *o
         if (!self && (status = evalExpression(eval,frame,callee->a,&receiver))) return status;
         if (!self) self = &receiver;
     } else if (form == CallFunction && target->typeName) self = frame->self;
+    // Folding, a sibling of a method native code compiles, or a closure it
+    // holds, runs with values known only then.
+    if (evalRooted(eval,frame) && ((form == CallFunction && target->typeName && !self) || (form == CallClosure && !evalNamed(frame,target))))
+        return EvalUnknown;
     for (size_t i = 0; i < call->itemCount; ++i)
         if ((status = evalExpression(eval,frame,call->items[i]->a,&arguments[i]))) return status;
     if (form == CallClosure) {
@@ -6777,6 +6807,7 @@ static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *o
         *out = (RangeValue){.kind=ValueDeclaration,.node=declaration};
         return EvalNormal;
     }
+    if (evalRooted(eval,frame)) return nativeKnownName(eval->outside,declaration,out); /* a name native code holds */
     return evalFail(eval,expr,"the value of '%s' is not known at macro time",expr->name);
 }
 
@@ -6826,6 +6857,8 @@ static int evalMatch(Eval *eval, EvalFrame *frame, RangeNode *pattern, RangeValu
     switch (pattern->integer) {
     case RangePatternAny: return EvalNormal;
     case RangePatternBind:
+        // Folding, a name a condition binds for the code native code emits around it is bound at run.
+        if (eval->outside && frame == eval->root) return EvalUnknown;
         evalBind(eval,frame,found(frame->key,pattern->a)->resolvedDeclaration ? found(frame->key,pattern->a)->resolvedDeclaration : pattern->a,value);
         return EvalNormal;
     case RangePatternCase: {
@@ -6944,7 +6977,7 @@ static int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *
     case RangeNodeEmission:
         // A shape-only block landed before the body ran; a law run emits nothing.
         if ((eval->application && eval->application->specialization) || (expr->found & RangeFlagShape)) return EvalNormal;
-        return evalEmit(eval,frame,expr);
+        return eval->application ? evalEmit(eval,frame,expr) : EvalUnknown;
     default: return evalFail(eval,expr,"%s expressions are not run at macro time",rangeNodeKindName(expr->kind));
     }
 }
@@ -6970,16 +7003,25 @@ static int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeVa
     if (!expr) return EvalNormal;
     RangeFacts *facts = found(frame->key,expr);
     int status = evalPlain(eval,frame,facts->lowered ? facts->lowered : expr,out);
-    if (!status && facts->narrowed) {
-        if (out->kind != ValueCase || out->node != facts->narrowed || out->count != 1)
-            return evalFail(eval,expr,"this narrowed value holds no payload");
-        *out = out->values[0];
-    }
+    if (!status && facts->narrowed && (out->kind != ValueCase || out->node != facts->narrowed || out->count != 1))
+        status = evalFail(eval,expr,"this narrowed value holds no payload");
+    else if (!status && facts->narrowed) *out = out->values[0];
     if (!status && facts->promoted) status = evalPromote(eval,out,facts->promoted,expr);
+    if (eval->outside && frame == eval->root) nativeRemember(eval->outside,expr,status,out);
     return status;
 }
 
 /* ---- statements ---- */
+
+/* A local's value: `let p: Point(x: 1)` constructs; `let r: step(x: 1)`
+ * calls; a bare name that resolved to a value copies it. */
+static int evalDeclared(Eval *eval, EvalFrame *frame, RangeNode *node, RangeValue *value)
+{
+    RangeNode *initial = declarationValue(frame->key,node), *type = found(frame->key,node)->type;
+    int status = initial == node ? evalConstruct(eval,frame,type,node->items,node->itemCount,node,value)
+                                 : evalExpression(eval,frame,initial,value);
+    return status ? status : evalAdopt(eval,value,type,node);
+}
 
 static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
 {
@@ -6991,16 +7033,9 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     case RangeNodeBlock:
         for (size_t i = 0; i < node->itemCount; ++i) if ((status = evalStatement(eval,frame,node->items[i]))) return status;
         return EvalNormal;
-    case RangeNodeLet: case RangeNodeState: {
-        // `let p: Point(x: 1)` constructs; `let r: step(x: 1)` calls; a bare
-        // name that resolved to a value copies it.
-        RangeNode *initial = declarationValue(frame->key,node), *type = found(frame->key,node)->type;
-        if (initial == node) status = evalConstruct(eval,frame,type,node->items,node->itemCount,node,&value);
-        else status = evalExpression(eval,frame,initial,&value);
-        if (!status) status = evalAdopt(eval,&value,type,node);
-        if (!status) evalBind(eval,frame,node,value);
+    case RangeNodeLet: case RangeNodeState:
+        if (!(status = evalDeclared(eval,frame,node,&value))) evalBind(eval,frame,node,value);
         return status;
-    }
     case RangeNodeAssign: {
         RangeFacts *assigned = found(frame->key,node->a);
         RangeNode *target = assigned->type ? assigned->type
@@ -7077,8 +7112,9 @@ static int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
 /* A branch to patch once its target is known: its position and encoding. */
 typedef struct { size_t at; uint32_t base; } NativeJump;
 /* An alias slot names another binding's storage; it does not own the value.
- * A packed one is a member inside an aggregate, a scalar at its own size. */
-typedef struct { RangeNode *declaration; int32_t offset; RangeNode *type; int alias, packed; } NativeSlot;
+ * A packed one is a member inside an aggregate, a scalar at its own size. A
+ * known one names its value, and has no storage (offset 0). */
+typedef struct { RangeNode *declaration; int32_t offset; RangeNode *type; int alias, packed; RangeValue *known; } NativeSlot;
 typedef struct { size_t at; RangeNode *function, *key, *self; } NativeCall;
 typedef struct { size_t at; uint32_t branch; const char *message; } NativeTrap;
 typedef struct { RangeNode *function, *key, *self; size_t offset; int compiled; } NativeInstance;
@@ -7124,6 +7160,10 @@ typedef struct { size_t slotFrom, slotTo, closureFrom, closureTo; } NativeHidden
 /* An inlined body: `return` leaves its value in result and branches to its
  * end, ending the values the body began; sp returns to stack when the return
  * is inside a switch expression's arm. */
+/* What the evaluator found about an expression of the body being compiled,
+ * under a key, in one compiled body (the function's, or a body inlined in
+ * it, by serial): whether it is known before run, and its value. */
+typedef struct { RangeNode *node, *key; size_t serial; int known; RangeValue value; } NativeFold;
 typedef struct NativeRegion {
     RangeNode *function, *key, *resultType;
     int32_t result, stack;
@@ -7133,11 +7173,13 @@ typedef struct NativeRegion {
     struct NativeRegion *outer;
 } NativeRegion;
 
-typedef struct {
+typedef struct Native {
     SourceReport *report;
     Typer *typer;
     RangeMachine machine;
     int failed;
+    int asWritten; /* every expression compiled as written: nothing is filled before run */
+    NativeFold *folds; size_t foldCount, foldCapacity, serial, serials;
     /* The function being compiled, and the key its findings are read under. */
     RangeNode *owner, *self, *output, *function, *key;
     int32_t frame, selfSlot, resultSlot;
@@ -7336,6 +7378,105 @@ static void nativeZero(Native *native, int base, size_t size)
             nativeEmit(native,armStoreSized(chunk,31,12,(uint32_t)offset));
             offset += chunk;
         }
+}
+
+/* ---- what is known before run ----
+ * Native code fills in every value known before run and emits machine code
+ * only for what stays unknown. Each expression it reaches first asks the
+ * evaluator, which runs what the expression reaches as a macro would,
+ * reading the names of the body being compiled as native code holds them: a
+ * known slot's value, or nothing known. A known value is emitted; anything
+ * else is compiled as written, its parts asking in turn. What reads or binds
+ * a name at run (a parameter, the receiver, a state, what a condition
+ * binds), makes an effect, traps, exceeds the evaluator's limits, or needs
+ * typing that has not run is not known. What the evaluator finds about an
+ * expression at the root of the body is kept, so each is evaluated once. */
+
+static size_t nativeFoldAt(const Native *native, const RangeNode *node, const RangeNode *key, size_t serial)
+{
+    size_t mask = native->foldCapacity - 1;
+    size_t at = (((uintptr_t)node >> 4) ^ ((uintptr_t)key >> 4) ^ serial * 0x9E3779B9u) & mask;
+    for (NativeFold *fold; (fold = &native->folds[at])->node; at = (at + 1) & mask)
+        if (fold->node == node && fold->key == key && fold->serial == serial) break;
+    return at;
+}
+
+/* What the evaluator found about an expression at the root of the body. */
+static void nativeRemember(Native *native, RangeNode *node, int status, const RangeValue *value)
+{
+    if (2 * (native->foldCount + 1) > native->foldCapacity) {
+        // Grow, keeping every fold.
+        NativeFold *folds = native->folds;
+        size_t capacity = native->foldCapacity;
+        native->foldCapacity = capacity ? capacity * 2 : 256;
+        native->folds = calloc(native->foldCapacity,sizeof(*folds));
+        if (!native->folds) abort();
+        for (size_t i = 0; i < capacity; ++i)
+            if (folds[i].node) native->folds[nativeFoldAt(native,folds[i].node,folds[i].key,folds[i].serial)] = folds[i];
+        free(folds);
+    }
+    NativeFold *fold = &native->folds[nativeFoldAt(native,node,native->key,native->serial)];
+    native->foldCount += !fold->node;
+    *fold = (NativeFold){.node=node,.key=native->key,.serial=native->serial,
+                         .known=status == EvalNormal && value->kind != ValueClosure,.value=*value};
+}
+
+/* The evaluator, folding the body being compiled: `root` is its frame. */
+static Eval nativeEval(Native *native, EvalFrame *root)
+{
+    *root = (EvalFrame){.key=native->key};
+    return (Eval){.vm=native->typer->vm,.typer=native->typer,.outside=native,.root=root};
+}
+
+/* Whether `expr` is known before run, and its value. */
+static int nativeKnown(Native *native, RangeNode *expr, RangeValue *value)
+{
+    if (native->asWritten || !expr) return 0;
+    NativeFold *fold = native->foldCapacity ? &native->folds[nativeFoldAt(native,expr,native->key,native->serial)] : NULL;
+    if (fold && fold->node) { *value = fold->value; return fold->known; }
+    EvalFrame root;
+    Eval eval = nativeEval(native,&root);
+    return evalExpression(&eval,&root,expr,value) == EvalNormal && value->kind != ValueClosure;
+}
+
+/* A name the evaluator reads in the body: a known slot's value. */
+static int nativeKnownName(Native *native, RangeNode *declaration, RangeValue *out)
+{
+    NativeSlot *slot = nativeSlotOf(native,declaration);
+    if (!slot || !slot->known) return EvalUnknown;
+    *out = *slot->known;
+    return EvalNormal;
+}
+
+/* Whether native code builds a known value of `type`: a scalar, Bool or a
+ * case without payloads among them. */
+static int nativeBuilds(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
+{
+    if (!type || value->type != type || macroTimeType(native->typer,type) || !layoutOf(native->typer,type,at)) return 0;
+    return type->scalarBits && (value->kind == ValueScalar || (value->kind == ValueCase && !value->count));
+}
+
+/* Emit a known value of `type` as an expression leaves it: a scalar in x0.
+ * Returns 0, emitting nothing, for one native code does not build. */
+static int nativeKnownValue(Native *native, const RangeValue *value, RangeNode *type, RangeNode *at)
+{
+    if (!nativeBuilds(native,value,type,at)) return 0;
+    nativeConstant(native,0,(uint64_t)(value->kind == ValueCase ? value->node->integer : value->integer));
+    native->resultTemp = -1;
+    return 1;
+}
+
+/* A declaration whose value is known: a slot naming the value, without
+ * storage; each read fills it in. Returns 0 for a value native code does
+ * not build. */
+static int nativeKnownSlot(Native *native, RangeNode *declaration, RangeNode *type, const RangeValue *value)
+{
+    if (!nativeBuilds(native,value,type,declaration)) return 0;
+    RangeValue *known = rangeArenaAllocate(native->report->arena,sizeof(*known));
+    *known = *value;
+    NativeSlot slot = {.declaration=declaration,.type=type,.known=known};
+    NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
+    return 1;
 }
 
 /* ---- expressions: a scalar in x0, or an aggregate's address in x0 ---- */
@@ -7679,7 +7820,7 @@ static void nativeReleaseSlots(Native *native, size_t from)
 {
     for (size_t i = native->slotCount; i-- > from;) {
         RangeNode *type = native->slots[i].type;
-        if (!type || native->slots[i].alias || type->scalarBits || !nativeSharesSlots(type)) continue;
+        if (!type || native->slots[i].alias || !native->slots[i].offset || type->scalarBits || !nativeSharesSlots(type)) continue;
         nativeFrameAddress(native,0,native->slots[i].offset);
         nativeRelease(native,type);
     }
@@ -8317,6 +8458,8 @@ static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *functio
     nativeEmit(native,armAddImm(10,31,0)); /* mov x10, sp */
     nativeStore(native,10,region.stack);
     NativeContext saved = nativeUse(native,*context);
+    size_t serial = native->serial;
+    native->serial = ++native->serials; /* its own known values */
     native->region = &region;
     native->valueDepth += 1;
     if (value) {
@@ -8336,6 +8479,7 @@ static RangeNode *nativeRegion(Native *native, RangeNode *at, RangeNode *functio
     free(region.returns);
     native->valueDepth -= 1;
     native->region = region.outer;
+    native->serial = serial;
     nativeUse(native,saved);
     native->resultTemp = -1;
     if (kind == NativeScalar) nativeLoad(native,0,region.result);
@@ -8392,6 +8536,9 @@ static RangeNode *nativeInline(Native *native, RangeNode *call, RangeNode *targe
         RangeNode *type = found(key,parameter)->type;
         int kind = nativeKind(native,type,parameter);
         if (kind == NativeNone) return NULL;
+        // A known argument is known in the body inlined here.
+        RangeValue known;
+        if (nativeKnown(native,value,&known) && nativeKnownSlot(native,parameter,type,&known)) continue;
         int32_t offset = kind == NativeAggregate ? nativeReserve(native,type->size ? type->size : 1,type->alignment) : nativeReserve(native,8,8);
         if (!nativeArgument(native,value,type,kind,offset)) return NULL;
         NativeSlot slot = {.declaration=parameter,.offset=offset,.type=type};
@@ -8416,10 +8563,14 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
     size_t count = literal->itemCount;
     int32_t offsets[count ? count : 1];
     RangeNode *types[count ? count : 1];
+    RangeValue known[count ? count : 1];
     for (size_t i = 0; i < count && i < call->itemCount; ++i) {
         types[i] = found(closure.context->key,literal->items[i])->type;
         int kind = nativeKind(native,types[i],literal->items[i]);
         if (kind == NativeNone) return NULL;
+        // A known argument is known in the closure's body.
+        offsets[i] = 0;
+        if (nativeKnown(native,call->items[i]->a,&known[i]) && nativeBuilds(native,&known[i],types[i],literal->items[i])) continue;
         offsets[i] = kind == NativeAggregate ? nativeReserve(native,types[i]->size ? types[i]->size : 1,types[i]->alignment) : nativeReserve(native,8,8);
         if (!nativeArgument(native,call->items[i]->a,types[i],kind,offsets[i])) return NULL;
     }
@@ -8427,6 +8578,7 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
     NATIVE_PUSH(native->hidden,native->hiddenCount,native->hiddenCapacity,hidden);
     size_t slots = native->slotCount;
     for (size_t i = 0; i < count; ++i) {
+        if (!offsets[i]) { nativeKnownSlot(native,literal->items[i],types[i],&known[i]); continue; }
         NativeSlot slot = {.declaration=literal->items[i],.offset=offsets[i],.type=types[i]};
         NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,slot);
     }
@@ -8522,6 +8674,16 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
             return native->self;
         }
         NativeSlot *slot = nativeSlotOf(native,declaration);
+        if (slot && !slot->offset) {
+            // A known value, filled in where its address is needed.
+            nativeKnownValue(native,slot->known,slot->type,expr);
+            if (!slot->type->scalarBits) return slot->type;
+            int32_t temporary = nativeReserve(native,8,8);
+            nativeStore(native,0,temporary);
+            nativeFrameAddress(native,0,temporary);
+            *frameSlot = 1;
+            return slot->type;
+        }
         if (slot) {
             nativeFrameAddress(native,0,slot->offset);
             *frameSlot = slot->type && slot->type->scalarBits && !slot->packed;
@@ -8623,14 +8785,18 @@ static RangeNode *nativePromote(Native *native, RangeNode *at, RangeNode *option
     return optional;
 }
 
-/* What typing lowered an expression to, if anything, is compiled in its
- * place, and a promoted value becomes the present case holding it. Only a
- * call, construction, switch expression, slot read, or promotion produces a
+/* A value known before run is emitted as it is. Otherwise what typing
+ * lowered an expression to, if anything, is compiled in its place, and a
+ * promoted value becomes the present case holding it. Only a call,
+ * construction, switch expression, slot read, or promotion produces a
  * temporary; any other expression reports none, whatever its operands left
  * behind. */
 static RangeNode *nativeExpression(Native *native, RangeNode *expr)
 {
     RangeFacts *facts = expr ? found(native->key,expr) : NULL;
+    RangeValue known;
+    if (nativeKnown(native,expr,&known) && nativeKnownValue(native,&known,facts->promoted ? facts->promoted : facts->type,expr))
+        return facts->promoted ? facts->promoted : facts->type;
     RangeNode *runs = facts && facts->lowered ? facts->lowered : expr;
     RangeNode *type = nativeExpressionValue(native,runs);
     RangeNode *resolved = runs ? found(native->key,runs)->resolvedDeclaration : NULL;
@@ -9018,7 +9184,13 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         RangeNode *type = found(native->key,node)->type;
         int kind = nativeKind(native,type,node);
         if (kind == NativeNone) break;
-        // A bare name that resolved to a value is a copy; to a type, a requirement.
+        // A let known before run names its value. A bare name that resolved
+        // to a value is a copy; to a type, a requirement.
+        EvalFrame root;
+        Eval eval = nativeEval(native,&root);
+        RangeValue known;
+        if (node->kind == RangeNodeLet && !native->asWritten && evalDeclared(&eval,&root,node,&known) == EvalNormal
+            && nativeKnownSlot(native,node,type,&known)) break;
         RangeNode *value = declarationValue(native->key,node);
         int construction = value == node;
         if (kind == NativeScalar) {
@@ -9070,15 +9242,20 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         break;
     }
     case RangeNodeWhile: {
+        // Without a condition, or with one known to hold, the loop ends only
+        // at break; with one known not to, it never runs.
+        RangeValue known;
+        int tested = node->a && !nativeKnown(native,node->a,&known);
+        if (node->a && !tested && !evalTruth(known)) break;
         size_t top = native->machine.size, exit = 0;
         nativeEnter(native,1,top);
-        if (node->a) { /* without a condition, the loop ends only at break */
+        if (tested) {
             nativeCondition(native,node->a);
             exit = nativeEmit(native,armCbz(0,0));
         }
         nativeStatement(native,node->b);
         nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
-        if (node->a) nativeBranchHere(native,exit,armCbz(0,0));
+        if (tested) nativeBranchHere(native,exit,armCbz(0,0));
         nativeLeave(native);
         break;
     }
@@ -9144,10 +9321,13 @@ static void nativeStatementBody(Native *native, RangeNode *node)
         NATIVE_PUSH(native->returns,native->returnCount,native->returnCapacity,at);
         break;
     }
-    case RangeNodeExpressionStatement:
+    case RangeNodeExpressionStatement: {
+        // A value known before run has no effect: nothing runs.
+        RangeValue known;
         if (node->a && node->a->kind == RangeNodeAttribute) nativeEffect(native,node,node->a);
-        else nativeExpression(native,node->a);
+        else if (!nativeKnown(native,node->a,&known)) nativeExpression(native,node->a);
         break;
+    }
     case RangeNodeSwitch:
         (void)nativeSwitch(native,node);
         break;
@@ -9301,21 +9481,44 @@ static RangeNode *nativeCaseTest(Native *native, RangeNode *test)
     return found(native->key,test)->type;
 }
 
+/* The arm a switch runs when the choice is known before run, its bindings
+ * known with it; the arm count when no arm runs; SIZE_MAX when the choice
+ * is left to run. */
+static size_t nativeKnownArm(Native *native, RangeNode *node, EvalFrame *arm)
+{
+    EvalFrame root;
+    Eval eval = nativeEval(native,&root);
+    size_t chosen;
+    if (native->asWritten || evalChoose(&eval,&root,node,arm,&chosen) != EvalNormal) return SIZE_MAX;
+    if (chosen == node->itemCount) return (node->flags & RangeFlagValue) ? SIZE_MAX : chosen;
+    RangeNode *entry = node->items[chosen];
+    for (size_t j = 0; entry->c && j < entry->c->itemCount; ++j) {
+        RangeNode *binding = entry->c->items[j], *type = found(native->key,binding)->type;
+        RangeValue *value = evalNamed(arm,binding);
+        if (!value || !nativeBuilds(native,value,type,binding)) return SIZE_MAX;
+    }
+    return chosen;
+}
+
 /* A switch statement, or a switch expression (RangeFlagValue): each arm that
  * yields leaves the value in one frame slot, a scalar or the aggregate itself
  * holding its own references, which the expression then is, as a temporary.
- * Only the chosen arm is evaluated. Returns the expression's type. */
+ * Only the chosen arm is evaluated; when the choice is known before run,
+ * only that arm is compiled, with nothing tested. Returns the expression's
+ * type. */
 static RangeNode *nativeSwitch(Native *native, RangeNode *node)
 {
     int value = (node->flags & RangeFlagValue) != 0;
     RangeNode *valueType = value ? found(native->key,node)->type : NULL;
     int valueKind = value ? nativeKind(native,valueType,node) : NativeNone;
     if (value && valueKind == NativeNone) return NULL;
+    EvalFrame arm;
+    size_t known = nativeKnownArm(native,node,&arm);
     // Each subject is evaluated once, in order, into its own slot.
     size_t width = node->c ? node->c->itemCount : 1;
     NativePlace places[width];
     RangeNode *types[width];
-    for (size_t k = 0; k < width; ++k) {
+    for (size_t k = 0; known == SIZE_MAX && k < width; ++k) {
         RangeNode *subject = node->c ? node->c->items[k] : node->a;
         types[k] = nativeExpression(native,subject);
         if (!types[k]) return NULL;
@@ -9332,10 +9535,12 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
     for (size_t i = 0; i < node->itemCount; ++i) {
         RangeNode *entry = node->items[i];
         size_t scope = native->slotCount;
+        if (known != SIZE_MAX && i != known) continue;
         for (size_t j = 0; entry->c && j < entry->c->itemCount; ++j) {
             RangeNode *binding = entry->c->items[j], *bindingType = found(native->key,binding)->type;
             int bindingKind = nativeKind(native,bindingType,binding);
             if (bindingKind == NativeNone) continue;
+            if (known != SIZE_MAX) { nativeKnownSlot(native,binding,bindingType,evalNamed(&arm,binding)); continue; }
             int32_t offset = nativeNewSlot(native,binding,bindingType,bindingKind);
             // A condition's case tests fill the slot, and a failed one leaves
             // it empty: it starts empty, so ending it is always safe.
@@ -9347,7 +9552,7 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
         size_t bound = native->slotCount;
         NativeJump *bodies = NULL;
         size_t bodyCount = 0, bodyCapacity = 0;
-        int fallible = !(entry->flags & RangeFlagLiteral);
+        int fallible = known == SIZE_MAX && !(entry->flags & RangeFlagLiteral);
         for (size_t j = 0; fallible && j < entry->itemCount; ++j) {
             RangeNode *pattern = entry->items[j], *patterns[width];
             NativeMatch match = {0};
@@ -9387,6 +9592,7 @@ static RangeNode *nativeSwitch(Native *native, RangeNode *node)
         } else nativeBlock(native,entry->b);
         nativeReleaseSlots(native,scope);
         native->slotCount = scope;
+        if (known != SIZE_MAX) break;
         NativeJump end = {.at=nativeEmit(native,armB(0)),.base=armB(0)};
         NATIVE_PUSH(ends,endCount,endCapacity,end);
         if (fallible) nativeBranchHere(native,next,armB(0));
@@ -9421,6 +9627,8 @@ static void nativeFunction(Native *native, NativeInstance *instance)
     native->tempCount = 0; native->resultTemp = -1;
     native->selfSlot = 0; native->resultSlot = 0;
     native->region = NULL; native->closureCount = 0; native->hiddenCount = 0;
+    native->serial = ++native->serials; native->foldCount = 0; /* what is known is found afresh */
+    if (native->folds) memset(native->folds,0,native->foldCapacity * sizeof(*native->folds));
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0)); /* mov x29, sp */
     size_t frameHigh = nativeEmit(native,armSubImmHigh(31,31,0));
@@ -9516,11 +9724,12 @@ static void nativeMethods(Native *native, RangeNode *construct)
 }
 
 /* Compile the entry block, every function, and every method of every concrete
- * specialization; write the executable when nothing is missing. Returns 1
- * when an executable was written. */
-static int emitNative(SourceReport *report, Typer *typer, const char *path)
+ * specialization; write the executable when nothing is missing. With
+ * `asWritten`, every expression is compiled as written: nothing is filled
+ * in before run. Returns 1 when an executable was written. */
+static int emitNative(SourceReport *report, Typer *typer, const char *path, int asWritten)
 {
-    Native native = {.report=report,.typer=typer};
+    Native native = {.report=report,.typer=typer,.asWritten=asWritten};
     RangeNode *entry = NULL;
     size_t entries = 0;
     for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)
@@ -9574,7 +9783,7 @@ static int emitNative(SourceReport *report, Typer *typer, const char *path)
     rangeMachineFree(&native.machine);
     free(native.slots); free(native.returns); free(native.calls); free(native.traps); free(native.instances); free(native.texts);
     free(native.temps); free(native.helpers); free(native.helperCalls); free(native.targets); free(native.stackResets);
-    free(native.closures); free(native.hidden);
+    free(native.closures); free(native.hidden); free(native.folds);
     return written;
 }
 
@@ -9681,7 +9890,7 @@ int main(int argc, char **argv)
 {
     RangeArena arena;
     rangeArenaInit(&arena);
-    int treeMode = 0;
+    int treeMode = 0, asWritten = 0;
     const char *literalMacro = NULL, *literalInput = NULL;
     int first = 1;
     int option = first;
@@ -9689,9 +9898,10 @@ int main(int argc, char **argv)
         literalMacro=argv[option + 1]; literalInput=argv[option + 2]; first=option + 3;
     }
     else if (argc > option && strcmp(argv[option], "--tree") == 0) { treeMode = 1; first = option + 1; }
+    else if (argc > option && strcmp(argv[option],"--as-written") == 0) { asWritten = 1; first = option + 1; }
     const char *output = "a.out";
     if (!treeMode && !literalMacro && argc > first + 1 && strcmp(argv[first],"-o") == 0) { output = argv[first + 1]; first += 2; }
-    if (first >= argc) { fprintf(stderr, "usage: compiler [-o executable | --tree | --match-literal macro text] files-or-directories...\n"); return 64; }
+    if (first >= argc) { fprintf(stderr, "usage: compiler [--as-written] [-o executable | --tree | --match-literal macro text] files-or-directories...\n"); return 64; }
     Sources sources = {0};
     RangeNode **units = NULL;
     int status = 66;
@@ -9737,7 +9947,7 @@ int main(int argc, char **argv)
         for (size_t u = 0; u < unitCount; ++u) diagnoseBuiltinFunctions(&report,units[u]);
         if (typer) typeCheck(typer);
         // Native code is generated from a complete, well-typed graph only.
-        int written = typer && !report.errors && emitNative(&report,typer,output);
+        int written = typer && !report.errors && emitNative(&report,typer,output,asWritten);
         if (typer) diagnoseWritten(typer);
         writeSourceDiagnostics(&report,stderr);
         if (report.errors || failures) {
