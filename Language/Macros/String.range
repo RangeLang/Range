@@ -2,7 +2,7 @@
 // including escapes and \( ) interpolation; this pattern only picks the construct.
 @literal("\".*\"")
 macro string(): Construct {
-  let value: #members.first(where: { member in member.name = "value" })
+  let value: #target.members.first(where: { member in member.name = "value" })
   switch {
     value.absent: @diagnostic("Construct must specify value"),
     value.present: {}
@@ -18,11 +18,11 @@ macro string(): Construct {
   // values' bytes into a new block. `=` is the built-in structural
   // comparison, which compares the bytes.
   #graph {
-    extension #name {
+    extension #target.name {
       @builtin let bytes
       @builtin let count: Int
       @builtin function byte(let at: Int): Int<bits: 8, signed: false>
-      @builtin function +(let other: #name): #name
+      @builtin function +(let other: #target.name): #target.name
     }
   }
 }

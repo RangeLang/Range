@@ -282,7 +282,7 @@ static int rejectStoredFunctionType(RangeParser *parser)
 static int startsClosure(RangeParser *parser);
 
 /* True when the current token opens a type position rather than an inferred
- * initialiser. `let x: Int(0)` is typed; `let m: #members.filter(...)` and
+ * initialiser. `let x: Int(0)` is typed; `let m: #target.members.filter(...)` and
  * `let author: "George"` place the initialising expression in that position. */
 static int atTypePosition(RangeParser *parser)
 {
@@ -714,9 +714,9 @@ static RangeNode *parsePrimary(RangeParser *parser)
         parserAdvance(parser);
         node->name = parserExpectName(parser);
         if (parser->conditionDepth == 0 && parserAt(parser, "{")) {
-            /* #graph quotes ordinary top-level declarations; inside it, #name
-             * splices a macro-time value and a bare name resolves where the
-             * code lands. */
+            /* #graph quotes ordinary top-level declarations; inside it,
+             * #target.name or a macro local such as #width splices a
+             * macro-time value and a bare name resolves where the code lands. */
             if (strcmp(node->name, "graph") != 0) {
                 parserFail(parser, &parser->current, "only #graph opens emitted code");
                 return node;
@@ -777,6 +777,21 @@ static RangeNode *parsePrimary(RangeParser *parser)
     parserFail(parser, &token, "unexpected '%.*s' in expression",
                (int)token.length, token.text);
     return NULL;
+}
+
+/* A splice in a type position inside #graph: `#target.name` or a macro
+ * local such as `#element`, read through `.field` steps only. */
+static RangeNode *parseTypeSplice(RangeParser *parser)
+{
+    RangeNode *value = parsePrimary(parser);
+    while (!parser->failed && parserAt(parser, ".")) {
+        RangeNode *access = parserNode(parser, RangeNodeMemberAccess);
+        parserAdvance(parser);
+        access->a = value;
+        access->name = parserExpectName(parser);
+        value = access;
+    }
+    return value;
 }
 
 static RangeNode *parsePostfix(RangeParser *parser)
@@ -1563,8 +1578,8 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
             parserFail(parser, &parser->current, "parameters require a single name used as the argument label");
         parserExpect(parser, ":");
         if (parser->macroDepth && parserAt(parser, "#")) {
-            /* Inside a macro's #graph, `let other: #name` splices the type. */
-            parameter->b = parsePrimary(parser);
+            /* Inside a macro's #graph, `let other: #target.name` splices the type. */
+            parameter->b = parseTypeSplice(parser);
             rangeNodeAppend(parser->arena, node, parameter);
             parseSeparator(parser, ")", "parameters");
             continue;
@@ -1589,10 +1604,10 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
     }
     parserExpect(parser, ")");
     if (parserAt(parser, ":") && parser->macroDepth && rangeTokenIs(parserPeek(parser), "#")) {
-        /* Inside a macro's #graph, `): #name` splices the result type. */
+        /* Inside a macro's #graph, `): #target.name` splices the result type. */
         parserAdvance(parser);
-        parser->conditionDepth += 1; /* a body may follow: `#name {` is not #graph */
-        node->b = parsePrimary(parser);
+        parser->conditionDepth += 1; /* a body may follow: `#target.name {` is not #graph */
+        node->b = parseTypeSplice(parser);
         parser->conditionDepth -= 1;
     } else if (parserAt(parser, ":")) {
         parserAdvance(parser);
@@ -1703,7 +1718,7 @@ static RangeNode *parseConstruct(RangeParser *parser, RangeNode *attributes)
 }
 
 /* `extension Name { … }` adds construct members to the declaration it names.
- * Inside #graph, the subject may be a splice such as `#name`. Macro
+ * Inside #graph, the subject may be a splice such as `#target.name`. Macro
  * applications written on the extension apply to that declaration. */
 static RangeNode *parseExtension(RangeParser *parser, RangeNode *attributes)
 {
@@ -1796,7 +1811,7 @@ static RangeNode *parseEnum(RangeParser *parser, RangeNode *attributes)
 
 /* Macro declarations are parsed in full: parameters with defaults, the target
  * and result type positions, and the body as a real block. Macro bodies are
- * compile-time programs: they may read #fields, emit #graph blocks, use $
+ * compile-time programs: they may read #target, emit #graph blocks, use $
  * templates, and end in a bare implicit result. Nothing here is retained as a
  * raw span. */
 static RangeNode *parseMacro(RangeParser *parser, RangeNode *attributes)

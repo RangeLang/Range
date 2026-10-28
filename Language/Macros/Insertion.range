@@ -1,4 +1,4 @@
-// C primitive: C builds a reflection list, such as `#cases` or `#members`, by
+// C primitive: C builds a reflection list, such as `#target.cases` or `#target.members`, by
 // constructing the collection its grammar field declares and calling that
 // collection's one function applying @insertion once per declaration, in order.
 //

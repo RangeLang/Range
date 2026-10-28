@@ -1,6 +1,6 @@
 macro example(): Construct {
     let ignored: "#graph is only text here"
-    let first: #members.first()
+    let first: #target.members.first()
     switch {
         first.present: {
             #graph {

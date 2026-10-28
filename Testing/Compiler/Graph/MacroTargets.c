@@ -47,22 +47,22 @@ int main(void)
     RangeArena arena; rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
     RangeNode *macros = parse(&arena,"Macros.range",
         "macro inspect(): Construct { let name: \"local\" let members: 0 "
-        "let targetName: #name let chosen: #members "
-        "let config: #generics let attached: #macros "
-        "let width: #generics.first { generic in generic.name = \"width\" } "
-        "let missing: #members.first { member in member.name = \"absent\" } } "
-        "macro inspect(): Function { let targetName: #name let parameters: #parameters "
-        "let output: #output let body: #body } "
-        "macro inspect(): Enum { let targetName: #name let chosen: #cases } "
-        "macro inspect(): Macro { let targetName: #name let targetType: #target "
-        "let body: #body let original: #body.members let expansions: #body.graph }");
+        "let targetName: #target.name let chosen: #target.members "
+        "let config: #target.generics let attached: #target.macros "
+        "let width: #target.generics.first { generic in generic.name = \"width\" } "
+        "let missing: #target.members.first { member in member.name = \"absent\" } } "
+        "macro inspect(): Function { let targetName: #target.name let parameters: #target.parameters "
+        "let output: #target.output let body: #target.body } "
+        "macro inspect(): Enum { let targetName: #target.name let chosen: #target.cases } "
+        "macro inspect(): Macro { let targetName: #target.name let targetType: #target.target "
+        "let body: #target.body let original: #target.body.members let expansions: #target.body.graph }");
     RangeNode *targets = parse(&arena,"Targets.range",
         "@inspect construct First<let width: 8> { let payload: 11 "
         "@inspect function nested() {} } "
         "@inspect construct Second<let width: 16> { let payload: 22 } "
         "@inspect function start(let input: Any): First { return 0 } "
         "@inspect enum Choice { case alpha case beta } "
-        "@inspect macro recipe(): Construct { let original: #members "
+        "@inspect macro recipe(): Construct { let original: #target.members "
         "#graph { construct Deferred {} } }");
     RangeNode *grammar = parse(&arena,RANGE_LANGUAGE_DIR "/Grammar/Nodes.range",
         "construct Construct { let name: String let members: Array<Member> "
@@ -117,16 +117,20 @@ int main(void)
     reject("macro mark(): Missing {}","unknown macro target type 'Missing'");
     reject("macro mark(): Construct? {}","macro target requires one declaration type");
     reject("macro mark(): Array<Construct> {}","macro target requires one declaration type");
-    reject("macro mark(): Construct { let old: #target.members }","field 'target' is not declared by @type Construct");
-    reject("macro mark(): Construct { let old: #body }","field 'body' is not declared by @type Construct");
-    reject("macro mark(): Function { switch { false: { let bad: #members }, default: {} } }","field 'members' is not declared by @type Function");
-    reject("macro mark() { let bad: #name }","#name requires a declared macro target");
+    reject("macro mark(): Construct { let old: #target.target.members }","field 'target' is not declared by @type Construct");
+    reject("macro mark(): Construct { let old: #target.body }","field 'body' is not declared by @type Construct");
+    reject("macro mark(): Function { switch { false: { let bad: #target.members }, default: {} } }","field 'members' is not declared by @type Function");
+    reject("macro mark() { let bad: #target.name }","#target requires a declared macro target");
+    // `#` names #target, the declaration the macro is attached to, and #graph;
+    // the target's fields are members of #target.
+    reject("macro mark(): Construct { let old: #members }",
+           "'#members' names nothing here; in macro code, #target is the declaration the macro is attached to");
 
     // Primitive annotation spelling is overloadable by target too.
     rangeArenaInit(&arena); rangeGraphInitTypes(&arena);
     RangeNode *literal = parse(&arena,"LiteralTargets.range",
         "@builtin macro literal(let pattern: Text): Macro "
-        "macro literal(): Construct { let targetName: #name } "
+        "macro literal(): Construct { let targetName: #target.name } "
         "@literal(\"[0-9]+\") macro digits(): Construct {} "
         "macro digits(): Function {} "
         "@digits construct Quantity {} @digits function start() {} "

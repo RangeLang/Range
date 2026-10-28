@@ -2,7 +2,7 @@
 // declared after it, so two locals cannot depend on each other.
 macro forward(): Construct {
     let value: other
-    let other: #name
+    let other: #target.name
 }
 @forward
 construct Example {}

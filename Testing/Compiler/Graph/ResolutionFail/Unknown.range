@@ -1,5 +1,5 @@
 macro unknown(): Construct {
-    let value: #unknown
+    let value: #target.unknown
 }
 @unknown
 construct Example {}

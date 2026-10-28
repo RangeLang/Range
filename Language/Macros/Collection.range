@@ -4,7 +4,7 @@
 macro collection(): Construct {
     // A collection names its element type Element: the code emitted below
     // refers to it, and typing reports a target without one, per specialization
-    // of a generic target. This macro cannot inspect #generics first: reflection
+    // of a generic target. This macro cannot inspect #target.generics first: reflection
     // lists are collections, built with the functions it is emitting.
 
     // The construct itself holds the header; count and capacity are ordinary
@@ -17,7 +17,7 @@ macro collection(): Construct {
     // wrote it, so it checks the `=` emitted beside it.
     #graph {
         @equatable
-        extension #name {
+        extension #target.name {
             state count: 0
             state capacity: 0
             @many
@@ -41,7 +41,7 @@ macro collection(): Construct {
             // Two collections are equal when they hold equal elements in the
             // same order, each pair compared with Element's own `=`; capacity
             // is storage, not value, so it never takes part.
-            function =(let other: #name): Bool {
+            function =(let other: #target.name): Bool {
                 switch { count != other.count: return false, default: {} }
                 for index in 0..<count {
                     switch { read(at: index) != other.read(at: index): return false, default: {} }
@@ -75,8 +75,8 @@ macro collection(): Construct {
             // The elements for which `where` is true, in order, as a new
             // collection. Like every function that takes a closure, it is
             // compiled inline where it is called.
-            function filter(let where: (Element) -> Bool): #name {
-                state result: #name()
+            function filter(let where: (Element) -> Bool): #target.name {
+                state result: #target.name()
                 state index: 0
                 while index < count {
                     let element: read(at: index)

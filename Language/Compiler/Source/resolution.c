@@ -286,11 +286,17 @@ static RangeNode *macroType(Resolver *vm, RangeNode *at, const char *name)
     return found;
 }
 
-/* #field must exist on the target type, or on every kind a macro type admits. */
+/* In macro code `#` names #target, the declaration the macro is attached
+ * to; `#target.field` must exist on the target type, or on every kind a
+ * macro type admits. #graph code splices macro locals too: typing checks it. */
 static void validateTargetReferences(Resolver *vm, RangeNode *node, RangeNode *type, RangeNode *nominal)
 {
     if (!node || node->kind == RangeNodeEmission) return; /* deferred code */
-    if (node->kind == RangeNodeEnvironment && nominal) {
+    if (node->kind == RangeNodeEnvironment && !same(node->name,"target"))
+        fail(vm,node,"'#%s' names nothing here; in macro code, #target is the declaration the macro is attached to",node->name);
+    if (node->kind == RangeNodeEnvironment && !type && !nominal) fail(vm,node,"#target requires a declared macro target");
+    int field = node->kind == RangeNodeMemberAccess && node->a && node->a->kind == RangeNodeEnvironment && same(node->a->name,"target");
+    if (field && nominal) {
         size_t kinds = 0;
         RangeNode *shapes = vm->arena->graphTypes;
         for (size_t i = 0; i < shapes->itemCount; ++i) {
@@ -301,34 +307,28 @@ static void validateTargetReferences(Resolver *vm, RangeNode *node, RangeNode *t
                 fail(vm,node,"field '%s' is not declared by %s, which applies @%s",node->name,shape->name,nominal->name);
         }
         if (!kinds) fail(vm,node,"no declaration kind applies @%s",nominal->name);
-    } else if (node->kind == RangeNodeEnvironment) {
-        if (!type) fail(vm,node,"#%s requires a declared macro target",node->name);
-        if (!rangeGraphField(type,node->name))
-            fail(vm,node,"field '%s' is not declared by @type %s",node->name,type->name);
-    }
+    } else if (field && type && !rangeGraphField(type,node->name))
+        fail(vm,node,"field '%s' is not declared by @type %s",node->name,type->name);
     validateTargetReferences(vm,node->a,type,nominal); validateTargetReferences(vm,node->b,type,nominal);
     validateTargetReferences(vm,node->c,type,nominal); validateTargetReferences(vm,node->generics,type,nominal);
     for (size_t i = 0; i < node->itemCount; ++i) validateTargetReferences(vm,node->items[i],type,nominal);
 }
 
-/* Whether quoted code splices only bare target fields, each a single node
- * of the target's shape that no parameter or top-level local of the macro
- * shadows. A nested macro's splices are its own. */
-static int shapeSplices(const RangeNode *macro, const RangeNode *shape, const RangeNode *node)
+/* Whether quoted code splices only #target or `#target.field`, a single
+ * node of the target's shape. A nested macro's splices are its own. */
+static int shapeSplices(const RangeNode *shape, const RangeNode *node)
 {
     if (!node || node->kind == RangeNodeMacro) return 1;
     if (spliceChain(node)) {
-        const RangeNode *field = node->kind == RangeNodeEnvironment ? rangeGraphField(shape,node->name) : NULL;
-        if (!field || (field->flags & (RangeFlagMany | RangeFlagOptional))) return 0;
-        for (size_t i = 0; i < macro->itemCount; ++i) if (same(macro->items[i]->name,node->name)) return 0;
-        for (size_t i = 0; i < macro->a->itemCount; ++i)
-            if (rangeNodeDeclaresValue(macro->a->items[i]->kind) && same(macro->a->items[i]->name,node->name)) return 0;
-        return 1;
+        if (node->kind == RangeNodeEnvironment) return same(node->name,"target");
+        if (node->kind != RangeNodeMemberAccess || node->a->kind != RangeNodeEnvironment || !same(node->a->name,"target")) return 0;
+        const RangeNode *field = rangeGraphField(shape,node->name);
+        return field && !(field->flags & (RangeFlagMany | RangeFlagOptional));
     }
-    if (!shapeSplices(macro,shape,node->a) || !shapeSplices(macro,shape,node->b) || !shapeSplices(macro,shape,node->c)
-        || !shapeSplices(macro,shape,node->generics) || !shapeSplices(macro,shape,node->annotations)
-        || !shapeSplices(macro,shape,node->rhsReference)) return 0;
-    for (size_t i = 0; i < node->itemCount; ++i) if (!shapeSplices(macro,shape,node->items[i])) return 0;
+    if (!shapeSplices(shape,node->a) || !shapeSplices(shape,node->b) || !shapeSplices(shape,node->c)
+        || !shapeSplices(shape,node->generics) || !shapeSplices(shape,node->annotations)
+        || !shapeSplices(shape,node->rhsReference)) return 0;
+    for (size_t i = 0; i < node->itemCount; ++i) if (!shapeSplices(shape,node->items[i])) return 0;
     return 1;
 }
 
@@ -341,7 +341,7 @@ static void markShapeBlocks(RangeNode *macro, const RangeNode *shape)
     for (size_t i = 0; shape && macro->a && i < macro->a->itemCount; ++i) {
         RangeNode *statement = macro->a->items[i];
         RangeNode *emission = statement->kind == RangeNodeExpressionStatement ? statement->a : NULL;
-        if (emission && emission->kind == RangeNodeEmission && shapeSplices(macro,shape,emission->b))
+        if (emission && emission->kind == RangeNodeEmission && shapeSplices(shape,emission->b))
             emission->found |= RangeFlagShape;
     }
 }
@@ -640,13 +640,17 @@ int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t count,
     return ok;
 }
 
-/* A splice is a #name chain such as #element or #element.name; the whole
- * chain runs at macro time. `#name(…)` calls the spliced name where the code
- * lands: only the name is spliced. */
+/* A splice is a # chain such as #element or #target.name; the whole chain
+ * runs at macro time. `#element(…)` and `#target.name(…)` call the spliced
+ * name where the code lands: only the name is spliced, since a declaration
+ * value has fields and no functions. */
 int spliceChain(const RangeNode *node)
 {
     while (node && (node->kind == RangeNodeMemberAccess || node->kind == RangeNodeCall)) {
-        if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeEnvironment) return 0;
+        const RangeNode *callee = node->kind == RangeNodeCall ? node->a : NULL;
+        if (callee && (callee->kind == RangeNodeEnvironment
+                       || (callee->kind == RangeNodeMemberAccess && callee->a && callee->a->kind == RangeNodeEnvironment
+                           && same(callee->a->name,"target")))) return 0;
         node = node->a;
     }
     return node && node->kind == RangeNodeEnvironment;
@@ -1036,10 +1040,6 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         /* Runtime member access is typed later. */
         if (scope && scope->meta && reflectionList(report->arena,node->name))
             sourceDiagnostic(report,node,1,"C-implementation","'.%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's @insertion function for each declaration",node->name);
-        break;
-    case RangeNodeEnvironment:
-        if (reflectionList(report->arena,node->name))
-            sourceDiagnostic(report,node,1,"C-implementation","'#%s' is a reflection list: C builds the collection its grammar field declares by calling that collection's @insertion function for each declaration",node->name);
         break;
     case RangeNodeAttribute: {
         if (same(node->name,"builtin") || same(node->name,"extern")) {

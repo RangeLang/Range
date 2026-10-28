@@ -74,7 +74,7 @@ assert "'?' sugar resolves to the enum applying @optional, and 'for … in' unwr
 # functions and member, and a macro reads an element's name as its field,
 # through a closure. C builds reflection lists and runs closures, and says so.
 assert "is hard-coded in C" not in active, active
-assert "'#cases' is a reflection list: C builds the collection its grammar field declares" in active, active
+assert "'.cases' is a reflection list: C builds the collection its grammar field declares" in active, active
 assert "name(of:)" not in active, active
 assert "a compile-time closure is run by C's evaluator while the call it is passed to runs" in active, active
 assert "function types are C's: a parameter typed (A) -> R takes a closure" in active, active

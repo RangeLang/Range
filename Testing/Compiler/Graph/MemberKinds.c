@@ -79,7 +79,7 @@ int main(void)
     // A concrete target admits one kind; a macro type admits every kind that applied it.
     ok = resolve(&arena,units,
         "macro grow(): State {} "
-        "macro describe(): @member { let label: #name } "
+        "macro describe(): @member { let label: #target.name } "
         "construct Box { @grow state items: 0 @describe let a: 1 @describe binding b: 2 }",error);
     if (!ok) fprintf(stderr,"%s\n",error);
     assert(ok);
@@ -95,10 +95,10 @@ int main(void)
     reject("macro grow(): State {} construct Box { @grow let items: 0 }","no macro 'grow' targets Let");
     reject("macro describe(): @member {} macro describe(): State {} construct Box { @describe state a: 1 }",
            "ambiguous graph macro 'describe'");
-    reject("macro describe(): @member { let bad: #members }",
+    reject("macro describe(): @member { let bad: #target.members }",
            "field 'members' is not declared by Let, which applies @member");
     reject("macro describe(): @missing {}","unknown macro type '@missing'");
-    reject("macro unused(): Construct {} macro describe(): @unused { let label: #name }",
+    reject("macro unused(): Construct {} macro describe(): @unused { let label: #target.name }",
            "no declaration kind applies @unused");
     puts("member kinds: shapes, grammar identities, macro types, nominal targets, rejections=pass");
     return 0;

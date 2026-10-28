@@ -95,8 +95,8 @@ static void validateLanguage(const char *source, const char *expected, size_t co
 
 #define POLICY \
     "macro assess(): Construct { " \
-    "let payload: #members.first(where: { m in m.name = \"payload\" }) " \
-    "let ceiling: #generics.first(where: { g in g.name = \"ceiling\" }) " \
+    "let payload: #target.members.first(where: { m in m.name = \"payload\" }) " \
+    "let ceiling: #target.generics.first(where: { g in g.name = \"ceiling\" }) " \
     "switch { payload.absent: @diagnostic(\"missing payload\"), " \
     "ceiling.absent: @diagnostic(\"missing ceiling\"), " \
     "payload.present & ceiling.present & !accepts(candidate: payload.value, limit: ceiling.value): " \
@@ -132,14 +132,14 @@ int main(void)
                     "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,2);
     validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
                     "@assess construct Second<let ceiling: 2> { let payload: 3 }","source policy rejected",0);
-    validateLanguage("macro assess(): Construct { switch { #members.first().present(let m) & m.value < 0: @diagnostic(\"negative\"), default: {} } } "
-                     "macro assess(): Function { let input: #parameters.first() switch { input.absent: @diagnostic(\"missing input\"), input.present: {} } } "
+    validateLanguage("macro assess(): Construct { switch { #target.members.first().present(let m) & m.value < 0: @diagnostic(\"negative\"), default: {} } } "
+                     "macro assess(): Function { let input: #target.parameters.first() switch { input.absent: @diagnostic(\"missing input\"), input.present: {} } } "
                      "@assess construct Parcel { let payload: 8 } @assess function start(let input: Int) {}",NULL,2);
     // An effect is the macro of that name without a target.
     validateLanguage("macro diagnostic(): Construct {} macro assess(): Function { @diagnostic(\"selected effect\") } "
                      "@assess function start() {}","selected effect",0);
     // Whole rule bodies are executed. Reversing the source condition changes validity.
-#define FIRST_VALUE "let first: #members.first() switch { first.absent: {}, first.present(let m): { "
+#define FIRST_VALUE "let first: #target.members.first() switch { first.absent: {}, first.present(let m): { "
     validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value < 10: @diagnostic(\"too small\"), default: {} } } } } "
                      "@assess construct Parcel { let payload: 8 }","too small",0);
     validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value > 10: @diagnostic(\"too large\"), default: {} } } } } "
@@ -148,7 +148,7 @@ int main(void)
     // builtin macros are selected by their own names.
     languageEdits = (const char *const[]){"String","Text","Bool","Truth","diagnostic(let message:","diagnostic(let text:",NULL};
     validateLanguage("@literal(\"[0-9]+\") macro decimalRule(): Construct { "
-                     "switch { !small(text: #name): @diagnostic(\"too big\"), default: {} } } "
+                     "switch { !small(text: #target.name): @diagnostic(\"too big\"), default: {} } } "
                      "function small(let text: Text): Truth { return text = \"Quantity\" } "
                      "@decimalRule construct Quantity { let storage: 3 }",NULL,1);
     languageEdits = NULL;
@@ -178,11 +178,11 @@ int main(void)
     validateLanguage(SIZES "@assess construct Parcel { let payload: -3 }","negative",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 7 }","seven",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 50 }",NULL,1);
-    validateLanguage("macro assess(): Construct { let first: #members.first() let kind: switch { first.present: \"filled\", first.absent: \"empty\" } "
-                     "@diagnostic(\"\\(#name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
-    validateLanguage("macro assess(): Construct { let first: #members.first() let size: switch { first.present(let m): switch { m.value = 3: 30, default: 0 }, first.absent: 0 } "
+    validateLanguage("macro assess(): Construct { let first: #target.members.first() let kind: switch { first.present: \"filled\", first.absent: \"empty\" } "
+                     "@diagnostic(\"\\(#target.name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
+    validateLanguage("macro assess(): Construct { let first: #target.members.first() let size: switch { first.present(let m): switch { m.value = 3: 30, default: 0 }, first.absent: 0 } "
                      "switch { size = 30: @diagnostic(\"thirty\"), default: {} } } @assess construct Parcel { let payload: 3 }","thirty",0);
-    validateLanguage("macro assess(): Construct { switch { #name = \"Parcel\": @diagnostic(\"named\"), default: {} } } "
+    validateLanguage("macro assess(): Construct { switch { #target.name = \"Parcel\": @diagnostic(\"named\"), default: {} } } "
                      "@assess construct Parcel {}","named",0);
     validateLanguage("macro assess(): Construct { let b: true switch { b.true: {} } } @assess construct Parcel {}","'b.false' is not handled",0);
     validateLanguage("macro assess(): Construct { let n: 1 switch { n = 1: {} } } @assess construct Parcel {}","must be exhaustive; add a default",0);
@@ -250,31 +250,31 @@ int main(void)
 #define LIGHT "enum Light { case red case green(Int) case blue } " \
     "extension Array { function last(): Element? { switch { count > 0: return read(at: count - 1), default: {} } return .absent } } "
     validateLanguage(LIGHT "macro probe(): Enum { "
-                     "switch { #cases.count = 3: {}, default: @diagnostic(\"count\") } "
-                     "switch { #cases.first().present(let c) & c.name = \"red\": {}, default: @diagnostic(\"first\") } "
-                     "switch { #cases.last().present(let c) & c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
-                     "let green: #cases.first(where: { c in c.name = \"green\" }) "
+                     "switch { #target.cases.count = 3: {}, default: @diagnostic(\"count\") } "
+                     "switch { #target.cases.first().present(let c) & c.name = \"red\": {}, default: @diagnostic(\"first\") } "
+                     "switch { #target.cases.last().present(let c) & c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
+                     "let green: #target.cases.first(where: { c in c.name = \"green\" }) "
                      "switch { green.present(let c): switch { c.name = \"green\": {}, default: @diagnostic(\"named\") }, "
                      "green.absent: @diagnostic(\"missing green\") } "
-                     "switch { #cases.first(where: { c in c.name = \"purple\" }).absent: {}, default: @diagnostic(\"purple\") } "
-                     "switch { #cases.filter(where: { c in c.name = \"blue\" }).count = 1: {}, default: @diagnostic(\"filter\") } "
-                     "switch { #cases.map(transform: { c in c.name }).last().present(\"blue\"): {}, default: @diagnostic(\"map\") } } "
+                     "switch { #target.cases.first(where: { c in c.name = \"purple\" }).absent: {}, default: @diagnostic(\"purple\") } "
+                     "switch { #target.cases.filter(where: { c in c.name = \"blue\" }).count = 1: {}, default: @diagnostic(\"filter\") } "
+                     "switch { #target.cases.map(transform: { c in c.name }).last().present(\"blue\"): {}, default: @diagnostic(\"map\") } } "
                      "@probe extension Light {}",NULL,1);
-    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.second() } @probe extension Light {}",
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #target.cases.second() } @probe extension Light {}",
                      "Array<Element: EnumCase> has no function 'second'",0);
-    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first.name } @probe extension Light {}",
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #target.cases.first.name } @probe extension Light {}",
                      "'Array.first' is a function; call it",0);
     // An optional is tested by its cases; it has no isTarget, or any member.
-    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first().isTarget } @probe extension Light {}",
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #target.cases.first().isTarget } @probe extension Light {}",
                      "Optional<Wrapped: EnumCase> has no case 'isTarget'",0);
     // Bodies are Block values, absent for a builtin; a block lists the
     // declarations written in it.
-    validateLanguage("macro probe(): Function { let body: #body switch { body.present(let b): switch { b.members.count = 2: {}, "
+    validateLanguage("macro probe(): Function { let body: #target.body switch { body.present(let b): switch { b.members.count = 2: {}, "
                      "default: @diagnostic(\"members\") }, body.absent: @diagnostic(\"no body\") } } "
                      "@probe function work(): Int { let a: 1 let b: 2 return a + b } "
                      "construct Holder { @probe @builtin function read(): Int }",
                      "no body",0);
-    validateLanguage("macro probe(): Function { let body: #body switch { body.present(let b): switch { b.members.count = 2: {}, "
+    validateLanguage("macro probe(): Function { let body: #target.body switch { body.present(let b): switch { b.members.count = 2: {}, "
                      "default: @diagnostic(\"members\") }, body.absent: {} } } "
                      "@probe function work(): Int { let a: 1 let b: 2 return a + b }",NULL,1);
     // C builds reflection lists through the collection's @insertion function,
@@ -283,20 +283,20 @@ int main(void)
                                           "result.append(value:","result.add(element:",
                                           "write(at: count, value: value)","write(at: count, value: element)",NULL};
     validateLanguage(LIGHT "macro probe(): Enum { "
-                     "switch { #cases.count = 3: {}, default: @diagnostic(\"count\") } "
-                     "switch { #cases.first(where: { c in c.name = \"green\" }).present: {}, default: @diagnostic(\"missing green\") } } "
+                     "switch { #target.cases.count = 3: {}, default: @diagnostic(\"count\") } "
+                     "switch { #target.cases.first(where: { c in c.name = \"green\" }).present: {}, default: @diagnostic(\"missing green\") } } "
                      "@probe extension Light {}",NULL,1);
     // Without the role, C has no function to build them with.
     languageEdits = (const char *const[]){"@insertion\n","",NULL};
-    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #target.cases.first() } @probe extension Light {}",
                      "which declares no @insertion function to build it with",0);
     // A reflection list is also read: its collection declares @iteration too.
     languageEdits = (const char *const[]){"@iteration\n","",NULL};
-    validateLanguage(LIGHT "macro probe(): Enum { let none: #cases.first() } @probe extension Light {}",
+    validateLanguage(LIGHT "macro probe(): Enum { let none: #target.cases.first() } @probe extension Light {}",
                      "which declares no @iteration function; a reflection list's collection declares both @iteration and @insertion",0);
     // Without a grammar member for the field, it has no Range type: typing the macro says so.
     languageEdits = (const char *const[]){"    let members: Array<@member>\n","",NULL};
-    validateLanguage("macro assess(): Construct { let none: #members.first() } @assess construct Parcel {}",
+    validateLanguage("macro assess(): Construct { let none: #target.members.first() } @assess construct Parcel {}",
                      "Construct has no member 'members'",0);
     languageEdits = NULL;
     puts("macro validation: source policies, renamed declarations, diagnostics, scopes, control flow, limits=pass");

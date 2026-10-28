@@ -15,7 +15,7 @@ int main(void)
          "function throughCall(): Whole { return start() } function finish() { return } "
          "function take(let w: Whole, let m: Missing): Whole { return w }"),
         "@integer construct Whole<let bits: 64, let signed: true> { let value: 0  function same(let other: Whole): Whole { return other } }",
-        "macro integer(): Construct { let bits: #generics let first: #generics.first { generic in generic.name = \"bits\" } }"
+        "macro integer(): Construct { let bits: #target.generics let first: #target.generics.first { generic in generic.name = \"bits\" } }"
     };
     RangeNode *units[3];
     for (size_t i = 0; i < 3; ++i) {
@@ -29,7 +29,7 @@ int main(void)
     assert(!units[0]->items[1]->b->resolvedDeclaration);
     RangeMacroApplication *app = construct->c->items[0]->macroApplication;
     assert(app && app->target == construct && app->declaration == units[2]->items[0]);
-    // #generics reads the construct's own generics; a generic's value is its literal.
+    // #target.generics reads the construct's own generics; a generic's value is its literal.
     RangeGraphValue generics = rangeGraphStoredField(&arena,construct,"generics");
     assert(generics.kind == RangeGraphNodes && generics.nodes[0] == construct->generics->items[0]);
     assert(rangeNodeRHS(generics.nodes[0])->integer == 64);

@@ -272,7 +272,7 @@ static int evalText(Eval *eval, EvalFrame *frame, RangeNode *node, const char **
 
 /* A declaration's members and functions include what its written macros
  * emit, so a use of it at macro time first applies those that have not run:
- * `#cases.first()` needs the functions @collection gives Array. A failure
+ * `#target.cases.first()` needs the functions @collection gives Array. A failure
  * there fails the application that needed it. */
 static void evalPrepare(Eval *eval, RangeNode *declaration)
 {
@@ -370,9 +370,9 @@ static int evalList(Eval *eval, RangeNode *grammar, const char *name, RangeNode 
     return status;
 }
 
-/* `#field` of the target, or `.field` of a declaration: what C's adapter
+/* `.field` of a declaration, such as `#target.members`: what C's adapter
  * holds there, as the value its grammar member's type says. An element of
- * `#macros`, an application, reads as the Macro it applies: its name. */
+ * `#target.macros`, an application, reads as the Macro it applies: its name. */
 static int evalField(Eval *eval, RangeNode *owner, const char *name, RangeNode *at, RangeValue *out)
 {
     RangeArena *arena = eval->vm->arena;
@@ -449,13 +449,14 @@ static void forgetFacts(RangeNode *copy)
 }
 
 /* A spliced value becomes the source a person would have written there: a
- * declaration or a name, a reference; a literal or a scalar, a literal. A
- * target field spliced alone is the node or the name C holds there. */
+ * declaration or a name, a reference; a literal or a scalar, a literal.
+ * `#target.field` is the node or the name C holds there. */
 static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **out)
 {
     RangeArena *arena = eval->vm->arena;
     RangeValue value;
-    if (at->kind == RangeNodeEnvironment && !found(frame->key,at)->resolvedDeclaration && !found(frame->key,at)->narrowed) {
+    if (at->kind == RangeNodeMemberAccess && at->a->kind == RangeNodeEnvironment && same(at->a->name,"target")
+        && !found(frame->key,at)->narrowed) {
         RangeGraphValue raw = rangeGraphStoredField(arena,eval->application->target,at->name);
         if (raw.kind == RangeGraphNodes) return evalFail(eval,at,"cannot splice a list of %zu declarations",raw.count);
         value = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.text=raw.text,.length=strlen(raw.text)}
@@ -1171,10 +1172,12 @@ int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return evalLiteral(eval,frame,expr,out);
     case RangeNodeName: return evalName(eval,frame,expr,out);
     case RangeNodeEnvironment:
-        // A splice of a macro local, or a field of the application's target.
+        // A splice of a macro local, or #target: the application's target.
         if (found(frame->key,expr)->resolvedDeclaration) return evalName(eval,frame,expr,out);
         if (!eval->application) return evalFail(eval,expr,"'#%s' is read outside a macro application",expr->name);
-        return evalField(eval,eval->application->target,expr->name,expr,out);
+        if (eval->outside) return EvalUnknown; /* declarations are values of macros only */
+        *out = (RangeValue){.kind=ValueDeclaration,.node=eval->application->target,.type=found(frame->key,expr)->type};
+        return EvalNormal;
     case RangeNodeCase:
         if (!found(frame->key,expr)->resolvedDeclaration) return evalStop(eval);
         *out = (RangeValue){.kind=ValueCase,.type=found(frame->key,expr)->type,.node=found(frame->key,expr)->resolvedDeclaration};

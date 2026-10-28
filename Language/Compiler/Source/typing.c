@@ -164,7 +164,7 @@ static size_t patternMissing(RangeArena *arena, Typer *typer, RangeNode ***rows,
 /* ---- the static structure of a switch's conditions ----
  * A switch arm's condition is a Bool, but its case tests on stable subjects
  * are a pattern table: a local, a parameter, a member path of one, a
- * #reflection value, or the receiver, never a call or a name the arm binds.
+ * #target value, or the receiver, never a call or a name the arm binds.
  * The condition, read as `|` of `&`s, gives one row per alternative, with
  * one column per subject: the case test of that subject, or wild. A row
  * that also needs anything else, a guard, covers nothing for the arms after
@@ -814,7 +814,7 @@ RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const char *na
         return NULL; /* undeclared is reported already */
     // As in Swift, a generic declaration's bare name inside its own bodies is
     // the specialization being typed: `Optional` in Optional<Wrapped>'s methods.
-    // Value generics too: `#name` in Int's operators is Int<bits: 8> there.
+    // Value generics too: `#target.name` in Int's operators is Int<bits: 8> there.
     if (!generics && context && context->kind == RangeNodeSpecialization
         && context->resolvedDeclaration == declaration && declaration->generics) return context;
     return specialize(typer,scope,declaration,generics,context,at);
@@ -1822,7 +1822,7 @@ static void typeSharedBindings(Typer *typer, RangeNode *pattern)
  * as in `manager.present`, narrows the value: to the right of the test in
  * the same `&` chain, and in the arm's body or the loop's, the value is the
  * payload of the present case, read with no check. A stable value is a let,
- * a parameter, a #reflection value, or a member path of one; a state can
+ * a parameter, a #target value, or a member path of one; a state can
  * change and a call is computed again, so neither narrows. A test under `!`
  * or on one side of `|` narrows nothing beyond it, unless both sides of the
  * `|` narrow the same value. The optional is the enum applying @optional.
@@ -2089,7 +2089,7 @@ static RangeNode *typeInterval(Typer *typer, SourceScope *scope, RangeNode *expr
 
 /* `a + b` and `-a`: the function the operator names on the operand's type.
  * Its parameter and result are typed in that type, as a method's are, so
- * inside Int<bits: 8> `#name` is Int<bits: 8>. A function with a body is
+ * inside Int<bits: 8> `#target.name` is Int<bits: 8>. A function with a body is
  * called: that call, typed, is what runs in the operator's place. A builtin
  * one is the C primitive its name selects, lowered where the operator is. */
 static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *operand,
@@ -2161,7 +2161,7 @@ static int declaredLater(RangeNode *key, SourceScope *scope, RangeNode *declarat
     return 0;
 }
 
-/* The local, binding, or parameter a splice `#name` names: one declared, in
+/* The local, binding, or parameter a splice `#width` names: one declared, in
  * the scopes the #graph block is written in, before it. */
 static RangeNode *spliceLocal(RangeNode *key, SourceScope *scope, const char *name)
 {
@@ -2176,32 +2176,18 @@ static RangeNode *spliceLocal(RangeNode *key, SourceScope *scope, const char *na
     return NULL;
 }
 
-/* Whether the macro's target declares field `name`: its kind's C shape, or
- * the shape of a kind its macro type admits. */
-static int targetField(RangeArena *arena, const RangeNode *macro, const char *name)
-{
-    if (!macro->b) return 0;
-    if (!(macro->b->flags & RangeFlagMacroType)) return rangeGraphField(rangeGraphType(arena,macro->b->name),name) != NULL;
-    for (size_t i = 0; i < arena->graphTypes->itemCount; ++i) {
-        RangeNode *shape = arena->graphTypes->items[i];
-        if (appliesMacro(shape->resolvedDeclaration,macro->b->resolvedDeclaration) && rangeGraphField(shape,name)) return 1;
-    }
-    return 0;
-}
-
 /* Quoted code is typed where it lands; its splices are typed where the
- * macro runs. `#x` is the macro's local x or the target's field x, never
- * both. A nested macro's splices are its own. */
+ * macro runs. `#target` is the declaration the macro is attached to; any
+ * other `#x` is the macro's local x. A nested macro's splices are its own. */
 static void typeSplices(Typer *typer, SourceScope *scope, RangeNode *node)
 {
     if (!node || node->kind == RangeNodeMacro) return;
     if (spliceChain(node)) {
         RangeNode *root = node;
         while (root->kind != RangeNodeEnvironment) root = root->a;
-        RangeNode *local = spliceLocal(typer->key,scope,root->name);
-        int field = targetField(typer->report->arena,typer->macro,root->name);
-        if (local && field) typeError(typer,root,"#%s names both a macro local and a target field",root->name);
-        else if (!local && !field) typeError(typer,root,"#%s is neither a macro local nor a target field",root->name);
+        RangeNode *local = same(root->name,"target") ? NULL : spliceLocal(typer->key,scope,root->name);
+        if (!local && !same(root->name,"target"))
+            typeError(typer,root,"#%s names no macro local declared before this #graph block; #target is the declaration the macro is attached to",root->name);
         else {
             finding(typer,root)->resolvedDeclaration = local;
             (void)typeOf(typer,scope,node,NULL,NULL);
@@ -2357,19 +2343,15 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         // A splice of a macro local is that local.
         RangeNode *local = found(typer->key,expr)->resolvedDeclaration;
         if (local) { type = found(typer->key,local)->type; break; }
-        // `#cases`: the field the macro's target kind declares. A target
-        // with no grammar declaration has fields without Range types; a
-        // field C has no adapter for is reported where the macro resolves.
+        // `#target`: the declaration the macro is attached to, a value of
+        // its target type; `#target.cases` is a member of it. A target with
+        // no grammar declaration has fields without Range types; a field C
+        // has no adapter for is reported where the macro resolves.
+        if (!same(expr->name,"target")) { typeError(typer,expr,"'#%s' names nothing here; in macro code, #target is the declaration the macro is attached to",expr->name); break; }
         RangeNode *target = typer->macro && typer->macro->b ? typer->macro->b->resolvedDeclaration : NULL;
-        if (target && target->kind == RangeNodeMacro) {
-            RangeNode *kind = macroTypeNamed(typer,target->name,expr);
-            type = kind ? macroTypeMember(typer,kind,expr->name,expr) : NULL;
-            break;
-        }
-        if (!target || target->kind != RangeNodeConstruct) break;
-        RangeNode *member = findMember(target,expr->name);
-        if (!member) { typeError(typer,expr,"%s has no member '%s'",target->name,expr->name); break; }
-        type = memberType(typer,target,member,ownSpecialization(typer,target));
+        if (!typer->macro) typeError(typer,expr,"#target is written only in a macro's body");
+        else if (target && target->kind == RangeNodeMacro) type = macroTypeNamed(typer,target->name,expr);
+        else if (target && target->kind == RangeNodeConstruct) type = ownSpecialization(typer,target);
         break;
     }
     case RangeNodeEmission:
@@ -3106,8 +3088,8 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
 
 /* A macro's body is typed as a function's is, returning no value, in place
  * and once, as it is first applied: its parameters, its locals, and
- * top-level functions are in scope; `#field` is the field its target kind
- * declares; #graph code is typed where it lands, its splices here. Typing at
+ * top-level functions are in scope; `#target` is the declaration it is
+ * attached to, a value of its target type; #graph code is typed where it lands, its splices here. Typing at
  * the first application reports what the source pass would then, and a body
  * with anything unresolved or mistyped does not run. A macro never applied
  * is typed after macro time; the source pass checked it. */

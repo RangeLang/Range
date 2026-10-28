@@ -18,10 +18,10 @@ construct Twice {
 
 // Reports whether @equatable is written, through an extension too.
 macro reportsEquatable(): Construct {
-    let written: #macros.first(where: { applied in applied.name = "equatable" })
+    let written: #target.macros.first(where: { applied in applied.name = "equatable" })
     switch {
-        written.present: @warning("\(#name) writes @equatable"),
-        written.absent: @warning("\(#name) does not write @equatable")
+        written.present: @warning("\(#target.name) writes @equatable"),
+        written.absent: @warning("\(#target.name) does not write @equatable")
     }
 }
 
@@ -35,8 +35,8 @@ construct Defaulted { let n: Int }
 macro alwaysEqual(): Enum {
     #graph {
         @equatable
-        extension #name {
-            function =(let other: #name): Bool { return true }
+        extension #target.name {
+            function =(let other: #target.name): Bool { return true }
         }
     }
 }

@@ -6,7 +6,8 @@ C implements mechanisms and explicit primitives, without hardcoded concrete type
 
 - Reuse the language's constructs and relationships. Use `Array<T>` for collections.
 - Each attached macro declares one target type; its name and target type select
-  the declaration. `#field` accesses that application's target fields directly.
+  the declaration. `#target` is the declaration it is attached to; `#target.field`
+  reads its fields.
 - Distinguish implemented behavior, accepted design, and proposals. Explain choices
   plainly with Range examples; report verification and remaining failures briefly.
 - Report missing declarations, unimplemented behavior, and remaining C shortcuts.

@@ -1,15 +1,15 @@
 macro probe(): Construct {
-    let targetName: #name
-    let selected: #members.first { member in member.name = "payload" }
-    let width: #generics.first { generic in generic.name = "width" }
-    let evaluated: #members.first { member in member.name = "payload" }
-    let missing: #members.first { member in member.name = "absent" }
+    let targetName: #target.name
+    let selected: #target.members.first { member in member.name = "payload" }
+    let width: #target.generics.first { generic in generic.name = "width" }
+    let evaluated: #target.members.first { member in member.name = "payload" }
+    let missing: #target.members.first { member in member.name = "absent" }
     switch {
         false: @diagnostic("Hidden control flow must remain parsed but not displayed"),
         default: {}
     }
     #graph {
-        extension #name {
+        extension #target.name {
             let probed: #width
         }
     }

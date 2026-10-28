@@ -52,7 +52,7 @@ int main(void)
     // A collection-shaped macro extends its target; bare names resolve there.
     compile(&c,CORE
         "macro collection(): Construct { "
-        "#graph { extension #name { "
+        "#graph { extension #target.name { "
         "state count: 0 state capacity: 0 state elements: Element "
         "function isEmpty(): Truth { return count = 0 } } } } "
         "@collection construct Array<Element> {} "
@@ -72,7 +72,7 @@ int main(void)
     // Splices take literal values and field text; emitted declarations join the unit.
     compile(&c,CORE
         "macro label(): Construct { let width: 8 "
-        "#graph { construct Label { let size: #width let owner: #name } } } "
+        "#graph { construct Label { let size: #width let owner: #target.name } } } "
         "construct Owner {} @label construct Box {}");
     RangeNode *label = declaration(c.unit,"Label");
     assert(label && label->emittedBy);
@@ -87,7 +87,7 @@ int main(void)
     // Duplicates follow the ordinary per-scope rule, however they arrive.
     compile(&c,CORE
         "macro greeter(): Construct { #graph { construct Hello {} } } "
-        "macro counted(): Construct { #graph { extension #name { let count: 0 } } } "
+        "macro counted(): Construct { #graph { extension #target.name { let count: 0 } } } "
         "@greeter construct A {} @greeter construct B {} "
         "@counted construct Tally { let count: 1 }");
     assert(reported(&c,"duplicate","@greeter emits 'Hello', which is declared more than once in the program"));
@@ -96,7 +96,7 @@ int main(void)
 
     // Emitted code may apply macros; they run in a later round.
     compile(&c,CORE
-        "macro mark(): Construct { #graph { extension #name { let marked: 1 } } } "
+        "macro mark(): Construct { #graph { extension #target.name { let marked: 1 } } } "
         "macro build(): Construct { #graph { @mark construct Built {} } } "
         "@build construct Seed {}");
     RangeNode *built = declaration(c.unit,"Built");
@@ -104,21 +104,21 @@ int main(void)
     assert(!reported(&c,"macro-validation",""));
     rangeArenaDestroy(&c.arena);
 
-    // Missing extension subjects, ambiguous splices, and failed applications.
+    // Missing extension subjects, unknown splices, and failed applications.
     compile(&c,CORE "extension Missing { let value: 1 }");
     assert(reported(&c,"resolution","extension of undeclared 'Missing'"));
     rangeArenaDestroy(&c.arena);
     compile(&c,CORE
-        "macro clash(): Construct { let name: 1 #graph { construct Clash { let value: #name } } } "
+        "macro clash(): Construct { let name: 1 #graph { construct Clash { let value: #names } } } "
         "@clash construct Box {}");
-    assert(reported(&c,"type","#name names both a macro local and a target field"));
+    assert(reported(&c,"type","#names names no macro local declared before this #graph block"));
     assert(!declaration(c.unit,"Clash"));
     rangeArenaDestroy(&c.arena);
     // A failed application emits nothing from its body. A shape-only block,
     // which splices only the target's shape, landed before the body ran.
     compile(&c,CORE
         "macro partial(): Construct { let size: 1 #graph { construct Partial { let value: #size } } "
-        "#graph { construct Shaped { let owner: #name } } @diagnostic(\"stop\") } "
+        "#graph { construct Shaped { let owner: #target.name } } @diagnostic(\"stop\") } "
         "@partial construct Box {}");
     assert(reported(&c,"macro-validation","stop") && !declaration(c.unit,"Partial"));
     RangeNode *shaped = declaration(c.unit,"Shaped");

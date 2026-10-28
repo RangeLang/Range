@@ -1,7 +1,7 @@
 @literal("true|false")
 macro boolean(): Enum {
-  let no: #cases.first(where: { entry in entry.name = "false" })
-  let yes: #cases.first(where: { entry in entry.name = "true" })
+  let no: #target.cases.first(where: { entry in entry.name = "false" })
+  let yes: #target.cases.first(where: { entry in entry.name = "true" })
   switch {
     no.present & yes.present: {},
     no.absent: @diagnostic("Enum must declare case false"),
@@ -21,10 +21,10 @@ macro boolean(): Enum {
   // type, and C writes the branch. No other type may declare `&` or `|`:
   // they also join the case tests of a switch arm's condition.
   #graph {
-    extension #name {
-      @builtin function !(): #name
-      @builtin function &(let other: #name): #name
-      @builtin function |(let other: #name): #name
+    extension #target.name {
+      @builtin function !(): #target.name
+      @builtin function &(let other: #target.name): #target.name
+      @builtin function |(let other: #target.name): #target.name
     }
   }
 }

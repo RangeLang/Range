@@ -86,9 +86,9 @@ static int sameSyntax(const RangeNode *a, const RangeNode *b)
 }
 
 /* A macro application written on an extension applies to the extended
- * declaration as if written there: it is listed in #macros. The same macro
- * applied twice to one declaration is one application; different arguments
- * are an error. */
+ * declaration as if written there: it is listed in #target.macros. The same
+ * macro applied twice to one declaration is one application; different
+ * arguments are an error. */
 static void attachApplication(Resolver *vm, RangeNode *declaration, RangeNode *attribute)
 {
     if (!declaration->c)
@@ -117,9 +117,9 @@ static void mergeExtension(Resolver *vm, RangeNode *extension)
 {
     RangeNode *subject = extension->a, *declaration = NULL;
     if (!subject || subject->kind != RangeNodeName)
-        fail(vm,extension,"#name splices are only valid inside #graph");
-    // `extension #name` emitted by an application extends that application's
-    // target, nested or not.
+        fail(vm,extension,"a splice such as #target.name is valid only inside #graph");
+    // `extension #target.name` emitted by an application extends that
+    // application's target, nested or not.
     RangeMacroApplication *emitter = extension->emittedBy ? extension->emittedBy->macroApplication : NULL;
     if (emitter && emitter->target && same(emitter->target->name,subject->name)
         && (emitter->target->kind == RangeNodeConstruct || emitter->target->kind == RangeNodeEnum))

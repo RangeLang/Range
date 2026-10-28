@@ -84,7 +84,7 @@ grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable
 grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
     || fail "a second application of @equatable was not noted"
 grep -Fq "ExtensionTypes.range:28:1: warning[macro]: Written writes @equatable" "$work_root/log" \
-    || fail "#macros does not list an application written through an extension"
+    || fail "#target.macros does not list an application written through an extension"
 ! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no" "$work_root/log" \
     || fail "@equatable on an extension missed the '=' beside it"
 ! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its '='"
@@ -108,8 +108,8 @@ function g(let o: Int?, let p: Int?): Int {
     switch { o.present(let x) & x > 0 | p.present(let x): return 1, default: return 0 }
 }
 macro checked(): Enum {
-    let on: #cases.first(where: { c in c.name = "on" })
-    switch { on.present(let c): {}, on.absent: @diagnostic("\(#name) has no case on") }
+    let on: #target.cases.first(where: { c in c.name = "on" })
+    switch { on.present(let c): {}, on.absent: @diagnostic("\(#target.name) has no case on") }
 }
 @checked
 enum Light { case on, off }
@@ -143,12 +143,12 @@ run compile-time-closures 0 "" "$(case_file compile-time-closures 'function coun
 }
 macro counted(): Enum {
     state seen: 0
-    let others: count(cases: #cases) { c in
+    let others: count(cases: #target.cases) { c in
         seen: seen + 1
         switch { c.name = "on": return false, default: {} }
         return true
     }
-    @warning("\(#name) has \(others) other cases of \(seen)")
+    @warning("\(#target.name) has \(others) other cases of \(seen)")
 }
 @counted
 enum Light { case on, off, dim }
@@ -159,22 +159,22 @@ grep -Fq "compile-time-closures.range:19:1: warning[macro]: Light has 2 other ca
 run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro checked(): Enum {
     let wanted: "on"
     switch {
-        #cases.first(where: { c in c.name = wanted }).present(let c): @warning("\(#name) has \(c.name)"),
-        default: @diagnostic("\(#name) has no case on")
+        #target.cases.first(where: { c in c.name = wanted }).present(let c): @warning("\(#target.name) has \(c.name)"),
+        default: @diagnostic("\(#target.name) has no case on")
     }
     state seen: 0
-    let others: #cases.filter { c in
+    let others: #target.cases.filter { c in
         seen: seen + 1
         return c.name != "on"
     }
-    let total: #cases.reduce(initial: 0) { sum, c in sum + 1 }
-    let names: #cases.map { c in c.name }
+    let total: #target.cases.reduce(initial: 0) { sum, c in sum + 1 }
+    let names: #target.cases.map { c in c.name }
     switch {
-        names.first().present(let n): @warning("\(#name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
+        names.first().present(let n): @warning("\(#target.name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
         default: {}
     }
     switch {
-        #cases.contains(where: { c in #cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }): @warning("\(#name) dims"),
+        #target.cases.contains(where: { c in #target.cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }): @warning("\(#target.name) dims"),
         default: {}
     }
 }
@@ -452,13 +452,13 @@ reject condition-default-unreached "'default' is never reached: the arms above m
 { return 0 }'
 # Case tests run at compile time too, in conditions and as plain Bools.
 paired='macro paired(): Enum {
-    let on: #cases.first(where: { c in c.name = "on" })
-    let off: #cases.first(where: { c in c.name = "off" })
+    let on: #target.cases.first(where: { c in c.name = "on" })
+    let off: #target.cases.first(where: { c in c.name = "off" })
     let both: on.present & off.present
     switch {
-        on.present(let c) & c.name != "on": @diagnostic("\(#name) misnames on"),
-        both: @warning("\(#name) has on and off"),
-        default: @diagnostic("\(#name) needs on and off")
+        on.present(let c) & c.name != "on": @diagnostic("\(#target.name) misnames on"),
+        both: @warning("\(#target.name) has on and off"),
+        default: @diagnostic("\(#target.name) needs on and off")
     }
 }'
 run macro-case-tests 0 "" "$(case_file macro-case-tests "$paired
@@ -472,7 +472,7 @@ enum Half { case on }
 { return 0 }"
 reject macro-case-coverage "switch must be exhaustive: 'off.absent' is not handled; add an arm for it or a default" \
     'macro both(): Enum {
-    let off: #cases.first(where: { c in c.name = "off" })
+    let off: #target.cases.first(where: { c in c.name = "off" })
     switch { off.present(let c) & c.name = "off": {}, off.present: {} }
 }
 @both
@@ -480,7 +480,7 @@ enum Light { case on, off }
 { return 0 }'
 reject macro-case-unreachable "this condition is already handled by earlier arms" \
     'macro both(): Enum {
-    let off: #cases.first(where: { c in c.name = "off" })
+    let off: #target.cases.first(where: { c in c.name = "off" })
     switch { off.present: {}, off.absent: {}, off.present(let c): {} }
 }
 @both
@@ -522,12 +522,12 @@ function f(let b: Box): Int { switch { b.full: return b + 1, default: return 0 }
 # At compile time too: a macro's lets narrow through `&`, through `|` when
 # both sides narrow, and in the arm's body.
 run macro-narrowing 0 "" "$(case_file macro-narrowing 'macro named(): Enum {
-    let on: #cases.first(where: { c in c.name = "on" })
-    let off: #cases.first(where: { c in c.name = "off" })
+    let on: #target.cases.first(where: { c in c.name = "on" })
+    let off: #target.cases.first(where: { c in c.name = "off" })
     switch {
-        on.present & on.name != "on": @diagnostic("\(#name) misnames on"),
-        on.present & off.present | on.present & on.name = "on": @warning("\(#name) has \(on.name)"),
-        default: @diagnostic("\(#name) has no case on")
+        on.present & on.name != "on": @diagnostic("\(#target.name) misnames on"),
+        on.present & off.present | on.present & on.name = "on": @warning("\(#target.name) has \(on.name)"),
+        default: @diagnostic("\(#target.name) has no case on")
     }
 }
 @named
@@ -536,7 +536,7 @@ enum Light { case on, off }
 grep -Fq "warning[macro]: Light has on" "$work_root/log" || fail "a compile-time narrowing did not hold"
 reject macro-narrowing-shadow "'on' is already narrowed to the payload here" \
     'macro named(): Enum {
-    let on: #cases.first(where: { c in c.name = "on" })
+    let on: #target.cases.first(where: { c in c.name = "on" })
     switch { on.present(let on): @warning("\(on.name)"), default: {} }
 }
 @named
@@ -544,18 +544,18 @@ enum Light { case on, off }
 { return 0 }'
 reject macro-narrowing-state "Optional<Wrapped: EnumCase> has no case 'name'" \
     'macro named(): Enum {
-    state on: #cases.first(where: { c in c.name = "on" })
+    state on: #target.cases.first(where: { c in c.name = "on" })
     switch { on.present: @warning("\(on.name)"), default: {} }
 }
 @named
 enum Light { case on, off }
 { return 0 }'
-# A macro's body is typed as a function's is: #members is Array<@member>, so
+# A macro's body is typed as a function's is: #target.members is Array<@member>, so
 # a member's name is a String, and the same mistake is the same type error.
 # A body with a type error does not run, so the mistake is reported once.
-reject macro-mismatch "macro-mismatch.range:2:63: error[type]: operator '=' requires matching types; found String and Int<bits: 64, signed: true>" \
+reject macro-mismatch "macro-mismatch.range:2:70: error[type]: operator '=' requires matching types; found String and Int<bits: 64, signed: true>" \
     'macro valued(): Construct {
-    let stored: #members.first(where: { member in member.name = 5 })
+    let stored: #target.members.first(where: { member in member.name = 5 })
 }
 @valued
 construct Box { let value: 1 }
@@ -565,19 +565,19 @@ construct Box { let value: 1 }
 # them declares is an error; one only some declare is known at macro time.
 reject macro-type-member "@member has no member 'nmae'" \
     'macro named(): Construct {
-    let first: #members.first(where: { member in member.nmae = "value" })
+    let first: #target.members.first(where: { member in member.nmae = "value" })
 }
 { return 0 }'
 reject macro-field "field 'nmae' is not declared by @type Construct" \
-    'macro named(): Construct { let name: #nmae }
+    'macro named(): Construct { let name: #target.nmae }
 { return 0 }'
 reject macro-grammar-field "Macro has no member 'target'" \
-    'macro targeted(): Macro { let target: #target }
+    'macro targeted(): Macro { let target: #target.target }
 { return 0 }'
 run macro-time-value 0 "" "$(case_file macro-time-value 'macro sized(): Construct {
-    let width: #generics.first(where: { generic in generic.name = "width" })
+    let width: #target.generics.first(where: { generic in generic.name = "width" })
     switch {
-        width.present & width.value > 4: @warning("\(#name) is \(width.value) wide"),
+        width.present & width.value > 4: @warning("\(#target.name) is \(width.value) wide"),
         default: {}
     }
 }
@@ -694,6 +694,15 @@ run written-equality 0 "" "$(case_file written-equality 'construct Own { let n: 
 run written-equality-extension 0 "" "$(case_file written-equality-extension 'enum Own { case one, two }
 extension Own { function =(let other: Own): Bool { return true } }
 { switch { Own.one != .two: return 1, default: {} } return 0 }')"
+# #target is the declaration a macro is attached to: an ordinary value, and
+# spliced alone into #graph it names that declaration.
+run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {
+    let target: #target
+    switch { target.members.count != 2: @diagnostic("\(target.name) must have 2 members"), default: {} }
+    #graph { extension #target { function size(): Int { return #target.members.count } } }
+}
+@sized construct Point { let x: Int  let y: Int }
+{ return Point(x: 1, y: 2).size() }')"
 reject top-level-equality "'=' must be declared on the type it compares, in the type or an extension of it" \
     'function =(let other: Int): Bool { return true }
 { return 0 }'

@@ -53,7 +53,7 @@ int main(void)
         "construct Function { let name: String let parameters: Array<Parameter> let output: Construct? let body: Array<Return> } "
         "construct Let { let name: String let value: Any? } "
         "construct Return { let value: Any? } "
-        "macro probe(): Construct { let chosen: #members }";
+        "macro probe(): Construct { let chosen: #target.members }";
     RangeNode *units[] = {
         parse(&arena,RANGE_LANGUAGE_DIR "/Grammar/Grammar.range",core),
         parse(&arena,"Project.range",
