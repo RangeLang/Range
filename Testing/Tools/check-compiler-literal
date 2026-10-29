@@ -11,6 +11,8 @@ core=Language/Macros/Literal.range
 fixtures=Testing/Compiler/Literal
 for mode in ordinary sanitized; do
     compiler="$work_root/$mode"
+    matches=0
+    rejections=0
     options=()
     if [[ "$mode" == sanitized ]]; then options=(--sanitize); fi
     Language/Compiler/Tools/build-range-compiler "$compiler" ${options[@]+"${options[@]}"}
@@ -25,6 +27,7 @@ for mode in ordinary sanitized; do
         local result
         result="$("$compiler" --match-literal "$1" "$2" "$core" "$fixtures/Rules.range")"
         [[ "$result" == "match=$3" ]] || fail "$mode $1 returned $result"
+        matches=$((matches + 1))
     }
     check decimal 64 true
     check decimal 00064 true
@@ -53,11 +56,13 @@ for mode in ordinary sanitized; do
         [[ "$status" == 65 ]] || fail "$mode $fixture exited $status"
         grep -Fq "$expected" "$work_root/error" || fail "$mode $fixture wrong error"
         grep -Eq ':[0-9]+:[0-9]+:' "$work_root/error" || fail "$mode $fixture lacks location"
+        rejections=$((rejections + 1))
     done
     status=0
     "$compiler" "$core" "$fixtures/Invalid.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode invalid regex compilation claimed success"
     grep -Fq 'invalid literal regex' "$work_root/error" || fail "$mode compilation skipped literal validation"
+    rejections=$((rejections + 1))
     # A literal rule's argument is typed as any application's: labeled as
     # the parameter is.
     status=0
@@ -65,13 +70,16 @@ for mode in ordinary sanitized; do
     [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode unlabeled literal rule compiled"
     grep -Fq "Label.range:1:10: error[type]: argument 1 of '@literal' requires label 'pattern'" "$work_root/error" \
         || fail "$mode literal rule label was not checked"
+    rejections=$((rejections + 1))
     status=0
     "$compiler" --match-literal decimal 64 "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing builtin was accepted"
     grep -Fq "unresolved graph macro 'literal'" "$work_root/error" || fail "$mode missing builtin wrong error"
+    rejections=$((rejections + 1))
     status=0
     "$compiler" --match-literal unregistered 64 "$core" "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing rule was accepted"
     grep -Fq "has no literal rule" "$work_root/error" || fail "$mode missing rule wrong error"
-    echo "compiler literal: $mode matches=15 rejections=7 normal-resolution=pass"
+    rejections=$((rejections + 1))
+    echo "compiler literal: $mode matches=$matches rejections=$rejections normal-resolution=pass"
 done

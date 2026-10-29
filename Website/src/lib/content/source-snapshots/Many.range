@@ -2,8 +2,8 @@ macro many(count: Int?, ordering: Ordering: .ordered): @member {
   let element: #environment.target.Declaration.type
 
   if count < 0 {
-    #environment.diagnostic(
-      "Many count must not be negative"
+    diagnostic(
+      message: "Many count must not be negative"
     )
   }
 

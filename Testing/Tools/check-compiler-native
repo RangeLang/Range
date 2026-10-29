@@ -14,6 +14,10 @@ Language/Compiler/Tools/build-range-compiler "$compiler"
 # the integer and boolean checks need the grammar and the collection.
 core=(Language/Functions Language/Grammar Language/Macros Language/Types)
 
+# The summary counts what run and reject actually checked.
+programs=0
+rejections=0
+
 # run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE...
 # Each program is compiled as written, then with every value known before
 # run filled in; both executables must report, write, and exit the same.
@@ -35,6 +39,7 @@ run() {
     for file in log stdout stderr; do
         cmp -s "$work_root/$file" "$work_root/written-$file" || fail "$name $file differs from the program compiled as written"
     done
+    programs=$((programs + 1))
 }
 case_file() { printf '%s\n' "$2" > "$work_root/$1.range"; echo "$work_root/$1.range"; }
 
@@ -277,6 +282,7 @@ reject() {
         [[ "$status" == 65 && ! -e "$work_root/$1" ]] || fail "$1 $mode compiled"
         grep -Fq "$2" "$work_root/log" || fail "$1 $mode reported wrongly: $(grep 'error\[' "$work_root/log")"
     done
+    rejections=$((rejections + 1))
 }
 reject non-exhaustive "switch must be exhaustive: 'd.west' is not handled; add an arm for it or a default" \
     'enum Direction { case north, east, south, west }
@@ -353,6 +359,24 @@ reject never-return-value "return requires Never; found Int<bits: 64, signed: tr
 { stop() return 0 }'
 reject never-constructed "an enum is not constructed, and Never has no cases, so it has no values" \
     '{ let x: Never() return 0 }'
+# A construct holds a value of each stored member, so a member whose type
+# has no values leaves it none to hold. A case's payload or a parameter of
+# such a type only makes that case or that call unreachable, as a generic
+# filled with Never does.
+reject never-member "never-member.range:1:19: error[type]: 'x' has type Never, which has no values, so Proud could never be constructed" \
+    'construct Proud { let x: Never }
+{ return 0 }'
+reject never-member-state "never-member-state.range:1:33: error[type]: 'x' has type Never, which has no values, so Proud could never be constructed" \
+    'construct Proud { let tag: Int  state x: Never }
+{ return Proud(tag: 1, x: diagnostic(message: "none")).tag }'
+reject never-member-nested "never-member-nested.range:1:37: error[type]: 'x' has type Never, which has no values, so Inner could never be constructed" \
+    'construct Outer { construct Inner { let x: Never }  let n: Int }
+{ return 0 }'
+run never-unreached 7 "" "$(case_file never-unreached 'enum Outcome { case done(Int), failed(Never) }
+function absurd(let n: Never): Int { return 1 }
+construct Box<T> { let value: T }
+function open(let b: Box<Never>): Int { return 0 }
+{ let o: Outcome.done(7) switch { o.done(let v): return v, default: return 0 } }')"
 reject print-label "argument 1 of 'print' requires label 'message'" '{ print(text: "hi") return 0 }'
 reject print-arguments "'print' takes 1 arguments; 2 supplied" '{ print(message: "hi", message: "again") return 0 }'
 reject print-interpolation "an interpolated value is an integer, a case without payloads, or a string; this one is Array<Element: Int<bits: 64, signed: true>>" \
@@ -788,6 +812,20 @@ construct Outer {
 { return 0 }"
 grep -Fq "macro-argument-unknown-call.range:7:19: note[macro-validation]: the value of 'count' is not known at macro time" "$work_root/log" \
     || fail "macro-argument-unknown-call gave no reason: $(cat "$work_root/log")"
+# A trap is known: the error states it where the argument is written, with
+# the trap's place as a note when the trap is elsewhere.
+reject macro-argument-trap "macro-argument-trap.range:4:8: error[macro-validation]: the argument 'width' of @sized traps at macro time: division by zero in '/'" "$sized
+@sized(width: 1 / 0)
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+! grep -Fq "note[" "$work_root/log" || fail "macro-argument-trap repeated its trap as a note"
+reject macro-argument-trap-call "macro-argument-trap-call.range:5:8: error[macro-validation]: the argument 'width' of @sized traps at macro time: result of '*' does not fit Int<bits: 64, signed: true>" "$sized
+function square(let n: Int): Int { return n * n }
+@sized(width: square(n: 4294967296))
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+grep -Fq "macro-argument-trap-call.range:4:45: note[macro-validation]: result of '*' does not fit Int<bits: 64, signed: true>" "$work_root/log" \
+    || fail "macro-argument-trap-call gave no place: $(cat "$work_root/log")"
 reject macro-argument-target "#target is written only in a macro's body" "$sized
 @sized(width: #target.members.count)
 construct Point { let x: Int  let y: Int }
@@ -1322,4 +1360,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-echo "compiler native: programs=69 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=$programs rejections=$rejections case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

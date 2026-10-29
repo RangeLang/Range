@@ -154,6 +154,7 @@ typedef struct {
     unsigned steps, depth;
     RangeValue returned;
     const char *message; RangeNode *at;
+    int trapped; /* the message is a trap native code would hit at run */
     /* Emitted copies by original, so a node quoted code reaches twice (a
      * for-in's binding is in its pattern and its scope) stays one node. */
     RangeNode **emittedFrom, **emittedTo; size_t emittedCapacity, emittedCount;

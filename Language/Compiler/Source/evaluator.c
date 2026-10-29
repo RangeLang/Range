@@ -36,6 +36,17 @@ static int evalFail(Eval *eval, RangeNode *at, const char *format, ...)
     vsnprintf(text,sizeof(text),format,args); va_end(args);
     eval->message = rangeArenaIntern(eval->vm->arena,text,strlen(text));
     eval->at = at;
+    eval->trapped = 0;
+    return EvalFailed;
+}
+
+/* A trap: what native code would stop on at run, which is known. */
+static int evalTrap(Eval *eval, RangeNode *at, const char *format, ...)
+{
+    char text[512]; va_list args; va_start(args,format);
+    vsnprintf(text,sizeof(text),format,args); va_end(args);
+    evalFail(eval,at,"%s",text);
+    eval->trapped = 1;
     return EvalFailed;
 }
 
@@ -664,7 +675,7 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
                                      || builtinFunction(function,"diagnostic")))
         return evalEffect(eval,function,arguments[0],at);
     if (self && self->kind == ValueText && same(function->name,"byte") && function->itemCount == 1) {
-        if (arguments[0].integer < 0 || (size_t)arguments[0].integer >= self->length) return evalFail(eval,at,"byte index is outside the bytes");
+        if (arguments[0].integer < 0 || (size_t)arguments[0].integer >= self->length) return evalTrap(eval,at,"byte index is outside the bytes");
         *out = (RangeValue){.kind=ValueScalar,.type=function->type,.integer=(unsigned char)self->text[arguments[0].integer]};
         return EvalNormal;
     }
@@ -679,7 +690,7 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
     RangeValue *slots = &self->values[many];
     long long index = arguments[0].integer;
     if (same(function->name,"resize")) {
-        if (index < 0) return evalFail(eval,at,"resize to a negative slot count");
+        if (index < 0) return evalTrap(eval,at,"resize to a negative slot count");
         size_t kept = (size_t)index < slots->count ? (size_t)index : slots->count;
         eval->steps += (size_t)index - kept < 100000 ? (unsigned)((size_t)index - kept) : 100000;
         int status = evalStep(eval,at);
@@ -690,7 +701,7 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
         *slots = (RangeValue){.kind=ValueSlots,.values=values,.count=(size_t)index};
         return EvalNormal;
     }
-    if (index < 0 || (size_t)index >= slots->count) return evalFail(eval,at,"slot index is outside the @many storage");
+    if (index < 0 || (size_t)index >= slots->count) return evalTrap(eval,at,"slot index is outside the @many storage");
     if (same(function->name,"read")) { *out = slots->values[index]; return EvalNormal; }
     evalOwn(eval,slots);
     slots->values[index] = arguments[1];
@@ -981,12 +992,12 @@ static int evalPrimitive(Eval *eval, RangeNode *expr, RangeValue left, RangeValu
         return EvalNormal;
     } else if (same(op,"+")) result = a + b;
     else if (same(op,"-")) result = a - b;
-    else if (same(op,"*")) { if (__builtin_mul_overflow(a,b,&result)) return evalFail(eval,expr,"result of '*' does not fit %s",name); }
+    else if (same(op,"*")) { if (__builtin_mul_overflow(a,b,&result)) return evalTrap(eval,expr,"result of '*' does not fit %s",name); }
     else if (same(op,"/") || same(op,"%")) {
-        if (!b) return evalFail(eval,expr,"division by zero in '%s'",op);
+        if (!b) return evalTrap(eval,expr,"division by zero in '%s'",op);
         result = same(op,"/") ? a / b : a % b;
     } else return evalFail(eval,expr,"no C primitive implements builtin operator '%s' on %s",op,name);
-    if (!scalarFits(result,bits,isSigned)) return evalFail(eval,expr,"result of '%s' does not fit %s",op,name);
+    if (!scalarFits(result,bits,isSigned)) return evalTrap(eval,expr,"result of '%s' does not fit %s",op,name);
     *out = (RangeValue){.kind=ValueScalar,.type=left.type,.integer=(long long)result};
     return EvalNormal;
 }
@@ -1371,17 +1382,28 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
 }
 
 /* An argument whose value evaluation could not compute: reported where the
- * argument is written, naming its parameter, with the evaluator's reason as a note
+ * argument is written, naming its parameter. A trap is known, so the error
+ * states it, with the trap's place as a note when it is elsewhere; any other
+ * value is not known at macro time, with the evaluator's reason as a note
  * unless the argument is the very name the reason is about. Its application
  * computes no values, so every later run stops. */
 static int evalUnknownArgument(Eval *eval, RangeMacroApplication *declared, size_t index, const Eval *lexical)
 {
     RangeNode *macro = declared->declaration, *labeled = declared->attribute->items[index], *argument = labeled->a;
-    char text[256];
-    snprintf(text,sizeof(text),"the argument '%s' of @%s is not known at macro time",macro->items[index]->name,macro->name);
-    int noted = !(argument->kind == RangeNodeName && lexical->at == argument);
+    char text[768];
+    int noted;
+    if (lexical->trapped) {
+        snprintf(text,sizeof(text),"the argument '%s' of @%s traps at macro time: %s",macro->items[index]->name,macro->name,lexical->message);
+        noted = lexical->at && lexical->at != argument;
+    } else {
+        snprintf(text,sizeof(text),"the argument '%s' of @%s is not known at macro time",macro->items[index]->name,macro->name);
+        noted = !(argument->kind == RangeNodeName && lexical->at == argument);
+    }
     declared->argued = -1;
-    if (!eval->vm->report) return evalFail(eval,labeled,"%s%s%s",text,noted ? ": " : "",noted ? lexical->message : "");
+    if (!eval->vm->report) {
+        int reasoned = noted && !lexical->trapped;
+        return evalFail(eval,labeled,"%s%s%s",text,reasoned ? ": " : "",reasoned ? lexical->message : "");
+    }
     sourceDiagnostic(eval->vm->report,labeled,0,"macro-validation","%s",text);
     if (noted) sourceDiagnostic(eval->vm->report,lexical->at ? lexical->at : argument,2,"macro-validation","%s",lexical->message);
     return evalStop(eval);
@@ -1406,7 +1428,7 @@ static int evalArguments(Eval *eval, RangeMacroApplication *app, EvalFrame *fram
             if (status == EvalFailed && lexical.message) return evalUnknownArgument(eval,declared,i,&lexical);
             if (!status) status = evalAdopt(&lexical,&values[i],found(NULL,macro->items[i])->type,argument);
             if (status) {
-                eval->message = lexical.message; eval->at = lexical.at;
+                eval->message = lexical.message; eval->at = lexical.at; eval->trapped = lexical.trapped;
                 return status;
             }
         }
