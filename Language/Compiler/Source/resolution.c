@@ -102,12 +102,45 @@ void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attribute)
     attribute->macroApplication = app;
 }
 
+/* Where an application was written: its location, and the application
+ * that emitted it, if any. */
+static void applicationSite(char *out, size_t size, const RangeNode *attribute)
+{
+    const RangeNode *emitter = attribute->emittedBy;
+    int length = snprintf(out,size,"%s:%d:%d",attribute->path,attribute->line,attribute->column);
+    if (emitter && length >= 0 && (size_t)length < size)
+        snprintf(out + length,size - (size_t)length,", emitted by @%s at %s:%d:%d",emitter->name,emitter->path,emitter->line,emitter->column);
+}
+
+/* A macro applies to a declaration at most once: like a nominal type's
+ * name, a macro's names one application there, whatever its arguments or
+ * overload. A second is an error where it is attached, written on the
+ * declaration or an extension of it, or emitted, before it runs; an emitted
+ * one is reported at the application that emitted it. */
+void singleApplication(Resolver *vm, RangeNode *declaration, RangeNode *attribute)
+{
+    if (same(attribute->name,"builtin") || same(attribute->name,"extern")) return;
+    for (size_t i = 0; declaration->c && i < declaration->c->itemCount && declaration->c->items[i] != attribute; ++i) {
+        RangeNode *first = declaration->c->items[i];
+        if (!same(first->name,attribute->name)) continue;
+        char site[512], again[512] = "";
+        applicationSite(site,sizeof(site),first);
+        if (attribute->emittedBy)
+            snprintf(again,sizeof(again),"; @%s emits it again",attribute->emittedBy->name);
+        fail(vm,attribute->emittedBy ? attribute->emittedBy : attribute,
+             "@%s is already applied to '%s' at %s; a macro applies once per declaration%s",
+             attribute->name,declaration->name ? declaration->name : rangeNodeKindName(declaration->kind),site,again);
+    }
+}
+
 void resolveGraphTarget(Resolver *vm, RangeNode *target)
 {
     if (!target->graphType) return;
     RangeNode *attributes = target->c;
-    if (attributes) for (size_t a = 0; a < attributes->itemCount; ++a)
+    if (attributes) for (size_t a = 0; a < attributes->itemCount; ++a) {
+        singleApplication(vm,target,attributes->items[a]);
         resolveApplication(vm,target,attributes->items[a]);
+    }
     if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
         for (size_t i = 0; i < target->itemCount; ++i) resolveGraphTarget(vm,target->items[i]);
 }
@@ -257,7 +290,7 @@ static void registerLiteralRules(Resolver *vm)
             if (!builtin || !same(a->name,builtin->name)) continue;
             if (resolveMacroDeclaration(vm,a,node,NULL) != builtin) continue;
             if (node->kind != RangeNodeMacro) fail(vm,a,"literal rule must target a Macro");
-            if (node->literalPattern) fail(vm,a,"duplicate literal rule");
+            singleApplication(vm,node,a);
             // Typing checks the argument against the parameter, as it checks
             // any application's; reading it needs a literal pattern now.
             if (a->itemCount != 1) continue;

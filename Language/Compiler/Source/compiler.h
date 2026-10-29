@@ -181,6 +181,7 @@ _Noreturn void fail(Resolver *vm, RangeNode *at, const char *format, ...);
 RangeNode *grammarDeclaration(Resolver *vm, RangeNode *node);
 void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attribute);
 void resolveGraphTarget(Resolver *vm, RangeNode *target);
+void singleApplication(Resolver *vm, RangeNode *declaration, RangeNode *attribute);
 void validateGraphShape(Resolver *vm, RangeNode *node, const char *source);
 int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const char *input);
 int macroBuiltin(RangeNode *node, const char *name);

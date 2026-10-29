@@ -68,43 +68,15 @@ static void resolveMergedNode(Resolver *vm, RangeNode *node)
     resolveLiteralDefaults(vm,node);
 }
 
-/* Two applications with the same written arguments, compared as syntax. */
-static int sameSyntax(const RangeNode *a, const RangeNode *b)
-{
-    if (!a || !b) return a == b;
-    if (a->kind != b->kind || a->integer != b->integer || a->itemCount != b->itemCount
-        || (a->flags & ~RangeFlagImplicit) != (b->flags & ~RangeFlagImplicit)) return 0;
-    if ((a->name || b->name) && !same(a->name,b->name)) return 0;
-    if ((a->typeName || b->typeName) && !same(a->typeName,b->typeName)) return 0;
-    if (!sameSyntax(a->a,b->a) || !sameSyntax(a->b,b->b) || !sameSyntax(a->c,b->c)
-        || !sameSyntax(a->generics,b->generics)) return 0;
-    for (size_t i = 0; i < a->itemCount; ++i) if (!sameSyntax(a->items[i],b->items[i])) return 0;
-    return 1;
-}
-
 /* A macro application written on an extension applies to the extended
- * declaration as if written there: it is listed in #target.macros. The same
- * macro applied twice to one declaration is one application; different
- * arguments are an error. */
+ * declaration as if written there: it is listed in #target.macros. A macro
+ * already applied to the declaration is not applied again. */
 static void attachApplication(Resolver *vm, RangeNode *declaration, RangeNode *attribute)
 {
+    singleApplication(vm,declaration,attribute);
     if (!declaration->c)
         declaration->c = rangeNodeCreate(vm->arena,RangeNodeAttribute,declaration->path,declaration->line,declaration->column);
-    RangeNode *list = declaration->c;
-    for (size_t i = 0; i < list->itemCount; ++i) {
-        RangeNode *existing = list->items[i];
-        if (!same(existing->name,attribute->name)) continue;
-        if (!sameSyntax(existing,attribute))
-            fail(vm,attribute,"@%s is applied to '%s' twice with different arguments, at %s:%d:%d and at %s:%d:%d",
-                 attribute->name,declaration->name,existing->path,existing->line,existing->column,
-                 attribute->path,attribute->line,attribute->column);
-        if (vm->report)
-            sourceDiagnostic(vm->report,attribute,2,"macro",
-                "@%s is already applied to '%s' at %s:%d:%d; this is the same application",
-                attribute->name,declaration->name,existing->path,existing->line,existing->column);
-        return;
-    }
-    rangeNodeAppend(vm->arena,list,attribute);
+    rangeNodeAppend(vm->arena,declaration->c,attribute);
     resolveApplication(vm,declaration,attribute);
 }
 

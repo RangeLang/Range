@@ -9,13 +9,6 @@ enum Parity { case even, odd }
 
 construct Plain { let n: Int }
 
-// Written on the declaration and again through an extension: one application.
-@equatable
-construct Twice {
-    let n: Int
-    function =(let other: Twice): Bool { return true }
-}
-
 // Reports whether @equatable is written, through an extension too.
 macro reportsEquatable(): Construct {
     let written: #target.macros.first(where: { applied in applied.name = "equatable" })

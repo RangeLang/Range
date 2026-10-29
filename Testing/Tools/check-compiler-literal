@@ -44,7 +44,7 @@ for mode in ordinary sanitized; do
     for fixture in Invalid Duplicate Argument Target; do
         case "$fixture" in
             Invalid) expected='invalid literal regex' ;;
-            Duplicate) expected='duplicate literal rule' ;;
+            Duplicate) expected="@literal is already applied to 'invalid' at" ;;
             Argument) expected='literal pattern requires a non-interpolated string' ;;
             Target) expected="no macro 'literal' targets Construct" ;;
         esac

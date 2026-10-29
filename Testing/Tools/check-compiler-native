@@ -81,11 +81,9 @@ run array-equality 42 "" Testing/Compiler/Native/ArrayEquality.range
 run extension-equality 42 "" Testing/Compiler/Native/ExtensionTypes.range Testing/Compiler/Native/ExtensionEquality.range
 grep -Fq "ExtensionEquality.range:19:1: warning[macro]: Plain applies @equatable but declares no '='; the built-in structural '=' is used" \
     "$work_root/log" || fail "@equatable extension without '=' was not warned"
-grep -Fq "ExtensionEquality.range:23:1: note[macro]: @equatable is already applied to 'Twice' at" "$work_root/log" \
-    || fail "a second application of @equatable was not noted"
-grep -Fq "ExtensionTypes.range:28:1: warning[macro]: Written writes @equatable" "$work_root/log" \
+grep -Fq "ExtensionTypes.range:21:1: warning[macro]: Written writes @equatable" "$work_root/log" \
     || fail "#target.macros does not list an application written through an extension"
-! grep -Eq "(Fraction|Parity|Coin|Twice) applies @equatable but declares no" "$work_root/log" \
+! grep -Eq "(Fraction|Parity|Coin) applies @equatable but declares no" "$work_root/log" \
     || fail "@equatable on an extension missed the '=' beside it"
 ! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its '='"
 run member-defaults 42 "" Testing/Compiler/Native/MemberDefaults.range
@@ -753,6 +751,34 @@ macro sized(let width: Int): Construct {}
 @sized(width: 2)
 construct Point { let x: Int  let y: Int }
 { return 0 }"
+# A macro applies to a declaration once, whatever its arguments: a second
+# application is an error where it is attached, written on the declaration,
+# on an extension of it, or emitted by another macro, before either runs.
+reject twice-written "twice-written.range:2:1: @equatable is already applied to 'Twice' at" \
+    '@equatable
+@equatable
+construct Twice { let n: Int  function =(let other: Twice): Bool { return true } }
+{ return 0 }'
+grep -Fq "twice-written.range:1:1; a macro applies once per declaration" "$work_root/log" || fail "twice-written named no first application"
+reject twice-extension "twice-extension.range:3:1: @equatable is already applied to 'Twice' at" \
+    '@equatable
+construct Twice { let n: Int  function =(let other: Twice): Bool { return true } }
+@equatable
+extension Twice {}
+{ return 0 }'
+grep -Fq "twice-extension.range:1:1; a macro applies once per declaration" "$work_root/log" || fail "twice-extension named no first application"
+reject twice-arguments "@sized is already applied to 'Point'" \
+    'macro sized(let width: Int): Construct {}
+macro sized(let atLeast: Int): Construct {}
+@sized(width: 2)
+@sized(atLeast: 1)
+construct Point { let x: Int  let y: Int }
+{ return 0 }'
+reject twice-emitted "@equatable is already applied to 'Array' at" \
+    '@equatable
+extension Array {}
+{ return 0 }'
+grep -Fq "a macro applies once per declaration; @collection emits it again" "$work_root/log" || fail "twice-emitted named no emitter"
 # #target is the declaration a macro is attached to: an ordinary value, and
 # spliced alone into #graph it names that declaration.
 run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {
