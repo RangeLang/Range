@@ -14,5 +14,7 @@ C implements mechanisms and explicit primitives, without hardcoded concrete type
   Do not invent definitions or hide gaps to make compilation appear successful.
 - This is the sole repository guidance file. Keep it high-level; use source and
   tests for current behavior. Do not add duplicate READMEs, handoffs, or status docs.
+- TODO.md is the one place for open work: design discussions and implementation
+  gaps. Add to it and remove finished items there, not in other files.
 - Deferred material and saved benchmarks are historical references, not evidence
   of current compiler support or performance.
