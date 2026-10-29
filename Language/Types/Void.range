@@ -1,6 +1,6 @@
 // What a function or closure that returns no information returns, as in
 // (Element) -> Void. A construct without stored members has one value and
 // holds nothing, so a closure returning it yields no value and `return`
-// needs none; C reads that from the members, never from this name. "Never
-// returns" (a function that always traps) would be a different, empty type.
+// needs none; C reads that from the members, never from this name. A
+// function that never returns returns Never, an enum without cases.
 construct Void {}

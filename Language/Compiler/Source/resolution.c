@@ -1283,7 +1283,7 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
                              "interpolated integers in C; at macro time it writes to the compiler's output");
         else if (builtinFunction(item,"diagnostic"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'diagnostic' writes its located message to standard error "
-                             "and exits with status 134 in C; at macro time it fails the application; C treats a call of it as diverging");
+                             "and exits with status 134 in C; at macro time it fails the application");
         else if (builtinFunction(item,"warning"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'warning' reports a compile-time warning at the "
                              "application through C's diagnostics");

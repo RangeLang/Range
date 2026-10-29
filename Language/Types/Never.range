@@ -1,0 +1,5 @@
+// What a function that never returns returns, as diagnostic does: an enum
+// without cases, so it has no value and nothing constructs one. A call whose
+// result type has no values diverges, as return does: it can end an arm of
+// a switch expression. C reads that from the cases, never from this name.
+enum Never {}

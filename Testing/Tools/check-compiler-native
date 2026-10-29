@@ -313,12 +313,13 @@ reject break-outside "'break' is only allowed inside a loop" \
 reject continue-outside "'continue' is only allowed inside a loop" \
     'function f(let b: Bool): Int { switch { b: continue, default: return 0 } }
 { return f(b: true) }'
-reject arm-falls-through "an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or diagnostic" \
+reject arm-falls-through "an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or a call that never returns" \
     'function f(let n: Int): Int { let m: switch { n > 0: n, default: { print(message: "no") } } return m }
 { return f(n: 1) }'
 # print, diagnostic, and warning are ordinary builtin functions: calls with
-# labels, typed as any call is. A call of diagnostic diverges, so it can be
-# an arm of a switch expression; a call of print yields nothing, so it cannot.
+# labels, typed as any call is. diagnostic returns Never, an enum without
+# cases: a call whose result type has no values diverges, so it can be an arm
+# of a switch expression; a call of print yields nothing, so it cannot.
 run diagnostic-arm 134 "diagnostic-arm.range:1:66: n must be positive" "$(case_file diagnostic-arm \
     'function f(let n: Int): Int { let m: switch { n > 0: n, default: diagnostic(message: "n must be positive") } return m }
 { print(message: "\(f(n: 2))") return f(n: 0) }')"
@@ -326,6 +327,22 @@ run diagnostic-arm 134 "diagnostic-arm.range:1:66: n must be positive" "$(case_f
 reject print-arm "an arm of a switch expression yields a value or diverges; 'print' returns no value" \
     'function f(let n: Int): Int { let m: switch { n > 0: n, default: print(message: "no") } return m }
 { return f(n: 1) }'
+# Any function whose result type has no values never returns, so every path
+# of its body ends in such a call, and nothing constructs a value of it.
+run never-arm 134 "never-arm.range:2:69: stopped at 3" "$(case_file never-arm 'function stop(let n: Int): Never {
+    switch { n = 1: diagnostic(message: "stopped at one"), default: diagnostic(message: "stopped at \(n)") }
+}
+function pick(let n: Int): Int { return switch { n > 5: n, default: stop(n: n) } }
+{ print(message: "\(pick(n: 6))") let v: pick(n: 3) print(message: "after") return v }')"
+[[ "$(cat "$work_root/stdout")" == "6" ]] || fail "never arm printed: $(cat "$work_root/stdout")"
+reject never-returns "never-returns.range:1:1: error[type]: 'stop' returns Never, which has no values: every path of its body ends in a call that never returns" \
+    'function stop(let n: Int): Never { switch { n = 1: diagnostic(message: "one"), default: {} } }
+{ stop(n: 1) return 0 }'
+reject never-return-value "return requires Never; found Int<bits: 64, signed: true>" \
+    'function stop(): Never { return 1 }
+{ stop() return 0 }'
+reject never-constructed "an enum is not constructed, and Never has no cases, so it has no values" \
+    '{ let x: Never() return 0 }'
 reject print-label "argument 1 of 'print' requires label 'message'" '{ print(text: "hi") return 0 }'
 reject print-arguments "'print' takes 1 arguments; 2 supplied" '{ print(message: "hi", message: "again") return 0 }'
 reject print-interpolation "an interpolated value is an integer, a case without payloads, or a string; this one is Array<Element: Int<bits: 64, signed: true>>" \

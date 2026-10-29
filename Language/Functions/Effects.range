@@ -8,10 +8,10 @@ function print(let message: String)
 
 // Report the message. Called at macro time, it fails validation; in a
 // program it writes the located message to standard error and exits with
-// status 134, so it diverges as return does: it can end an arm of a switch
-// expression.
+// status 134. It never returns, so its result type is Never, and a call of
+// it diverges as return does: it can end an arm of a switch expression.
 @builtin
-function diagnostic(let message: String)
+function diagnostic(let message: String): Never
 
 // Called at macro time, report the message as a warning at the application
 // and continue; a law run per specialization does not repeat it. It has no

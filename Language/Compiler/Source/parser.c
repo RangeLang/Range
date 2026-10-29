@@ -933,7 +933,7 @@ static void parseArm(RangeParser *parser, RangeNode *entry, int value)
         entry->b = parseBlock(parser);
         if (value && !parser->failed && !entry->b->itemCount)
             parserFail(parser, &open, "'{}' does nothing, so it is not an arm of a switch expression; "
-                       "yield a value, or diverge with return, break, continue, or diagnostic");
+                       "yield a value, or diverge with return, break, continue, or a call that never returns");
         return;
     }
     static const char *const blocks[] = {"let", "state", "derived", "binding", "while", "for", "function", NULL};

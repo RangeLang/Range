@@ -1348,6 +1348,8 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
         if (optionalWrapped(typer,type,&present))
             typeError(typer,at,"an enum is not constructed: write %s.%s(value), or bind the value directly to infer %s",
                       t,present->name,t);
+        else if (uninhabited(type))
+            typeError(typer,at,"an enum is not constructed, and %s has no cases, so it has no values",t);
         else
             typeError(typer,at,"an enum is not constructed: write %s.%s, or bind a value of %s directly",t,
                       declaration->itemCount ? declaration->items[0]->name : "case",t);
@@ -1713,7 +1715,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
  * holding one, is only called or passed on to a function-typed parameter. */
 
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
-static int exits(RangeNode *, const RangeNode *, int);
+static int exits(RangeNode *, RangeNode *, int);
 
 /* The expression a closure body is: its switch read as an expression, or its
  * one expression statement. */
@@ -2478,18 +2480,28 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
 
-/* Whether a call is of the builtin function diagnostic, which ends the
- * program, as typing under `key` resolved it. */
-static int diverges(RangeNode *key, const RangeNode *call)
+/* Whether a type has no values: an enum without cases, such as Never. The
+ * rule is structural; C names no such type. */
+int uninhabited(const RangeNode *type)
 {
-    return call && call->kind == RangeNodeCall && call->a && builtinFunction(found(key,call->a)->resolvedDeclaration,"diagnostic");
+    if (!type || type->kind != RangeNodeSpecialization || type->resolvedDeclaration->kind != RangeNodeEnum) return 0;
+    for (size_t i = 0; i < type->resolvedDeclaration->itemCount; ++i)
+        if (type->resolvedDeclaration->items[i]->kind == RangeNodeEnumCase) return 0;
+    return 1;
+}
+
+/* Whether a call never returns, as typing under `key` found it: its result
+ * type has no values to return, as diagnostic's Never has none. */
+static int diverges(RangeNode *key, RangeNode *call)
+{
+    return call && call->kind == RangeNodeCall && uninhabited(found(key,call)->type);
 }
 
 /* Whether control cannot reach the end of `node`: it returns, breaks, or
- * continues on every path, or ends the program through diagnostic. `break`
+ * continues on every path, or calls a function that never returns. `break`
  * and `continue` leave the innermost loop; a switch is never their target. A
  * loop nested here ends its own breaks, so they do not leave `node`. */
-static int exits(RangeNode *key, const RangeNode *node, int breaking)
+static int exits(RangeNode *key, RangeNode *node, int breaking)
 {
     if (!node) return 0;
     switch (node->kind) {
@@ -2991,17 +3003,18 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         if (entry->a) {
             RangeNode *actual = typeOf(typer,&body,entry->a,expected ? expected : type,context);
             RangeNode *callee = entry->a->kind == RangeNodeCall && entry->a->a ? found(typer->key,entry->a->a)->resolvedDeclaration : NULL;
-            // A call of a function without a result yields nothing, unless it diverges.
-            if (!actual && callee && callee->kind == RangeNodeFunction && !callee->b && !diverges(typer->key,entry->a))
+            // A call of a function without a result yields nothing; one that
+            // never returns diverges, so its arm yields no value.
+            if (!actual && callee && callee->kind == RangeNodeFunction && !callee->b)
                 typeError(typer,entry->a,"an arm of a switch expression yields a value or diverges; '%s' returns no value",callee->name);
-            type = armsType(typer,node,type,entry->a,actual);
+            if (!diverges(typer->key,entry->a)) type = armsType(typer,node,type,entry->a,actual);
             typer->narrowedCount = narrowed;
             continue;
         }
         typeBlock(typer,&body,entry->b,context,output);
         typer->narrowedCount = narrowed;
         if (value && !exits(typer->key,entry->b,typer->loops > 0))
-            typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or diagnostic");
+            typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or a call that never returns");
     }
     if (value && !type && typer->report->errors == errors)
         typeError(typer,node,"no arm of this switch expression yields a value");
@@ -3099,6 +3112,13 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     finding(typer,function)->type = output;
     typer->output = output;
     if (function->a) typeBlock(typer,&scope,function->a,context,output);
+    // A result type without values has nothing to return: every path ends
+    // in a call that never returns, so a call of the function diverges.
+    if (function->a && uninhabited(output) && !exits(typer->key,function->a,0)) {
+        char name[160]; describeType(name,sizeof(name),output);
+        typeError(typer,function,"'%s' returns %s, which has no values: every path of its body ends in a call that never returns",
+                  function->name,name);
+    }
     typerRestore(typer,outer);
 }
 
