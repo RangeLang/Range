@@ -96,6 +96,8 @@ run identity-references 42 "" Testing/Compiler/Native/IdentityReferences.range
 run value-generics 42 "" Testing/Compiler/Native/ValueGenerics.range
 run macro-applications 42 "" Testing/Compiler/Native/MacroApplications.range
 run macro-arguments 42 "" Testing/Compiler/Native/MacroArguments.range
+printf '%s\n' "Bag holds Array<Element: Int<bits: 64, signed: true>>" "Byte holds Int" | cmp -s - "$work_root/out" \
+    || fail "macro-time specializations printed: $(cat "$work_root/out")"
 run promotion 42 "" Testing/Compiler/Native/Promotion.range
 # A name a pattern binds and nothing reads is a warning, in native code and
 # in macros alike; a read in the arm's condition or body uses it.
@@ -741,11 +743,18 @@ reject macro-argument-target "#target is written only in a macro's body" "$sized
 @sized(width: #target.members.count)
 construct Point { let x: Int  let y: Int }
 { return 0 }"
-reject macro-argument-generic "'Array<…>' as a value is not implemented: at macro time a type's name is its declaration, written without generic arguments" \
-    'macro holding(let type: @nominal): Construct { #graph { extension #target.name { let inner: #type } } }
-@holding(type: Array<Int>)
+# A type written with generic arguments is checked as it is in a type, where
+# the argument is written; a generic declaration's bare name is the
+# declaration, which names no type where it is spliced.
+holding='macro holding(let type: @nominal): Construct { #graph { extension #target.name { let inner: #type } } }'
+reject macro-argument-generic "macro-argument-generic.range:2:26: error[type]: generic bits requires Int<bits: 64, signed: true>; found Bool" "$holding
+@holding(type: Int<bits: true>)
 construct Holder { let tag: Int }
-{ return 0 }'
+{ return 0 }"
+reject macro-argument-unspecialized "macro-argument-unspecialized.range:1:82: error[type]: 'Array' requires generic Element" "$holding
+@holding(type: Array)
+construct Holder { let tag: Int }
+{ return 0 }"
 reject macro-argument-ambiguous "ambiguous graph macro 'sized' for target Construct" "$sized
 macro sized(let width: Int): Construct {}
 @sized(width: 2)

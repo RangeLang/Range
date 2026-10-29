@@ -675,7 +675,8 @@ int spliceChain(const RangeNode *node)
 }
 
 /* `let x: #element` becomes `let x: Element`: a spliced name in a
- * declaration RHS takes the type position, as the parser would place it. */
+ * declaration RHS takes the type position, as the parser would place it,
+ * with the generic arguments a spliced specialization writes. */
 void spliceDeclarationType(RangeNode *copy, const RangeNode *original)
 {
     if (!rangeNodeDeclaresValue(copy->kind) || copy->typeName
@@ -683,6 +684,7 @@ void spliceDeclarationType(RangeNode *copy, const RangeNode *original)
         || !spliceChain(original->items[0]->a) || copy->items[0]->a->kind != RangeNodeName) return;
     RangeNode *reference = copy->items[0]->a;
     copy->typeName = reference->name;
+    copy->generics = reference->generics;
     copy->itemCount = 0;
     if (!copy->flags) copy->rhsReference = reference;
 }

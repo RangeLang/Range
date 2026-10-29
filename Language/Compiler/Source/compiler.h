@@ -227,6 +227,7 @@ void drainLaws(Typer *typer);
 RangeFacts *found(RangeNode *key, RangeNode *node);
 void patternRow(RangeNode *row, RangeNode **vector, size_t width);
 void describeType(char *out, size_t size, const RangeNode *type);
+int bareSpecialization(const RangeNode *specialization);
 int lawInputs(const RangeNode *value, RangeNodeKind *kind, long long *integer, const char **text);
 RangeNode **genericSlot(RangeNode *specialization, RangeNode *generic);
 RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declaration, RangeNode *arguments, RangeNode *context, RangeNode *at);

@@ -1,7 +1,9 @@
 // Type kinds apply @nominal, so @nominal names any declaration that is a
 // type: a construct or an enum. Function.output, Function.receiver, and
-// Parameter.type hold one. Each kind declares its own fields; every kind has
-// a name.
+// Parameter.type hold one. At macro time a type written with generic
+// arguments, such as Array<Int>, is a @nominal value too: the specialization
+// they select, whose fields are its declaration's. Each kind declares its own
+// fields; every kind has a name.
 macro nominal(): Construct {
   let name: #target.members.first(where: { member in member.name = "name" })
   switch {

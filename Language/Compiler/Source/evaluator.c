@@ -200,7 +200,8 @@ static int evalAdopt(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *
 /* ---- text ---- */
 
 /* A value as a message writes it: integers in decimal, a case without a
- * payload by its name, text as its bytes, a declaration by its name. */
+ * payload by its name, text as its bytes, a declaration by its name, a
+ * specialization as a type is described. */
 int evalWrite(Eval *eval, RangeValue value, RangeNode *at, const char **text, size_t *length)
 {
     char piece[64];
@@ -223,6 +224,13 @@ int evalWrite(Eval *eval, RangeValue value, RangeNode *at, const char **text, si
     case ValueDeclaration:
         if (!value.node->name) return evalFail(eval,at,"a compile-time message cannot interpolate this value");
         *text = value.node->name; *length = strlen(*text);
+        if (value.node->kind == RangeNodeSpecialization) {
+            // A specialization is written as a type is described: Array<Element: Int>.
+            char described[512];
+            describeType(described,sizeof(described),value.node);
+            *length = strlen(described);
+            *text = rangeArenaIntern(eval->vm->arena,described,*length);
+        }
         return EvalNormal;
     default: return evalFail(eval,at,"a compile-time message cannot interpolate this value");
     }
@@ -424,34 +432,46 @@ static void forgetFacts(RangeNode *copy)
 }
 
 /* A spliced value becomes the source a person would have written there: a
- * declaration or a name, a reference; a literal or a scalar, a literal.
- * `#target.field` is the node or the name C holds there. */
-static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **out)
+ * declaration or a name, a reference; a specialization, a reference with its
+ * generic arguments, each spliced in turn, as in `Array<Element: Int>`; a
+ * literal or a scalar, a literal. */
+static int evalSpliced(Eval *eval, RangeValue value, RangeNode *at, RangeNode **out)
 {
     RangeArena *arena = eval->vm->arena;
-    RangeValue value;
-    if (at->kind == RangeNodeMemberAccess && at->a->kind == RangeNodeEnvironment && same(at->a->name,"target")
-        && !found(frame->key,at)->narrowed) {
-        RangeGraphValue raw = rangeGraphStoredField(arena,eval->application->target,at->name);
-        if (raw.kind == RangeGraphNodes) return evalFail(eval,at,"cannot splice a list of %zu declarations",raw.count);
-        value = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.text=raw.text,.length=strlen(raw.text)}
-            : raw.kind == RangeGraphNode ? (RangeValue){.kind=ValueDeclaration,.node=raw.node} : (RangeValue){0};
-    } else {
-        int status = evalExpression(eval,frame,at,&value);
-        if (status) return status;
-    }
     RangeNode *node = NULL;
     char spelled[32];
     int bits = 64, isSigned = 1;
     switch (value.kind) {
     case ValueNone: return evalFail(eval,at,"splice has no value");
-    case ValueDeclaration: case ValueText:
+    case ValueDeclaration: case ValueText: {
         if (value.kind == ValueText && value.node && value.node->kind == RangeNodeString) break;
+        RangeNode *type = value.kind == ValueDeclaration && value.node->kind == RangeNodeSpecialization ? value.node : NULL;
+        RangeNode *declaration = type ? type->resolvedDeclaration : value.node;
+        if (type && declaration->kind == RangeNodeMacro) return evalFail(eval,at,"cannot splice the macro type %s",type->name);
+        if (type && bareSpecialization(type)) type = NULL; /* Int<bits: 64, signed: true> is written Int */
         node = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
-        node->name = value.kind == ValueText ? rangeArenaIntern(arena,value.text,value.length) : value.node->name;
+        node->name = value.kind == ValueText ? rangeArenaIntern(arena,value.text,value.length) : declaration->name;
         if (!node->name) return evalFail(eval,at,"cannot splice an unnamed %s",rangeNodeKindName(value.node->kind));
-        if (value.kind == ValueDeclaration) node->resolvedDeclaration = value.node;
+        if (value.kind == ValueDeclaration) node->resolvedDeclaration = declaration;
+        if (!type || !type->values || !declaration->generics) break;
+        node->generics = rangeNodeCreate(arena,RangeNodeBlock,at->path,at->line,at->column);
+        node->generics->name = "genericArguments";
+        for (size_t i = 0; i < declaration->generics->itemCount; ++i) {
+            RangeNode *generic = declaration->generics->items[i], *held = type->values[i];
+            RangeValue argument = {.kind=ValueDeclaration,.node=held};
+            EvalFrame none = {0};
+            int typed = generic->kind == RangeNodeTypeParameter;
+            int status = !held || (typed && held->kind != RangeNodeSpecialization)
+                ? evalFail(eval,at,"cannot splice %s: its generic %s holds no type or value a reference can write",declaration->name,generic->name)
+                : typed ? EvalNormal : evalExpression(eval,&none,held,&argument);
+            RangeNode *written = rangeNodeCreate(arena,RangeNodeArgument,at->path,at->line,at->column);
+            written->name = generic->name;
+            if (!status) status = evalSpliced(eval,argument,at,&written->a);
+            if (status) return status;
+            rangeNodeAppend(arena,node->generics,written);
+        }
         break;
+    }
     case ValueLiteral: case ValueScalar:
         if (value.kind == ValueLiteral && value.node->kind != RangeNodeInteger) break;
         (void)scalarShape(value.type,&bits,&isSigned);
@@ -485,6 +505,24 @@ static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **o
     node->emittedBy = eval->application->attribute;
     *out = node;
     return EvalNormal;
+}
+
+/* A splice: its value, spliced. `#target.field` is the node or the name C
+ * holds there. */
+static int evalSplice(Eval *eval, EvalFrame *frame, RangeNode *at, RangeNode **out)
+{
+    RangeValue value;
+    if (at->kind == RangeNodeMemberAccess && at->a->kind == RangeNodeEnvironment && same(at->a->name,"target")
+        && !found(frame->key,at)->narrowed) {
+        RangeGraphValue raw = rangeGraphStoredField(eval->vm->arena,eval->application->target,at->name);
+        if (raw.kind == RangeGraphNodes) return evalFail(eval,at,"cannot splice a list of %zu declarations",raw.count);
+        value = raw.kind == RangeGraphText ? (RangeValue){.kind=ValueText,.text=raw.text,.length=strlen(raw.text)}
+            : raw.kind == RangeGraphNode ? (RangeValue){.kind=ValueDeclaration,.node=raw.node} : (RangeValue){0};
+    } else {
+        int status = evalExpression(eval,frame,at,&value);
+        if (status) return status;
+    }
+    return evalSpliced(eval,value,at,out);
 }
 
 /* Copy one quoted declaration for this application, filling its splices.
@@ -1026,7 +1064,13 @@ static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *o
         return status ? status : evalAdopt(eval,out,found(frame->key,declaration)->type,expr);
     }
     if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
-        *out = (RangeValue){.kind=ValueDeclaration,.node=declaration};
+        // Written with generic arguments, the specialization typing selected,
+        // or none, when typing reported why; one holding only defaults is
+        // the declaration.
+        RangeNode *specialization = found(frame->key,expr)->specialization;
+        if (expr->generics && !specialization) return evalStop(eval);
+        *out = (RangeValue){.kind=ValueDeclaration,
+            .node=specialization && !bareSpecialization(specialization) ? specialization : declaration};
         return EvalNormal;
     }
     if (evalRooted(eval,frame)) return nativeKnownName(eval->outside,declaration,out); /* a name native code holds */
@@ -1047,7 +1091,10 @@ static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, Range
     if (status) return status;
     RangeNode *declaration = receiver.type && receiver.type->kind == RangeNodeSpecialization ? receiver.type->resolvedDeclaration : NULL;
     switch (receiver.kind) {
-    case ValueDeclaration: return evalField(eval,receiver.node,expr->name,expr,out);
+    case ValueDeclaration:
+        // A specialization's fields are its declaration's, as written.
+        return evalField(eval,receiver.node->kind == RangeNodeSpecialization ? receiver.node->resolvedDeclaration : receiver.node,
+                         expr->name,expr,out);
     case ValueInstance: {
         size_t index = evalMember(&receiver,member ? member : declaration ? findMember(declaration,expr->name) : NULL);
         if (index == SIZE_MAX) break;

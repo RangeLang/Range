@@ -41,9 +41,39 @@ construct Box { let value: Int }
 @holding(type: Box)
 construct Holder { let tag: Int }
 
+// Written with generic arguments, a type at macro time is the specialization
+// they select, spliced as a reference to it. Specializations are interned, so
+// the same arguments make one value; one holding only its declaration's
+// defaults is the declaration its bare name names.
+macro measuring(let type: @nominal): Construct {
+    #graph { extension #target.name { function measure(let of: #type): Int { return of.count } } }
+}
+
+macro matching(let left: @nominal, let right: @nominal): Construct {
+    switch {
+        left != right: diagnostic(message: "\(left) is not \(right)"),
+        default: print(message: "\(#target.name) holds \(left)")
+    }
+}
+
+@holding(type: Array<Int>)
+@measuring(type: Array<Int>)
+@matching(left: Array<Int>, right: Array<Int>)
+construct Bag { let tag: Int }
+
+@holding(type: Int<bits: 8>)
+@matching(left: Int<bits: 64, signed: true>, right: Int)
+construct Byte { let tag: Int }
+
 {
     let point: Point(x: 10, y: 20)
     let line: Line(a: 1, b: 2, c: 3)
-    let holder: Holder(tag: 1, inner: Box(value: 4))
+    let holder: Holder(tag: 1, inner: Box(value: 2))
+    state items: Array<Int>()
+    items.append(value: 7)
+    let bag: Bag(tag: 2, inner: items)
+    let byte: Byte(tag: 3, inner: 127)
+    switch { byte.inner != 127: return 1, default: {} }
     return point.x + point.y + line.c + Wrap<Int>(value: 5).value + holder.inner.value
+        + bag.measure(of: bag.inner) + bag.inner.count
 }

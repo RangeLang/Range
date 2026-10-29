@@ -492,6 +492,19 @@ static int sameGenericValue(const RangeNode *generic, RangeNode *x, RangeNode *y
     return x && y ? sameLiteral(x,y) : x == y;
 }
 
+/* Whether a specialization is the one its declaration's bare name names:
+ * each of its generics is a value generic holding its default, as in
+ * Int<bits: 64, signed: true>, or it has none. */
+int bareSpecialization(const RangeNode *specialization)
+{
+    RangeNode *declared = specialization->resolvedDeclaration->generics;
+    for (size_t i = 0; declared && specialization->values && i < declared->itemCount; ++i) {
+        RangeNode *generic = declared->items[i];
+        if (generic->kind == RangeNodeTypeParameter || !sameGenericValue(generic,specialization->values[i],rangeNodeRHS(generic))) return 0;
+    }
+    return 1;
+}
+
 /* A specialization's values, one per generic of its declaration in order:
  * the type a type parameter names, or the value a value generic holds. */
 static RangeNode **genericValues(RangeArena *arena, const RangeNode *declaration)
@@ -2289,12 +2302,17 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             }
         } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
         else if ((typer->macro || typer->arguments) && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
-            // At macro time a type's name is that declaration, a value of its
-            // grammar kind: `written.output != Bool` compares declarations,
-            // and `@wraps(type: Int)` passes one.
+            // At macro time a type is a value of its grammar kind. Written
+            // bare, it is the declaration: `written.output != Bool` compares
+            // declarations, and `@wraps(type: Int)` passes one. Written with
+            // generic arguments, it is the specialization they select, which
+            // is interned, so `Array<Int> = Array<Int>`; one that holds only
+            // its declaration's defaults is what the bare name names, the
+            // declaration: `Int<bits: 64, signed: true> = Int`.
             if (expr->generics) {
-                typeError(typer,expr,"'%s<…>' as a value is not implemented: at macro time a type's name is its declaration, written without generic arguments",expr->name);
-                break;
+                RangeNode *specialization = specialize(typer,scope,declaration,expr->generics,context,expr);
+                if (!specialization) break;
+                finding(typer,expr)->specialization = specialization;
             }
             RangeNode *kind = declaration->grammarDefinition;
             if (kind && kind->kind == RangeNodeConstruct) type = specialize(typer,NULL,kind,NULL,NULL,expr);
