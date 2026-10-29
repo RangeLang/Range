@@ -1675,6 +1675,24 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
     return result;
 }
 
+static void nativeWriteMessage(Native *, int, const char *, RangeNode *);
+
+/* The builtin function print writes its message to standard output;
+ * diagnostic writes it, located at the call, to standard error and exits
+ * 134, as a law violation does. The message is streamed as it is written,
+ * part by part. */
+static void nativeEffect(Native *native, RangeNode *call, int print)
+{
+    char location[512] = "";
+    RangeNode *site = call->a ? call->a : call;
+    if (!print) snprintf(location,sizeof(location),"%s:%d:%d: ",site->path,site->line,site->column);
+    nativeWriteMessage(native,print ? 1 : 2,rangeArenaIntern(native->report->arena,location,strlen(location)),call->items[0]->a);
+    if (!print) {
+        nativeEmit(native,armMovz(0,134,0));
+        rangeCallImport(&native->machine,"_exit");
+    }
+}
+
 static RangeNode *nativeCall(Native *native, RangeNode *call)
 {
     RangeNode *callee = call->a;
@@ -1686,6 +1704,10 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     if (form == CallCase) return nativeVariant(native,call,found(native->key,call)->type,target,call->items,call->itemCount,0);
     if (form != CallFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
     if (nativeInlined(target)) return nativeInline(native,call,target,key);
+    if (call->itemCount == 1 && (builtinFunction(target,"print") || builtinFunction(target,"diagnostic"))) {
+        nativeEffect(native,call,builtinFunction(target,"print"));
+        return NULL;
+    }
     RangeNode *self = NULL;
     int hasSelf = 0;
     if (callee->kind == RangeNodeMemberAccess) {
@@ -2186,26 +2208,6 @@ static void nativeWriteMessage(Native *native, int fd, const char *prefix, Range
     free(known);
 }
 
-/* @print writes to standard output; @diagnostic writes a located message to
- * standard error and exits 134, as a law violation does. */
-static void nativeEffect(Native *native, RangeNode *node, RangeNode *attribute)
-{
-    RangeNode *macro = attribute->resolvedDeclaration;
-    int print = macroBuiltin(macro,"print");
-    if (!print && !macroBuiltin(macro,"diagnostic")) {
-        nativeMissing(native,node,"runtime macro application '@%s' is not implemented",attribute->name);
-        return;
-    }
-    if (attribute->itemCount != 1) return; /* reported by the type checker */
-    char location[512] = "";
-    if (!print) snprintf(location,sizeof(location),"%s:%d:%d: ",attribute->path,attribute->line,attribute->column);
-    nativeWriteMessage(native,print ? 1 : 2,rangeArenaIntern(native->report->arena,location,strlen(location)),attribute->items[0]->a);
-    if (!print) {
-        nativeEmit(native,armMovz(0,134,0));
-        rangeCallImport(&native->machine,"_exit");
-    }
-}
-
 static void nativeStatementBody(Native *, RangeNode *);
 static RangeNode *nativeSwitch(Native *, RangeNode *);
 
@@ -2427,8 +2429,7 @@ static void nativeStatementBody(Native *native, RangeNode *node)
     case RangeNodeExpressionStatement: {
         // A value known before run has no effect: nothing runs.
         RangeValue known;
-        if (node->a && node->a->kind == RangeNodeAttribute) nativeEffect(native,node,node->a);
-        else if (!nativeKnown(native,node->a,&known)) nativeExpression(native,node->a);
+        if (!nativeKnown(native,node->a,&known)) nativeExpression(native,node->a);
         break;
     }
     case RangeNodeSwitch:

@@ -12,7 +12,7 @@ enum Light {
 }
 
 // Every arm form of a statement switch: an expression (a call), a block, `{}`,
-// return, an assignment, an effect, and a nested switch.
+// return, an assignment, a call that writes, and a nested switch.
 function forms(let n: Int): Int {
     state total: 0
     switch {
@@ -22,7 +22,7 @@ function forms(let n: Int): Int {
             total: 20
             total: total + 2
         },
-        n = 3: @print("three"),
+        n = 3: print(message: "three"),
         n = 4: switch { n > 3: total: 4, default: {} },
         n = 5: note(total: total),
         default: {}

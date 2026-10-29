@@ -9,7 +9,7 @@ function gate(let ready: Bool, let blocked: Bool, let forced: Bool): Bool {
 
 // Each call counts, so a skipped right operand is visible.
 function touched(let count: Int, let result: Bool): Bool {
-    @print("touched \(count)")
+    print(message: "touched \(count)")
     return result
 }
 

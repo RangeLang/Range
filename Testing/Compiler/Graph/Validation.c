@@ -36,10 +36,10 @@ static char *editLanguage(char *text, size_t *size)
  * Optional, so macros that reflect need them. */
 static size_t loadLanguage(RangeArena *arena, RangeNode **units, size_t capacity)
 {
-    static const char *const directories[] = {"Language/Grammar", "Language/Macros", "Language/Types"};
+    static const char *const directories[] = {"Language/Functions", "Language/Grammar", "Language/Macros", "Language/Types"};
     size_t count = 0;
     char error[512];
-    for (size_t d = 0; d < 3; ++d) {
+    for (size_t d = 0; d < 4; ++d) {
         DIR *directory = opendir(directories[d]);
         assert(directory);
         for (struct dirent *entry; (entry = readdir(directory));) {
@@ -97,10 +97,10 @@ static void validateLanguage(const char *source, const char *expected, size_t co
     "macro assess(): Construct { " \
     "let payload: #target.members.first(where: { m in m.name = \"payload\" }) " \
     "let ceiling: #target.generics.first(where: { g in g.name = \"ceiling\" }) " \
-    "switch { payload.absent: @diagnostic(\"missing payload\"), " \
-    "ceiling.absent: @diagnostic(\"missing ceiling\"), " \
+    "switch { payload.absent: diagnostic(message: \"missing payload\"), " \
+    "ceiling.absent: diagnostic(message: \"missing ceiling\"), " \
     "payload.present & ceiling.present & !accepts(candidate: payload.value, limit: ceiling.value): " \
-    "@diagnostic(\"source policy rejected\"), " \
+    "diagnostic(message: \"source policy rejected\"), " \
     "payload.present & ceiling.present: {} } } " \
     "function accepts(let candidate: Int, let limit: Int): Bool { " \
     "state remaining: candidate state consumed: 0 " \
@@ -132,28 +132,29 @@ int main(void)
                     "@assess construct Second<let ceiling: 2> { let payload: 2 }",NULL,2);
     validateLanguage(POLICY "@assess construct First<let ceiling: 7> { let payload: 7 } "
                     "@assess construct Second<let ceiling: 2> { let payload: 3 }","source policy rejected",0);
-    validateLanguage("macro assess(): Construct { switch { #target.members.first().present(let m) & m.value < 0: @diagnostic(\"negative\"), default: {} } } "
-                     "macro assess(): Function { let input: #target.parameters.first() switch { input.absent: @diagnostic(\"missing input\"), input.present: {} } } "
+    validateLanguage("macro assess(): Construct { switch { #target.members.first().present(let m) & m.value < 0: diagnostic(message: \"negative\"), default: {} } } "
+                     "macro assess(): Function { let input: #target.parameters.first() switch { input.absent: diagnostic(message: \"missing input\"), input.present: {} } } "
                      "@assess construct Parcel { let payload: 8 } @assess function start(let input: Int) {}",NULL,2);
-    // An effect is the macro of that name without a target.
-    validateLanguage("macro diagnostic(): Construct {} macro assess(): Function { @diagnostic(\"selected effect\") } "
+    // A call of diagnostic is the builtin function, never a macro of that name.
+    validateLanguage("macro diagnostic(): Construct {} macro assess(): Function { diagnostic(message: \"selected effect\") } "
                      "@assess function start() {}","selected effect",0);
     // Whole rule bodies are executed. Reversing the source condition changes validity.
 #define FIRST_VALUE "let first: #target.members.first() switch { first.absent: {}, first.present(let m): { "
-    validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value < 10: @diagnostic(\"too small\"), default: {} } } } } "
+    validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value < 10: diagnostic(message: \"too small\"), default: {} } } } } "
                      "@assess construct Parcel { let payload: 8 }","too small",0);
-    validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value > 10: @diagnostic(\"too large\"), default: {} } } } } "
+    validateLanguage("macro assess(): Construct { " FIRST_VALUE "switch { m.value > 10: diagnostic(message: \"too large\"), default: {} } } } } "
                      "@assess construct Parcel { let payload: 8 }",NULL,1);
     // No concrete type, helper, or parameter spelling is an intrinsic;
-    // builtin macros are selected by their own names.
-    languageEdits = (const char *const[]){"String","Text","Bool","Truth","diagnostic(let message:","diagnostic(let text:",NULL};
+    // builtin macros and functions are selected by their own names.
+    languageEdits = (const char *const[]){"String","Text","Bool","Truth","diagnostic(let message:","diagnostic(let text:",
+                                          "diagnostic(message:","diagnostic(text:",NULL};
     validateLanguage("@literal(\"[0-9]+\") macro decimalRule(): Construct { "
-                     "switch { !small(text: #target.name): @diagnostic(\"too big\"), default: {} } } "
+                     "switch { !small(text: #target.name): diagnostic(text: \"too big\"), default: {} } } "
                      "function small(let text: Text): Truth { return text = \"Quantity\" } "
                      "@decimalRule construct Quantity { let storage: 3 }",NULL,1);
     languageEdits = NULL;
     // `&` and `|` evaluate their right operand only when the left does not decide.
-    validateLanguage("macro assess(): Construct { switch { false & 1 / 0 = 0: @diagnostic(\"bad\"), default: {} } "
+    validateLanguage("macro assess(): Construct { switch { false & 1 / 0 = 0: diagnostic(message: \"bad\"), default: {} } "
                      "switch { true | 1 / 0 = 0: { let ok: true }, default: {} } } @assess construct Parcel {}",NULL,1);
     validateLanguage("macro assess(): Construct { let fixed: 0 fixed: 1 } @assess construct Parcel {}","cannot assign to let 'fixed'",0);
     validateLanguage("macro assess(): Construct { let result: 1 / 0 } @assess construct Parcel {}","division by zero",0);
@@ -163,7 +164,7 @@ int main(void)
                      "macro assess(): Construct { let result: recurse() } @assess construct Parcel {}","call depth",0);
     validateLanguage("function helper(): Int { #graph {} return 0 } "
                      "macro assess(): Construct { let value: helper() } @assess construct Parcel {}","#graph is written only in a macro's body",0);
-    validateLanguage("macro assess(): Construct { @unknown(\"bad\") } @assess construct Parcel {}","no declaration for macro 'unknown' in the loaded sources",0);
+    validateLanguage("macro assess(): Construct { @unknown(\"bad\") let marked: 1 } @assess construct Parcel {}","no declaration for macro 'unknown' in the loaded sources",0);
     validateLanguage("function f(let a: Int, let b: Int): Int { return a } "
                      "macro assess(): Construct { let result: f(a: 1, a: 2) } @assess construct Parcel {}","argument 2 of 'f' requires label 'b'",0);
     validateLanguage("macro assess(): Construct { let n: 1 switch { n.true: {}, default: {} } } @assess construct Parcel {}",
@@ -171,18 +172,18 @@ int main(void)
     // switch runs at compile time: conditions joined by `|`, comparisons,
     // default, text, and switch expressions.
 #define SIZES "macro assess(): Construct { " FIRST_VALUE "let n: m.value " \
-    "switch { n = 1 | n = 2: @diagnostic(\"small\"), n < 0: @diagnostic(\"negative\"), " \
-    "n > 100: @diagnostic(\"big \\(n)\"), n = 7: @diagnostic(\"seven\"), default: {} } } } } "
+    "switch { n = 1 | n = 2: diagnostic(message: \"small\"), n < 0: diagnostic(message: \"negative\"), " \
+    "n > 100: diagnostic(message: \"big \\(n)\"), n = 7: diagnostic(message: \"seven\"), default: {} } } } } "
     validateLanguage(SIZES "@assess construct Parcel { let payload: 500 }","big 500",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 2 }","small",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: -3 }","negative",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 7 }","seven",0);
     validateLanguage(SIZES "@assess construct Parcel { let payload: 50 }",NULL,1);
     validateLanguage("macro assess(): Construct { let first: #target.members.first() let kind: switch { first.present: \"filled\", first.absent: \"empty\" } "
-                     "@diagnostic(\"\\(#target.name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
+                     "diagnostic(message: \"\\(#target.name) is \\(kind)\") } @assess construct Parcel {}","Parcel is empty",0);
     validateLanguage("macro assess(): Construct { let first: #target.members.first() let size: switch { first.present(let m): switch { m.value = 3: 30, default: 0 }, first.absent: 0 } "
-                     "switch { size = 30: @diagnostic(\"thirty\"), default: {} } } @assess construct Parcel { let payload: 3 }","thirty",0);
-    validateLanguage("macro assess(): Construct { switch { #target.name = \"Parcel\": @diagnostic(\"named\"), default: {} } } "
+                     "switch { size = 30: diagnostic(message: \"thirty\"), default: {} } } @assess construct Parcel { let payload: 3 }","thirty",0);
+    validateLanguage("macro assess(): Construct { switch { #target.name = \"Parcel\": diagnostic(message: \"named\"), default: {} } } "
                      "@assess construct Parcel {}","named",0);
     validateLanguage("macro assess(): Construct { let b: true switch { b.true: {} } } @assess construct Parcel {}","'b.false' is not handled",0);
     validateLanguage("macro assess(): Construct { let n: 1 switch { n = 1: {} } } @assess construct Parcel {}","must be exhaustive; add a default",0);
@@ -195,17 +196,17 @@ int main(void)
 #define CASES "enum Shape { case circle(radius: Int) case square(Int) case empty } " \
     "function half(let n: Int): Int? { switch { n < 0: return .nothing, default: {} } return n / 2 } " \
     "function shape(let n: Int): Shape { switch { n = 0: return .empty, n = 1: return Shape.circle(radius: 5), default: return .square(n) } } "
-    validateLanguage(CASES "macro assess(): Construct { let h: half(n: 8) switch { h.nothing: @diagnostic(\"none\"), "
-                     "h.just(let v) & v > 10: @diagnostic(\"big\"), h.just(4): @diagnostic(\"four\"), h.just: {} } } "
+    validateLanguage(CASES "macro assess(): Construct { let h: half(n: 8) switch { h.nothing: diagnostic(message: \"none\"), "
+                     "h.just(let v) & v > 10: diagnostic(message: \"big\"), h.just(4): diagnostic(message: \"four\"), h.just: {} } } "
                      "@assess construct Parcel {}","four",0);
-    validateLanguage(CASES "macro assess(): Construct { let h: half(n: -1) switch { h.nothing: @diagnostic(\"none\"), h.just: {} } } "
+    validateLanguage(CASES "macro assess(): Construct { let h: half(n: -1) switch { h.nothing: diagnostic(message: \"none\"), h.just: {} } } "
                      "@assess construct Parcel {}","none",0);
     validateLanguage(CASES "macro assess(): Construct { let s: shape(n: 9) let w: switch { s.square(let w) | s.circle(radius: let w): w, s.empty: 0 } "
-                     "switch { w = 9: {}, default: @diagnostic(\"wrong payload\") } "
-                     "switch { shape(n: 1) = Shape.circle(radius: 5): {}, default: @diagnostic(\"unequal\") } "
-                     "switch { half(n: 6) = 3: {}, default: @diagnostic(\"not promoted\") } "
-                     "switch { half(n: -2) = .nothing: {}, default: @diagnostic(\"not absent\") } "
-                     "let held: Int?.just(5) switch { held.just(5): {}, default: @diagnostic(\"not held\") } } "
+                     "switch { w = 9: {}, default: diagnostic(message: \"wrong payload\") } "
+                     "switch { shape(n: 1) = Shape.circle(radius: 5): {}, default: diagnostic(message: \"unequal\") } "
+                     "switch { half(n: 6) = 3: {}, default: diagnostic(message: \"not promoted\") } "
+                     "switch { half(n: -2) = .nothing: {}, default: diagnostic(message: \"not absent\") } "
+                     "let held: Int?.just(5) switch { held.just(5): {}, default: diagnostic(message: \"not held\") } } "
                      "@assess construct Parcel {}",NULL,1);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 2) switch { h.nothing: {} } } @assess construct Parcel {}",
                      "switch must be exhaustive: 'h.just' is not handled; add an arm for it or a default",0);
@@ -221,13 +222,13 @@ int main(void)
     // Case tests on several subjects: bindings joined by `&`, alternatives
     // grouped in parentheses, and guards on one alternative or on the whole.
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 8) let s: shape(n: 2) switch { "
-                     "h.just(let v) & s.square(let w) & v = w * 2: @diagnostic(\"rows \\(v) \\(w)\"), default: {} } } "
+                     "h.just(let v) & s.square(let w) & v = w * 2: diagnostic(message: \"rows \\(v) \\(w)\"), default: {} } } "
                      "@assess construct Parcel {}","rows 4 2",0);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: -1) let s: shape(n: 0) switch { "
-                     "(h.nothing | h.just) & s.empty: @diagnostic(\"grouped\"), default: {} } } @assess construct Parcel {}","grouped",0);
+                     "(h.nothing | h.just) & s.empty: diagnostic(message: \"grouped\"), default: {} } } @assess construct Parcel {}","grouped",0);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 8) let s: shape(n: 0) switch { "
-                     "(h.just & s.empty | h.nothing & s.square) & false: @diagnostic(\"guarded\"), "
-                     "h.nothing & s.empty | h.just & s.empty & true: @diagnostic(\"second row\"), default: {} } } "
+                     "(h.just & s.empty | h.nothing & s.square) & false: diagnostic(message: \"guarded\"), "
+                     "h.nothing & s.empty | h.just & s.empty & true: diagnostic(message: \"second row\"), default: {} } } "
                      "@assess construct Parcel {}","second row",0);
     validateLanguage(CASES "macro assess(): Construct { let h: half(n: 2) let s: shape(n: 0) switch { h.nothing: {}, h.just & s.empty: {} } } "
                      "@assess construct Parcel {}",
@@ -250,15 +251,15 @@ int main(void)
 #define LIGHT "enum Light { case red case green(Int) case blue } " \
     "extension Array { function last(): Element? { switch { count > 0: return read(at: count - 1), default: {} } return .absent } } "
     validateLanguage(LIGHT "macro probe(): Enum { "
-                     "switch { #target.cases.count = 3: {}, default: @diagnostic(\"count\") } "
-                     "switch { #target.cases.first().present(let c) & c.name = \"red\": {}, default: @diagnostic(\"first\") } "
-                     "switch { #target.cases.last().present(let c) & c.name = \"blue\": {}, default: @diagnostic(\"last\") } "
+                     "switch { #target.cases.count = 3: {}, default: diagnostic(message: \"count\") } "
+                     "switch { #target.cases.first().present(let c) & c.name = \"red\": {}, default: diagnostic(message: \"first\") } "
+                     "switch { #target.cases.last().present(let c) & c.name = \"blue\": {}, default: diagnostic(message: \"last\") } "
                      "let green: #target.cases.first(where: { c in c.name = \"green\" }) "
-                     "switch { green.present(let c): switch { c.name = \"green\": {}, default: @diagnostic(\"named\") }, "
-                     "green.absent: @diagnostic(\"missing green\") } "
-                     "switch { #target.cases.first(where: { c in c.name = \"purple\" }).absent: {}, default: @diagnostic(\"purple\") } "
-                     "switch { #target.cases.filter(where: { c in c.name = \"blue\" }).count = 1: {}, default: @diagnostic(\"filter\") } "
-                     "switch { #target.cases.map(transform: { c in c.name }).last().present(\"blue\"): {}, default: @diagnostic(\"map\") } } "
+                     "switch { green.present(let c): switch { c.name = \"green\": {}, default: diagnostic(message: \"named\") }, "
+                     "green.absent: diagnostic(message: \"missing green\") } "
+                     "switch { #target.cases.first(where: { c in c.name = \"purple\" }).absent: {}, default: diagnostic(message: \"purple\") } "
+                     "switch { #target.cases.filter(where: { c in c.name = \"blue\" }).count = 1: {}, default: diagnostic(message: \"filter\") } "
+                     "switch { #target.cases.map(transform: { c in c.name }).last().present(\"blue\"): {}, default: diagnostic(message: \"map\") } } "
                      "@probe extension Light {}",NULL,1);
     validateLanguage(LIGHT "macro probe(): Enum { let none: #target.cases.second() } @probe extension Light {}",
                      "Array<Element: EnumCase> has no function 'second'",0);
@@ -270,12 +271,12 @@ int main(void)
     // Bodies are Block values, absent for a builtin; a block lists the
     // declarations written in it.
     validateLanguage("macro probe(): Function { let body: #target.body switch { body.present(let b): switch { b.members.count = 2: {}, "
-                     "default: @diagnostic(\"members\") }, body.absent: @diagnostic(\"no body\") } } "
+                     "default: diagnostic(message: \"members\") }, body.absent: diagnostic(message: \"no body\") } } "
                      "@probe function work(): Int { let a: 1 let b: 2 return a + b } "
                      "construct Holder { @probe @builtin function read(): Int }",
                      "no body",0);
     validateLanguage("macro probe(): Function { let body: #target.body switch { body.present(let b): switch { b.members.count = 2: {}, "
-                     "default: @diagnostic(\"members\") }, body.absent: {} } } "
+                     "default: diagnostic(message: \"members\") }, body.absent: {} } } "
                      "@probe function work(): Int { let a: 1 let b: 2 return a + b }",NULL,1);
     // C builds reflection lists through the collection's @insertion function,
     // found by that role: renamed, it still builds them, under its own label.
@@ -283,8 +284,8 @@ int main(void)
                                           "result.append(value:","result.add(element:",
                                           "write(at: count, value: value)","write(at: count, value: element)",NULL};
     validateLanguage(LIGHT "macro probe(): Enum { "
-                     "switch { #target.cases.count = 3: {}, default: @diagnostic(\"count\") } "
-                     "switch { #target.cases.first(where: { c in c.name = \"green\" }).present: {}, default: @diagnostic(\"missing green\") } } "
+                     "switch { #target.cases.count = 3: {}, default: diagnostic(message: \"count\") } "
+                     "switch { #target.cases.first(where: { c in c.name = \"green\" }).present: {}, default: diagnostic(message: \"missing green\") } } "
                      "@probe extension Light {}",NULL,1);
     // Without the role, C has no function to build them with.
     languageEdits = (const char *const[]){"@insertion\n","",NULL};

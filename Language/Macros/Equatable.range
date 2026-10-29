@@ -23,21 +23,21 @@ macro equatable(): Construct {
             let parameter: written.parameters.first()
             switch {
                 parameter.present & parameter.name != "other":
-                    @diagnostic("the parameter of \(#target.name)'s '=' must be labeled 'other', as in 'function =(let other: \(#target.name)): Bool'; it is labeled '\(parameter.name)'"),
+                    diagnostic(message: "the parameter of \(#target.name)'s '=' must be labeled 'other', as in 'function =(let other: \(#target.name)): Bool'; it is labeled '\(parameter.name)'"),
 
                 parameter.present & parameter.type != written.receiver:
-                    @diagnostic("the parameter of \(#target.name)'s '=' must be of type \(#target.name), the type it compares"),
+                    diagnostic(message: "the parameter of \(#target.name)'s '=' must be of type \(#target.name), the type it compares"),
 
                 default: {}
             }
             switch {
-                written.output != Bool: @diagnostic("\(#target.name)'s '=' must return Bool"),
+                written.output != Bool: diagnostic(message: "\(#target.name)'s '=' must return Bool"),
                 default: {}
             }
         },
 
         written.absent:
-            @warning("\(#target.name) applies @equatable but declares no '='; the built-in structural '=' is used")
+            warning(message: "\(#target.name) applies @equatable but declares no '='; the built-in structural '=' is used")
     }
 }
 
@@ -50,20 +50,20 @@ macro equatable(): Enum {
             let parameter: written.parameters.first()
             switch {
                 parameter.present & parameter.name != "other":
-                    @diagnostic("the parameter of \(#target.name)'s '=' must be labeled 'other', as in 'function =(let other: \(#target.name)): Bool'; it is labeled '\(parameter.name)'"),
+                    diagnostic(message: "the parameter of \(#target.name)'s '=' must be labeled 'other', as in 'function =(let other: \(#target.name)): Bool'; it is labeled '\(parameter.name)'"),
 
                 parameter.present & parameter.type != written.receiver:
-                    @diagnostic("the parameter of \(#target.name)'s '=' must be of type \(#target.name), the type it compares"),
+                    diagnostic(message: "the parameter of \(#target.name)'s '=' must be of type \(#target.name), the type it compares"),
 
                 default: {}
             }
             switch {
-                written.output != Bool: @diagnostic("\(#target.name)'s '=' must return Bool"),
+                written.output != Bool: diagnostic(message: "\(#target.name)'s '=' must return Bool"),
                 default: {}
             }
         },
 
         written.absent:
-            @warning("\(#target.name) applies @equatable but declares no '='; the built-in structural '=' is used")
+            warning(message: "\(#target.name) applies @equatable but declares no '='; the built-in structural '=' is used")
     }
 }

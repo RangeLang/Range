@@ -9,7 +9,7 @@ macro example(): Construct {
                     let text: "hello"
                     function show() {
                         switch {
-                            true: @diagnostic(text),
+                            true: diagnostic(message: text),
                             default: {}
                         }
                     }

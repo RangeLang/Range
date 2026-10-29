@@ -20,8 +20,8 @@ construct Twice {
 macro reportsEquatable(): Construct {
     let written: #target.macros.first(where: { applied in applied.name = "equatable" })
     switch {
-        written.present: @warning("\(#target.name) writes @equatable"),
-        written.absent: @warning("\(#target.name) does not write @equatable")
+        written.present: warning(message: "\(#target.name) writes @equatable"),
+        written.absent: warning(message: "\(#target.name) does not write @equatable")
     }
 }
 

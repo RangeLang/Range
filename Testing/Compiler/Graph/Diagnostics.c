@@ -83,11 +83,14 @@ int main(void)
     assert(!report.errors && report.warnings == 1);
     assert(!diagnostic(&report,"C-implementation","hard-coded"));
     rangeArenaDestroy(&arena);
-    report = collect(&arena,"@builtin macro diagnostic(let message: Text) "
+    report = collect(&arena,"@builtin function diagnostic(let message: Text) "
         "@builtin macro literal(let regex: Text): Macro "
-        "@literal(\"[0-9]+\") macro inspect(): Construct { @diagnostic(\"a diagnostic\") }",
+        "@literal(\"[0-9]+\") macro inspect(): Construct { diagnostic(message: \"a diagnostic\") }",
         "construct Text {} construct Macro {} construct Construct {}");
-    assert(!report.errors && !report.warnings); /* explicit primitive metadata */
+    // The literal rule's pattern is explicit primitive metadata; the message
+    // diagnostic is called with is an ordinary argument, a C string literal.
+    assert(!report.errors && report.warnings == 1);
+    assert(diagnostic(&report,"C-implementation","string literal values are supplied by C"));
     rangeArenaDestroy(&arena);
     report = collect(&arena,"@builtin macro example()",NULL);
     assert(diagnostic(&report,"not-implemented","no C primitive is implemented for builtin macro 'example'"));

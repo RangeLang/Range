@@ -204,6 +204,14 @@ int macroBuiltin(RangeNode *node, const char *name)
     return 0;
 }
 
+/* A builtin top-level function is `@builtin function name`; its name
+ * selects the C primitive that runs where its body would. */
+int builtinFunction(const RangeNode *node, const char *name)
+{
+    return node && node->kind == RangeNodeFunction && (node->flags & RangeFlagBuiltin) && !node->owner
+        && !node->typeName && same(node->name,name);
+}
+
 /* A role marks the function C calls for a construct: @iteration for `for … in`
  * and @insertion for building reflection lists. Applying one has no
  * compile-time effect. */
@@ -251,7 +259,8 @@ static void registerLiteralRules(Resolver *vm)
 static int isLanguageNode(const RangeNode *node)
 {
     static const char *const directories[] = {
-        RANGE_LANGUAGE_DIR "/Grammar", RANGE_LANGUAGE_DIR "/Macros", RANGE_LANGUAGE_DIR "/Types"
+        RANGE_LANGUAGE_DIR "/Functions", RANGE_LANGUAGE_DIR "/Grammar", RANGE_LANGUAGE_DIR "/Macros",
+        RANGE_LANGUAGE_DIR "/Types"
     };
     if (!node->path) return 0;
     for (size_t i = 0; i < sizeof(directories)/sizeof(*directories); ++i) {
@@ -574,46 +583,6 @@ void resolveSignatureTypes(Resolver *vm, RangeNode *node, RangeNode *owner)
         resolveSignatureTypes(vm,node->items[i],node->kind == RangeNodeUnit ? NULL : node);
 }
 
-/* An application of a macro without a target (an effect such as @print) is a
- * statement of its own, even when it precedes a declaration it would
- * otherwise appear to annotate. */
-static int effectMacro(Resolver *vm, const char *name)
-{
-    for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
-        RangeNode *node = vm->units[u]->items[i];
-        if (node->kind == RangeNodeMacro && !node->b && same(node->name,name)) return 1;
-    }
-    return 0;
-}
-
-static void separateEffects(Resolver *vm, RangeNode *node)
-{
-    if (!node) return;
-    if (node->kind == RangeNodeBlock) {
-        for (size_t i = 0; i < node->itemCount; ++i) {
-            RangeNode *statement = node->items[i], *annotations = statement->annotations;
-            if (!annotations) continue;
-            size_t kept = 0, moved = 0;
-            for (size_t j = 0; j < annotations->itemCount; ++j) {
-                RangeNode *attribute = annotations->items[j];
-                if (!effectMacro(vm,attribute->name)) { annotations->items[kept++] = attribute; continue; }
-                RangeNode *effect = rangeNodeCreate(vm->arena,RangeNodeExpressionStatement,attribute->path,attribute->line,attribute->column);
-                effect->a = attribute;
-                // Insert before the statement, keeping source order.
-                rangeNodeAppend(vm->arena,node,effect);
-                memmove(node->items + i + moved + 1,node->items + i + moved,(node->itemCount - 1 - i - moved) * sizeof(*node->items));
-                node->items[i + moved] = effect;
-                ++moved;
-            }
-            annotations->itemCount = kept;
-            if (!kept) statement->annotations = NULL;
-            i += moved;
-        }
-    }
-    separateEffects(vm,node->a); separateEffects(vm,node->b); separateEffects(vm,node->c);
-    for (size_t i = 0; i < node->itemCount; ++i) separateEffects(vm,node->items[i]);
-}
-
 int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t count,
                              char *error, size_t errorSize)
 {
@@ -622,7 +591,6 @@ int resolveGraphApplications(RangeArena *arena, RangeNode **units, size_t count,
     vm->arena=arena; vm->units=units; vm->count=count; vm->error=error; vm->errorSize=errorSize;
     int ok = 0;
     if (setjmp(vm->failure) == 0) {
-        for (size_t u = 0; u < count; ++u) separateEffects(vm,units[u]);
         for (size_t u = 0; u < count; ++u) validateGraphShape(vm,units[u],units[u]->source);
         registerGrammarDefinitions(vm);
         registerLiteralRules(vm);
@@ -985,8 +953,6 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
             sourceDiagnostic(report,node,1,"C-implementation","'?' sugar resolves to the enum applying @optional, and 'for … in' unwraps its payload case, in C");
             sourceDiagnostic(report,node,1,"C-implementation","a value of T where T? is expected becomes the payload case holding it, in C");
         }
-        else if (macroBuiltin(node,"print"))
-            sourceDiagnostic(report,node,1,"C-implementation","@print writes through libSystem write in C, formatting integers in C");
         else if (macroBuiltin(node,"iteration")) {
             sourceDiagnostic(report,node,1,"C-implementation","'for … in' calls the function applying @iteration at positions 0, 1, 2, … until it returns absence; C writes the loop");
             sourceDiagnostic(report,node,1,"C-implementation","the @iteration law (one per type, one Int parameter, an optional result) is checked in C");
@@ -997,10 +963,7 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         }
         else if (macroBuiltin(node,"interval"))
             sourceDiagnostic(report,node,1,"C-implementation","'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C");
-        else if (macroBuiltin(node,"warning"))
-            sourceDiagnostic(report,node,1,"C-implementation","@warning reports a compile-time warning through C's diagnostics");
-        else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal") && !macroBuiltin(node,"diagnostic")
-                 && !macroBuiltin(node,"print"))
+        else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal"))
             for (size_t i = 0; i < node->c->itemCount; ++i)
                 if (same(node->c->items[i]->name,"builtin"))
                     sourceDiagnostic(report,node,0,"not-implemented","no C primitive is implemented for builtin macro '%s'",node->name);
@@ -1049,7 +1012,7 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         if (node->name) {
             RangeNode *macro = sourceReference(report,scope,node,node->name,1);
             if (node->resolvedDeclaration) macro = node->resolvedDeclaration;
-            metadata = macroBuiltin(macro,"literal") || macroBuiltin(macro,"diagnostic") || macroBuiltin(macro,"warning");
+            metadata = macroBuiltin(macro,"literal");
         }
         break;
     }
@@ -1259,7 +1222,16 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
         else if (builtinMember(item))
             sourceDiagnostic(report,item,1,"C-implementation","builtin member '%s' is a C layout primitive",item->name);
         if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
-        if (same(item->name,"="))
+        if (builtinFunction(item,"print"))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'print' writes through libSystem write in C, formatting "
+                             "interpolated integers in C; at macro time it writes to the compiler's output");
+        else if (builtinFunction(item,"diagnostic"))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'diagnostic' writes its located message to standard error "
+                             "and exits with status 134 in C; at macro time it fails the application; C treats a call of it as diverging");
+        else if (builtinFunction(item,"warning"))
+            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'warning' reports a compile-time warning at the "
+                             "application through C's diagnostics");
+        else if (same(item->name,"="))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function '=' is C's structural comparison: every stored member, or the tag then the payload; it is emitted only for the types a program compares");
         else if (bytes && same(item->name,"byte"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'byte' reads one byte of the bytes primitive in C, checking the index");

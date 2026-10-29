@@ -42,8 +42,8 @@ static RangeNode *declaration(RangeNode *owner, const char *name)
     return NULL;
 }
 
-#define CORE "construct Construct {} construct Truth {} construct Text {} " \
-    "@builtin macro diagnostic(let message: Text) "
+#define CORE "construct Construct {} construct Truth {} construct Text { @builtin let bytes } " \
+    "@builtin function diagnostic(let message: Text) "
 
 int main(void)
 {
@@ -118,7 +118,7 @@ int main(void)
     // which splices only the target's shape, landed before the body ran.
     compile(&c,CORE
         "macro partial(): Construct { let size: 1 #graph { construct Partial { let value: #size } } "
-        "#graph { construct Shaped { let owner: #target.name } } @diagnostic(\"stop\") } "
+        "#graph { construct Shaped { let owner: #target.name } } diagnostic(message: \"stop\") } "
         "@partial construct Box {}");
     assert(reported(&c,"macro-validation","stop") && !declaration(c.unit,"Partial"));
     RangeNode *shaped = declaration(c.unit,"Shaped");

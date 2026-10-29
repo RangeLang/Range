@@ -43,6 +43,6 @@ construct Message {
     let subjects: mail.map { m in m.subject }
     switch { subjects.read(at: 2) != "news": return 12, default: {} }
     let labels: mail.map { m in switch { m.unread: "new", default: "read" } }
-    @print("\(labels.read(at: 0)) \(labels.read(at: 1)) \(subjects.count)")
+    print(message: "\(labels.read(at: 0)) \(labels.read(at: 1)) \(subjects.count)")
     return 42
 }

@@ -44,8 +44,8 @@ static void compile(Compiled *c, const char *project)
 {
     rangeArenaInit(&c->arena); rangeGraphInitTypes(&c->arena);
     Sources sources = {0};
-    const char *directories[] = {"Language/Grammar","Language/Macros","Language/Types"};
-    for (size_t i = 0; i < 3; ++i) assert(collectSources(&c->arena,&sources,directories[i],0));
+    const char *directories[] = {"Language/Functions","Language/Grammar","Language/Macros","Language/Types"};
+    for (size_t i = 0; i < 4; ++i) assert(collectSources(&c->arena,&sources,directories[i],0));
     c->units = rangeArenaAllocate(&c->arena,(sources.count + 1) * sizeof(*c->units));
     c->count = 0;
     char error[512];
@@ -172,7 +172,7 @@ int main(void)
     compile(&c,"macro sized(): Construct { "
         "let extra: #target.members.first(where: { member in member.name = \"extra\" }) "
         "let n: #target.generics.first(where: { generic in generic.name = \"n\" }) "
-        "switch { extra.present: @diagnostic(\"sees what it emits\"), n.present & n.value > 2: @diagnostic(\"n is too big\"), default: {} } "
+        "switch { extra.present: diagnostic(message: \"sees what it emits\"), n.present & n.value > 2: diagnostic(message: \"n is too big\"), default: {} } "
         "let zero: 0 #graph { extension #target.name { let extra: #zero } } } "
         "@sized construct Pair<T, let n: 1> { let first: T } "
         "function pairs(): Int { let small: Pair<Int, n: 2>(first: 1) let big: Pair<Bool, n: 3>(first: true) return small.extra + big.extra }");
@@ -298,7 +298,7 @@ int main(void)
         "function boxes(let box: Box?): Int { let empty: Int? let made: Box(label: 1) "
         "switch { box.present & box.size.present: return 1, box.absent: return 0 } } "
         "macro probe(): Construct { let first: #target.members.first() "
-        "switch { first.present(let m) & m.value.absent: @warning(\"starts absent\"), default: {} } } "
+        "switch { first.present(let m) & m.value.absent: warning(message: \"starts absent\"), default: {} } } "
         "@probe construct Starts { let size: Int? }");
     assert(errorsIn(&c,"type") == 1);
     assert(reported(&c,"type","switch must be exhaustive: 'box.present & box.present.size.absent' is not handled"));

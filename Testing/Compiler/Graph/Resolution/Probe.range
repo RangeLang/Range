@@ -5,7 +5,7 @@ macro probe(): Construct {
     let evaluated: #target.members.first { member in member.name = "payload" }
     let missing: #target.members.first { member in member.name = "absent" }
     switch {
-        false: @diagnostic("Hidden control flow must remain parsed but not displayed"),
+        false: diagnostic(message: "Hidden control flow must remain parsed but not displayed"),
         default: {}
     }
     #graph {

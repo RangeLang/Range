@@ -12,7 +12,7 @@ compiler="$work_root/range-compiler"
 Language/Compiler/Tools/build-range-compiler "$compiler"
 # The language sources: macros reflect through Array and Optional, so even
 # the integer and boolean checks need the grammar and the collection.
-core=(Language/Grammar Language/Macros Language/Types)
+core=(Language/Functions Language/Grammar Language/Macros Language/Types)
 
 # run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE...
 # Each program is compiled as written, then with every value known before
@@ -48,7 +48,7 @@ run lifetimes 42 "" Testing/Compiler/Native/Lifetimes.range
 run output 134 "Output.range:21:28: count is 5, expected at most 3" Testing/Compiler/Native/Output.range
 printf '%s\n' "Hello from Range!" "hello, world" "count: 5, last: 25, empty: false, capacity: 8" \
     "-128 4294967295 -9223372036854775808 0 true" "done" | cmp -s - "$work_root/stdout" \
-    || fail "@print wrote: $(cat "$work_root/stdout")"
+    || fail "print wrote: $(cat "$work_root/stdout")"
 run enums 42 "" Testing/Compiler/Native/Enums.range
 [[ "$(cat "$work_root/stdout")" == "north east west west" ]] || fail "enum cases printed: $(cat "$work_root/stdout")"
 run switches 42 "" Testing/Compiler/Native/Switches.range
@@ -109,7 +109,7 @@ function g(let o: Int?, let p: Int?): Int {
 }
 macro checked(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
-    switch { on.present(let c): {}, on.absent: @diagnostic("\(#target.name) has no case on") }
+    switch { on.present(let c): {}, on.absent: diagnostic(message: "\(#target.name) has no case on") }
 }
 @checked
 enum Light { case on, off }
@@ -148,7 +148,7 @@ macro counted(): Enum {
         switch { c.name = "on": return false, default: {} }
         return true
     }
-    @warning("\(#target.name) has \(others) other cases of \(seen)")
+    warning(message: "\(#target.name) has \(others) other cases of \(seen)")
 }
 @counted
 enum Light { case on, off, dim }
@@ -159,8 +159,8 @@ grep -Fq "compile-time-closures.range:19:1: warning[macro]: Light has 2 other ca
 run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro checked(): Enum {
     let wanted: "on"
     switch {
-        #target.cases.first(where: { c in c.name = wanted }).present(let c): @warning("\(#target.name) has \(c.name)"),
-        default: @diagnostic("\(#target.name) has no case on")
+        #target.cases.first(where: { c in c.name = wanted }).present(let c): warning(message: "\(#target.name) has \(c.name)"),
+        default: diagnostic(message: "\(#target.name) has no case on")
     }
     state seen: 0
     let others: #target.cases.filter { c in
@@ -170,11 +170,11 @@ run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro c
     let total: #target.cases.reduce(initial: 0) { sum, c in sum + 1 }
     let names: #target.cases.map { c in c.name }
     switch {
-        names.first().present(let n): @warning("\(#target.name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
+        names.first().present(let n): warning(message: "\(#target.name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
         default: {}
     }
     switch {
-        #target.cases.contains(where: { c in #target.cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }): @warning("\(#target.name) dims"),
+        #target.cases.contains(where: { c in #target.cases.contains(where: { d in d.name = c.name & c.name = "dim" }) }): warning(message: "\(#target.name) dims"),
         default: {}
     }
 }
@@ -198,7 +198,7 @@ function words(): Array<String> { state ws: Array<String>()  ws.append(value: "o
     state copy: ws
     copy.write(at: 0, value: "three")
     let tree: Tree.node(.leaf(ws.count), .node(.leaf(3), .leaf(4)))
-    @print("\(ws.read(at: 0)) \(copy.read(at: 0)) \(words().count) \(sum(t: tree))")
+    print(message: "\(ws.read(at: 0)) \(copy.read(at: 0)) \(words().count) \(sum(t: tree))")
     return 0
 }')"
 [[ "$(cat "$work_root/stdout")" == "one three 2 9" ]] || fail "known blocks printed: $(cat "$work_root/stdout")"
@@ -312,9 +312,25 @@ reject break-outside "'break' is only allowed inside a loop" \
 reject continue-outside "'continue' is only allowed inside a loop" \
     'function f(let b: Bool): Int { switch { b: continue, default: return 0 } }
 { return f(b: true) }'
-reject arm-falls-through "an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic" \
-    'function f(let n: Int): Int { let m: switch { n > 0: n, default: { @print("no") } } return m }
+reject arm-falls-through "an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or diagnostic" \
+    'function f(let n: Int): Int { let m: switch { n > 0: n, default: { print(message: "no") } } return m }
 { return f(n: 1) }'
+# print, diagnostic, and warning are ordinary builtin functions: calls with
+# labels, typed as any call is. A call of diagnostic diverges, so it can be
+# an arm of a switch expression; a call of print yields nothing, so it cannot.
+run diagnostic-arm 134 "diagnostic-arm.range:1:66: n must be positive" "$(case_file diagnostic-arm \
+    'function f(let n: Int): Int { let m: switch { n > 0: n, default: diagnostic(message: "n must be positive") } return m }
+{ print(message: "\(f(n: 2))") return f(n: 0) }')"
+[[ "$(cat "$work_root/stdout")" == "2" ]] || fail "diagnostic arm printed: $(cat "$work_root/stdout")"
+reject print-arm "an arm of a switch expression yields a value or diverges; 'print' returns no value" \
+    'function f(let n: Int): Int { let m: switch { n > 0: n, default: print(message: "no") } return m }
+{ return f(n: 1) }'
+reject print-label "argument 1 of 'print' requires label 'message'" '{ print(text: "hi") return 0 }'
+reject print-arguments "'print' takes 1 arguments; 2 supplied" '{ print(message: "hi", message: "again") return 0 }'
+reject print-interpolation "an interpolated value is an integer, a case without payloads, or a string; this one is Array<Element: Int<bits: 64, signed: true>>" \
+    '{ let xs: Array<Int>() print(message: "\(xs)") return 0 }'
+reject warning-run "native calls to builtin function 'warning' are not implemented" '{ warning(message: "at run") return 0 }'
+reject effect-attribute "'@print' applies to the declaration written after it, and none follows" '{ @print("hi") return 0 }'
 reject binding-in-other-arm "no declaration for 'v' in the loaded sources" \
     'function f(let o: Int?): Int { let w: switch { o.present(let v): v, o.absent: { return v } } return w }
 { return f(o: .absent) }'
@@ -456,9 +472,9 @@ paired='macro paired(): Enum {
     let off: #target.cases.first(where: { c in c.name = "off" })
     let both: on.present & off.present
     switch {
-        on.present(let c) & c.name != "on": @diagnostic("\(#target.name) misnames on"),
-        both: @warning("\(#target.name) has on and off"),
-        default: @diagnostic("\(#target.name) needs on and off")
+        on.present(let c) & c.name != "on": diagnostic(message: "\(#target.name) misnames on"),
+        both: warning(message: "\(#target.name) has on and off"),
+        default: diagnostic(message: "\(#target.name) needs on and off")
     }
 }'
 run macro-case-tests 0 "" "$(case_file macro-case-tests "$paired
@@ -525,9 +541,9 @@ run macro-narrowing 0 "" "$(case_file macro-narrowing 'macro named(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
     let off: #target.cases.first(where: { c in c.name = "off" })
     switch {
-        on.present & on.name != "on": @diagnostic("\(#target.name) misnames on"),
-        on.present & off.present | on.present & on.name = "on": @warning("\(#target.name) has \(on.name)"),
-        default: @diagnostic("\(#target.name) has no case on")
+        on.present & on.name != "on": diagnostic(message: "\(#target.name) misnames on"),
+        on.present & off.present | on.present & on.name = "on": warning(message: "\(#target.name) has \(on.name)"),
+        default: diagnostic(message: "\(#target.name) has no case on")
     }
 }
 @named
@@ -537,7 +553,7 @@ grep -Fq "warning[macro]: Light has on" "$work_root/log" || fail "a compile-time
 reject macro-narrowing-shadow "'on' is already narrowed to the payload here" \
     'macro named(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
-    switch { on.present(let on): @warning("\(on.name)"), default: {} }
+    switch { on.present(let on): warning(message: "\(on.name)"), default: {} }
 }
 @named
 enum Light { case on, off }
@@ -545,7 +561,7 @@ enum Light { case on, off }
 reject macro-narrowing-state "Optional<Wrapped: EnumCase> has no case 'name'" \
     'macro named(): Enum {
     state on: #target.cases.first(where: { c in c.name = "on" })
-    switch { on.present: @warning("\(on.name)"), default: {} }
+    switch { on.present: warning(message: "\(on.name)"), default: {} }
 }
 @named
 enum Light { case on, off }
@@ -577,7 +593,7 @@ reject macro-grammar-field "Macro has no member 'target'" \
 run macro-time-value 0 "" "$(case_file macro-time-value 'macro sized(): Construct {
     let width: #target.generics.first(where: { generic in generic.name = "width" })
     switch {
-        width.present & width.value > 4: @warning("\(#target.name) is \(width.value) wide"),
+        width.present & width.value > 4: warning(message: "\(#target.name) is \(width.value) wide"),
         default: {}
     }
 }
@@ -592,8 +608,8 @@ reject macro-local-type "assignment to 'count' requires Int<bits: 64, signed: tr
     count: "two"
 }
 { return 0 }'
-reject macro-effect-type "argument 'message' of '@diagnostic' requires String; found Int<bits: 64, signed: true>" \
-    'macro failing(): Enum { @diagnostic(5) }
+reject macro-effect-type "argument 'message' of 'diagnostic' requires String; found Int<bits: 64, signed: true>" \
+    'macro failing(): Enum { diagnostic(message: 5) }
 { return 0 }'
 
 reject case-test-not-enum "Int<bits: 64, signed: true> has no member 'present'" \
@@ -698,7 +714,7 @@ extension Own { function =(let other: Own): Bool { return true } }
 # spliced alone into #graph it names that declaration.
 run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {
     let target: #target
-    switch { target.members.count != 2: @diagnostic("\(target.name) must have 2 members"), default: {} }
+    switch { target.members.count != 2: diagnostic(message: "\(target.name) must have 2 members"), default: {} }
     #graph { extension #target { function size(): Int { return #target.members.count } } }
 }
 @sized construct Point { let x: Int  let y: Int }
@@ -819,9 +835,9 @@ reject comparison-arm "the result of this comparison is unused" \
 # Text known before run is written as it reads; an interpolated string of
 # known values is filled in, though one built at run is not implemented yet.
 run known-text 0 "" "$(case_file known-text 'construct Tag { let name: String  let size: Int }
-{ let tag: Tag(name: "box", size: 3)  state n: 4  @print("\(tag.name) holds \(tag.size), then \(n)")  return 0 }')"
+{ let tag: Tag(name: "box", size: 3)  state n: 4  print(message: "\(tag.name) holds \(tag.size), then \(n)")  return 0 }')"
 [[ "$(cat "$work_root/stdout")" == "box holds 3, then 4" ]] || fail "known text printed: $(cat "$work_root/stdout")"
-source="$(case_file known-interpolation '{ let k: 7  let label: "k is \(k)"  @print(label)  return 0 }')"
+source="$(case_file known-interpolation '{ let k: 7  let label: "k is \(k)"  print(message: label)  return 0 }')"
 "$compiler" -o "$work_root/known-interpolation" "${core[@]}" "$source" > /dev/null 2> "$work_root/log" \
     || fail "known-interpolation did not compile: $(grep 'error\[' "$work_root/log")"
 [[ "$("$work_root/known-interpolation")" == "k is 7" ]] || fail "known interpolation printed: $("$work_root/known-interpolation")"
@@ -1041,10 +1057,10 @@ reject union-type "a type is a single name, not several joined by '|'; related: 
 { return f(value: 3) }'
 reject macro-target "unknown macro target type 'Int'" \
     'macro transform(): Int { return 3 }
-{ @transform return 0 }'
+{ return 0 }'
 # Without a construct applying @interval, `..<` has no meaning.
 full=("${core[@]}")
-core=(Language/Grammar Language/Types/{Array,Bool,Int,Optional,String}.range)
+core=(Language/Functions Language/Grammar Language/Types/{Array,Bool,Int,Optional,String}.range)
 for macro in Language/Macros/*.range; do [[ "$macro" == */Interval.range ]] || core+=("$macro"); done
 reject interval-undeclared "'..<' needs exactly one construct applying @interval; found 0" \
     '{ let r: 0..<3 return 0 }'

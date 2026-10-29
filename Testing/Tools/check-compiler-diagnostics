@@ -34,7 +34,7 @@ def compile_sources(*paths):
 
 # Every feature the language sources declare is provided by Range or by C:
 # they check with no errors, and each C-provided piece is a warning.
-language = subprocess.run([compiler, 'Language/Grammar', 'Language/Macros', 'Language/Types'],
+language = subprocess.run([compiler, 'Language/Functions', 'Language/Grammar', 'Language/Macros', 'Language/Types'],
                           capture_output=True, text=True)
 active = language.stderr
 assert language.returncode == 0 and not language.stdout, language.stdout + active
@@ -103,10 +103,10 @@ assert 'no entry block, so no executable was written' in result.stderr, result.s
 
 # Normal compilation invokes the evaluator and reports independent macro failures.
 first.write_text('''construct Construct {}
-construct Text {}
-@builtin macro diagnostic(let message: Text)
-macro first(): Construct { @diagnostic("first application failed") }
-macro second(): Construct { @diagnostic("second application failed") }
+construct Text { @builtin let bytes }
+@builtin function diagnostic(let message: Text)
+macro first(): Construct { diagnostic(message: "first application failed") }
+macro second(): Construct { diagnostic(message: "second application failed") }
 @first construct First {}
 @second construct Second {}
 ''')

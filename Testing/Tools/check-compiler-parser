@@ -11,9 +11,9 @@ fail() { echo "compiler parser: $*" >&2; exit 1; }
 compiler="$work_root/range-compiler"
 "$REPO_ROOT/Language/Compiler/Tools/build-range-compiler" "$compiler"
 
-language_sources=("$REPO_ROOT/Language/Grammar" "$REPO_ROOT/Language/Macros" "$REPO_ROOT/Language/Types")
+language_sources=("$REPO_ROOT/Language/Functions" "$REPO_ROOT/Language/Grammar" "$REPO_ROOT/Language/Macros" "$REPO_ROOT/Language/Types")
 structure="$("$compiler" --tree "${language_sources[@]}")"
-[[ "$("$compiler" --tree "${language_sources[2]}" "${language_sources[0]}" "${language_sources[1]}")" == "$structure" ]] \
+[[ "$("$compiler" --tree "${language_sources[3]}" "${language_sources[1]}" "${language_sources[0]}" "${language_sources[2]}")" == "$structure" ]] \
     || fail "language folder order changed parsing"
 
 (cd "$REPO_ROOT" && "$compiler" --tree Language/Types/Int.range) > "$work_root/int-tree"

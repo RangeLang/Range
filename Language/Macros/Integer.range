@@ -10,14 +10,14 @@ macro integer(): Construct {
   let signed: #target.generics.first(where: { generic in generic.name = "signed" })
   switch {
       stored.present & bits.present & signed.present & bits.value <= 0:
-          @diagnostic("Integer bits must be positive"),
+          diagnostic(message: "Integer bits must be positive"),
 
       stored.present & bits.present & signed.present &
       !integerValueFits(value: stored.value, bits: bits.value, signed: signed.value):
-          @diagnostic("Integer value does not fit the declared bits and signedness"),
+          diagnostic(message: "Integer value does not fit the declared bits and signedness"),
 
       stored.present & bits.present & signed.present: {},
-      default: @diagnostic("Construct must specify value, bits and signed")
+      default: diagnostic(message: "Construct must specify value, bits and signed")
   }
 
   // Layout and arithmetic: the construct is a scalar exactly bits wide, signed

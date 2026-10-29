@@ -4,7 +4,7 @@
 macro string(): Construct {
   let value: #target.members.first(where: { member in member.name = "value" })
   switch {
-    value.absent: @diagnostic("Construct must specify value"),
+    value.absent: diagnostic(message: "Construct must specify value"),
     value.present: {}
   }
 

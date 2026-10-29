@@ -917,10 +917,11 @@ static void rejectComparisonStatement(RangeParser *parser, const RangeNode *expr
 }
 
 /* One arm's body. In a statement switch: a block (`{}` does nothing), or one
- * statement: return, break, continue, an assignment, an effect such as
- * @print(…), a switch, or an expression. In a switch expression: an
- * expression, which the arm yields (its a), or a block, or one return, break,
- * continue, or effect, which must diverge; `{}` and assignments yield nothing. */
+ * statement: return, break, continue, an assignment, a switch, or an
+ * expression, such as a call. In a switch expression: an expression, which
+ * the arm yields (its a) unless it is a call that diverges, or a block, or
+ * one return, break, or continue, which must diverge; `{}` and assignments
+ * yield nothing. */
 static void parseArm(RangeParser *parser, RangeNode *entry, int value)
 {
     RangeNode *body = parserNode(parser, RangeNodeBlock);
@@ -930,7 +931,7 @@ static void parseArm(RangeParser *parser, RangeNode *entry, int value)
         entry->b = parseBlock(parser);
         if (value && !parser->failed && !entry->b->itemCount)
             parserFail(parser, &open, "'{}' does nothing, so it is not an arm of a switch expression; "
-                       "yield a value, or diverge with return, break, continue, or @diagnostic");
+                       "yield a value, or diverge with return, break, continue, or diagnostic");
         return;
     }
     static const char *const blocks[] = {"let", "state", "derived", "binding", "while", "for", "function", NULL};
@@ -941,7 +942,7 @@ static void parseArm(RangeParser *parser, RangeNode *entry, int value)
             return;
         }
     if (parserAt(parser, "return") || parserAt(parser, "break") || parserAt(parser, "continue")
-        || parserAt(parser, "@") || (!value && parserAt(parser, "switch"))) {
+        || (!value && parserAt(parser, "switch"))) {
         RangeNode *statement = parseStatement(parser);
         if (statement) rangeNodeAppend(parser->arena, body, statement);
         return;
@@ -1366,23 +1367,12 @@ static RangeNode *parseStatement(RangeParser *parser)
         if (parserAt(parser, "}") || parserAtKind(parser, RangeTokenEnd)
             || !(valueDeclarationKind(parser, &declared) || parserAt(parser, "function")
                  || parserAt(parser, "construct"))) {
-            /* Attributes annotate declarations; before anything else they are
-             * effects, like @print(…), and the next statement stands alone.
-             * Each one is its own statement; a run of them becomes a block. */
-            if (attributes->itemCount == 1) {
-                RangeNode *application =
-                    parserNode(parser, RangeNodeExpressionStatement);
-                application->a = attributes->items[0];
-                return application;
-            }
-            RangeNode *group = parserNode(parser, RangeNodeBlock);
-            for (size_t index = 0; index < attributes->itemCount; ++index) {
-                RangeNode *application =
-                    parserNode(parser, RangeNodeExpressionStatement);
-                application->a = attributes->items[index];
-                rangeNodeAppend(parser->arena, group, application);
-            }
-            return group;
+            /* An attribute applies to the declaration written after it. */
+            RangeNode *first = attributes->itemCount ? attributes->items[0] : NULL;
+            if (first) parserFailAt(parser, first, "'@%s' applies to the declaration written after it, and none follows",
+                                    first->name ? first->name : "");
+            else parserFail(parser, &parser->current, "an attribute applies to the declaration written after it, and none follows");
+            return NULL;
         }
         RangeNode *statement = parseStatement(parser);
         if (statement) {

@@ -1,10 +1,10 @@
 function greet(let name: String): Int {
-    @print("hello, \(name)")
+    print(message: "hello, \(name)")
     return 0
 }
 
 {
-    @print("Hello from Range!")
+    print(message: "Hello from Range!")
     let zero: greet(name: "world")
     state xs: Array<Int>()
     state i: 1
@@ -12,12 +12,12 @@ function greet(let name: String): Int {
         xs.append(value: i * i)
         i: i + 1
     }
-    @print("count: \(xs.count), last: \(xs.read(at: 4)), empty: \(xs.isEmpty()), capacity: \(xs.capacity)")
+    print(message: "count: \(xs.count), last: \(xs.read(at: 4)), empty: \(xs.isEmpty()), capacity: \(xs.capacity)")
     let small: Int<bits: 8>(-128)
     let big: Int<bits: 32, signed: false>(4294967295)
     let min: (-9223372036854775807 - 1)
-    @print("\(small) \(big) \(min) \(0) \(true)")
-    @print("done")
-    switch { xs.count > 3: @diagnostic("count is \(xs.count), expected at most 3"), default: {} }
+    print(message: "\(small) \(big) \(min) \(0) \(true)")
+    print(message: "done")
+    switch { xs.count > 3: diagnostic(message: "count is \(xs.count), expected at most 3"), default: {} }
     return 0
 }

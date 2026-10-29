@@ -23,7 +23,7 @@ typedef struct {
     jmp_buf failure;
     RangeNode *emitted; /* declarations emitted by the running application */
     RangeNode *unit;    /* unit holding the running application's target */
-    struct SourceReport *report; /* where @warning reports, when compiling */
+    struct SourceReport *report; /* where warning(message:) reports, when compiling */
     Typer *typer; /* alive from before the first application to the end of type checking */
     size_t checked; /* applications run */
 } Resolver;
@@ -183,6 +183,7 @@ void resolveGraphTarget(Resolver *vm, RangeNode *target);
 void validateGraphShape(Resolver *vm, RangeNode *node, const char *source);
 int literalMatch(Resolver *vm, RangeNode *at, const char *pattern, const char *input);
 int macroBuiltin(RangeNode *node, const char *name);
+int builtinFunction(const RangeNode *node, const char *name);
 int roleMacro(RangeNode *node);
 int appliesMacro(const RangeNode *declaration, const RangeNode *macro);
 void linkGrammarNodes(Resolver *vm, RangeNode *node);

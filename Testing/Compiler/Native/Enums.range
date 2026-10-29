@@ -37,6 +37,6 @@ function turn(let d: Direction): Direction {
     state d: Direction.west
     d: turn(d: d)
     switch { d != .north: return 6, default: {} }
-    @print("\(a) \(b) \(xs.read(at: 1)) \(h.fallback)")
+    print(message: "\(a) \(b) \(xs.read(at: 1)) \(h.fallback)")
     return 42
 }

@@ -1700,7 +1700,7 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
  * holding one, is only called or passed on to a function-typed parameter. */
 
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
-static int exits(const RangeNode *, int);
+static int exits(RangeNode *, const RangeNode *, int);
 
 /* The expression a closure body is: its switch read as an expression, or its
  * one expression statement. */
@@ -1755,7 +1755,7 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
         typeBlock(typer,&own,closure->a,context,result);
         if (!result) result = typer->inferred;
         if (!result) typeError(typer,closure,"the result of this closure is not known: return a value, or make its body one expression");
-        else if (!unit && !exits(closure->a,0))
+        else if (!unit && !exits(typer->key,closure->a,0))
             typeError(typer,closure,"this closure returns %s: return a value on every path, or make its body one expression",
                       (describeType(t,sizeof(t),result),t));
     }
@@ -2227,9 +2227,20 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     switch (expr->kind) {
     case RangeNodeInteger: case RangeNodeBool: case RangeNodeString:
         type = typeLiteral(typer,expr,expr,expected);
-        // An interpolated value is typed where it is written.
-        for (size_t i = 0; expr->kind == RangeNodeString && i < expr->itemCount; ++i)
-            if (!(expr->items[i]->flags & RangeFlagLiteral)) (void)typeOf(typer,scope,expr->items[i]->a,NULL,context);
+        // An interpolated value is typed where it is written, and written as
+        // text: an integer, a case without payloads (a boolean among them),
+        // or a string; at macro time also a declaration, by its name.
+        for (size_t i = 0; expr->kind == RangeNodeString && i < expr->itemCount; ++i) {
+            RangeNode *part = expr->items[i];
+            if (part->flags & RangeFlagLiteral) continue;
+            RangeNode *written = typeOf(typer,scope,part->a,NULL,context);
+            if (!written || (typer->macro && macroTimeType(typer,written))) continue;
+            RangeNode *declaration = written->kind == RangeNodeSpecialization ? written->resolvedDeclaration : NULL;
+            if (declaration && (declaration == typer->integer || declaration == typer->boolean
+                || (isEnum(written) && !enumPayloads(declaration)) || (type && declaration == type->resolvedDeclaration))) continue;
+            char name[160]; describeType(name,sizeof(name),written);
+            typeError(typer,part->a,"an interpolated value is an integer, a case without payloads, or a string; this one is %s",name);
+        }
         break;
     case RangeNodeName: {
         RangeNode *declaration = nameLookup(typer->report,scope,expr);
@@ -2432,28 +2443,35 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
 static void typeBlock(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
 
+/* Whether a call is of the builtin function diagnostic, which ends the
+ * program, as typing under `key` resolved it. */
+static int diverges(RangeNode *key, const RangeNode *call)
+{
+    return call && call->kind == RangeNodeCall && call->a && builtinFunction(found(key,call->a)->resolvedDeclaration,"diagnostic");
+}
+
 /* Whether control cannot reach the end of `node`: it returns, breaks, or
- * continues on every path, or ends the program through @diagnostic. `break`
+ * continues on every path, or ends the program through diagnostic. `break`
  * and `continue` leave the innermost loop; a switch is never their target. A
  * loop nested here ends its own breaks, so they do not leave `node`. */
-static int exits(const RangeNode *node, int breaking)
+static int exits(RangeNode *key, const RangeNode *node, int breaking)
 {
     if (!node) return 0;
     switch (node->kind) {
     case RangeNodeReturn: return 1;
     case RangeNodeBreak: case RangeNodeContinue: return breaking;
     case RangeNodeBlock:
-        for (size_t i = 0; i < node->itemCount; ++i) if (exits(node->items[i],breaking)) return 1;
+        for (size_t i = 0; i < node->itemCount; ++i) if (exits(key,node->items[i],breaking)) return 1;
         return 0;
     case RangeNodeSwitch:
         if (!node->itemCount) return 0;
         for (size_t i = 0; i < node->itemCount; ++i) {
             RangeNode *entry = node->items[i];
-            if (!exits(entry->a ? entry->a : entry->b,breaking)) return 0;
+            if (!exits(key,entry->a ? entry->a : entry->b,breaking)) return 0;
         }
         return 1;
-    case RangeNodeExpressionStatement:
-        return node->a && node->a->kind == RangeNodeAttribute && macroBuiltin(node->a->resolvedDeclaration,"diagnostic");
+    case RangeNodeExpressionStatement: return diverges(key,node->a);
+    case RangeNodeCall: return diverges(key,node);
     default: return 0;
     }
 }
@@ -2523,47 +2541,6 @@ static void checkInsertion(Typer *typer, RangeNode *declaration, RangeNode *view
         char t[160] = "one element";
         if (element) { char e[140]; describeType(e,sizeof(e),element); snprintf(t,sizeof(t),"one %s, the element its @iteration function yields",e); }
         typeError(typer,function,"@insertion function '%s' of '%s' must take %s",function->name,declaration->name,t);
-    }
-}
-
-/* `@print(…)` and `@diagnostic(…)` in runtime code: one message, a String or
- * an interpolated literal whose parts are integers, booleans, or strings. */
-static void typeEffect(Typer *typer, SourceScope *scope, RangeNode *attribute, RangeNode *context)
-{
-    RangeNode *macro = NULL;
-    for (size_t u = 0; u < typer->report->count && !macro; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
-        RangeNode *candidate = typer->report->units[u]->items[i];
-        if (candidate->kind == RangeNodeMacro && !candidate->b && same(candidate->name,attribute->name)) { macro = candidate; break; }
-    }
-    if (!macro) return; /* undeclared macros are reported already */
-    attribute->resolvedDeclaration = macro;
-    // @warning runs only at macro time; elsewhere code generation reports it.
-    if (!macroBuiltin(macro,"print") && !macroBuiltin(macro,"diagnostic") && !(typer->macro && macroBuiltin(macro,"warning")))
-        return;
-    if (attribute->itemCount != 1) { typeError(typer,attribute,"@%s requires one message",macro->name); return; }
-    // The message is the effect's one parameter: a String.
-    RangeNode *message = attribute->items[0]->a, *expected = NULL;
-    if (macro->itemCount == 1) {
-        SourceScope effect = {.owner=macro};
-        expected = declaredTypeIn(typer,&effect,macro->items[0],NULL);
-    }
-    RangeNode *actual = typeOf(typer,scope,message,expected,context);
-    char what[160]; snprintf(what,sizeof(what),"argument '%s' of '@%s'",macro->itemCount == 1 ? macro->items[0]->name : "message",macro->name);
-    expectType(typer,attribute,expected,actual,what);
-    if (message->kind != RangeNodeString) return;
-    for (size_t i = 0; i < message->itemCount; ++i) {
-        RangeNode *part = message->items[i];
-        if (part->flags & RangeFlagLiteral) continue;
-        RangeNode *type = found(typer->key,part->a)->type; /* typed with the message */
-        if (!type) continue;
-        // At macro time a declaration is written as its name.
-        if (typer->macro && macroTimeType(typer,type)) continue;
-        if (type->kind == RangeNodeSpecialization && (type->resolvedDeclaration == typer->integer
-            || type->resolvedDeclaration == typer->boolean
-            || (isEnum(type) && !enumPayloads(type->resolvedDeclaration))
-            || (found(typer->key,message)->type && type->resolvedDeclaration == found(typer->key,message)->type->resolvedDeclaration))) continue;
-        char name[160]; describeType(name,sizeof(name),type);
-        typeError(typer,part->a,"@%s cannot write %s",macro->name,name);
     }
 }
 
@@ -2703,8 +2680,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         (void)typeSwitch(typer,scope,node,NULL,context,output);
         break;
     case RangeNodeExpressionStatement:
-        if (node->a && node->a->kind == RangeNodeAttribute) typeEffect(typer,scope,node->a,context);
-        else if (node->a) (void)typeOf(typer,scope,node->a,NULL,context);
+        if (node->a) (void)typeOf(typer,scope,node->a,NULL,context);
         break;
     default: break; /* declarations, and forms reported as not implemented */
     }
@@ -2979,14 +2955,18 @@ static RangeNode *typeSwitch(Typer *typer, SourceScope *scope, RangeNode *node, 
         SourceScope body = {.owner=entry->c ? entry->c : entry,.parent=scope};
         if (entry->a) {
             RangeNode *actual = typeOf(typer,&body,entry->a,expected ? expected : type,context);
+            RangeNode *callee = entry->a->kind == RangeNodeCall && entry->a->a ? found(typer->key,entry->a->a)->resolvedDeclaration : NULL;
+            // A call of a function without a result yields nothing, unless it diverges.
+            if (!actual && callee && callee->kind == RangeNodeFunction && !callee->b && !diverges(typer->key,entry->a))
+                typeError(typer,entry->a,"an arm of a switch expression yields a value or diverges; '%s' returns no value",callee->name);
             type = armsType(typer,node,type,entry->a,actual);
             typer->narrowedCount = narrowed;
             continue;
         }
         typeBlock(typer,&body,entry->b,context,output);
         typer->narrowedCount = narrowed;
-        if (value && !exits(entry->b,typer->loops > 0))
-            typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or @diagnostic");
+        if (value && !exits(typer->key,entry->b,typer->loops > 0))
+            typeError(typer,entry->b,"an arm of a switch expression yields a value or diverges; this block ends without return, break, continue, or diagnostic");
     }
     if (value && !type && typer->report->errors == errors)
         typeError(typer,node,"no arm of this switch expression yields a value");

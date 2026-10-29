@@ -46,11 +46,8 @@ RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     if (macroBuiltin(app->declaration,"many") || macroBuiltin(app->declaration,"optional")
         || macroBuiltin(app->declaration,"interval") || roleMacro(app->declaration)) return emitted;
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
-        if (same(app->declaration->c->items[j]->name,"builtin")) {
-            if (!macroBuiltin(app->declaration,"literal") && !macroBuiltin(app->declaration,"diagnostic"))
-                fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
-            fail(vm,attribute,"builtin macro '%s' is an effect C runs where it is written; it applies to no target",app->declaration->name);
-        }
+        if (same(app->declaration->c->items[j]->name,"builtin"))
+            fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);
     // A body that stopped on a problem typing reported emits nothing.
     vm->emitted = emitted;
     if (!evalApplication(vm,app,0)) emitted->itemCount = 0;

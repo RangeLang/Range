@@ -122,6 +122,6 @@ construct Walker {
     switch { !maybe.isPresent() | none.isPresent(): return 10, default: {} }
     let lit: Light.on(.green)
     switch { lit.color() != .green | lit.color().swapped() != .red | Light.off.color() != .red: return 11, default: {} }
-    @print("\(d.opposite()) \(t.sum())")
+    print(message: "\(d.opposite()) \(t.sum())")
     return 42
 }

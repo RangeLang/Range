@@ -127,6 +127,6 @@ construct Box<T> {
     box.items.append(value: "bb")
     let long: box.matching { s in s.count > 1 }
     switch { long != 1: return 12, default: {} }
-    @print("calls: \(calls), pairs: \(pairs)")
+    print(message: "calls: \(calls), pairs: \(pairs)")
     return 42
 }

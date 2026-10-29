@@ -1,0 +1,20 @@
+// Write the message and a newline. Called at macro time, it writes to the
+// compiler's output; in a program it writes to standard output. Interpolated
+// parts are written in order: integers of any width in decimal, enum values
+// without payloads (booleans among them) as their case names, strings as
+// their bytes.
+@builtin
+function print(let message: String)
+
+// Report the message. Called at macro time, it fails validation; in a
+// program it writes the located message to standard error and exits with
+// status 134, so it diverges as return does: it can end an arm of a switch
+// expression.
+@builtin
+function diagnostic(let message: String)
+
+// Called at macro time, report the message as a warning at the application
+// and continue; a law run per specialization does not repeat it. It has no
+// native code.
+@builtin
+function warning(let message: String)

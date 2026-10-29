@@ -14,7 +14,7 @@
  * primitive typing chose, as native code runs it. A value keeps the type it
  * was made with, so what typing left to macro time (a value of a macro type,
  * a member kind's value) is chosen from the value it holds when it runs.
- * What only a macro has, its application's target fields, effects, #graph
+ * What only a macro has, its application's target fields, #graph
  * emission, and the applications a use of a declaration needs first, is
  * reached through those nodes alone; outside an application they are not
  * known. Evaluation stops with a message, which the application reports, or
@@ -415,31 +415,6 @@ static int evalField(Eval *eval, RangeNode *owner, const char *name, RangeNode *
     return evalAdopt(eval,out,type,at);
 }
 
-/* `@print`, `@warning`, and `@diagnostic`: the message, written to the
- * compiler's output, reported as a warning at the application (a law run per
- * specialization repeats nothing), or ending evaluation as a failure there. */
-static int evalEffect(Eval *eval, EvalFrame *frame, RangeNode *attribute)
-{
-    RangeNode *macro = attribute->resolvedDeclaration;
-    int print = macroBuiltin(macro,"print"), warning = macroBuiltin(macro,"warning");
-    if (!print && !warning && !macroBuiltin(macro,"diagnostic"))
-        return evalFail(eval,attribute,"@%s is not an effect C runs at macro time",attribute->name);
-    if (eval->outside) return EvalUnknown; /* folding: effects happen at run */
-    if (attribute->itemCount != 1) return evalStop(eval);
-    const char *text; size_t length;
-    int status = evalText(eval,frame,attribute->items[0]->a,&text,&length);
-    if (status) return status;
-    if (warning) {
-        RangeNode *at = eval->application && eval->application->attribute ? eval->application->attribute : attribute;
-        if (eval->vm->report && !(eval->application && eval->application->specialization))
-            sourceDiagnostic(eval->vm->report,at,1,"macro","%.*s",(int)length,text);
-        return EvalNormal;
-    }
-    if (!print) return evalFail(eval,attribute,"%.*s",(int)length,text);
-    printf("%.*s\n",(int)length,text);
-    return EvalNormal;
-}
-
 /* A copy #graph emits is new code: what the compiler found about the
  * original is found about it afresh. */
 static void forgetFacts(RangeNode *copy)
@@ -618,11 +593,37 @@ static RangeValue evalZero(Eval *eval, RangeNode *type, unsigned depth)
     return zero;
 }
 
-/* A C primitive a function declares with @builtin, on its receiver: one
+/* The builtin functions print, warning, and diagnostic: the message,
+ * written to the compiler's output, reported as a warning at the
+ * application (a law run per specialization repeats nothing), or ending
+ * evaluation as a failure where it is called. Folding, they run at run. */
+static int evalEffect(Eval *eval, RangeNode *function, RangeValue message, RangeNode *at)
+{
+    if (eval->outside) return EvalUnknown;
+    RangeNode *site = at->kind == RangeNodeCall && at->a ? at->a : at;
+    const char *text; size_t length;
+    int status = evalWrite(eval,message,site,&text,&length);
+    if (status) return status;
+    if (builtinFunction(function,"warning")) {
+        RangeNode *application = eval->application && eval->application->attribute ? eval->application->attribute : site;
+        if (eval->vm->report && !(eval->application && eval->application->specialization))
+            sourceDiagnostic(eval->vm->report,application,1,"macro","%.*s",(int)length,text);
+        return EvalNormal;
+    }
+    if (builtinFunction(function,"diagnostic")) return evalFail(eval,site,"%.*s",(int)length,text);
+    printf("%.*s\n",(int)length,text);
+    return EvalNormal;
+}
+
+/* A C primitive a function declares with @builtin: on its receiver, one
  * byte of the bytes primitive, or the slot primitives on the receiver's one
- * @many member, whose new slots hold zero values. Each new slot is a step. */
+ * @many member, whose new slots hold zero values, each new slot a step; at
+ * the top level, the effects print, warning, and diagnostic. */
 static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeValue *arguments, RangeNode *at, RangeValue *out)
 {
+    if (function->itemCount == 1 && (builtinFunction(function,"print") || builtinFunction(function,"warning")
+                                     || builtinFunction(function,"diagnostic")))
+        return evalEffect(eval,function,arguments[0],at);
     if (self && self->kind == ValueText && same(function->name,"byte") && function->itemCount == 1) {
         if (arguments[0].integer < 0 || (size_t)arguments[0].integer >= self->length) return evalFail(eval,at,"byte index is outside the bytes");
         *out = (RangeValue){.kind=ValueScalar,.type=function->type,.integer=(unsigned char)self->text[arguments[0].integer]};
@@ -1196,7 +1197,6 @@ int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
         return EvalNormal;
     case RangeNodeSwitch: return evalSwitch(eval,frame,expr,out);
     case RangeNodeUnary: case RangeNodeBinary: return evalOperator(eval,frame,expr,out);
-    case RangeNodeAttribute: return evalEffect(eval,frame,expr);
     case RangeNodeEmission:
         // A shape-only block landed before the body ran; a law run emits nothing.
         if ((eval->application && eval->application->specialization) || (expr->found & RangeFlagShape)) return EvalNormal;
