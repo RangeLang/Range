@@ -14,6 +14,10 @@ Language/Compiler/Tools/build-range-compiler "$compiler"
 # the integer and boolean checks need the grammar and the collection.
 core=(Language/Functions Language/Grammar Language/Macros Language/Types)
 
+# The summary counts what run and reject actually checked.
+programs=0
+rejections=0
+
 # run NAME EXPECTED-STATUS EXPECTED-STDERR SOURCE-FILE...
 # Each program is compiled as written, then with every value known before
 # run filled in; both executables must report, write, and exit the same.
@@ -35,6 +39,7 @@ run() {
     for file in log stdout stderr; do
         cmp -s "$work_root/$file" "$work_root/written-$file" || fail "$name $file differs from the program compiled as written"
     done
+    programs=$((programs + 1))
 }
 case_file() { printf '%s\n' "$2" > "$work_root/$1.range"; echo "$work_root/$1.range"; }
 
@@ -267,6 +272,7 @@ reject() {
         [[ "$status" == 65 && ! -e "$work_root/$1" ]] || fail "$1 $mode compiled"
         grep -Fq "$2" "$work_root/log" || fail "$1 $mode reported wrongly: $(grep 'error\[' "$work_root/log")"
     done
+    rejections=$((rejections + 1))
 }
 reject non-exhaustive "switch must be exhaustive: 'd.west' is not handled; add an arm for it or a default" \
     'enum Direction { case north, east, south, west }
@@ -1187,4 +1193,4 @@ core=("${full[@]}")
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
     '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
-echo "compiler native: programs=69 rejections=192 case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"
+echo "compiler native: programs=$programs rejections=$rejections case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

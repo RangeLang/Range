@@ -127,6 +127,4 @@ of a generic declaration would differ between its own run and its law runs.
 - Flat, numbered storage.
 
 ### Tooling and site
-- The summary counts in `check-compiler-native` and `rejections=7` in
-  `check-compiler-literal` are hardcoded and wrong.
 - Website sources still use `@diagnostic(` and `#cases.map`.
