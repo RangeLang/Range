@@ -347,7 +347,15 @@ reject print-label "argument 1 of 'print' requires label 'message'" '{ print(tex
 reject print-arguments "'print' takes 1 arguments; 2 supplied" '{ print(message: "hi", message: "again") return 0 }'
 reject print-interpolation "an interpolated value is an integer, a case without payloads, or a string; this one is Array<Element: Int<bits: 64, signed: true>>" \
     '{ let xs: Array<Int>() print(message: "\(xs)") return 0 }'
-reject warning-run "native calls to builtin function 'warning' are not implemented" '{ warning(message: "at run") return 0 }'
+# At run, warning writes its message to standard error, located at the call
+# and marked a warning, and the program continues.
+run warning-run 0 "warning-run.range:2:22: warning: 3 is low" "$(case_file warning-run 'function check(let n: Int): Int {
+    switch { n < 10: warning(message: "\(n) is low"), default: {} }
+    return n
+}
+{ print(message: "ran") return check(n: 3) - 3 }')"
+[[ "$(cat "$work_root/stdout")" == "ran" && "$(wc -l < "$work_root/stderr")" -eq 1 ]] \
+    || fail "warning at run wrote: $(cat "$work_root/stdout") / $(cat "$work_root/stderr")"
 reject effect-attribute "'@print' applies to the declaration written after it, and none follows" '{ @print("hi") return 0 }'
 reject binding-in-other-arm "no declaration for 'v' in the loaded sources" \
     'function f(let o: Int?): Int { let w: switch { o.present(let v): v, o.absent: { return v } } return w }
@@ -749,13 +757,27 @@ reject macro-argument-type "argument 'width' of '@sized' requires Int<bits: 64, 
 @sized(width: \"two\")
 construct Point { let x: Int  let y: Int }
 { return 0 }"
-reject macro-argument-unknown "macro-argument-unknown.range:6:19: the value of 'count' is not known at macro time" "$sized
+# An argument whose value is not known at macro time is reported where it is
+# written, naming its parameter; the evaluator's reason follows as a note
+# unless the argument is the name it is about.
+reject macro-argument-unknown "macro-argument-unknown.range:6:12: error[macro-validation]: the argument 'width' of @sized is not known at macro time" "$sized
 construct Outer {
     let count: 2
     @sized(width: count)
     construct Point { let x: Int  let y: Int }
 }
 { return 0 }"
+! grep -Fq "note[" "$work_root/log" || fail "macro-argument-unknown repeated its reason as a note"
+reject macro-argument-unknown-call "macro-argument-unknown-call.range:7:12: error[macro-validation]: the argument 'width' of @sized is not known at macro time" "$sized
+@extern function clock(): Int
+construct Outer {
+    let count: 2
+    @sized(width: count + clock())
+    construct Point { let x: Int  let y: Int }
+}
+{ return 0 }"
+grep -Fq "macro-argument-unknown-call.range:7:19: note[macro-validation]: the value of 'count' is not known at macro time" "$work_root/log" \
+    || fail "macro-argument-unknown-call gave no reason: $(cat "$work_root/log")"
 reject macro-argument-target "#target is written only in a macro's body" "$sized
 @sized(width: #target.members.count)
 construct Point { let x: Int  let y: Int }

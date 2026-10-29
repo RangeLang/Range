@@ -1340,6 +1340,23 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     }
 }
 
+/* An argument whose value evaluation could not compute: reported where the
+ * argument is written, naming its parameter, with the evaluator's reason as a note
+ * unless the argument is the very name the reason is about. Its application
+ * computes no values, so every later run stops. */
+static int evalUnknownArgument(Eval *eval, RangeMacroApplication *declared, size_t index, const Eval *lexical)
+{
+    RangeNode *macro = declared->declaration, *labeled = declared->attribute->items[index], *argument = labeled->a;
+    char text[256];
+    snprintf(text,sizeof(text),"the argument '%s' of @%s is not known at macro time",macro->items[index]->name,macro->name);
+    int noted = !(argument->kind == RangeNodeName && lexical->at == argument);
+    declared->argued = -1;
+    if (!eval->vm->report) return evalFail(eval,labeled,"%s%s%s",text,noted ? ": " : "",noted ? lexical->message : "");
+    sourceDiagnostic(eval->vm->report,labeled,0,"macro-validation","%s",text);
+    if (noted) sourceDiagnostic(eval->vm->report,lexical->at ? lexical->at : argument,2,"macro-validation","%s",lexical->message);
+    return evalStop(eval);
+}
+
 /* An application's parameters, bound in the macro's frame: its arguments'
  * values, computed once, where the application is written, at macro time,
  * and reused by every later run, law runs among them, since an argument
@@ -1356,6 +1373,7 @@ static int evalArguments(Eval *eval, RangeMacroApplication *app, EvalFrame *fram
         for (size_t i = 0; i < macro->itemCount; ++i) {
             RangeNode *argument = attribute->items[i]->a;
             int status = evalExpression(&lexical,&none,argument,&values[i]);
+            if (status == EvalFailed && lexical.message) return evalUnknownArgument(eval,declared,i,&lexical);
             if (!status) status = evalAdopt(&lexical,&values[i],found(NULL,macro->items[i])->type,argument);
             if (status) {
                 eval->message = lexical.message; eval->at = lexical.at;

@@ -1678,16 +1678,18 @@ static RangeNode *nativeCallClosure(Native *native, RangeNode *call, RangeNode *
 static void nativeWriteMessage(Native *, int, const char *, RangeNode *);
 
 /* The builtin function print writes its message to standard output;
- * diagnostic writes it, located at the call, to standard error and exits
- * 134, as a law violation does. The message is streamed as it is written,
- * part by part. */
-static void nativeEffect(Native *native, RangeNode *call, int print)
+ * warning writes it, located at the call and marked a warning, to standard
+ * error and continues; diagnostic writes it, located at the call, to
+ * standard error and exits 134, as a law violation does. The message is
+ * streamed as it is written, part by part. */
+static void nativeEffect(Native *native, RangeNode *call, RangeNode *function)
 {
+    int print = builtinFunction(function,"print"), warning = builtinFunction(function,"warning");
     char location[512] = "";
     RangeNode *site = call->a ? call->a : call;
-    if (!print) snprintf(location,sizeof(location),"%s:%d:%d: ",site->path,site->line,site->column);
+    if (!print) snprintf(location,sizeof(location),"%s:%d:%d: %s",site->path,site->line,site->column,warning ? "warning: " : "");
     nativeWriteMessage(native,print ? 1 : 2,rangeArenaIntern(native->report->arena,location,strlen(location)),call->items[0]->a);
-    if (!print) {
+    if (!print && !warning) {
         nativeEmit(native,armMovz(0,134,0));
         rangeCallImport(&native->machine,"_exit");
     }
@@ -1704,8 +1706,9 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     if (form == CallCase) return nativeVariant(native,call,found(native->key,call)->type,target,call->items,call->itemCount,0);
     if (form != CallFunction) { nativeMissing(native,call,"native call target is not implemented"); return NULL; }
     if (nativeInlined(target)) return nativeInline(native,call,target,key);
-    if (call->itemCount == 1 && (builtinFunction(target,"print") || builtinFunction(target,"diagnostic"))) {
-        nativeEffect(native,call,builtinFunction(target,"print"));
+    if (call->itemCount == 1 && (builtinFunction(target,"print") || builtinFunction(target,"warning")
+                                 || builtinFunction(target,"diagnostic"))) {
+        nativeEffect(native,call,target);
         return NULL;
     }
     RangeNode *self = NULL;

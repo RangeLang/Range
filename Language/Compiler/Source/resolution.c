@@ -1286,7 +1286,8 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
                              "and exits with status 134 in C; at macro time it fails the application");
         else if (builtinFunction(item,"warning"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'warning' reports a compile-time warning at the "
-                             "application through C's diagnostics");
+                             "application through C's diagnostics; in a program it writes its located message, marked a warning, "
+                             "to standard error in C and continues");
         else if (same(item->name,"="))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function '=' is C's structural comparison: every stored member, or the tag then the payload; it is emitted only for the types a program compares");
         else if (bytes && same(item->name,"byte"))

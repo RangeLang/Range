@@ -13,8 +13,9 @@ function print(let message: String)
 @builtin
 function diagnostic(let message: String): Never
 
-// Called at macro time, report the message as a warning at the application
-// and continue; a law run per specialization does not repeat it. It has no
-// native code.
+// Report the message as a warning and continue. Called at macro time, it
+// reports it at the application, and a law run per specialization does not
+// repeat it; in a program it writes the message to standard error, located
+// at the call and marked a warning, as in "File.range:3:5: warning: low".
 @builtin
 function warning(let message: String)
