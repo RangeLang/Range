@@ -784,6 +784,20 @@ construct Outer {
 { return 0 }"
 grep -Fq "macro-argument-unknown-call.range:7:19: note[macro-validation]: the value of 'count' is not known at macro time" "$work_root/log" \
     || fail "macro-argument-unknown-call gave no reason: $(cat "$work_root/log")"
+# A trap is known: the error states it where the argument is written, with
+# the trap's place as a note when the trap is elsewhere.
+reject macro-argument-trap "macro-argument-trap.range:4:8: error[macro-validation]: the argument 'width' of @sized traps at macro time: division by zero in '/'" "$sized
+@sized(width: 1 / 0)
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+! grep -Fq "note[" "$work_root/log" || fail "macro-argument-trap repeated its trap as a note"
+reject macro-argument-trap-call "macro-argument-trap-call.range:5:8: error[macro-validation]: the argument 'width' of @sized traps at macro time: result of '*' does not fit Int<bits: 64, signed: true>" "$sized
+function square(let n: Int): Int { return n * n }
+@sized(width: square(n: 4294967296))
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+grep -Fq "macro-argument-trap-call.range:4:45: note[macro-validation]: result of '*' does not fit Int<bits: 64, signed: true>" "$work_root/log" \
+    || fail "macro-argument-trap-call gave no place: $(cat "$work_root/log")"
 reject macro-argument-target "#target is written only in a macro's body" "$sized
 @sized(width: #target.members.count)
 construct Point { let x: Int  let y: Int }

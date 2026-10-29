@@ -102,9 +102,6 @@ of a generic declaration would differ between its own run and its law runs.
   write one yet.
 - When one macro emits a second application of another, the first
   application may already have run in that round; the emitted one never runs.
-- A trap while computing a macro argument, such as dividing by zero, is
-  reported as "not known at macro time" with the trap as a note. A trap is
-  known; it deserves its own message.
 - `--match-literal` does not run typing, so a wrong `@literal` label is
   caught only when compiling.
 - Unused generic bodies are only lightly checked.
