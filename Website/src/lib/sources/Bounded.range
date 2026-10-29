@@ -2,20 +2,20 @@ macro bounded(let minimum: Value, let maximum: Value): @member -> Value {
   let value: #environment.target.Application.value
 
   if minimum > maximum {
-    @diagnostic(
-      "Bounded minimum must not exceed maximum"
+    diagnostic(
+      message: "Bounded minimum must not exceed maximum"
     )
   }
 
   if value < minimum {
-    @diagnostic(
-      "Value must be greater than or equal to \(minimum)"
+    diagnostic(
+      message: "Value must be greater than or equal to \(minimum)"
     )
   }
 
   if value > maximum {
-    @diagnostic(
-      "Value must be less than or equal to \(maximum)"
+    diagnostic(
+      message: "Value must be less than or equal to \(maximum)"
     )
   }
 

@@ -127,4 +127,8 @@ of a generic declaration would differ between its own run and its law runs.
 - Flat, numbered storage.
 
 ### Tooling and site
-- Website sources still use `@diagnostic(` and `#cases.map`.
+- The Website's Range samples are still written in the earlier
+  `#environment` dialect: `#environment.target.Declaration`, `if`,
+  `switch x { case … }`, and `#name` splices of macro locals such as
+  `#fields.map` and `#property.identity`. Rewriting them is a choice
+  between updating dated essays and keeping them as written.

@@ -22,8 +22,8 @@ macro many(
 
   switch count {
   case < 0:
-    @diagnostic(
-      "Many count must not be negative"
+    diagnostic(
+      message: "Many count must not be negative"
     )
 
   case .none:
@@ -35,8 +35,8 @@ macro many(
 
   default:
     if #environment.target.Application.values.count != count {
-      @diagnostic(
-        "Many value count must match declared count"
+      diagnostic(
+        message: "Many value count must match declared count"
       )
     }
 

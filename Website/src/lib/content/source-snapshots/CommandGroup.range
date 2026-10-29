@@ -6,7 +6,7 @@ macro commandGroup(): Construct {
     )
 
     if commands.count == 0 {
-        #environment.error("@commandGroup requires at least one @command function.")
+        diagnostic(message: "@commandGroup requires at least one @command function.")
     }
 
     #environment {

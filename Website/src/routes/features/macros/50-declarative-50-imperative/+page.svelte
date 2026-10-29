@@ -45,8 +45,8 @@
     )
 
     if payloadCases.count != 0 {
-        #environment.error(
-            "@caseIterable requires cases without associated values"
+        diagnostic(
+            message: "@caseIterable requires cases without associated values"
         )
     }
 
@@ -54,7 +54,7 @@
         extension #environment.target.Declaration.identifier {
             function allCases(): [Self] {
                 return [
-                    #cases.map { item in
+                    #target.cases.map { item in
                         .#item.identifier,
                     }
                 ]
