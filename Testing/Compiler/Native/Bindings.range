@@ -1,0 +1,86 @@
+// A binding member reads and writes a state its owner passes with $: a state
+// local, a state member path from a state, or another binding. A method that
+// writes only through bindings does not change its receiver, so it is
+// called on a let.
+construct Stepper {
+    binding quantity: Int
+    // A default and a derived value read through the binding too.
+    let start: quantity
+    derived double: quantity * 2
+    function bump() { quantity: quantity + 1 }
+}
+
+construct Cart { state count: 0  state names: Array<String>() }
+
+construct Pair {
+    binding value: Int
+    // A binding passed on to another binding.
+    function bumpTwice() {
+        let inner: Stepper(quantity: $value)
+        inner.bump()
+        inner.bump()
+    }
+}
+
+// A narrow state is read and written at its own size.
+construct Small { binding cell: Int<bits: 8>  function down() { cell: cell - 50 } }
+
+// A binding to a value holding blocks writes it in place.
+construct Names {
+    binding list: Array<String>
+    function add(let name: String) { list.append(value: name) }
+    function reset() { list: Array<String>() }
+}
+
+construct Counter {
+    state own: 0
+    binding total: Int
+    // Writing its own state changes the receiver, as passing it to a binding does.
+    function tick() { own: own + 1  total: total + 10 }
+    function link() {
+        let s: Stepper(quantity: $own)
+        s.bump()
+    }
+}
+
+{
+    state amount: 3
+    let stepper: Stepper(quantity: $amount)
+    stepper.bump()
+    print(message: "\(amount)")
+
+    state cart: Cart()
+    let counted: Stepper(quantity: $cart.count)
+    counted.bump()
+    counted.bump()
+    print(message: "count \(cart.count) start \(counted.start) double \(counted.double) read \(counted.quantity)")
+    counted.quantity: 10
+    print(message: "count \(cart.count)")
+    let pair: Pair(value: $cart.count)
+    pair.bumpTwice()
+    print(message: "count \(cart.count)")
+    let again: Stepper(quantity: $counted.quantity)
+    again.bump()
+    print(message: "count \(cart.count)")
+
+    state tiny: Int<bits: 8>(20)
+    let small: Small(cell: $tiny)
+    small.down()
+    print(message: "tiny \(tiny)")
+    small.down()
+    print(message: "tiny \(tiny)")
+
+    let names: Names(list: $cart.names)
+    names.add(name: "a")
+    names.add(name: "b")
+    print(message: "names \(cart.names.count)")
+    names.reset()
+    print(message: "names \(cart.names.count)")
+
+    state sum: 0
+    state counter: Counter(total: $sum)
+    counter.tick()
+    counter.link()
+    print(message: "own \(counter.own) sum \(sum)")
+    return 42
+}

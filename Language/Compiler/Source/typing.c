@@ -1283,12 +1283,12 @@ static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value
     return type;
 }
 
-/* Construction inputs: let and state members that are neither builtin nor
- * @many storage, which starts empty. A member with a default is optional;
- * one without is required. */
+/* Construction inputs: let, state, and binding members that are neither
+ * builtin nor @many storage, which starts empty. A member with a default is
+ * optional; one without is required; a binding has none. */
 int constructionInput(const RangeNode *member)
 {
-    return (member->kind == RangeNodeLet || member->kind == RangeNodeState)
+    return (member->kind == RangeNodeLet || member->kind == RangeNodeState || member->kind == RangeNodeBinding)
         && !builtinMember(member) && !(member->flags & RangeFlagMany);
 }
 
@@ -1314,6 +1314,134 @@ RangeNode *declarationValue(RangeNode *key, RangeNode *node)
     if (node->flags & RangeFlagApplication) return node;
     RangeNode *copied = node->rhsReference ? found(key,node->rhsReference)->resolvedDeclaration : NULL;
     return copied && (rangeNodeDeclaresValue(copied->kind) || copied->kind == RangeNodeParameter) ? node->rhsReference : NULL;
+}
+
+/* ---- bindings ----
+ * A binding member reads and writes a state of its owner: it is given one
+ * at construction, written `$place`, where place is a state local, a state
+ * member path whose root is a state, or another binding. Natively it holds
+ * the address of that cell. A value holding a binding, through its own
+ * construct or a stored member or payload field, lives no longer than the
+ * block that made it: it is not returned from a function, not stored in a
+ * state member or in @many storage, and assigned only to a local of the
+ * block the assignment is in, so it never outlives the state it binds. */
+
+typedef struct { RangeNode *seen[64]; size_t count; } Holding;
+
+static int holdsBindingIn(Typer *typer, RangeNode *type, Holding *visit)
+{
+    if (!type || type->kind != RangeNodeSpecialization) return 0;
+    RangeNode *declaration = type->resolvedDeclaration;
+    if (graphConstruct(typer,declaration) || declaration->kind == RangeNodeMacro) return 0;
+    for (size_t i = 0; i < visit->count; ++i) if (visit->seen[i] == type) return 0;
+    if (visit->count == sizeof(visit->seen)/sizeof(*visit->seen)) return 0;
+    visit->seen[visit->count++] = type;
+    for (size_t i = 0; i < declaration->itemCount; ++i) {
+        RangeNode *item = declaration->items[i];
+        if (item->kind == RangeNodeEnumCase) {
+            for (size_t j = 0; j < item->itemCount; ++j)
+                if (holdsBindingIn(typer,memberTypeIn(typer,type,item->items[j]),visit)) return 1;
+            continue;
+        }
+        if (item->kind == RangeNodeBinding) return 1;
+        if ((item->kind != RangeNodeLet && item->kind != RangeNodeState) || builtinMember(item)) continue;
+        RangeNode *held = item->flags & RangeFlagMany ? manyElement(typer,type,item) : memberTypeIn(typer,type,item);
+        if (holdsBindingIn(typer,held,visit)) return 1;
+    }
+    return 0;
+}
+
+static int holdsBinding(Typer *typer, RangeNode *type)
+{
+    Holding visit = {.count=0};
+    return holdsBindingIn(typer,type,&visit);
+}
+
+/* `cart.count` as written: a name and its member path, or NULL. */
+static const char *placeText(Typer *typer, RangeNode *place)
+{
+    if (!place || !place->name) return NULL;
+    if (place->kind == RangeNodeName) return place->name;
+    if (place->kind != RangeNodeMemberAccess) return NULL;
+    const char *owner = placeText(typer,place->a);
+    if (!owner) return NULL;
+    size_t length = strlen(owner) + strlen(place->name) + 2;
+    char *text = rangeArenaAllocate(typer->report->arena,length);
+    snprintf(text,length,"%s.%s",owner,place->name);
+    return text;
+}
+
+/* The place a value binds, as written where it was made, when typing can
+ * follow it there: through locals' values and construction arguments. */
+static const char *boundPlace(Typer *typer, RangeNode *node, unsigned depth)
+{
+    if (!node || depth > 16) return NULL;
+    if (node->kind == RangeNodeBindingArgument) return placeText(typer,node->a);
+    if (node->kind == RangeNodeName) {
+        RangeNode *declaration = found(typer->key,node)->resolvedDeclaration;
+        if (!declaration || (declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState && declaration->kind != RangeNodeDerived))
+            return NULL;
+        RangeNode *value = declarationValue(typer->key,declaration);
+        if (value != declaration) return boundPlace(typer,value,depth + 1);
+        for (size_t i = 0; i < declaration->itemCount; ++i) {
+            const char *bound = boundPlace(typer,declaration->items[i]->a,depth + 1);
+            if (bound) return bound;
+        }
+        return NULL;
+    }
+    if (node->kind == RangeNodeClosure || node->kind == RangeNodeFunction) return NULL;
+    const char *bound = boundPlace(typer,node->a,depth + 1);
+    if (!bound) bound = boundPlace(typer,found(typer->key,node)->lowered,depth + 1);
+    for (size_t i = 0; !bound && i < node->itemCount; ++i) bound = boundPlace(typer,node->items[i],depth + 1);
+    return bound;
+}
+
+/* A value holding a binding reaches somewhere that outlives the block it was made in. */
+static void bindingEscape(Typer *typer, RangeNode *at, RangeNode *value)
+{
+    const char *bound = boundPlace(typer,value,0);
+    const char *name = value && value->kind == RangeNodeName ? value->name : NULL;
+    if (name && bound) typeError(typer,at,"'%s' holds a binding to '%s' and cannot outlive it",name,bound);
+    else if (name) typeError(typer,at,"'%s' holds a binding and cannot outlive the state it binds",name);
+    else if (bound) typeError(typer,at,"this value holds a binding to '%s' and cannot outlive it",bound);
+    else typeError(typer,at,"this value holds a binding and cannot outlive the state it binds");
+}
+
+/* `$amount` as a binding input: the place it names is a state local, a
+ * path of state members from a state, or a binding; a member of the running
+ * method's receiver only in a method, which then changes its receiver. Its
+ * type is the binding's own. */
+static RangeNode *typeBindingArgument(Typer *typer, SourceScope *scope, RangeNode *argument, RangeNode *expected,
+                                      const char *what, RangeNode *context)
+{
+    RangeNode *place = argument->a;
+    RangeNode *actual = typeOf(typer,scope,place,NULL,context);
+    finding(typer,argument)->type = actual;
+    for (RangeNode *step = place;; step = step->a) {
+        if (!step || (step->kind != RangeNodeName && step->kind != RangeNodeMemberAccess) || found(typer->key,step)->lowered) {
+            typeError(typer,argument,"$ binds to a state; this is an expression");
+            return actual;
+        }
+        RangeNode *declaration = found(typer->key,step)->resolvedDeclaration;
+        if (!declaration) return actual; /* reported where it is resolved */
+        if (declaration->kind == RangeNodeBinding) break; /* the owner's cell, whoever holds the binding */
+        if (declaration->kind != RangeNodeState) {
+            if (declaration->kind == RangeNodeDerived) typeError(typer,argument,"$ binds to a state; '%s' is derived",step->name);
+            else typeError(typer,argument,"$ binds to a state; '%s' is a %s",step->name,rangeNodeKindName(declaration->kind));
+            return actual;
+        }
+        if (step->kind == RangeNodeName) {
+            RangeNode *owner = typer->function ? typer->function->owner : NULL;
+            int member = 0;
+            for (SourceScope *at = scope; at && !member; at = at->parent)
+                member = at->owner && (at->owner->kind == RangeNodeConstruct) && memberOf(at->owner,declaration);
+            if (member && !(owner && memberOf(owner,declaration)))
+                typeError(typer,argument,"$ binds to a state; '%s' is a member here, and only a method passes its receiver's state",step->name);
+            break;
+        }
+    }
+    expectType(typer,argument,expected,actual,what);
+    return actual;
 }
 
 /* `Point(x: 1, y: 2)`: each argument names the member it populates, and is
@@ -1377,9 +1505,26 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
             if (found(typer->key,arguments[j])->resolvedDeclaration == member) typeError(typer,argument,"'%s' is supplied twice",member->name);
         finding(typer,argument)->resolvedDeclaration = member;
         RangeNode *expected = memberTypeIn(typer,type,member);
-        RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
         char what[200]; snprintf(what,sizeof(what),"input '%s' of %s",member->name,typeName);
-        coerce(typer,argument->a,expected,actual,what);
+        RangeNode *value = argument->a;
+        if (member->kind == RangeNodeBinding) {
+            // A binding is given a state with $, never a value.
+            if (value && value->kind == RangeNodeBindingArgument) { (void)typeBindingArgument(typer,scope,value,expected,what,context); continue; }
+            (void)typeOf(typer,scope,value,expected,context);
+            typeError(typer,argument,"'%s' is a binding; pass a state with $, as in $%s",member->name,
+                      value && value->kind == RangeNodeName ? value->name : member->name);
+            continue;
+        }
+        if (value && value->kind == RangeNodeBindingArgument) {
+            (void)typeOf(typer,scope,value->a,NULL,context);
+            typeError(typer,argument,"$%s passes a state to a binding; '%s' is not a binding",
+                      placeText(typer,value->a) ? placeText(typer,value->a) : "",member->name);
+            continue;
+        }
+        RangeNode *actual = typeOf(typer,scope,value,expected,context);
+        coerce(typer,value,expected,actual,what);
+        // A state member can be given another value later: it holds no binding.
+        if (member->kind == RangeNodeState && holdsBinding(typer,expected)) bindingEscape(typer,argument,value);
     }
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
@@ -1855,7 +2000,8 @@ static int narrowablePath(RangeNode *key, RangeNode *path)
     if (path->kind == RangeNodeEnvironment) return 1;
     const RangeNode *declaration = found(key,path)->resolvedDeclaration;
     if (path->kind == RangeNodeMemberAccess)
-        return declaration && rangeNodeDeclaresValue(declaration->kind) && narrowablePath(key,path->a);
+        return declaration && rangeNodeDeclaresValue(declaration->kind) && declaration->kind != RangeNodeBinding
+            && declaration->kind != RangeNodeDerived && narrowablePath(key,path->a);
     if (path->kind != RangeNodeName || (path->flags & RangeFlagImplicit) || !declaration) return 0;
     return declaration->kind == RangeNodeLet || (declaration->kind == RangeNodeParameter && !(declaration->flags & RangeFlagBinding));
 }
@@ -1961,6 +2107,15 @@ static void typeArguments(Typer *typer, SourceScope *scope, RangeNode *site, Ran
         if (labeled && !argumentFits(argument,callable,i))
             typeError(typer,argument,"argument %zu of '%s' requires label '%s'",i + 1,name,parameter->name);
         RangeNode *expected = declaredTypeIn(typer,signature,parameter,receiver);
+        if (argument->a && argument->a->kind == RangeNodeBindingArgument) {
+            // `$` passes a state to a binding member at construction; a function takes values.
+            (void)typeOf(typer,scope,argument->a->a,NULL,context);
+            const char *place = placeText(typer,argument->a->a);
+            if (parameter->flags & RangeFlagBinding)
+                sourceDiagnostic(typer->report,argument,0,"not-implemented","passing a state to a function's binding parameter '%s' is not implemented",parameter->name);
+            else typeError(typer,argument,"$%s passes a state to a binding; '%s' is not a binding",place ? place : "",parameter->name);
+            continue;
+        }
         RangeNode *closure = typer->closureSite;
         typer->closureSite = isFunctionType(expected) ? argument->a : NULL;
         RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
@@ -2433,6 +2588,13 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         else if (target && target->kind == RangeNodeConstruct) type = ownSpecialization(typer,target);
         break;
     }
+    case RangeNodeBindingArgument: {
+        // A binding input is typed where its construction names the binding.
+        (void)typeOf(typer,scope,expr->a,NULL,context);
+        const char *place = placeText(typer,expr->a);
+        typeError(typer,expr,"$%s passes a state to a binding input; this is not one",place ? place : "");
+        break;
+    }
     case RangeNodeEmission:
         if (!typer->macro) { typeError(typer,expr,"#graph is written only in a macro's body"); break; }
         typeSplices(typer,scope,expr->b);
@@ -2635,6 +2797,19 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
         finding(typer,node)->found |= RangeFlagTyped;
 }
 
+/* A value holding a binding is assigned only to a local of the block the
+ * assignment is in, or a member path of one: the local ends with that block,
+ * before any state the value can bind from there. */
+static void assignedBinding(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *type)
+{
+    if (!holdsBinding(typer,type)) return;
+    RangeNode *root = node->a;
+    while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+    RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
+    int local = declaration && scope && scope->owner && scope->owner->kind == RangeNodeBlock && memberOf(scope->owner,declaration);
+    if (!local) bindingEscape(typer,node,node->b);
+}
+
 /* `let r: step(x: 1)` calls a function: the call, over the written
  * arguments, is the value typing records beside the declaration. */
 static RangeNode *typeInitializerCall(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context)
@@ -2682,8 +2857,10 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
                 typeError(typer,node,"'%s' is derived from other values; it is not assigned",member->name);
                 break;
             }
+            // A binding along the way writes its owner's state: what holds the binding is not changed.
             for (;;) {
                 RangeNode *through = found(typer->key,root)->resolvedDeclaration;
+                if (through && through->kind == RangeNodeBinding) break;
                 if ((root->kind == RangeNodeMemberAccess || root->kind == RangeNodeName) && through && through->kind != RangeNodeState)
                     typeError(typer,node,"cannot assign through %s '%s'",rangeNodeKindName(through->kind),root->name);
                 if (root->kind != RangeNodeMemberAccess) break;
@@ -2693,6 +2870,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
                 RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
                 char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",member->name);
                 coerce(typer,node->b,expected,actual,what);
+                assignedBinding(typer,scope,node,expected);
             }
             break;
         }
@@ -2701,12 +2879,17 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         finding(typer,target)->resolvedDeclaration = declaration;
         if (!declaration) break;
         if (declaration->kind == RangeNodeDerived) { typeError(typer,node,"'%s' is derived from other values; it is not assigned",target->name); break; }
-        if (declaration->kind != RangeNodeState) { typeError(typer,node,"cannot assign to %s '%s'",rangeNodeKindName(declaration->kind),target->name); break; }
+        // A binding writes the state its owner passed.
+        if (declaration->kind != RangeNodeState && declaration->kind != RangeNodeBinding) {
+            typeError(typer,node,"cannot assign to %s '%s'",rangeNodeKindName(declaration->kind),target->name);
+            break;
+        }
         // The state's type was computed where it was declared; an assignment does not re-derive it.
         RangeNode *expected = found(typer->key,declaration)->type ? found(typer->key,declaration)->type : declaredTypeIn(typer,scope,declaration,context);
         RangeNode *actual = typeOf(typer,scope,node->b,expected,context);
         char what[160]; snprintf(what,sizeof(what),"assignment to '%s'",target->name);
         coerce(typer,node->b,expected,actual,what);
+        assignedBinding(typer,scope,node,expected);
         break;
     }
     case RangeNodeWhile: {
@@ -2762,6 +2945,8 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
             if (!node->a && unitType(typer,output)) break; /* a unit result, such as Void, needs no value */
             if (!node->a) { char t[160]; describeType(t,sizeof(t),output); typeError(typer,node,"return requires %s",t); break; }
             coerce(typer,node->a,output,typeOf(typer,scope,node->a,output,context),"return");
+            // A function's result outlives its body; a closure's goes to the call it runs in.
+            if (!typer->closures && holdsBinding(typer,output)) bindingEscape(typer,node,node->a);
         } else if (node->a) {
             (void)typeOf(typer,scope,node->a,NULL,context);
             typeError(typer,node,"this function returns no value");
@@ -3334,6 +3519,15 @@ static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeN
     finding(typer,item)->found |= RangeFlagTyped;
     // A derived member is computed on the instance it is read on, an instance of its owner.
     if (item->kind == RangeNodeDerived && scope && scope->owner && scope->owner->kind == RangeNodeConstruct) item->owner = scope->owner;
+    // A binding names the type of the state it is given; it has no value of its own.
+    if (item->kind == RangeNodeBinding) {
+        if (item->typeName && !(item->flags & RangeFlagApplication) && !item->a && !item->itemCount) {
+            finding(typer,item)->type = declaredType(typer,scope,item,context);
+            if (!declarationValue(typer->key,item)) return;
+        }
+        typeError(typer,item,"binding '%s' has no initial value; it is given a state at construction, written $ before the state's name",item->name);
+        return;
+    }
     if (item->typeName && (item->flags & RangeFlagApplication)) {
         // A member initialized by construction, e.g. `state from: Point(x: 0)`.
         if (!lookupFunction(typer->report,scope,item->typeName))
@@ -3347,6 +3541,9 @@ static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeN
     // A derived member is computed from its expression on every read; it is never supplied.
     if (item->kind == RangeNodeDerived && !declarationValue(typer->key,item))
         typeError(typer,item,"derived '%s' needs the expression it is computed from",item->name);
+    // A state member can be given another value later: it holds no binding.
+    RangeNode *value = item->kind == RangeNodeState ? declarationValue(typer->key,item) : NULL;
+    if (value && holdsBinding(typer,found(typer->key,item)->type)) bindingEscape(typer,item,value == item ? NULL : value);
 }
 
 /* A construct's members and methods are typed in its own specialization,
@@ -3573,7 +3770,8 @@ int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
             if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member) || member->kind == RangeNodeDerived) continue;
             size_t memberSize, memberAlignment;
             RangeNode *type = NULL;
-            if (member->flags & RangeFlagMany) { memberSize = 8; memberAlignment = 8; }
+            // @many storage holds its block's address; a binding, its owner's cell's.
+            if ((member->flags & RangeFlagMany) || member->kind == RangeNodeBinding) { memberSize = 8; memberAlignment = 8; }
             else {
                 type = memberTypeIn(typer,specialization,member);
                 if (!type || type->kind != RangeNodeSpecialization || !layoutOf(typer,type,member)) {
@@ -3622,10 +3820,18 @@ static int mutatesIn(Typer *typer, RangeNode *owner, RangeNode *node)
 {
     if (!node) return 0;
     if (node->kind == RangeNodeFunction || node->kind == RangeNodeConstruct) return 0;
-    if (node->kind == RangeNodeAssign) {
+    // Writing the receiver's state, or passing it to a binding, changes the
+    // receiver; writing through a binding changes the binding's owner.
+    if (node->kind == RangeNodeAssign || node->kind == RangeNodeBindingArgument) {
         RangeNode *root = node->a;
-        while (root && root->kind == RangeNodeMemberAccess) root = root->a;
-        if (root && root->kind == RangeNodeName && memberOf(owner,found(typer->key,root)->resolvedDeclaration)) return 1;
+        int through = 0;
+        for (; root && root->kind == RangeNodeMemberAccess; root = root->a) {
+            RangeNode *step = found(typer->key,root)->resolvedDeclaration;
+            through |= step && step->kind == RangeNodeBinding;
+        }
+        RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
+        through |= declaration && declaration->kind == RangeNodeBinding;
+        if (!through && memberOf(owner,declaration)) return 1;
     }
     if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeName) {
         RangeFacts *call = found(typer->key,node->a);
@@ -3714,14 +3920,19 @@ static void checkMutations(Typer *typer, RangeNode *node)
         RangeNode *function = call->resolvedDeclaration;
         if (function && function->kind == RangeNodeFunction && mutates(typer,function,call->specialization)) {
             // A derived value along the way is computed, not a place to change.
+            // A binding along the way changes its owner's state, which the binding's owner passed with $.
             RangeNode *root = node->a->a, *derived = NULL;
+            int through = 0;
             for (; root && root->kind == RangeNodeMemberAccess; root = root->a) {
                 RangeNode *step = found(typer->key,root)->resolvedDeclaration;
-                if (step && step->kind == RangeNodeDerived) derived = step;
+                if (step && step->kind == RangeNodeDerived && !through) derived = step;
+                if (step && step->kind == RangeNodeBinding && !derived) through = 1;
             }
             RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
-            if (declaration && declaration->kind == RangeNodeDerived) derived = declaration;
-            if (derived)
+            if (declaration && declaration->kind == RangeNodeDerived && !through) derived = declaration;
+            through |= !derived && declaration && declaration->kind == RangeNodeBinding;
+            if (through) {}
+            else if (derived)
                 typeError(typer,node,"'%s' changes its receiver, and '%s' is derived from other values; it is not changed",function->name,derived->name);
             else if (!declaration || declaration->kind != RangeNodeState)
                 typeError(typer,node,"'%s' changes its receiver, which must be declared with state",function->name);
@@ -3782,6 +3993,10 @@ static int comparable(Typer *typer, RangeNode *type, Comparing *visit, char *why
         RangeNode *member = declaration->items[i];
         if (member->flags & RangeFlagMany) {
             snprintf(why,size,"field '%s' of %s is @many storage, which the structural '=' does not compare",member->name,name);
+            return 0;
+        }
+        if (member->kind == RangeNodeBinding) {
+            snprintf(why,size,"field '%s' of %s is a binding, which the structural '=' does not compare",member->name,name);
             return 0;
         }
         if (comparable(typer,type->memberTypes[i],visit,inner,sizeof(inner))) continue;
@@ -4046,6 +4261,14 @@ void typeCheck(Typer *typer)
     for (size_t i = 0; i < typer->specializations->itemCount; ++i) {
         RangeNode *specialization = typer->specializations->items[i], *declaration = specialization->resolvedDeclaration;
         if (keyOf(declaration,specialization)) typeLaws(typer,declaration,specialization);
+        // @many storage outlives any block: its elements hold no binding.
+        for (size_t j = 0; declaration->kind == RangeNodeConstruct && j < declaration->itemCount; ++j) {
+            RangeNode *member = declaration->items[j], *element;
+            if (!rangeNodeDeclaresValue(member->kind) || !(member->flags & RangeFlagMany) || graphConstruct(typer,declaration)) continue;
+            if (!(element = manyElement(typer,specialization,member)) || !holdsBinding(typer,element)) continue;
+            char name[160], held[160]; describeType(name,sizeof(name),specialization); describeType(held,sizeof(held),element);
+            sourceDiagnostic(report,specialization,0,"type","%s cannot hold %s: it holds a binding, which cannot outlive the state it binds",name,held);
+        }
         if (specialization->layout == 2 || layoutOf(typer,specialization,declaration) || specialization->integer) continue;
         char name[160]; describeType(name,sizeof(name),specialization);
         sourceDiagnostic(report,declaration,0,"layout","%s has no layout",name);

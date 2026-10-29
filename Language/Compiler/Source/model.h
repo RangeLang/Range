@@ -45,7 +45,7 @@ typedef enum {
     RangeNodeBinary,
     RangeNodeManyLiteral,
     RangeNodeEnvironment,
-    RangeNodeSyntaxTemplate,
+    RangeNodeBindingArgument, /* $amount: the state a passes to a binding input */
     RangeNodeClosure,
     RangeNodeEmission,
     RangeNodeSwitch,

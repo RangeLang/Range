@@ -80,6 +80,11 @@ A marker plus an ordinary function any macro can call to skip a member. The
 scoped form `@ignored([@equatable, @database])` needs macros referenced as
 values.
 
+### `$` for bindings
+Revisit the `$` spelling for passing a state to a binding
+(`Stepper(quantity: $amount)`); George chose `$` for visibility at the call
+site on 2026-10-29, to be revisited.
+
 ### Reflected types as specializations
 `Parameter.type`, `Function.output` and `Function.receiver` are declarations,
 generic arguments aside. A type written with generic arguments is a
@@ -100,6 +105,16 @@ of a generic declaration would differ between its own run and its law runs.
   followed through writes.
 - `binding` in a block is rejected as not implemented; a binding is a
   construct member.
+- Passing a state to a binding is not run at macro time: "passing a state to
+  a binding is not run at macro time".
+- `$` to a function's `binding` parameter is reported as not implemented;
+  such a parameter is otherwise read as a let.
+- A value holding a binding follows a conservative rule: it is never
+  returned from a function, never held by a state member or @many storage,
+  and assigned only to a local of the assignment's own block. Returning one
+  whose bound state outlives the call needs lifetimes of what it binds.
+- `let s: make(1)`, where `make` is a closure parameter, is not compiled
+  natively ("native values of <unknown> are not implemented").
 
 ### Macro gaps
 - `@holding(type: Array<@nominal>)` does not parse.

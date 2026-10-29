@@ -624,7 +624,8 @@ static RangeValue evalZero(Eval *eval, RangeNode *type, unsigned depth)
     zero.values = evalValues(eval,zero.count);
     for (size_t i = 0; i < zero.count; ++i) {
         RangeNode *member = variant ? zero.node->items[i] : declaration->items[i];
-        if (!variant && (!rangeNodeDeclaresValue(member->kind) || builtinMember(member) || member->kind == RangeNodeDerived)) continue;
+        if (!variant && (!rangeNodeDeclaresValue(member->kind) || builtinMember(member) || member->kind == RangeNodeDerived
+                         || member->kind == RangeNodeBinding)) continue;
         zero.values[i] = member->flags & RangeFlagMany ? (RangeValue){.kind=ValueSlots}
             : evalZero(eval,memberTypeIn(eval->typer,type,member),depth + 1);
     }
@@ -1269,6 +1270,9 @@ int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
         return EvalNormal;
     case RangeNodeSwitch: return evalSwitch(eval,frame,expr,out);
     case RangeNodeUnary: case RangeNodeBinary: return evalOperator(eval,frame,expr,out);
+    case RangeNodeBindingArgument:
+        // A binding reads and writes a cell at run: folding, it is never known.
+        return eval->outside ? EvalUnknown : evalFail(eval,expr,"passing a state to a binding is not run at macro time");
     case RangeNodeEmission:
         // A shape-only block landed before the body ran; a law run emits nothing.
         if ((eval->application && eval->application->specialization) || (expr->found & RangeFlagShape)) return EvalNormal;

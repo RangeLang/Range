@@ -113,9 +113,9 @@ int main(void)
     reject("construct Return {} construct Return {}","ambiguous language grammar construct");
     reject("construct Return { let value: Any? let value: Any? }","duplicate language grammar field");
     reject("construct Return { let extra: Any? }","no C field adapter");
-    // Structural syntax stays in C; old template annotations fail explicitly.
+    // Structural syntax stays in C; old @syntax annotations fail explicitly.
     RangeArena rejected; rangeArenaInit(&rejected);
-    const char *template = "@syntax { return $value } construct Return { let value: Any? }";
+    const char *template = "@syntax { return value } construct Return { let value: Any? }";
     assert(!rangeParseUnit(&rejected,"Deferred.range",template,strlen(template),error,sizeof(error)));
     assert(strstr(error,"@syntax is deferred"));
     rangeArenaDestroy(&rejected);

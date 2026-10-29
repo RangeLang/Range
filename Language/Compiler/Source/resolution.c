@@ -1125,9 +1125,6 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         diagnoseSourceNode(report,&own,node->a,metadata);
         return;
     }
-    case RangeNodeSyntaxTemplate:
-        sourceDiagnostic(report,node,0,"not-implemented","execution of '%s' is not implemented",rangeNodeKindName(node->kind));
-        break;
     default: break;
     }
     diagnoseSourceNode(report,scope,node->a,metadata);

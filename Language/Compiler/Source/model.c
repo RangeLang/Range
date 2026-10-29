@@ -87,7 +87,7 @@ static const char *const RANGE_NODE_NAMES[RangeNodeKindCount] = {
     "let", "state", "derived", "binding", "typeParameter", "parameter", "attribute", "block", "assign",
     "while", "return", "expressionStatement", "call", "argument",
     "memberAccess", "name", "integer", "bool", "string", "stringPart",
-    "case", "unary", "binary", "manyLiteral", "environment", "syntaxTemplate",
+    "case", "unary", "binary", "manyLiteral", "environment", "bindingArgument",
     "closure", "emission", "switch", "switchCase", "extension", "specialization", "type", "pattern",
     "for", "break", "continue", "functionType", "caseTest"
 };

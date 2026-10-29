@@ -737,12 +737,6 @@ static RangeNode *parsePrimary(RangeParser *parser)
         }
         return node;
     }
-    if (parserAt(parser, "$")) {
-        RangeNode *node = parserNode(parser, RangeNodeSyntaxTemplate);
-        parserAdvance(parser);
-        node->name = parserExpectName(parser);
-        return node;
-    }
     if (parserAt(parser, "@")) {
         const RangeToken *ahead = parserPeek(parser);
         if (rangeTokenIs(ahead, "many") || rangeTokenIs(ahead, "any")
@@ -860,6 +854,17 @@ static RangeNode *parsePostfix(RangeParser *parser)
 
 static RangeNode *parseUnary(RangeParser *parser)
 {
+    if (parserAt(parser, "$")) {
+        /* `$amount`, `$cart.count`: a state passed to a binding input. */
+        RangeNode *node = parserNode(parser, RangeNodeBindingArgument);
+        parserAdvance(parser);
+        if (parser->current.kind != RangeTokenName) {
+            parserFail(parser, &parser->current, "'$' passes a state to a binding: write $ before its name, as in $amount");
+            return node;
+        }
+        node->a = parsePostfix(parser);
+        return node;
+    }
     if (parserAt(parser, "!") || parserAt(parser, "-")) {
         RangeNode *node = parserNode(parser, RangeNodeUnary);
         node->name = rangeArenaIntern(parser->arena, parser->current.text,
@@ -1808,9 +1813,8 @@ static RangeNode *parseEnum(RangeParser *parser, RangeNode *attributes)
 
 /* Macro declarations are parsed in full: parameters with defaults, the target
  * and result type positions, and the body as a real block. Macro bodies are
- * compile-time programs: they may read #target, emit #graph blocks, use $
- * templates, and end in a bare implicit result. Nothing here is retained as a
- * raw span. */
+ * compile-time programs: they may read #target, emit #graph blocks, and end
+ * in a bare implicit result. Nothing here is retained as a raw span. */
 static RangeNode *parseMacro(RangeParser *parser, RangeNode *attributes)
 {
     RangeNode *node = parserNode(parser, RangeNodeMacro);

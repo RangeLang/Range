@@ -805,7 +805,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
     // member computed on the value being built.
     int32_t selfSlot = 0;
     for (size_t i = 0; !selfSlot && i < declaration->itemCount; ++i)
-        if (declaration->items[i]->kind == RangeNodeDerived) {
+        if (declaration->items[i]->kind == RangeNodeDerived || declaration->items[i]->kind == RangeNodeBinding) {
             selfSlot = nativeReserve(native,8,8);
             nativeStore(native,0,selfSlot);
         }
@@ -814,14 +814,24 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         RangeNode *member = declaration->items[i];
         size_t offset = type->memberOffsets ? type->memberOffsets[i] : SIZE_MAX;
         if (offset == SIZE_MAX || (member->flags & RangeFlagMany)) continue;
-        if (previous != SIZE_MAX) {
-            // The member stored before this one is initialized now.
+        if (previous != SIZE_MAX && declaration->items[previous]->kind != RangeNodeBinding) {
+            // The member stored before this one is initialized now; a binding
+            // before it is read through the value being built.
             NativeSlot alias = {.declaration=declaration->items[previous],.offset=destination + (int32_t)type->memberOffsets[previous],
                 .type=type->memberTypes[previous],.alias=1,.packed=1};
             NATIVE_PUSH(native->slots,native->slotCount,native->slotCapacity,alias);
         }
         previous = i;
         RangeNode *memberType = type->memberTypes[i], *value = constructionArgument(native->key,member,arguments,count);
+        if (member->kind == RangeNodeBinding) {
+            // `$amount`: the address of the state's cell, which the binding reads and writes.
+            int frameSlot = 0;
+            if (!value || value->kind != RangeNodeBindingArgument || !nativeAddress(native,value->a,&frameSlot)) continue;
+            nativeFrameAddress(native,1,destination);
+            nativeAddOffset(native,1,1,offset);
+            nativeEmit(native,armStr(0,1,0));
+            continue;
+        }
         int memberKind = nativeKind(native,memberType,member);
         if (memberKind == NativeNone) continue;
         if (value) nativeExpression(native,value);
@@ -1808,6 +1818,14 @@ static RangeNode *nativeDerived(Native *native, RangeNode *at, RangeNode *derive
     return built;
 }
 
+/* A binding member at x0 holds its owner's cell's address: the place it
+ * reads and writes, a value of the type it binds, at its own size. */
+static RangeNode *nativeThroughBinding(Native *native, RangeNode *receiver, RangeNode *binding)
+{
+    nativeEmit(native,armLdr(0,0,0));
+    return memberTypeIn(native->typer,receiver,binding);
+}
+
 /* A computed value where its address is needed: a scalar kept in a frame slot. */
 static RangeNode *nativeDerivedPlace(Native *native, RangeNode *at, RangeNode *type, int *frameSlot)
 {
@@ -1858,6 +1876,7 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
         if (index != SIZE_MAX && native->self->memberOffsets && native->self->memberOffsets[index] != SIZE_MAX) {
             nativeLoad(native,0,native->selfSlot);
             nativeAddOffset(native,0,0,native->self->memberOffsets[index]);
+            if (declaration->kind == RangeNodeBinding) return nativeThroughBinding(native,native->self,declaration);
             return native->self->memberTypes[index];
         }
         if (declaration && (declaration->flags & RangeFlagMany)) {
@@ -1884,6 +1903,7 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
             return NULL;
         }
         nativeAddOffset(native,0,0,receiver->memberOffsets[index]);
+        if (member->kind == RangeNodeBinding) return nativeThroughBinding(native,receiver,member);
         return receiver->memberTypes[index];
     }
     RangeNode *type = nativeExpression(native,expr);
@@ -2361,6 +2381,8 @@ static void nativeStatementBody(Native *native, RangeNode *node)
             else if (value) nativeExpression(native,value);
             else { nativeMissing(native,node,"'%s' has no initial value",node->name); break; } /* the type checker rejects it */
             nativeStore(native,0,nativeNewSlot(native,node,type,kind));
+            // A state is read and written at its own size, as a binding to it does.
+            if (node->kind == RangeNodeState) native->slots[native->slotCount - 1].packed = 1;
             break;
         }
         if (construction) {
