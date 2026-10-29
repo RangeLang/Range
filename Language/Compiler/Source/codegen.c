@@ -739,10 +739,10 @@ static NativeContext nativeUse(Native *native, NativeContext context)
 
 /* A member's default, compiled where it is declared: in the specialization
  * being constructed, under its key. */
-static RangeNode *nativeDefault(Native *native, RangeNode *type, RangeNode *value)
+static RangeNode *nativeDefault(Native *native, RangeNode *type, RangeNode *value, int32_t selfSlot)
 {
     NativeContext caller = nativeUse(native,(NativeContext){.owner=type->resolvedDeclaration,.self=type,
-                                                            .key=keyOf(type->resolvedDeclaration,type)});
+                                                            .key=keyOf(type->resolvedDeclaration,type),.selfSlot=selfSlot});
     RangeNode *result = nativeExpression(native,value);
     nativeUse(native,caller);
     return result;
@@ -763,7 +763,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         RangeNode *value = constructionSingle(key,declaration,arguments,count,&defaulted);
         native->resultTemp = -1;
         if (!value) nativeEmit(native,armMovz(0,0,0));
-        else if (defaulted) nativeDefault(native,type,value);
+        else if (defaulted) nativeDefault(native,type,value,0);
         else nativeExpression(native,value);
         return type;
     }
@@ -777,7 +777,7 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         nativeFrameAddress(native,0,destination);
         nativeZero(native,0,type->size);
         if (value) {
-            if (!(defaulted ? nativeDefault(native,type,value) : nativeExpression(native,value))) return NULL;
+            if (!(defaulted ? nativeDefault(native,type,value,0) : nativeExpression(native,value))) return NULL;
             int moved = nativeTakeTemp(native);
             nativeFrameAddress(native,1,destination);
             nativeCopyValue(native,1,0,type,!moved);
@@ -801,7 +801,14 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
     nativeFrameAddress(native,0,destination);
     nativeZero(native,0,type->size);
     // Members are initialized in declaration order; a default sees the ones
-    // before it by name, through slots aliasing them in place.
+    // before it by name, through slots aliasing them in place, and a derived
+    // member computed on the value being built.
+    int32_t selfSlot = 0;
+    for (size_t i = 0; !selfSlot && i < declaration->itemCount; ++i)
+        if (declaration->items[i]->kind == RangeNodeDerived) {
+            selfSlot = nativeReserve(native,8,8);
+            nativeStore(native,0,selfSlot);
+        }
     size_t aliases = native->slotCount, previous = SIZE_MAX;
     for (size_t i = 0; i < declaration->itemCount; ++i) {
         RangeNode *member = declaration->items[i];
@@ -820,12 +827,12 @@ static RangeNode *nativeConstruct(Native *native, RangeNode *at, RangeNode *type
         if (value) nativeExpression(native,value);
         else if ((value = declarationValue(key,member)) == member) {
             // A default that constructs: its arguments are the declaration's.
-            NativeContext caller = nativeUse(native,(NativeContext){.owner=declaration,.self=type,.key=key});
+            NativeContext caller = nativeUse(native,(NativeContext){.owner=declaration,.self=type,.key=key,.selfSlot=selfSlot});
             nativeConstruct(native,member,memberType,member->items,member->itemCount,destination + (int32_t)offset);
             nativeUse(native,caller);
             if (memberKind == NativeScalar) { nativeFrameAddress(native,1,destination); nativeStoreScalar(native,0,1,offset,memberType); }
             continue;
-        } else if (value) nativeDefault(native,type,value);
+        } else if (value) nativeDefault(native,type,value,selfSlot);
         else continue; /* required inputs are enforced by the type checker */
         int moved = nativeTakeTemp(native);
         nativeFrameAddress(native,1,destination);
@@ -1766,6 +1773,52 @@ static RangeNode *nativeCall(Native *native, RangeNode *call)
     return output;
 }
 
+/* A derived value, computed where it is read from its expression: a
+ * member's on its receiver, whose address is in x0 when `receiver` is its
+ * type, else the running method's; a local's in the running body. Its value
+ * is left as an expression's: a scalar in x0, or an aggregate's address. */
+static RangeNode *nativeDerived(Native *native, RangeNode *at, RangeNode *derived, RangeNode *receiver)
+{
+    if (!derived->owner) {
+        RangeNode *value = declarationValue(native->key,derived), *type = found(native->key,derived)->type;
+        if (value == derived) return nativeConstruct(native,derived,type,derived->items,derived->itemCount,0);
+        return nativeExpression(native,value);
+    }
+    size_t depth = 0;
+    for (NativeRegion *region = native->region; region; region = region->outer) ++depth;
+    if (depth > 64) { nativeMissing(native,at,"'%s' is derived through too many values to compile",derived->name); return NULL; }
+    NativeContext context = {.owner=derived->owner,.self=receiver,.selfSlot=0};
+    if (receiver) {
+        context.selfSlot = nativeReserve(native,8,8);
+        nativeStore(native,0,context.selfSlot);
+    } else if (native->owner == derived->owner && native->selfSlot) {
+        context.self = native->self;
+        context.selfSlot = native->selfSlot;
+    } else { nativeMissing(native,at,"'%s' is read without an instance to compute it on",derived->name); return NULL; }
+    context.key = keyOf(derived->owner,context.self);
+    RangeNode *value = declarationValue(context.key,derived), *type = found(context.key,derived)->type;
+    if (value != derived) return nativeRegion(native,at,NULL,type,&context,NULL,value,native->slotCount);
+    // `derived corner: Point(x: width)` constructs, as a member's default does.
+    NativeContext caller = nativeUse(native,context);
+    size_t serial = native->serial;
+    native->serial = ++native->serials;
+    RangeNode *built = nativeConstruct(native,derived,type,derived->items,derived->itemCount,0);
+    native->serial = serial;
+    nativeUse(native,caller);
+    return built;
+}
+
+/* A computed value where its address is needed: a scalar kept in a frame slot. */
+static RangeNode *nativeDerivedPlace(Native *native, RangeNode *at, RangeNode *type, int *frameSlot)
+{
+    if (!type || nativeKind(native,type,at) != NativeScalar) return type;
+    int32_t temporary = nativeReserve(native,8,8);
+    nativeStore(native,0,temporary);
+    nativeFrameAddress(native,0,temporary);
+    *frameSlot = 1;
+    return type;
+}
+
 /* The address of what an expression reads, before any narrowing, in x0, and
  * its type. A scalar local's address is its frame slot (*frameSlot = 1: it
  * holds a full register). Other values that are not places are materialized
@@ -1776,6 +1829,8 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
     // A form that runs as what typing lowered it to is no place: it is materialized below.
     RangeFacts *facts = found(native->key,expr);
     RangeNodeKind kind = facts->lowered ? facts->lowered->kind : expr->kind;
+    if (kind == RangeNodeName && facts->resolvedDeclaration && facts->resolvedDeclaration->kind == RangeNodeDerived)
+        return nativeDerivedPlace(native,expr,nativeDerived(native,expr,facts->resolvedDeclaration,NULL),frameSlot);
     if (kind == RangeNodeName) {
         RangeNode *declaration = facts->resolvedDeclaration;
         if (declaration && native->function && declaration == native->function->receiver && native->owner) {
@@ -1817,6 +1872,7 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
         int innerSlot = 0;
         RangeNode *receiver = nativeAddress(native,expr->a,&innerSlot);
         if (!receiver) return NULL;
+        if (member && member->kind == RangeNodeDerived) return nativeDerivedPlace(native,expr,nativeDerived(native,expr,member,receiver),frameSlot);
         if (bytesType(receiver) && member && builtinMember(member) && same(member->name,"count")) {
             // The byte count is the bytes primitive's second word.
             nativeEmit(native,armAddImm(0,0,8));
@@ -2438,6 +2494,8 @@ static void nativeStatementBody(Native *native, RangeNode *node)
     case RangeNodeSwitch:
         (void)nativeSwitch(native,node);
         break;
+    case RangeNodeDerived:
+        break; /* computed where it is read */
     case RangeNodeFunction: case RangeNodeConstruct:
         nativeMissing(native,node,"nested %s declarations are not implemented natively",rangeNodeKindName(node->kind));
         break;

@@ -624,7 +624,7 @@ static RangeValue evalZero(Eval *eval, RangeNode *type, unsigned depth)
     zero.values = evalValues(eval,zero.count);
     for (size_t i = 0; i < zero.count; ++i) {
         RangeNode *member = variant ? zero.node->items[i] : declaration->items[i];
-        if (!variant && (!rangeNodeDeclaresValue(member->kind) || builtinMember(member))) continue;
+        if (!variant && (!rangeNodeDeclaresValue(member->kind) || builtinMember(member) || member->kind == RangeNodeDerived)) continue;
         zero.values[i] = member->flags & RangeFlagMany ? (RangeValue){.kind=ValueSlots}
             : evalZero(eval,memberTypeIn(eval->typer,type,member),depth + 1);
     }
@@ -819,7 +819,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
     defaults.self = &instance;
     for (size_t i = 0; i < instance.count; ++i) {
         RangeNode *member = declaration->items[i], *value = constructionArgument(frame->key,member,arguments,count);
-        if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
+        if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member) || member->kind == RangeNodeDerived) continue;
         if (member->flags & RangeFlagMany) { instance.values[i] = (RangeValue){.kind=ValueSlots}; continue; }
         RangeNode *memberType = memberTypeIn(eval->typer,type,member);
         if (value) status = evalExpression(eval,frame,value,&instance.values[i]);
@@ -841,6 +841,7 @@ static RangeValue *evalPlace(Eval *eval, EvalFrame *frame, RangeNode *expr)
 {
     RangeFacts *facts = found(frame->key,expr);
     if (facts->lowered || facts->narrowed) return NULL; /* it runs as something else, or reads a payload */
+    if (facts->resolvedDeclaration && facts->resolvedDeclaration->kind == RangeNodeDerived) return NULL; /* computed, not held */
     if (expr->kind == RangeNodeName) {
         RangeValue *bound = evalNamed(frame,facts->resolvedDeclaration);
         if (bound) return bound;
@@ -1038,6 +1039,23 @@ static int evalOperator(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValu
 
 /* ---- expressions ---- */
 
+/* A derived value, computed from its expression on every read. A member's
+ * is computed on the instance it is read on, `self`, under that instance's
+ * key; read through the running method's receiver while folding, it is
+ * known only at run. A local's is computed in the frame that reads it,
+ * which continues the one it was declared in. */
+static int evalDerived(Eval *eval, EvalFrame *frame, RangeValue *self, RangeNode *derived, RangeNode *at, RangeValue *out)
+{
+    if (derived->owner && evalMember(self,derived) == SIZE_MAX)
+        return evalRooted(eval,frame) ? EvalUnknown : evalFail(eval,at,"the value of '%s' is not known at macro time",derived->name);
+    int status = evalDeeper(eval,at);
+    if (status) return status;
+    EvalFrame member = {.self=self,.key=derived->owner ? keyOf(derived->owner,self->type) : NULL};
+    status = evalDeclared(eval,derived->owner ? &member : frame,derived,out);
+    --eval->depth;
+    return status;
+}
+
 /* A value generic: the constant of the specialization the running body was
  * typed in, or of one it is typed within, its receiver's. */
 static RangeNode *evalGeneric(EvalFrame *frame, RangeNode *declaration)
@@ -1052,6 +1070,7 @@ static RangeNode *evalGeneric(EvalFrame *frame, RangeNode *declaration)
 static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
 {
     RangeNode *declaration = found(frame->key,expr)->resolvedDeclaration;
+    if (declaration && declaration->kind == RangeNodeDerived) return evalDerived(eval,frame,frame->self,declaration,expr,out);
     RangeValue *bound = evalNamed(frame,declaration);
     if (bound) { *out = *bound; return EvalNormal; }
     if (declaration && frame->self && frame->function && declaration == frame->function->receiver) { *out = *frame->self; return EvalNormal; }
@@ -1096,7 +1115,13 @@ static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, Range
         return evalField(eval,receiver.node->kind == RangeNodeSpecialization ? receiver.node->resolvedDeclaration : receiver.node,
                          expr->name,expr,out);
     case ValueInstance: {
-        size_t index = evalMember(&receiver,member ? member : declaration ? findMember(declaration,expr->name) : NULL);
+        RangeNode *named = member ? member : declaration ? findMember(declaration,expr->name) : NULL;
+        if (named && named->kind == RangeNodeDerived) {
+            RangeValue *self = evalValues(eval,1);
+            *self = receiver;
+            return evalDerived(eval,frame,self,named,expr,out);
+        }
+        size_t index = evalMember(&receiver,named);
         if (index == SIZE_MAX) break;
         *out = receiver.values[index];
         return EvalNormal;
@@ -1306,6 +1331,7 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     case RangeNodeLet: case RangeNodeState:
         if (!(status = evalDeclared(eval,frame,node,&value))) evalBind(eval,frame,node,value);
         return status;
+    case RangeNodeDerived: return EvalNormal; /* computed where it is read */
     case RangeNodeAssign: {
         RangeFacts *assigned = found(frame->key,node->a);
         RangeNode *target = assigned->type ? assigned->type

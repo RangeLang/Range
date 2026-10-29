@@ -1385,8 +1385,13 @@ static RangeNode *parseStatement(RangeParser *parser)
         }
         return statement;
     }
-    if (parserAt(parser, "let") || parserAt(parser, "state")) {
-        RangeNode *node = parserNode(parser, parserAt(parser, "state") ? RangeNodeState : RangeNodeLet);
+    if (parserAt(parser, "binding")) {
+        parserFail(parser, &parser->current, "a binding in a block is not implemented; a binding is a construct member");
+        return NULL;
+    }
+    if (parserAt(parser, "let") || parserAt(parser, "state") || parserAt(parser, "derived")) {
+        RangeNode *node = parserNode(parser, parserAt(parser, "state") ? RangeNodeState
+                                             : parserAt(parser, "derived") ? RangeNodeDerived : RangeNodeLet);
         parserAdvance(parser);
         node->name = parserExpectName(parser);
         if (!parserAt(parser, ":") && node->kind == RangeNodeLet) return node;

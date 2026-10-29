@@ -1367,7 +1367,12 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
             member = only;
         } else for (size_t j = 0; j < declaration->itemCount; ++j)
             if (constructionInput(declaration->items[j]) && same(declaration->items[j]->name,argument->name)) member = declaration->items[j];
-        if (!member) { typeError(typer,argument,"%s has no input '%s'",typeName,argument->name); continue; }
+        if (!member) {
+            RangeNode *named = findMember(declaration,argument->name);
+            if (named && named->kind == RangeNodeDerived) typeError(typer,argument,"%s has no input '%s': it is derived",typeName,argument->name);
+            else typeError(typer,argument,"%s has no input '%s'",typeName,argument->name);
+            continue;
+        }
         for (size_t j = 0; j < i; ++j)
             if (found(typer->key,arguments[j])->resolvedDeclaration == member) typeError(typer,argument,"'%s' is supplied twice",member->name);
         finding(typer,argument)->resolvedDeclaration = member;
@@ -2176,12 +2181,38 @@ static RangeNode *typeOperator(Typer *typer, SourceScope *scope, RangeNode *expr
 static RangeNode *typeSwitch(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
 static RangeNode *typeExpression(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 
+/* `derived a: b * 2` and `derived b: a + 1` compute each from the other, so
+ * neither has a value; any other declarations whose types wait on each
+ * other have no type. The cycle is named in source order. */
+static void derivedCycle(Typer *typer, RangeNode *declaration, RangeNode **cycle, size_t count)
+{
+    int derived = 1;
+    for (size_t i = 0; i < count; ++i) derived &= cycle[i]->kind == RangeNodeDerived;
+    if (!derived) { typeError(typer,declaration,"the type of '%s' depends on itself",declaration->name); return; }
+    if (count == 1) { typeError(typer,declaration,"'%s' is derived from itself; it must be state",declaration->name); return; }
+    RangeNode *sorted[64];
+    for (size_t i = 0; i < count; ++i) {
+        size_t j = i;
+        for (; j > 0 && (sorted[j - 1]->line > cycle[i]->line
+                         || (sorted[j - 1]->line == cycle[i]->line && sorted[j - 1]->column > cycle[i]->column)); --j)
+            sorted[j] = sorted[j - 1];
+        sorted[j] = cycle[i];
+    }
+    char names[512] = "";
+    for (size_t i = 0; i < count; ++i) {
+        size_t used = strlen(names);
+        snprintf(names + used,sizeof(names) - used,"%s'%s'",i == 0 ? "" : i + 1 == count ? " and " : ", ",sorted[i]->name);
+    }
+    typeError(typer,sorted[0],"%s are derived from each other; one of them must be state",names);
+}
+
 /* A local of a block in scope whose statement is not typed yet: it is
  * declared later than where it is read. Names a pattern binds are declared
  * by their case tests. */
 static int declaredLater(RangeNode *key, SourceScope *scope, RangeNode *declaration)
 {
-    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState) || (found(key,declaration)->found & RangeFlagTyped)) return 0;
+    if ((declaration->kind != RangeNodeLet && declaration->kind != RangeNodeState && declaration->kind != RangeNodeDerived)
+        || (found(key,declaration)->found & RangeFlagTyped)) return 0;
     for (; scope; scope = scope->parent)
         if (scope->owner && scope->owner->kind == RangeNodeBlock && !same(scope->owner->name,"bindings"))
             for (size_t i = 0; i < scope->owner->itemCount; ++i) if (scope->owner->items[i] == declaration) return 1;
@@ -2292,7 +2323,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
                 size_t depth = typer->typingCount;
                 for (size_t i = 0; i < depth; ++i)
                     if (typer->typing[i] == declaration) {
-                        typeError(typer,declaration,"the type of '%s' depends on itself",declaration->name);
+                        derivedCycle(typer,declaration,typer->typing + i,depth - i);
                         depth = SIZE_MAX;
                         break;
                     }
@@ -2600,7 +2631,22 @@ static void typeStatement(Typer *typer, SourceScope *scope, RangeNode *node, Ran
     typeStatementOnly(typer,scope,node,context,output);
     typer->narrowedCount = mark;
     // A local is declared once its statement is typed: later ones may read it.
-    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState)) finding(typer,node)->found |= RangeFlagTyped;
+    if (node && (node->kind == RangeNodeLet || node->kind == RangeNodeState || node->kind == RangeNodeDerived))
+        finding(typer,node)->found |= RangeFlagTyped;
+}
+
+/* `let r: step(x: 1)` calls a function: the call, over the written
+ * arguments, is the value typing records beside the declaration. */
+static RangeNode *typeInitializerCall(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context)
+{
+    RangeNode *callee = rangeNodeCreate(typer->report->arena,RangeNodeName,node->path,node->line,node->column);
+    callee->name = node->typeName;
+    callee->generics = node->generics;
+    RangeNode *call = rangeNodeCreate(typer->report->arena,RangeNodeCall,node->path,node->line,node->column);
+    call->a = callee;
+    for (size_t i = 0; i < node->itemCount; ++i) rangeNodeAppend(typer->report->arena,call,node->items[i]);
+    finding(typer,node)->lowered = call;
+    return typeOf(typer,scope,call,NULL,context);
 }
 
 static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node, RangeNode *context, RangeNode *output)
@@ -2608,22 +2654,14 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
     if (!node) return;
     switch (node->kind) {
     case RangeNodeBlock: typeBlock(typer,scope,node,context,output); break;
-    case RangeNodeLet: case RangeNodeState:
+    case RangeNodeLet: case RangeNodeState: case RangeNodeDerived:
         if (node->typeName && (node->flags & RangeFlagApplication)) {
             // `let r: step(x: 1)` calls a function; a construct here is construction.
             if (!lookupFunction(typer->report,scope,node->typeName)) {
                 finding(typer,node)->type = typeConstruction(typer,scope,node,node->typeName,node->generics,node->flags,node->items,node->itemCount,context);
                 break;
             }
-            RangeNode *callee = rangeNodeCreate(typer->report->arena,RangeNodeName,node->path,node->line,node->column);
-            callee->name = node->typeName;
-            callee->generics = node->generics;
-            // The call, over the written arguments, is the value typing records beside it.
-            RangeNode *call = rangeNodeCreate(typer->report->arena,RangeNodeCall,node->path,node->line,node->column);
-            call->a = callee;
-            for (size_t i = 0; i < node->itemCount; ++i) rangeNodeAppend(typer->report->arena,call,node->items[i]);
-            finding(typer,node)->lowered = call;
-            finding(typer,node)->type = typeOf(typer,scope,call,NULL,context);
+            finding(typer,node)->type = typeInitializerCall(typer,scope,node,context);
             break;
         }
         finding(typer,node)->type = declaredType(typer,scope,node,context);
@@ -2631,7 +2669,8 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         // construct's member may leave its value to construction.
         if ((node->typeName || (found(typer->key,node)->found & RangeFlagRequired)) && !(node->flags & RangeFlagApplication)
             && !declarationValue(typer->key,node) && !optionalWithoutValue(node))
-            typeError(typer,node,"'%s' needs an initial value",node->name);
+            typeError(typer,node,node->kind == RangeNodeDerived ? "derived '%s' needs the expression it is computed from"
+                      : "'%s' needs an initial value",node->name);
         break;
     case RangeNodeAssign: {
         RangeNode *target = node->a;
@@ -2639,6 +2678,10 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
             // `p.x: 5` changes a state member of a state value.
             RangeNode *expected = typeOf(typer,scope,target,NULL,context);
             RangeNode *member = found(typer->key,target)->resolvedDeclaration, *root = target;
+            if (member && member->kind == RangeNodeDerived) {
+                typeError(typer,node,"'%s' is derived from other values; it is not assigned",member->name);
+                break;
+            }
             for (;;) {
                 RangeNode *through = found(typer->key,root)->resolvedDeclaration;
                 if ((root->kind == RangeNodeMemberAccess || root->kind == RangeNodeName) && through && through->kind != RangeNodeState)
@@ -2657,6 +2700,7 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
         RangeNode *declaration = sourceLookup(typer->report,scope,target->name,0);
         finding(typer,target)->resolvedDeclaration = declaration;
         if (!declaration) break;
+        if (declaration->kind == RangeNodeDerived) { typeError(typer,node,"'%s' is derived from other values; it is not assigned",target->name); break; }
         if (declaration->kind != RangeNodeState) { typeError(typer,node,"cannot assign to %s '%s'",rangeNodeKindName(declaration->kind),target->name); break; }
         // The state's type was computed where it was declared; an assignment does not re-derive it.
         RangeNode *expected = found(typer->key,declaration)->type ? found(typer->key,declaration)->type : declaredTypeIn(typer,scope,declaration,context);
@@ -3218,15 +3262,23 @@ static void typeEnum(Typer *typer, SourceScope *parent, RangeNode *declaration)
 /* The first member of `declaration`, at `index` or later, that a member
  * default refers to by bare name: defaults run in declaration order, so they
  * see only the members before them. */
-static RangeNode *laterMember(RangeNode *key, RangeNode *declaration, size_t index, RangeNode *node)
+static RangeNode *laterMember(RangeNode *key, RangeNode *declaration, size_t index, RangeNode *node, unsigned depth)
 {
-    if (!node || node->kind == RangeNodeFunction || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum) return NULL;
+    if (!node || depth > 64 || node->kind == RangeNodeFunction || node->kind == RangeNodeConstruct || node->kind == RangeNodeEnum) return NULL;
     RangeNode *target = node->kind == RangeNodeName ? found(key,node)->resolvedDeclaration : NULL;
     for (size_t i = index; target && i < declaration->itemCount; ++i)
         if (declaration->items[i] == target) return target;
-    RangeNode *later = laterMember(key,declaration,index,node->a);
-    if (!later) later = laterMember(key,declaration,index,node->b);
-    for (size_t i = 0; !later && i < node->itemCount; ++i) later = laterMember(key,declaration,index,node->items[i]);
+    // A derived member before it is computed from its own expression, read now.
+    if (target && target->kind == RangeNodeDerived && memberOf(declaration,target)) {
+        RangeNode *value = declarationValue(key,target);
+        RangeNode *later = value == target ? NULL : laterMember(key,declaration,index,value,depth + 1);
+        for (size_t i = 0; !later && value == target && i < target->itemCount; ++i)
+            later = laterMember(key,declaration,index,target->items[i],depth + 1);
+        if (later) return later;
+    }
+    RangeNode *later = laterMember(key,declaration,index,node->a,depth);
+    if (!later) later = laterMember(key,declaration,index,node->b,depth);
+    for (size_t i = 0; !later && i < node->itemCount; ++i) later = laterMember(key,declaration,index,node->items[i],depth);
     return later;
 }
 
@@ -3243,9 +3295,11 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
             // A bare name: a member copied, or a type required.
             RangeNode *named = !member->generics && !(member->flags & RangeFlagOptional) ? findMember(declaration,member->typeName) : NULL;
             for (size_t j = i; named && j < declaration->itemCount; ++j) if (declaration->items[j] == named) later = named;
+            if (!later && named && named->kind == RangeNodeDerived && member->rhsReference)
+                later = laterMember(typer->key,declaration,i,member->rhsReference,0);
         } else if (member->typeName) {
-            for (size_t j = 0; !later && j < member->itemCount; ++j) later = laterMember(typer->key,declaration,i,member->items[j]);
-        } else later = laterMember(typer->key,declaration,i,rangeNodeRHS(member));
+            for (size_t j = 0; !later && j < member->itemCount; ++j) later = laterMember(typer->key,declaration,i,member->items[j],0);
+        } else later = laterMember(typer->key,declaration,i,rangeNodeRHS(member),0);
         if (later == member)
             typeError(typer,member,"the default of '%s' refers to '%s' itself",member->name,member->name);
         else if (later)
@@ -3278,15 +3332,21 @@ static void typeMember(Typer *typer, SourceScope *scope, RangeNode *item, RangeN
 {
     if (found(typer->key,item)->found & RangeFlagTyped) return;
     finding(typer,item)->found |= RangeFlagTyped;
+    // A derived member is computed on the instance it is read on, an instance of its owner.
+    if (item->kind == RangeNodeDerived && scope && scope->owner && scope->owner->kind == RangeNodeConstruct) item->owner = scope->owner;
     if (item->typeName && (item->flags & RangeFlagApplication)) {
         // A member initialized by construction, e.g. `state from: Point(x: 0)`.
         if (!lookupFunction(typer->report,scope,item->typeName))
             finding(typer,item)->type = typeConstruction(typer,scope,item,item->typeName,item->generics,item->flags,
                                           item->items,item->itemCount,context);
+        else if (item->kind == RangeNodeDerived) finding(typer,item)->type = typeInitializerCall(typer,scope,item,context); /* computed on each read */
         else typeError(typer,item,"member '%s' cannot be initialized by calling '%s'",item->name,item->typeName);
         return;
     }
     finding(typer,item)->type = declaredType(typer,scope,item,context);
+    // A derived member is computed from its expression on every read; it is never supplied.
+    if (item->kind == RangeNodeDerived && !declarationValue(typer->key,item))
+        typeError(typer,item,"derived '%s' needs the expression it is computed from",item->name);
 }
 
 /* A construct's members and methods are typed in its own specialization,
@@ -3374,7 +3434,7 @@ static int containsInline(Typer *typer, RangeNode *type, RangeNode *target, Cont
                 if (type->layout == 2 && type->memberBoxed && type->memberBoxed[field]) continue;
                 if (containsInline(typer,memberTypeIn(typer,type,item->items[j]),target,visit)) return 1;
             }
-        } else if (rangeNodeDeclaresValue(item->kind) && !builtinMember(item) && !(item->flags & RangeFlagMany)
+        } else if (rangeNodeDeclaresValue(item->kind) && item->kind != RangeNodeDerived && !builtinMember(item) && !(item->flags & RangeFlagMany)
                    && containsInline(typer,memberTypeIn(typer,type,item),target,visit)) return 1;
     }
     return 0;
@@ -3509,7 +3569,8 @@ int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
         }
         for (size_t i = 0; i < declaration->itemCount; ++i) {
             RangeNode *member = declaration->items[i];
-            if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member)) continue;
+            // A derived member is computed where it is read: it takes no storage.
+            if (!rangeNodeDeclaresValue(member->kind) || builtinMember(member) || member->kind == RangeNodeDerived) continue;
             size_t memberSize, memberAlignment;
             RangeNode *type = NULL;
             if (member->flags & RangeFlagMany) { memberSize = 8; memberAlignment = 8; }
@@ -3592,17 +3653,77 @@ static int mutates(Typer *typer, RangeNode *function, RangeNode *key)
     return result;
 }
 
+/* Whether `node` is `within` or written inside it. */
+static int inside(const RangeNode *within, const RangeNode *node)
+{
+    if (!within || !node) return 0;
+    if (within == node) return 1;
+    if (inside(within->a,node) || inside(within->b,node) || inside(within->c,node) || inside(within->rhsReference,node)) return 1;
+    for (size_t i = 0; i < within->itemCount; ++i) if (inside(within->items[i],node)) return 1;
+    return 0;
+}
+
+/* A derived value is computed from others and changes nothing: its
+ * expression writes no value declared outside it, directly or by calling a
+ * method that changes its receiver. The first such write is reported. */
+static int derivedWrites(Typer *typer, RangeNode *derived, RangeNode *node)
+{
+    if (!node || node->kind == RangeNodeFunction || node->kind == RangeNodeConstruct) return 0;
+    if (node->kind == RangeNodeAssign) {
+        RangeNode *root = node->a;
+        while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+        RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
+        if (declaration && !inside(derived,declaration)) {
+            typeError(typer,node,"'%s' is derived; it cannot write '%s'",derived->name,root->name);
+            return 1;
+        }
+    }
+    if (node->kind == RangeNodeCall && node->a && (node->a->kind == RangeNodeMemberAccess || node->a->kind == RangeNodeName)) {
+        RangeFacts *call = found(typer->key,node->a);
+        RangeNode *function = call->resolvedDeclaration;
+        if (function && function->kind == RangeNodeFunction && function->typeName && mutates(typer,function,call->specialization)) {
+            RangeNode *root = node->a->kind == RangeNodeMemberAccess ? node->a->a : NULL;
+            while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+            RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
+            if (node->a->kind == RangeNodeName) {
+                typeError(typer,node,"'%s' is derived; it cannot call '%s', which changes its receiver",derived->name,function->name);
+                return 1;
+            }
+            if (declaration && !inside(derived,declaration)) {
+                typeError(typer,node,"'%s' is derived; it cannot write '%s' by calling '%s'",derived->name,root->name,function->name);
+                return 1;
+            }
+        }
+    }
+    if (derivedWrites(typer,derived,node->a) || derivedWrites(typer,derived,node->b) || derivedWrites(typer,derived,node->c)
+        || derivedWrites(typer,derived,found(typer->key,node)->lowered)) return 1;
+    for (size_t i = 0; i < node->itemCount; ++i) if (derivedWrites(typer,derived,node->items[i])) return 1;
+    return 0;
+}
+
 static void checkMutations(Typer *typer, RangeNode *node)
 {
     if (!node) return;
+    if (node->kind == RangeNodeDerived) {
+        RangeNode *value = declarationValue(typer->key,node);
+        if (value && value != node) (void)derivedWrites(typer,node,value);
+        for (size_t i = 0; value == node && i < node->itemCount; ++i) if (derivedWrites(typer,node,node->items[i])) break;
+    }
     if (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeMemberAccess) {
         RangeFacts *call = found(typer->key,node->a);
         RangeNode *function = call->resolvedDeclaration;
         if (function && function->kind == RangeNodeFunction && mutates(typer,function,call->specialization)) {
-            RangeNode *root = node->a->a;
-            while (root && root->kind == RangeNodeMemberAccess) root = root->a;
+            // A derived value along the way is computed, not a place to change.
+            RangeNode *root = node->a->a, *derived = NULL;
+            for (; root && root->kind == RangeNodeMemberAccess; root = root->a) {
+                RangeNode *step = found(typer->key,root)->resolvedDeclaration;
+                if (step && step->kind == RangeNodeDerived) derived = step;
+            }
             RangeNode *declaration = root && root->kind == RangeNodeName ? found(typer->key,root)->resolvedDeclaration : NULL;
-            if (!declaration || declaration->kind != RangeNodeState)
+            if (declaration && declaration->kind == RangeNodeDerived) derived = declaration;
+            if (derived)
+                typeError(typer,node,"'%s' changes its receiver, and '%s' is derived from other values; it is not changed",function->name,derived->name);
+            else if (!declaration || declaration->kind != RangeNodeState)
                 typeError(typer,node,"'%s' changes its receiver, which must be declared with state",function->name);
         }
     }
@@ -3940,7 +4061,8 @@ void typeCheck(Typer *typer)
         RangeNode *declaration = typer->specializations->items[i]->resolvedDeclaration;
         typer->key = keyOf(declaration,typer->specializations->items[i]);
         for (size_t j = 0; typer->key && j < declaration->itemCount; ++j)
-            if (declaration->items[j]->kind == RangeNodeFunction && (found(typer->key,declaration->items[j])->found & RangeFlagTyped))
+            if ((declaration->items[j]->kind == RangeNodeFunction || declaration->items[j]->kind == RangeNodeDerived)
+                && (found(typer->key,declaration->items[j])->found & RangeFlagTyped))
                 checkMutations(typer,declaration->items[j]);
     }
     typer->key = NULL;

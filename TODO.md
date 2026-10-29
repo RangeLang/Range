@@ -47,6 +47,9 @@ is a type, so `Logger()` is always a value.
     information, hint }`;
   - the idea of one `report(severity:message:)` beside a separate,
     diverging `error`.
+- derived must not perform effects (print, diagnostic, warning); detecting
+  that needs effects to have an owner instead of free functions, so it waits
+  for namespacing.
 
 ### How optionality is spelled
 Optionality on the type is fine; the bare `?` (`Int?`, `Int?.absent`,
@@ -95,6 +98,8 @@ of a generic declaration would differ between its own run and its law runs.
 - Constraints as the type of a type slot.
 - `state` as a run-time cell only; values known before run are not yet
   followed through writes.
+- `binding` in a block is rejected as not implemented; a binding is a
+  construct member.
 
 ### Macro gaps
 - `@holding(type: Array<@nominal>)` does not parse.
@@ -125,6 +130,8 @@ of a generic declaration would differ between its own run and its law runs.
 ### Code generation
 - Jump tables for `switch`.
 - Flat, numbered storage.
+- A derived value is computed again on every read; caching it until one of
+  its inputs changes is an optimization still to do.
 
 ### Tooling and site
 - The summary counts in `check-compiler-native` and `rejections=7` in

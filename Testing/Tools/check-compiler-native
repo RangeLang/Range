@@ -87,6 +87,12 @@ grep -Fq "ExtensionTypes.range:21:1: warning[macro]: Written writes @equatable" 
     || fail "@equatable on an extension missed the '=' beside it"
 ! grep -Fq "Array applies @equatable" "$work_root/log" || fail "@collection's @equatable missed its '='"
 run member-defaults 42 "" Testing/Compiler/Native/MemberDefaults.range
+# A derived value is computed again on every read: members on their
+# instance, locals in their scope; folded where its inputs are known.
+run derived 42 "" Testing/Compiler/Native/Derived.range
+printf '%s\n' "count 2 double 4" "area 12 double 24 report 36 twice 24 initial 7" "corner 4 3" "rect!" "big small 6" \
+    "total 22 further 44" "total 32 further 64" "large 1" "large 2" "square 16 fixed 12" "box 0 true" "box 1 false" \
+    | cmp -s - "$work_root/stdout" || fail "derived printed: $(cat "$work_root/stdout")"
 run expressions 42 "" Testing/Compiler/Native/Expressions.range
 run generics 42 "" Testing/Compiler/Native/Generics.range
 run bytes 42 "" Testing/Compiler/Native/Bytes.range
@@ -206,7 +212,7 @@ function words(): Array<String> { state ws: Array<String>()  ws.append(value: "o
 # Every block is freed when its last reference ends, and none twice.
 if command -v leaks > /dev/null; then
     for program in arrays copy-on-write lifetimes known-blocks payloads patterns recursive-enums nested-enums optionals \
-                   loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults expressions generics promotion strings-native \
+                   loops intervals guards switch-expressions enum-methods equality equatable equality-syntax operators array-equality extension-equality member-defaults derived expressions generics promotion strings-native \
                    bytes control evaluation identity-references subjects case-tests closures collections generic-methods generic-bodies; do
         MallocScribble=1 MallocCheckHeapStart=1 MallocCheckHeapEach=100 "$work_root/$program" > /dev/null 2>&1 \
             || [[ $? == 42 ]] || fail "$program failed under heap checking"
@@ -1154,6 +1160,54 @@ reject default-self "the default of 'a' refers to 'a' itself" \
 reject default-cycle "the type of 'a' depends on itself" \
     'construct F { let a: b + 1  let b: a + 1 }
 { return F().a }'
+# A derived value is computed, never written: its expression changes nothing
+# outside it, and nothing assigns or supplies it.
+reject derived-writes "'double' is derived; it cannot write 'count'" \
+    'function count(let xs: Array<Int>, let where: (Int) -> Bool): Int { return 0 }
+construct Cart {
+    state count: 0
+    state xs: Array<Int>()
+    derived double: count(xs: xs) { x in count: count + 1  return x > 0 }
+}
+{ return 0 }'
+reject derived-calls-changing "'double' is derived; it cannot call 'bump', which changes its receiver" \
+    'construct Cart {
+    state count: 0
+    derived double: bump()
+    function bump(): Int { count: count + 1  return count }
+}
+{ state c: Cart() return c.double }'
+reject derived-changes-value "'size' is derived; it cannot write 'xs' by calling 'append'" \
+    '{ state xs: Array<Int>() derived size: xs.append(value: 1) return 0 }'
+run derived-local-writes 0 "" "$(case_file derived-local-writes 'function count(let xs: Array<Int>, let where: (Int) -> Bool): Int { return 0 }
+{ state xs: Array<Int>() derived seen: count(xs: xs) { x in state n: 0  n: n + 1  return x > n } return seen }')"
+reject derived-assigned "'double' is derived from other values; it is not assigned" \
+    'construct Cart { state count: 0  derived double: count * 2 }
+{ state c: Cart() c.double: 3 return 0 }'
+reject derived-local-assigned "'d' is derived from other values; it is not assigned" \
+    '{ state a: 1 derived d: a + 1 d: 4 return d }'
+reject derived-input "Cart has no input 'double': it is derived" \
+    'construct Cart { state count: 0  derived double: count * 2 }
+{ let c: Cart(double: 3) return 0 }'
+reject derived-cycle "'a' and 'b' are derived from each other; one of them must be state" \
+    'construct Pair { derived a: b + 1  derived b: a * 2 }
+{ return Pair().a }'
+reject derived-self "'a' is derived from itself; it must be state" \
+    'construct Pair { derived a: a + 1 }
+{ return Pair().a }'
+reject derived-local-cycle "'a' and 'b' are derived from each other; one of them must be state" \
+    '{ derived a: b + 1  derived b: a  return a }'
+reject derived-without-value "derived 'a' needs the expression it is computed from" \
+    'construct Pair { derived a: Int }
+{ return 0 }'
+reject derived-changed "'add' changes its receiver, and 'copy' is derived from other values; it is not changed" \
+    'construct Counter { state n: 0  function add() { n: n + 1 } }
+construct Cart { state counter: Counter()  derived copy: counter }
+{ state c: Cart() c.copy.add() return 0 }'
+reject derived-default-order "the default of 'first' refers to 'last', which is declared after it" \
+    'construct Pair { derived d: last * 2  let first: d  let last: 3 }
+{ return Pair().first }'
+reject binding-local "a binding in a block is not implemented; a binding is a construct member" '{ binding x: 1 return 0 }'
 reject template-execution "@syntax is deferred; structural syntax is defined in C" '{ @syntax($value) return 0 }'
 reject trailing-interpolation "trailing tokens in interpolation" '{ let value: String("\(1 2)") return value.count }'
 reject immutable "cannot assign to let 'value'" '{ let value: Int(1) value: 2 return value }'

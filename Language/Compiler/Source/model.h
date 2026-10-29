@@ -211,7 +211,7 @@ struct RangeNode {
     const char *literalPattern; /* validated literal rule, owned by the arena */
     RangeNode *literalDefault; /* unique Core construct for a literal macro */
     RangeNode *receiver; /* method: its implicit receiver declaration, made on first use */
-    RangeNode *owner;    /* method: the construct or enum that declares it */
+    RangeNode *owner;    /* method: the construct or enum that declares it; derived member: its construct */
 };
 
 /* Arena owning every node and interned string for the process lifetime. */

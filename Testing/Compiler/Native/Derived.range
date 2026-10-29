@@ -1,0 +1,84 @@
+// A derived value is computed from others on every read, in the scope it is
+// declared in: a member from the instance's current members, a local from
+// the values before it. It takes no storage and is never supplied or
+// assigned; nothing is cached.
+construct Cart {
+    state count: 0
+    derived double: count * 2
+    function add() { count: count + 1 }
+}
+
+construct Point { let x: Int  let y: Int }
+
+construct Rect {
+    state width: 2
+    state height: 3
+    derived area: width * height
+    // A derived value reads another.
+    derived double: area * 2
+    derived corner: Point(x: width, y: height)
+    let label: "rect"
+    derived name: label + "!"
+    derived size: switch { area > 10: "big", default: "small" }
+    derived twice: doubled()
+    // A default is computed once, at construction, and may read a derived value.
+    let initial: area + 1
+    function grow() { width: width + 1 }
+    function doubled(): Int { return area * 2 }
+    function report(): Int { return double + area }
+}
+
+construct Box<Element> {
+    state items: Array<Element>()
+    derived size: items.count
+    derived empty: size = 0
+}
+
+function count(let xs: Array<Int>, let where: (Int) -> Bool): Int {
+    state found: 0
+    for x in xs { switch { where(x): found: found + 1, default: {} } }
+    return found
+}
+
+{
+    state cart: Cart()
+    cart.add()
+    cart.add()
+    print(message: "count \(cart.count) double \(cart.double)")
+
+    state r: Rect()
+    let fixed: Rect()
+    r.grow()
+    r.grow()
+    print(message: "area \(r.area) double \(r.double) report \(r.report()) twice \(r.twice) initial \(r.initial)")
+    print(message: "corner \(r.corner.x) \(r.corner.y)")
+    print(message: r.name)
+    print(message: "\(r.size) \(fixed.size) \(fixed.area)")
+
+    // Locals: each read computes the value again from the current state.
+    state base: 10
+    derived total: base + r.area
+    derived further: total * 2
+    print(message: "total \(total) further \(further)")
+    base: 20
+    print(message: "total \(total) further \(further)")
+
+    state xs: Array<Int>()
+    xs.append(value: 5)
+    xs.append(value: 50)
+    derived large: count(xs: xs) { x in x > total }
+    print(message: "large \(large)")
+    base: -10
+    print(message: "large \(large)")
+
+    // Inputs known before run fold; a let's derived value is known too.
+    let side: 4
+    derived square: side * side
+    print(message: "square \(square) fixed \(fixed.double)")
+
+    state b: Box<Int>()
+    print(message: "box \(b.size) \(b.empty)")
+    b.items.append(value: 3)
+    print(message: "box \(b.size) \(b.empty)")
+    return 42
+}
