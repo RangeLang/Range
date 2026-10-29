@@ -1,6 +1,6 @@
 // Selects String for quoted literals. C's lexer recognizes the literal itself,
 // including escapes and \( ) interpolation; this pattern only picks the construct.
-@literal("\".*\"")
+@literal(pattern: "\".*\"")
 macro string(): Construct {
   let value: #target.members.first(where: { member in member.name = "value" })
   switch {

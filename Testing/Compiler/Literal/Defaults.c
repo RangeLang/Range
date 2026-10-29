@@ -10,11 +10,11 @@ int main(void)
     rangeGraphInitTypes(&arena);
     const char *core =
         "@builtin macro literal(let pattern: String): Macro "
-        "@literal(\"[0-9]+\") macro number(): Construct {} "
+        "@literal(pattern: \"[0-9]+\") macro number(): Construct {} "
         "@number construct Whole<let bits: 64> { let value: 0 } "
-        "@literal(\"true|false\") macro truth(): Construct {} "
+        "@literal(pattern: \"true|false\") macro truth(): Construct {} "
         "@truth construct Logical { let value: false } "
-        "@literal(\"\\\".*\\\"\") macro quoted(): Construct {} "
+        "@literal(pattern: \"\\\".*\\\"\") macro quoted(): Construct {} "
         "@quoted construct Text { let value: \"\" }";
     const char *project =
         "@number construct ProjectNumber { let value: 9 } "
@@ -51,7 +51,7 @@ int main(void)
     assert(!resolveGraphApplications(&arena,units,2,error,sizeof(error)));
     assert(strstr(error,"requires one Core construct"));
     whole->path=RANGE_LANGUAGE_DIR "/Macros/Defaults.range";
-    const char *overlap="@literal(\"[0-9]+\") macro other(): Construct {} @other construct Other {}";
+    const char *overlap="@literal(pattern: \"[0-9]+\") macro other(): Construct {} @other construct Other {}";
     units[2]=rangeParseUnit(&arena,RANGE_LANGUAGE_DIR "/Macros/Overlap.range",overlap,strlen(overlap),error,sizeof(error));
     assert(units[2]);
     assert(!resolveGraphApplications(&arena,units,3,error,sizeof(error)));

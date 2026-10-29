@@ -89,6 +89,7 @@ struct Typer {
     size_t narrowedCount, narrowedCapacity, narrowedFloor;
     RangeNode *deferred; /* the type of a value known only at macro time */
     RangeNode *macro;    /* the macro whose body is being typed */
+    int arguments;       /* typing an application's arguments: macro-time code outside any macro body */
     /* Laws to run: typing never runs Range code, so a specialization or a
      * literal it meets waits here until typing returns to the top level. */
     struct { RangeNode *type, *value, *at; } *queued; size_t queuedCount, queuedCapacity;
@@ -263,6 +264,7 @@ void typerLanguage(Typer *typer);
 RangeNode *typeOnDemand(Typer *typer, RangeNode *function, RangeNode *receiver);
 void typeValueOnDemand(Typer *typer, RangeNode *member);
 int typeMacroOnDemand(Typer *typer, RangeMacroApplication *app);
+int typeApplicationOnDemand(Typer *typer, RangeMacroApplication *app);
 void typeCheck(Typer *typer);
 
 /* evaluator.c */

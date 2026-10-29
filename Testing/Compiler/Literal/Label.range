@@ -1,0 +1,2 @@
+@literal(regex: "[0-9]+")
+macro labeled(): Construct {}

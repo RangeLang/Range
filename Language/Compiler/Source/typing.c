@@ -351,7 +351,7 @@ static int conditionCoverage(RangeArena *arena, Typer *typer, ConditionShape *sh
  * it was. */
 typedef struct {
     RangeNode *function, *output, *macro, *inferred, *closureSite, *key;
-    int loops, inferring, closures;
+    int loops, inferring, closures, arguments;
     size_t narrowedFloor, narrowedCount, typingCount;
 } TyperContext;
 
@@ -359,7 +359,7 @@ static TyperContext typerSave(const Typer *typer)
 {
     return (TyperContext){.function=typer->function,.output=typer->output,.macro=typer->macro,
         .inferred=typer->inferred,.closureSite=typer->closureSite,.key=typer->key,.loops=typer->loops,
-        .inferring=typer->inferring,.closures=typer->closures,.narrowedFloor=typer->narrowedFloor,
+        .inferring=typer->inferring,.closures=typer->closures,.arguments=typer->arguments,.narrowedFloor=typer->narrowedFloor,
         .narrowedCount=typer->narrowedCount,.typingCount=typer->typingCount};
 }
 
@@ -367,7 +367,7 @@ static void typerRestore(Typer *typer, TyperContext saved)
 {
     typer->function = saved.function; typer->output = saved.output; typer->macro = saved.macro;
     typer->inferred = saved.inferred; typer->closureSite = saved.closureSite; typer->key = saved.key; typer->loops = saved.loops;
-    typer->inferring = saved.inferring; typer->closures = saved.closures;
+    typer->inferring = saved.inferring; typer->closures = saved.closures; typer->arguments = saved.arguments;
     typer->narrowedFloor = saved.narrowedFloor; typer->narrowedCount = saved.narrowedCount;
     typer->typingCount = saved.typingCount;
 }
@@ -378,7 +378,7 @@ static TyperContext typerTop(Typer *typer)
 {
     TyperContext saved = typerSave(typer);
     typer->function = NULL; typer->output = NULL; typer->macro = NULL; typer->inferred = NULL; typer->closureSite = NULL;
-    typer->key = NULL; typer->loops = 0; typer->inferring = 0; typer->closures = 0;
+    typer->key = NULL; typer->loops = 0; typer->inferring = 0; typer->closures = 0; typer->arguments = 0;
     typer->narrowedFloor = typer->narrowedCount; typer->typingCount = 0;
     return saved;
 }
@@ -1925,6 +1925,32 @@ static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test
     return finding(typer,test)->type = typer->booleanType;
 }
 
+/* The arguments of a call, or of a macro application, against the
+ * parameters of `callable`, a function or a macro: one per parameter,
+ * labeled with its name in order unless `labeled` is 0, each typed where it
+ * is written and coerced to its parameter's type in `signature`. */
+static void typeArguments(Typer *typer, SourceScope *scope, RangeNode *site, RangeNode *callable, int labeled,
+                          SourceScope *signature, RangeNode *receiver, RangeNode *context)
+{
+    char name[160];
+    snprintf(name,sizeof(name),"%s%s",callable->kind == RangeNodeMacro ? "@" : "",callable->name);
+    if (site->itemCount != callable->itemCount)
+        typeError(typer,site,"'%s' takes %zu arguments; %zu supplied",name,callable->itemCount,site->itemCount);
+    for (size_t i = 0; i < site->itemCount && i < callable->itemCount; ++i) {
+        RangeNode *argument = site->items[i], *parameter = callable->items[i];
+        if (labeled && !argumentFits(argument,callable,i))
+            typeError(typer,argument,"argument %zu of '%s' requires label '%s'",i + 1,name,parameter->name);
+        RangeNode *expected = declaredTypeIn(typer,signature,parameter,receiver);
+        RangeNode *closure = typer->closureSite;
+        typer->closureSite = isFunctionType(expected) ? argument->a : NULL;
+        RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
+        typer->closureSite = closure;
+        char what[200];
+        snprintf(what,sizeof(what),"argument '%s' of '%s'",parameter->name,name);
+        coerce(typer,argument->a,expected,actual,what);
+    }
+}
+
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
 {
     RangeNode *callee = call->a, *function = NULL, *receiver = NULL;
@@ -2034,23 +2060,9 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     // A method's signature names types in its owner, such as a nested enum.
     SourceScope ownerScope = {.owner=receiver && receiver->kind == RangeNodeSpecialization ? receiver->resolvedDeclaration : NULL};
     SourceScope functionScope = {.owner=function,.parent=ownerScope.owner ? &ownerScope : NULL};
-    if (call->itemCount != function->itemCount)
-        typeError(typer,call,"'%s' takes %zu arguments; %zu supplied",function->name,function->itemCount,call->itemCount);
     // A function chosen by its role, as `for … in` chooses its @iteration
     // function, takes its arguments in order, unlabeled.
-    for (size_t i = 0; i < call->itemCount && i < function->itemCount; ++i) {
-        RangeNode *argument = call->items[i], *parameter = function->items[i];
-        if (callee->name && !argumentFits(argument,function,i))
-            typeError(typer,argument,"argument %zu of '%s' requires label '%s'",i + 1,function->name,parameter->name);
-        RangeNode *expected = declaredTypeIn(typer,&functionScope,parameter,receiver);
-        RangeNode *site = typer->closureSite;
-        typer->closureSite = isFunctionType(expected) ? argument->a : NULL;
-        RangeNode *actual = typeOf(typer,scope,argument->a,expected,context);
-        typer->closureSite = site;
-        char what[160];
-        snprintf(what,sizeof(what),"argument '%s' of '%s'",parameter->name,function->name);
-        coerce(typer,argument->a,expected,actual,what);
-    }
+    typeArguments(typer,scope,call,function,callee->name != NULL,&functionScope,receiver,context);
     RangeNode *output = function->b;
     return output ? resolveTypeReference(typer,&functionScope,output->name,output->generics,output->flags,receiver,output) : NULL;
 }
@@ -2234,7 +2246,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             RangeNode *part = expr->items[i];
             if (part->flags & RangeFlagLiteral) continue;
             RangeNode *written = typeOf(typer,scope,part->a,NULL,context);
-            if (!written || (typer->macro && macroTimeType(typer,written))) continue;
+            if (!written || ((typer->macro || typer->arguments) && macroTimeType(typer,written))) continue;
             RangeNode *declaration = written->kind == RangeNodeSpecialization ? written->resolvedDeclaration : NULL;
             if (declaration && (declaration == typer->integer || declaration == typer->boolean
                 || (isEnum(written) && !enumPayloads(declaration)) || (type && declaration == type->resolvedDeclaration))) continue;
@@ -2276,9 +2288,14 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
                 --typer->typingCount;
             }
         } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
-        else if (typer->macro && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
-            // In a macro a type's name is that declaration, a value of its
-            // grammar kind: `written.output != Bool` compares declarations.
+        else if ((typer->macro || typer->arguments) && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
+            // At macro time a type's name is that declaration, a value of its
+            // grammar kind: `written.output != Bool` compares declarations,
+            // and `@wraps(type: Int)` passes one.
+            if (expr->generics) {
+                typeError(typer,expr,"'%s<…>' as a value is not implemented: at macro time a type's name is its declaration, written without generic arguments",expr->name);
+                break;
+            }
             RangeNode *kind = declaration->grammarDefinition;
             if (kind && kind->kind == RangeNodeConstruct) type = specialize(typer,NULL,kind,NULL,NULL,expr);
         } else if (declaration->kind == RangeNodeTypeParameter || declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
@@ -3055,6 +3072,7 @@ static void typeFunction(Typer *typer, SourceScope *parent, RangeNode *function,
     typer->closures = 0;
     typer->closureSite = NULL;
     typer->macro = NULL; /* a function a macro instantiates is not macro code */
+    typer->arguments = 0;
     typer->function = function;
     for (size_t i = 0; i < function->itemCount; ++i)
         finding(typer,function->items[i])->type = declaredType(typer,&scope,function->items[i],context);
@@ -3789,6 +3807,38 @@ int typeMacroOnDemand(Typer *typer, RangeMacroApplication *app)
     return !(macro->found & RangeFlagInvalid);
 }
 
+/* An application's arguments, before it first runs, or after macro time
+ * for one that never runs: typed as a call's are, against the parameters of
+ * the macro it selected, where the application is written: in the scopes
+ * around its target, never the target's own. They run at macro time, so a
+ * type's name is a value there. Returns whether they typed. */
+int typeApplicationOnDemand(Typer *typer, RangeMacroApplication *app)
+{
+    if (!app->argued) {
+        RangeNode *macro = app->declaration;
+        SourceScope written[33], declared[33], unit = {.owner=app->unit};
+        SourceScope *scope = enclosingScope(typer,app->target,written);
+        SourceScope signature = {.owner=macro,.parent=enclosingScope(typer,macro,declared)};
+        size_t errors = typer->report->errors;
+        TyperContext outer = typerTop(typer);
+        typer->arguments = 1;
+        typeArguments(typer,scope ? scope : &unit,app->attribute,macro,1,&signature,NULL,NULL);
+        typerRestore(typer,outer);
+        app->argued = typer->report->errors == errors ? 1 : -1;
+    }
+    return app->argued == 1;
+}
+
+/* The arguments of applications that never ran, such as @literal's. */
+static void typeApplications(Typer *typer, RangeNode *declaration)
+{
+    for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i)
+        if (declaration->c->items[i]->kind == RangeNodeAttribute && declaration->c->items[i]->macroApplication)
+            (void)typeApplicationOnDemand(typer,declaration->c->items[i]->macroApplication);
+    if (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
+        for (size_t i = 0; i < declaration->itemCount; ++i) typeApplications(typer,declaration->items[i]);
+}
+
 /* Type the program, after macro time: what macros left untyped, and the
  * checks that need every declaration. The typer is kept for code
  * generation, which lays out the types it meets. */
@@ -3827,6 +3877,8 @@ void typeCheck(Typer *typer)
             }
         }
     }
+    for (size_t u = 0; u < report->count; ++u)
+        for (size_t i = 0; i < report->units[u]->itemCount; ++i) typeApplications(typer,report->units[u]->items[i]);
     drainLaws(typer); /* the specializations and literals typing met */
     for (size_t u = 0; u < report->count; ++u) checkOverloads(typer,report->units[u]);
     checkEqualities(typer);

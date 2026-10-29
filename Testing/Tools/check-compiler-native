@@ -97,6 +97,7 @@ run evaluation 42 "" Testing/Compiler/Native/Evaluation.range
 run identity-references 42 "" Testing/Compiler/Native/IdentityReferences.range
 run value-generics 42 "" Testing/Compiler/Native/ValueGenerics.range
 run macro-applications 42 "" Testing/Compiler/Native/MacroApplications.range
+run macro-arguments 42 "" Testing/Compiler/Native/MacroArguments.range
 run promotion 42 "" Testing/Compiler/Native/Promotion.range
 # A name a pattern binds and nothing reads is a warning, in native code and
 # in macros alike; a read in the arm's condition or body uses it.
@@ -710,6 +711,48 @@ run written-equality 0 "" "$(case_file written-equality 'construct Own { let n: 
 run written-equality-extension 0 "" "$(case_file written-equality-extension 'enum Own { case one, two }
 extension Own { function =(let other: Own): Bool { return true } }
 { switch { Own.one != .two: return 1, default: {} } return 0 }')"
+# An application's arguments are a call's: labeled, typed, and known at
+# macro time, where the application is written; it cannot see its target.
+sized='macro sized(let width: Int): Construct {
+    switch { #target.members.count != width: diagnostic(message: "\(#target.name) must have \(width) members"), default: {} }
+}'
+reject macro-argument-diagnostic "macro-argument-diagnostic.range:2:46: Point must have 3 members" "$sized
+@sized(width: 3)
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+reject macro-argument-label "macro-argument-label.range:4:8: error[type]: argument 1 of '@sized' requires label 'width'" "$sized
+@sized(size: 2)
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+reject macro-argument-count "'@sized' takes 1 arguments; 0 supplied" "$sized
+@sized()
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+reject macro-argument-type "argument 'width' of '@sized' requires Int<bits: 64, signed: true>; found String" "$sized
+@sized(width: \"two\")
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+reject macro-argument-unknown "macro-argument-unknown.range:6:19: the value of 'count' is not known at macro time" "$sized
+construct Outer {
+    let count: 2
+    @sized(width: count)
+    construct Point { let x: Int  let y: Int }
+}
+{ return 0 }"
+reject macro-argument-target "#target is written only in a macro's body" "$sized
+@sized(width: #target.members.count)
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
+reject macro-argument-generic "'Array<…>' as a value is not implemented: at macro time a type's name is its declaration, written without generic arguments" \
+    'macro holding(let type: @nominal): Construct { #graph { extension #target.name { let inner: #type } } }
+@holding(type: Array<Int>)
+construct Holder { let tag: Int }
+{ return 0 }'
+reject macro-argument-ambiguous "ambiguous graph macro 'sized' for target Construct" "$sized
+macro sized(let width: Int): Construct {}
+@sized(width: 2)
+construct Point { let x: Int  let y: Int }
+{ return 0 }"
 # #target is the declaration a macro is attached to: an ordinary value, and
 # spliced alone into #graph it names that declaration.
 run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {

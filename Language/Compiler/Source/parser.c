@@ -573,7 +573,9 @@ static int startsGenericArguments(RangeParser *parser)
     }
     // Positional arguments, as in `Array<Int>()`: as in Swift, `<` opens a
     // generic list when a matching `>` follows with only type-like tokens
-    // inside and `(` or `.` after it; otherwise it is a comparison.
+    // inside and `(` or `.` after it, or the `)` or `,` that ends an argument,
+    // as in `@wraps(type: Array<Int>)`, where no comparison can end;
+    // otherwise it is a comparison.
     int depth = 1;
     while (depth > 0) {
         if (parserAt(&probe, "<")) ++depth;
@@ -584,7 +586,7 @@ static int startsGenericArguments(RangeParser *parser)
         parserAdvance(&probe);
         if (probe.failed) return 0;
     }
-    return parserAt(&probe, "(") || parserAt(&probe, ".");
+    return parserAt(&probe, "(") || parserAt(&probe, ".") || parserAt(&probe, ")") || parserAt(&probe, ",");
 }
 
 /* `{ x in` and `{ a, b in` open a closure; any other `{` is a block. */

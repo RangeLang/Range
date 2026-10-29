@@ -1293,6 +1293,34 @@ static int evalStatement(Eval *eval, EvalFrame *frame, RangeNode *node)
     }
 }
 
+/* An application's parameters, bound in the macro's frame: its arguments'
+ * values, computed once, where the application is written, at macro time,
+ * and reused by every later run, law runs among them, since an argument
+ * cannot see the target. */
+static int evalArguments(Eval *eval, RangeMacroApplication *app, EvalFrame *frame)
+{
+    RangeNode *macro = app->declaration, *attribute = app->attribute;
+    RangeMacroApplication *declared = attribute->macroApplication ? attribute->macroApplication : app;
+    if (!declared->arguments) {
+        if (!typeApplicationOnDemand(eval->typer,declared)) return evalStop(eval);
+        Eval lexical = {.vm=eval->vm,.typer=eval->typer};
+        EvalFrame none = {0};
+        RangeValue *values = evalValues(eval,macro->itemCount);
+        for (size_t i = 0; i < macro->itemCount; ++i) {
+            RangeNode *argument = attribute->items[i]->a;
+            int status = evalExpression(&lexical,&none,argument,&values[i]);
+            if (!status) status = evalAdopt(&lexical,&values[i],found(NULL,macro->items[i])->type,argument);
+            if (status) {
+                eval->message = lexical.message; eval->at = lexical.at;
+                return status;
+            }
+        }
+        declared->arguments = values;
+    }
+    for (size_t i = 0; i < macro->itemCount; ++i) evalBind(eval,frame,macro->items[i],declared->arguments[i]);
+    return EvalNormal;
+}
+
 /* Run an application against its target: its macro body, or with `shape`
  * only its shape-only #graph blocks. A failure is the application's (fail
  * reports it); returns 0 when the body stopped on a problem typing reported. */
@@ -1308,7 +1336,7 @@ int evalApplication(Resolver *vm, RangeMacroApplication *app, int shape)
             if (emission && emission->kind == RangeNodeEmission && (emission->found & RangeFlagShape)) status = evalEmit(&eval,&frame,emission);
         }
     } else if (!typeMacroOnDemand(vm->typer,app)) return 0;
-    else status = evalStatement(&eval,&frame,body);
+    else if (!(status = evalArguments(&eval,app,&frame))) status = evalStatement(&eval,&frame,body);
     if (status == EvalFailed && eval.message) fail(vm,eval.at,"%s",eval.message);
     return status != EvalFailed;
 }

@@ -85,7 +85,7 @@ int main(void)
     rangeArenaDestroy(&arena);
     report = collect(&arena,"@builtin function diagnostic(let message: Text) "
         "@builtin macro literal(let regex: Text): Macro "
-        "@literal(\"[0-9]+\") macro inspect(): Construct { diagnostic(message: \"a diagnostic\") }",
+        "@literal(regex: \"[0-9]+\") macro inspect(): Construct { diagnostic(message: \"a diagnostic\") }",
         "construct Text {} construct Macro {} construct Construct {}");
     // The literal rule's pattern is explicit primitive metadata; the message
     // diagnostic is called with is an ordinary argument, a C string literal.

@@ -1,2 +1,2 @@
-@literal("[0-9]+")
+@literal(pattern: "[0-9]+")
 construct invalid {}

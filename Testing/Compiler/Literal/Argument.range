@@ -1,2 +1,2 @@
-@literal(64)
+@literal(pattern: 64)
 macro invalid(): Construct {}

@@ -25,11 +25,22 @@ static RangeNode *graphTypeIdentity(RangeNode *node)
     return node->grammarDefinition ? node->grammarDefinition : node->graphType;
 }
 
-/* Names select candidates; the declared target identity selects an application. */
+/* Whether an application writes the labels of a macro's parameters, in order. */
+static int labelsFit(const RangeNode *attribute, const RangeNode *macro)
+{
+    if (attribute->itemCount != macro->itemCount) return 0;
+    for (size_t i = 0; i < attribute->itemCount; ++i) if (!argumentFits(attribute->items[i],macro,i)) return 0;
+    return 1;
+}
+
+/* Names select candidates; the declared target identity and the labels the
+ * application writes select one, as a call's labels select an overload.
+ * When no candidate's labels fit, the first for the target is selected, and
+ * typing its arguments reports why they do not fit. */
 static RangeNode *resolveMacroDeclaration(Resolver *vm, RangeNode *attribute,
                                           RangeNode *target, RangeNode **owner)
 {
-    RangeNode *macro = NULL;
+    RangeNode *macro = NULL, *first = NULL, *firstUnit = NULL;
     RangeNode *type = graphTypeIdentity(target);
     int named = 0;
     for (size_t u = 0; u < vm->count; ++u) for (size_t m = 0; m < vm->units[u]->itemCount; ++m) {
@@ -39,9 +50,15 @@ static RangeNode *resolveMacroDeclaration(Resolver *vm, RangeNode *attribute,
         if (!candidate->b || !type) continue;
         RangeNode *wanted = candidate->b->resolvedDeclaration;
         if (wanted != type && !((candidate->b->flags & RangeFlagMacroType) && appliesMacro(type,wanted))) continue;
+        if (!first) { first = candidate; firstUnit = vm->units[u]; }
+        if (!labelsFit(attribute,candidate)) continue;
         if (macro) fail(vm,attribute,"ambiguous graph macro '%s' for target %s",attribute->name,type->name);
         macro = candidate;
         if (owner) *owner = vm->units[u];
+    }
+    if (!macro && first) {
+        macro = first;
+        if (owner) *owner = firstUnit;
     }
     if (!macro) {
         if (named) fail(vm,attribute,"no macro '%s' targets %s",attribute->name,
@@ -77,9 +94,8 @@ void resolveApplication(Resolver *vm, RangeNode *target, RangeNode *attribute)
     if (same(attribute->name,"builtin")
         || (target->kind == RangeNodeFunction && same(attribute->name,"extern"))) return;
     RangeNode *macro = resolveMacroDeclaration(vm,attribute,target,&unit);
-    if (macroBuiltin(macro,"literal")) return; /* a registered compiler primitive */
-    if (attribute->itemCount || macro->itemCount)
-        fail(vm,attribute,"parameterized macro graph resolution is not implemented");
+    // An application of @literal is a registered compiler primitive: it never
+    // runs, and its arguments are typed as every application's are.
     RangeMacroApplication *app = rangeArenaAllocate(vm->arena,sizeof(*app));
     *app = (RangeMacroApplication){.declaration=macro,.target=target,.unit=unit,.attribute=attribute};
     attribute->resolvedDeclaration = macro;
@@ -242,8 +258,9 @@ static void registerLiteralRules(Resolver *vm)
             if (resolveMacroDeclaration(vm,a,node,NULL) != builtin) continue;
             if (node->kind != RangeNodeMacro) fail(vm,a,"literal rule must target a Macro");
             if (node->literalPattern) fail(vm,a,"duplicate literal rule");
-            if (a->itemCount != 1 || (a->items[0]->name && !same(a->items[0]->name,builtin->items[0]->name)))
-                fail(vm,a,"literal rule requires one pattern argument");
+            // Typing checks the argument against the parameter, as it checks
+            // any application's; reading it needs a literal pattern now.
+            if (a->itemCount != 1) continue;
             const char *pattern = literalString(vm,a->items[0]->a);
             (void)literalMatch(vm,a,pattern,NULL);
             node->literalPattern = pattern;
@@ -974,7 +991,11 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         return;
     }
     case RangeNodeParameter:
-        diagnoseType(report,scope,node->b);
+        // The parameter holds its written type's flags: `let type: @nominal` names a macro type.
+        if ((node->flags & RangeFlagMacroType) && node->b) {
+            (void)sourceReference(report,scope,node->b,node->b->name,1);
+            diagnoseSourceNode(report,scope,node->b->generics,0);
+        } else diagnoseType(report,scope,node->b);
         break;
     case RangeNodeLet: case RangeNodeState: case RangeNodeDerived: case RangeNodeBinding: {
         // `let xs: filled<size: 3>(value: 1)` calls a generic function; `let

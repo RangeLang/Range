@@ -58,6 +58,13 @@ for mode in ordinary sanitized; do
     "$compiler" "$core" "$fixtures/Invalid.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode invalid regex compilation claimed success"
     grep -Fq 'invalid literal regex' "$work_root/error" || fail "$mode compilation skipped literal validation"
+    # A literal rule's argument is typed as any application's: labeled as
+    # the parameter is.
+    status=0
+    "$compiler" "$core" "$fixtures/Label.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 && ! -s "$work_root/out" ]] || fail "$mode unlabeled literal rule compiled"
+    grep -Fq "Label.range:1:10: error[type]: argument 1 of '@literal' requires label 'pattern'" "$work_root/error" \
+        || fail "$mode literal rule label was not checked"
     status=0
     "$compiler" --match-literal decimal 64 "$fixtures/Rules.range" > "$work_root/out" 2> "$work_root/error" || status=$?
     [[ "$status" == 65 ]] || fail "$mode missing builtin was accepted"

@@ -1,4 +1,4 @@
-@literal("true|false")
+@literal(pattern: "true|false")
 macro boolean(): Enum {
   let no: #target.cases.first(where: { entry in entry.name = "false" })
   let yes: #target.cases.first(where: { entry in entry.name = "true" })

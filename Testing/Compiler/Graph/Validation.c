@@ -148,7 +148,7 @@ int main(void)
     // builtin macros and functions are selected by their own names.
     languageEdits = (const char *const[]){"String","Text","Bool","Truth","diagnostic(let message:","diagnostic(let text:",
                                           "diagnostic(message:","diagnostic(text:",NULL};
-    validateLanguage("@literal(\"[0-9]+\") macro decimalRule(): Construct { "
+    validateLanguage("@literal(pattern: \"[0-9]+\") macro decimalRule(): Construct { "
                      "switch { !small(text: #target.name): diagnostic(text: \"too big\"), default: {} } } "
                      "function small(let text: Text): Truth { return text = \"Quantity\" } "
                      "@decimalRule construct Quantity { let storage: 3 }",NULL,1);

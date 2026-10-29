@@ -131,7 +131,7 @@ int main(void)
     RangeNode *literal = parse(&arena,"LiteralTargets.range",
         "@builtin macro literal(let pattern: Text): Macro "
         "macro literal(): Construct { let targetName: #target.name } "
-        "@literal(\"[0-9]+\") macro digits(): Construct {} "
+        "@literal(pattern: \"[0-9]+\") macro digits(): Construct {} "
         "macro digits(): Function {} "
         "@digits construct Quantity {} @digits function start() {} "
         "@literal construct Tagged {}");

@@ -1,3 +1,3 @@
-@literal("a")
-@literal("b")
+@literal(pattern: "a")
+@literal(pattern: "b")
 macro invalid(): Construct {}

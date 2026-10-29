@@ -1,4 +1,4 @@
-@literal("[0-9]+")
+@literal(pattern: "[0-9]+")
 macro integer(): Construct {
   // The law runs per specialization and per supplied literal, so the stored
   // value and bits are the specialized ones here. Each `.present` test narrows its

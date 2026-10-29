@@ -153,6 +153,11 @@ struct RangeMacroApplication {
      * and the literal, and how many items the target had as the run began. */
     RangeNode *specialization, *slot, *literal;
     size_t items;
+    /* Its arguments: typed once, where the application is written (argued
+     * 1, or -1 when they did not type), and their values, computed once at
+     * macro time; every run binds them to the macro's parameters. */
+    int argued;
+    struct RangeValue *arguments;
 };
 
 struct RangeNode {

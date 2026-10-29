@@ -1,0 +1,49 @@
+// A macro is a function attached to a declaration: an application's
+// arguments are checked as a call's are, run once at macro time where the
+// application is written, and bound to the macro's parameters.
+macro sized(let width: Int): Construct {
+    switch {
+        #target.members.count != width:
+            diagnostic(message: "\(#target.name) must have \(width) members"),
+        default: {}
+    }
+}
+
+@sized(width: 2)
+construct Point { let x: Int  let y: Int }
+
+// Overloads are selected by name, target type, and labels.
+macro sized(let atLeast: Int): Construct {
+    switch {
+        #target.members.count < atLeast:
+            diagnostic(message: "\(#target.name) must have at least \(atLeast) members"),
+        default: {}
+    }
+}
+
+@sized(atLeast: 1)
+construct Line { let a: Int  let b: Int  let c: Int }
+
+// An argument is any expression known at macro time, such as a call.
+function two(): Int { return 2 }
+
+@sized(width: two() - 1)
+construct Wrap<Element> { let value: Element }
+
+// A type's name is a value at macro time: its declaration. Spliced into
+// #graph it names that type.
+macro holding(let type: @nominal): Construct {
+    #graph { extension #target.name { let inner: #type } }
+}
+
+construct Box { let value: Int }
+
+@holding(type: Box)
+construct Holder { let tag: Int }
+
+{
+    let point: Point(x: 10, y: 20)
+    let line: Line(a: 1, b: 2, c: 3)
+    let holder: Holder(tag: 1, inner: Box(value: 4))
+    return point.x + point.y + line.c + Wrap<Int>(value: 5).value + holder.inner.value
+}

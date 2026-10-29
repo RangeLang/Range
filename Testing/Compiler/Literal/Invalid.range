@@ -1,2 +1,2 @@
-@literal("[")
+@literal(pattern: "[")
 macro invalid(): Construct {}
