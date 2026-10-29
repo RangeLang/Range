@@ -107,7 +107,6 @@ of a generic declaration would differ between its own run and its law runs.
 - Unused generic bodies are only lightly checked.
 
 ### `Never`
-- A construct member of type `Never` is accepted without comment.
 - An `@extern` or `@builtin` function returning `Never` is trusted.
 
 ### C shortcuts to replace

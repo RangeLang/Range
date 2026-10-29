@@ -3254,6 +3254,15 @@ static void checkMemberDefaults(Typer *typer, RangeNode *declaration)
     }
 }
 
+/* Whether a member's type is written as one of its declaration's generics,
+ * which a use may fill with a type that has no values. */
+static int namesGeneric(const RangeNode *declaration, const RangeNode *member)
+{
+    for (size_t i = 0; member->typeName && !member->generics && declaration->generics && i < declaration->generics->itemCount; ++i)
+        if (same(declaration->generics->items[i]->name,member->typeName)) return 1;
+    return 0;
+}
+
 /* The C laws on a construct's or enum's members and functions, in `view`,
  * one of its specializations, under its key, with every member and payload
  * field typed there: its own as typing in order reaches it, any other once
@@ -3264,7 +3273,14 @@ static void typeLaws(Typer *typer, RangeNode *declaration, RangeNode *view)
     typer->key = keyOf(declaration,view);
     for (size_t i = 0; view && i < declaration->itemCount; ++i) {
         RangeNode *item = declaration->items[i];
-        if (rangeNodeDeclaresValue(item->kind)) (void)memberTypeIn(typer,view,item);
+        if (rangeNodeDeclaresValue(item->kind)) {
+            RangeNode *type = memberTypeIn(typer,view,item);
+            if (declaration->kind == RangeNodeConstruct && constructionInput(item) && uninhabited(type) && !namesGeneric(declaration,item)) {
+                char name[160]; describeType(name,sizeof(name),type);
+                typeError(typer,item,"'%s' has type %s, which has no values, so %s could never be constructed",
+                          item->name,name,declaration->name);
+            }
+        }
         for (size_t j = 0; item->kind == RangeNodeEnumCase && j < item->itemCount; ++j) (void)memberTypeIn(typer,view,item->items[j]);
     }
     if (view) checkMemberDefaults(typer,declaration);
