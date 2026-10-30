@@ -61,10 +61,60 @@ They were removed in 798beab7: `A | B` in a type is an error that points to
 an enum with one case per alternative, because `|` is logical or. Reusing
 `||` for types was rejected. Discuss together with `?`.
 
+Constraints are being reopened as logic over types (`@comparable |
+@hashable`), and the heterogeneous-array design uses `Triangle | Circle`. In
+both, `|` in a type reads as logical or: "a value of this type or that one".
+That reverses the reason they were removed.
+
 ### `named:` lookup and heterogeneous collections
 `#target.members.first(named: "value")` will come back. Selecting elements
 of a collection by a shared property is central to heterogeneous collections.
-The path back is generic constraints, as the type of a type slot.
+The path back is generic constraints, as the type of a type slot. See
+"Macros in place of protocols and classes" below.
+
+### Macros in place of protocols and classes
+Range has neither protocols nor classes; macros cover conformance checks,
+default implementations and retroactive conformance (applied on an
+extension). What protocols and classes give that Range does not have yet:
+
+- **A generic body checked once: accepted 2026-10-30, to implement.**
+  - A constraint is a macro type, as in `function sum<T: @integer>(…)`.
+  - A macro's face is what its unconditional `#graph` blocks emit, with
+    `#target.name` read as T. What a macro emits and what it requires are the
+    same thing; its other checks are for better errors.
+  - Emitted members whose types depend on splices of the target or of
+    arguments (`#type`, `#width`) are not part of the face.
+  - One rule for every generic body: it is checked against its constraints. A
+    bare `T` guarantees only what every type has, the built-in `=`. Code is
+    still generated per use.
+  - Constraints combine with the logic symbols: `@comparable & @hashable` has
+    both faces, and `@comparable | @hashable` has what both share. A plain list
+    is ambiguous, so it is an error.
+  - **Open:** a macro overloaded by target type (`@equatable` on Construct and
+    on Enum). The candidate reading is the `|` of its overloads, so its face is
+    what they share.
+- **Values of different types at run time.** This is the heterogeneous array
+  (see `named:` above). Its design is a partitioned array: one concrete buffer
+  per member type, plus one buffer of `(type, index)` references in source
+  order. It has the face of a normal array. `filter(for: Triangle)` returns
+  `Array<Triangle>`, which is that type's buffer. History: 457104e3 TODO.md
+  ("nominally partitioned multibuffer") and e0823c81
+  Development/CompilerFlow/GoalAudit.md ("Collection predicates and explicit
+  type selection", 2026-09-08).
+- **Shared identity.** Range does not nest values that point at each other; it
+  references them by ID, as in `let parent: ID?`. No ID type exists in
+  Language/Types today. The July 2026 model had
+  `Identifier { name, id, parent }`.
+
+Ideas from algebraic subtyping (Dolan, MLscript) worth keeping, without its
+inference engine: Range writes signatures and checks generics per use, so
+there is nothing for biunification to solve.
+
+- Structural "has these members" requirements, checked per specialization,
+  give `named:` lookup without runtime field shuffling. Only a runtime
+  collection of different types brings back the layout question.
+- If union types return, they are joins, with `Never` as bottom.
+- Value collections are copy-on-write, so `Array<T>` can be covariant safely.
 
 ### Parameter defaults
 Functions have none, so macros have none, and overloads cover it for now.
