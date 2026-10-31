@@ -9,9 +9,9 @@
 #include <string.h>
 
 /* ---- native code -----------------------------------------------------------
- * Lowers typed Range to ARM64. A scalar (a type with a storage primitive) lives
- * in a 64-bit register, sign- or zero-extended by the width its storage and
- * signed primitives declare. Any other value lives in memory and expressions
+ * Lowers typed Range to ARM64. A scalar (see scalarDeclaration) lives in a
+ * 64-bit register, sign- or zero-extended by the width its generics bits and
+ * signed hold. Any other value lives in memory and expressions
  * carry its address. Calling convention, internal to Range: a method receives
  * its receiver's address in x0 and parameters after it; scalars pass by value,
  * aggregates by address (the callee copies); an aggregate result is written to
@@ -1893,7 +1893,7 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
         if (!receiver) return NULL;
         if (member && member->kind == RangeNodeDerived) return nativeDerivedPlace(native,expr,nativeDerived(native,expr,member,receiver),frameSlot);
         if (bytesType(receiver) && member && builtinMember(member) && same(member->name,"count")) {
-            // The byte count is the bytes primitive's second word.
+            // The byte count is the second word of the bytes.
             nativeEmit(native,armAddImm(0,0,8));
             return facts->type;
         }
@@ -2090,7 +2090,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         if (expr->itemCount != 1 || !(expr->items[0]->flags & RangeFlagLiteral))
             nativeMissing(native,expr,"runtime string interpolation is not implemented");
         else if (nativeKind(native,type,expr) != NativeAggregate || !bytesType(type))
-            nativeMissing(native,expr,"string literals need a construct with the bytes primitive");
+            nativeMissing(native,expr,"string literals need a construct that holds bytes");
         return NULL;
     case RangeNodeName: case RangeNodeMemberAccess: {
         if (expr->kind == RangeNodeName && facts->resolvedDeclaration && genericSlot(native->key,facts->resolvedDeclaration)) {
@@ -2945,7 +2945,7 @@ int emitNative(SourceReport *report, Typer *typer, const char *path, int asWritt
         for (size_t i = 0; i < typer->instances->itemCount; ++i) {
             RangeNode *key = typer->instances->items[i], *context = key->outer;
             if (nativeGraphValues(&native,key) || (context && nativeGraphValues(&native,context))
-                || nativeInlined(key->resolvedDeclaration)) continue;
+                || nativeInlined(key->resolvedDeclaration) || abstractType(key)) continue;
             nativeInstance(&native,key->resolvedDeclaration,key,context);
         }
         for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)

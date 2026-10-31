@@ -41,8 +41,9 @@ assert language.returncode == 0 and not language.stdout, language.stdout + activ
 assert 'error[' not in active, active
 assert 'no entry block, so no executable was written' in active, active
 for provided in ('@many storage is a C heap block', "builtin function 'resize' is implemented in C",
-                 "builtin member 'storage' is a C layout primitive", "builtin member 'bytes' is a C layout primitive",
-                 "builtin member 'count' is the byte count the bytes primitive holds", "builtin function 'byte' reads one byte",
+                 "Int is a scalar in C, as wide as its generic 'bits' and signed as its generic 'signed' say",
+                 "String holds UTF-8 bytes in C",
+                 "builtin member 'count' is the byte count C holds", "builtin function 'byte' reads one byte",
                  "'for … in' calls the function applying @iteration at positions 0, 1, 2",
                  "the @iteration law (one per type, one Int parameter, an optional result) is checked in C",
                  "C builds each reflection list by calling the function applying @insertion on its collection",
@@ -102,15 +103,12 @@ assert "no declaration for 'NotDefined'" not in result.stderr, result.stderr
 assert 'no entry block, so no executable was written' in result.stderr, result.stderr
 
 # Normal compilation invokes the evaluator and reports independent macro failures.
-first.write_text('''construct Construct {}
-construct Text { @builtin let bytes }
-@builtin function diagnostic(let message: Text)
-macro first(): Construct { diagnostic(message: "first application failed") }
+first.write_text('''macro first(): Construct { diagnostic(message: "first application failed") }
 macro second(): Construct { diagnostic(message: "second application failed") }
 @first construct First {}
 @second construct Second {}
 ''')
-errors = compile_sources(first)
+errors = compile_sources('Language/Functions', 'Language/Grammar', 'Language/Macros', 'Language/Types', first)
 assert 'first application failed' in errors and 'second application failed' in errors, errors
 assert 'error[undeclared]' not in errors, errors
 assert 'error[macro-validation]' in errors, errors

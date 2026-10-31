@@ -1,0 +1,67 @@
+// A type parameter's constraint names macro types. A type given for it must
+// apply them, where it is declared or through an extension: `&` requires
+// both sides and `|` either. The body is checked once, with what the
+// constraint gives T, its face: the members the macro's #graph statements
+// emit into every type applying it. `&` gives both faces, `|` what both
+// share. Code is generated per use, with each type's own members.
+function larger<T: @integer>(let a: T, let b: T): T {
+    switch { a > b: return a, default: return b }
+}
+
+// @integer selects integer literals, so every type T: @integer admits is
+// written with them: `T(0)` and `return 1` are values of T. Each use types
+// the literal as its own type, whose law checks it there.
+function sum<T: @integer>(let values: Array<T>): T {
+    state total: T(0)
+    for value in values { total: total + value }
+    return total
+}
+function negative<T: @integer>(): T { return -1 }
+
+// @integer and @string both emit `+`, taking and giving the target itself.
+function joined<T: @integer | @string>(let a: T, let b: T): T { return a + b }
+
+construct Labeled<T: @integer | @string> {
+    let value: T
+    let label: String
+    function twice(): T { return value + value }
+}
+
+// A face holds an emitted function's signature; each use calls its type's own.
+macro greets(): Construct {
+    #graph { extension #target.name { function greeting(): String { return "hi" } } }
+}
+@greets construct Dog { let name: String }
+function greet<T: @greets>(let a: T): Int { return a.greeting().count }
+
+macro tagged(): Construct {}
+construct Point { let x: Int  let y: Int }
+@tagged extension Point {}
+
+function kept<T: @tagged & @equatable>(let value: T): T { return value }
+
+@equatable
+construct Money {
+    let cents: Int
+    function =(let other: Money): Bool { return cents = other.cents }
+}
+@tagged extension Money {}
+
+{
+    switch { larger(a: 3, b: 7) != 7: return 1, default: {} }
+    let small: Int<bits: 8>(5)
+    switch { larger(a: small, b: 2) != 5: return 2, default: {} }
+    switch { joined(a: 2, b: 3) != 5 | joined(a: "ab", b: "c") != "abc": return 3, default: {} }
+    let count: Labeled<Int>(value: 2, label: "count")
+    let name: Labeled<String>(value: "Ada", label: "name")
+    switch { count.twice() != 4 | name.twice() != "AdaAda": return 4, default: {} }
+    switch { greet(a: Dog(name: "rex")) != 2: return 5, default: {} }
+    switch { kept(value: Money(cents: 4)).cents != 4: return 6, default: {} }
+    state wide: Array<Int>()
+    wide.append(value: 40)
+    wide.append(value: 2)
+    state narrow: Array<Int<bits: 8>>()
+    narrow.append(value: 3)
+    switch { sum(values: wide) != 42 | sum(values: narrow) != 3 | negative<Int<bits: 8>>() != -1: return 7, default: {} }
+    return 42
+}

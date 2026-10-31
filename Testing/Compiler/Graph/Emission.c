@@ -6,26 +6,35 @@
 
 typedef struct {
     RangeArena arena;
-    RangeNode *unit;
+    RangeNode *units[2], *unit;
     SourceReport report;
 } Compiled;
+
+/* The text type: the construct string literals select, which holds bytes.
+ * Only the language's own sources declare literal rules, so it is read from
+ * a path inside Language. */
+static const char *const text =
+    "@builtin macro literal(let pattern: Text): Macro "
+    "@literal(pattern: \"\\\".*\\\"\") macro text(): Construct {} "
+    "@text construct Text { let value: \"\" }";
 
 /* The compiler's normal order: build the graph, apply macros, resolve names. */
 static void compile(Compiled *compiled, const char *source)
 {
     rangeArenaInit(&compiled->arena); rangeGraphInitTypes(&compiled->arena);
     char error[512];
-    compiled->unit = rangeParseUnit(&compiled->arena,"Emission.range",source,strlen(source),error,sizeof(error));
-    if (!compiled->unit) fprintf(stderr,"%s\n",error);
-    assert(compiled->unit);
-    compiled->report = (SourceReport){.arena=&compiled->arena,.units=&compiled->unit,.count=1};
-    int ok = resolveGraphApplications(&compiled->arena,&compiled->unit,1,error,sizeof(error));
+    compiled->units[0] = rangeParseUnit(&compiled->arena,"Language/Types/Text.range",text,strlen(text),error,sizeof(error));
+    compiled->unit = compiled->units[1] = rangeParseUnit(&compiled->arena,"Emission.range",source,strlen(source),error,sizeof(error));
+    if (!compiled->units[0] || !compiled->unit) fprintf(stderr,"%s\n",error);
+    assert(compiled->units[0] && compiled->unit);
+    compiled->report = (SourceReport){.arena=&compiled->arena,.units=compiled->units,.count=2};
+    int ok = resolveGraphApplications(&compiled->arena,compiled->units,2,error,sizeof(error));
     if (!ok) fprintf(stderr,"%s\n",error);
     assert(ok);
     diagnoseMacroApplications(&compiled->report);
-    diagnoseSourceNode(&compiled->report,NULL,compiled->unit,0);
+    for (size_t u = 0; u < 2; ++u) diagnoseSourceNode(&compiled->report,NULL,compiled->units[u],0);
     diagnoseDuplicates(&compiled->report);
-    diagnoseBuiltinFunctions(&compiled->report,compiled->unit);
+    for (size_t u = 0; u < 2; ++u) diagnoseBuiltinFunctions(&compiled->report,compiled->units[u]);
 }
 
 static int reported(Compiled *compiled, const char *category, const char *text)
@@ -42,7 +51,7 @@ static RangeNode *declaration(RangeNode *owner, const char *name)
     return NULL;
 }
 
-#define CORE "construct Construct {} construct Truth {} construct Text { @builtin let bytes } " \
+#define CORE "construct Construct {} construct Macro {} construct Truth {} " \
     "@builtin function diagnostic(let message: Text) "
 
 int main(void)

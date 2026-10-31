@@ -139,16 +139,12 @@ int evalTruth(RangeValue value)
     return value.kind == ValueCase ? value.node->integer != 0 : value.integer != 0;
 }
 
-/* A type with a storage primitive is a scalar that many bits wide, signed
- * or not, as its specialization declares: the members layout reads. */
+/* A scalar type (see scalarDeclaration) is that many bits wide, signed or
+ * not, as its specialization's generics bits and signed hold. */
 static int scalarShape(RangeNode *type, int *bits, int *isSigned)
 {
-    if (!type || type->kind != RangeNodeSpecialization) return 0;
-    RangeNode *declaration = type->resolvedDeclaration, *width = NULL, *signedness = NULL;
-    for (size_t i = 0; i < declaration->itemCount; ++i) {
-        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"storage")) width = builtinValue(type,declaration->items[i]);
-        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"signed")) signedness = builtinValue(type,declaration->items[i]);
-    }
+    if (!type || type->kind != RangeNodeSpecialization || !scalarDeclaration(type->resolvedDeclaration)) return 0;
+    RangeNode *width = scalarGeneric(type,"bits"), *signedness = scalarGeneric(type,"signed");
     if (!width || width->kind != RangeNodeInteger || width->integer <= 0 || width->integer > 64) return 0;
     *bits = (int)width->integer;
     *isSigned = signedness && signedness->kind == RangeNodeBool && signedness->integer;
@@ -666,7 +662,7 @@ static int evalEffect(Eval *eval, RangeNode *function, RangeValue message, Range
 }
 
 /* A C primitive a function declares with @builtin: on its receiver, one
- * byte of the bytes primitive, or the slot primitives on the receiver's one
+ * byte of a bytes value, or the slot primitives on the receiver's one
  * @many member, whose new slots hold zero values, each new slot a step; at
  * the top level, the effects print, warning, and diagnostic. */
 static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeValue *arguments, RangeNode *at, RangeValue *out)

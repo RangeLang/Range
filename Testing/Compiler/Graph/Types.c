@@ -205,7 +205,7 @@ int main(void)
     assert(!reported(&c,"type","'a' needs an initial value"));
     rangeArenaDestroy(&c.arena);
 
-    // Layout: scalars from their storage width, constructs from members in order.
+    // Layout: scalars from their bits, constructs from members in order.
     compile(&c,"construct Pair { let flag: Bool let count: Int } "
         "construct Bytes { let a: Int<bits: 8> let b: Int<bits: 8> let c: Int<bits: 12> } "
         "construct Loop { let again: Loop } "
@@ -220,7 +220,7 @@ int main(void)
             fprintf(stderr,"%s: size %zu alignment %zu\n",expected[i].name,type->size,type->alignment);
         assert(type->size == expected[i].size && type->alignment == expected[i].alignment);
     }
-    // The bytes primitive: an address, a byte count, and the owning block.
+    // Bytes: an address, a byte count, and the owning block.
     assert(local(&c,"layouts","s")->type->size == 24 && local(&c,"layouts","s")->type->alignment == 8);
     expectDescription(local(&c,"layouts","maybe")->type,"Optional<Wrapped: Int<bits: 8, signed: true>>");
     assert(reported(&c,"layout","Loop has no layout: it contains itself"));
@@ -356,16 +356,23 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
-    // A generic function is typed into each specialization: its own nodes
-    // keep nothing from either, and each specialization finds its own types.
-    compile(&c,"function sum<T>(let a: T, let b: T): T { return a + b } "
+    // A generic function is checked once, with T its face, and typed into
+    // each specialization: its own nodes keep nothing from any of them, and
+    // each specialization finds its own types.
+    compile(&c,"function sum<T: @integer>(let a: T, let b: T): T { return a + b } "
         "function sums(): Int { let small: Int<bits: 8>(1) let narrow: sum(a: small, b: small) return sum(a: 1, b: 2) }");
     assert(!errorsIn(&c,"type"));
-    RangeNode *generic = named(c.project,"sum"), *plus = generic->a->items[0]->a, *specializations[2];
+    RangeNode *generic = named(c.project,"sum"), *plus = generic->a->items[0]->a, *specializations[2], *once = NULL;
     size_t count = 0;
-    for (size_t i = 0; i < c.typer->instances->itemCount; ++i)
-        if (c.typer->instances->items[i]->resolvedDeclaration == generic && count < 2) specializations[count++] = c.typer->instances->items[i];
-    assert(count == 2 && !generic->type && !plus->type && !plus->resolvedDeclaration);
+    for (size_t i = 0; i < c.typer->instances->itemCount; ++i) {
+        RangeNode *instance = c.typer->instances->items[i];
+        if (instance->resolvedDeclaration != generic) continue;
+        if (abstractType(instance)) once = instance;
+        else if (count < 2) specializations[count++] = instance;
+    }
+    assert(count == 2 && once && !generic->type && !plus->type && !plus->resolvedDeclaration);
+    expectDescription(once,"sum<T>");
+    expectDescription(found(once,plus)->type,"T");
     expectDescription(specializations[0],"sum<T: Int<bits: 8, signed: true>>");
     expectDescription(specializations[1],"sum<T: Int<bits: 64, signed: true>>");
     expectDescription(found(specializations[0],plus)->type,"Int<bits: 8, signed: true>");
@@ -380,7 +387,7 @@ int main(void)
     // A generic construct's method is typed per specialization it is called
     // on, under that specialization's key: its own nodes keep nothing, and a
     // call records the specialization its callee runs in.
-    compile(&c,"construct Box<T> { let a: T  let b: T  function total(): T { return a + b } } "
+    compile(&c,"construct Box<T: @integer> { let a: T  let b: T  function total(): T { return a + b } } "
         "function totals(): Int { let narrow: Box<Int<bits: 8>>(a: 1, b: 2).total() let wide: Box<Int>(a: 1, b: 2) return wide.total() }");
     assert(!errorsIn(&c,"type"));
     RangeNode *method = named(named(c.project,"Box"),"total"), *added = method->a->items[0]->a;

@@ -77,22 +77,12 @@ Range has neither protocols nor classes; macros cover conformance checks,
 default implementations and retroactive conformance (applied on an
 extension). What protocols and classes give that Range does not have yet:
 
-- **A generic body checked once: accepted 2026-10-30, to implement.**
-  - A constraint is a macro type, as in `function sum<T: @integer>(…)`.
-  - A macro's face is what its unconditional `#graph` blocks emit, with
-    `#target.name` read as T. What a macro emits and what it requires are the
-    same thing; its other checks are for better errors.
-  - Emitted members whose types depend on splices of the target or of
-    arguments (`#type`, `#width`) are not part of the face.
-  - One rule for every generic body: it is checked against its constraints. A
-    bare `T` guarantees only what every type has, the built-in `=`. Code is
-    still generated per use.
-  - Constraints combine with the logic symbols: `@comparable & @hashable` has
-    both faces, and `@comparable | @hashable` has what both share. A plain list
-    is ambiguous, so it is an error.
-  - **Open:** a macro overloaded by target type (`@equatable` on Construct and
-    on Enum). The candidate reading is the `|` of its overloads, so its face is
-    what they share.
+- **A constraint that carries an element type.** A face may name only T,
+  its own members and the program's declarations, so `T: @collection` is
+  rejected: "@collection cannot be a constraint: its 'elements' names
+  Element, which each target declares for itself". Generic code over
+  collections writes `Array<T>`. Protocols answer this with associated types;
+  Range has no design for it yet.
 - **Values of different types at run time.** This is the heterogeneous array
   (see `named:` above). Its design is a partitioned array: one concrete buffer
   per member type, plus one buffer of `(type, index)` references in source
@@ -107,8 +97,8 @@ extension). What protocols and classes give that Range does not have yet:
   `Identifier { name, id, parent }`.
 
 Ideas from algebraic subtyping (Dolan, MLscript) worth keeping, without its
-inference engine: Range writes signatures and checks generics per use, so
-there is nothing for biunification to solve.
+inference engine: Range writes signatures and checks generics against
+their constraints, so there is nothing for biunification to solve.
 
 - Structural "has these members" requirements, checked per specialization,
   give `named:` lookup without runtime field shuffling. Only a runtime
@@ -150,7 +140,15 @@ of a generic declaration would differ between its own run and its law runs.
 ### Language gaps
 - String interpolation of values known only at run.
 - Escaping closures, such as stored event handlers.
-- Constraints as the type of a type slot.
+- A type parameter's constraint is not visible to macros: TypeParameter
+  reflects only its name.
+- `T: @boolean` has `!`, `&` and `|` in its face, but they are C primitives
+  of the condition type only: "builtin '&' is a C primitive of the condition
+  type only; T declares it".
+- A face holds signatures only, so a face function that changes its
+  receiver, called on a let, is caught per use: "'bump' changes its
+  receiver, which must be declared with state; in bumped<T: Tally>,
+  specialized at …".
 - `state` as a run-time cell only; values known before run are not yet
   followed through writes.
 - `binding` in a block is rejected as not implemented; a binding is a
@@ -174,14 +172,16 @@ of a generic declaration would differ between its own run and its law runs.
   application may already have run in that round; the emitted one never runs.
 - `--match-literal` does not run typing, so a wrong `@literal` label is
   caught only when compiling.
-- Unused generic bodies are only lightly checked.
 
 ### `Never`
 - An `@extern` or `@builtin` function returning `Never` is trusted.
 
 ### C shortcuts to replace
 - Builtins selected by name:
-  - `resize`, `read`, `write`, `byte`, `storage` and `count`;
+  - `resize`, `read`, `write`, `byte` and `count`;
+  - a scalar's generics `bits` and `signed`: a construct applying the macro
+    integer literals select is a scalar, and C reads its width and
+    signedness from those two generics;
   - the labels `lower`, `upper`, `at` and `value`;
   - `print`, `diagnostic` and `warning`, in `nativeCall`, `nativeEffect`,
     `evalBuiltin` and `evalEffect`.
