@@ -703,6 +703,11 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
     if (index < 0 || (size_t)index >= slots->count) return evalTrap(eval,at,"slot index is outside the @many storage");
     if (same(function->name,"read")) { *out = slots->values[index]; return EvalNormal; }
     evalOwn(eval,slots);
+    if (same(function->name,"drop")) {
+        memmove(&slots->values[index],&slots->values[index + 1],(slots->count - (size_t)index - 1) * sizeof(*slots->values));
+        slots->values[slots->count - 1] = evalZero(eval,manyElement(eval->typer,self->type,declaration->items[many]),0);
+        return EvalNormal;
+    }
     slots->values[index] = arguments[1];
     return EvalNormal;
 }

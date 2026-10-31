@@ -13,6 +13,8 @@ macro many(): State
 //   @builtin function resize(let to: Int)             make exactly n slots available
 //   @builtin function read(let at: Int): Element      the element in slot i
 //   @builtin function write(let at: Int, let value: Element)
+//   @builtin function drop(let at: Int)               remove slot i; the slots after it move down one,
+//                                                     and the last slot is left empty
 //
 // @many does not track count, capacity, or growth policy; the owning macro
 // declares those as ordinary members. The member is not a standalone value.

@@ -26,6 +26,7 @@ macro collection(): Construct {
             @builtin function resize(let to: Int)
             @builtin function read(let at: Int): Element
             @builtin function write(let at: Int, let value: Element)
+            @builtin function drop(let at: Int)
 
             function isEmpty(): Bool {
                 return count = 0
@@ -63,6 +64,29 @@ macro collection(): Construct {
                 }
                 write(at: count, value: value)
                 count: count + 1
+            }
+
+            // Removes the element at `at` and returns it; the elements after
+            // it move down one position.
+            function remove(let at: Int): Element {
+                switch { at < 0 | at >= count: diagnostic(message: "remove(at:) names a position outside the collection"), default: {} }
+                let removed: read(at: at)
+                drop(at: at)
+                count: count - 1
+                return removed
+            }
+
+            // The elements at the positions `at` holds, in order, as a new
+            // collection.
+            function slice(let at: Interval): #target.name {
+                switch {
+                    at.lower < 0 | at.upper > count | at.lower > at.upper:
+                        diagnostic(message: "slice(at:) names positions outside the collection"),
+                    default: {}
+                }
+                state result: #target.name()
+                for index in at { result.append(value: read(at: index)) }
+                return result
             }
 
             // The first element, or absence when there is none. A function, not

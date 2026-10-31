@@ -930,8 +930,9 @@ static void nativeReleaseSlots(Native *native, size_t from)
  * copying a value retains each block it reaches, and resize or write on a
  * shared block first give the writer its own block (cloned with libSystem
  * malloc and memcpy, retaining its elements; the old block loses a reference).
- * resize grows with realloc and zero-fills new slots; read and write check the
- * index against the count C keeps. Blocks are never released when values end,
+ * resize grows with realloc and zero-fills new slots; read, write, and drop
+ * check the index against the count C keeps, and drop moves the slots after
+ * the index down one and zero-fills the last. Blocks are never released when values end,
  * and never freed. The block belongs to the construct's single @many member;
  * its element size comes from that member's declared type in this
  * specialization. */
@@ -1157,6 +1158,40 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
         nativeEmit(native,armPop(1));
         nativeEmit(native,armPop(0));
         nativeCopy(native,0,1,size);
+        return NULL;
+    }
+    if (same(function->name,"drop")) {
+        // Release slot i, move the slots after it down one, and zero the last.
+        if (!nativeExpression(native,call->items[0]->a)) return NULL;
+        nativeEmit(native,armPush(0));          /* index */
+        nativeUnique(native,&slots,16,call);   /* receiver below the index */
+        nativeEmit(native,armLdr(3,31,0));
+        nativeLoadBlock(native,&slots,16);
+        nativeSlotAddress(native,&slots,call);
+        if (nativeSharesSlots(element)) nativeRelease(native,element);
+        nativeEmit(native,armLdr(3,31,0));
+        nativeLoadBlock(native,&slots,16);     /* x1 = block, x2 = count */
+        nativeConstant(native,4,size);
+        nativeEmit(native,armSub(5,2,3));
+        nativeEmit(native,armSubImm(5,5,1));
+        nativeEmit(native,armMul(5,5,4));      /* bytes after the slot */
+        nativeEmit(native,armMul(6,3,4));
+        nativeEmit(native,armAddImm(0,1,16));
+        nativeEmit(native,armAdd(0,0,6));      /* the slot */
+        nativeEmit(native,armAdd(1,0,4));      /* the one after it */
+        nativeEmit(native,armMov(2,5));
+        rangeCallImport(&native->machine,"_memmove");
+        nativeLoadBlock(native,&slots,16);
+        nativeConstant(native,4,size);
+        nativeEmit(native,armSubImm(2,2,1));
+        nativeEmit(native,armMul(2,2,4));
+        nativeEmit(native,armAddImm(0,1,16));
+        nativeEmit(native,armAdd(0,0,2));      /* the last slot */
+        nativeEmit(native,armMovz(1,0,0));
+        nativeEmit(native,armMov(2,4));
+        rangeCallImport(&native->machine,"_memset");
+        nativeEmit(native,armAddImm(31,31,32)); /* drop the index and the receiver */
+        native->resultTemp = -1;
         return NULL;
     }
     // resize(to: n): count checks, a block of its own, then realloc(block, 16 + n * size).

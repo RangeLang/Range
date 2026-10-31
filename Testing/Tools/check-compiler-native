@@ -49,6 +49,12 @@ run aggregates 42 "" Testing/Compiler/Native/Aggregates.range
 # Array's emitted methods over @many storage.
 run arrays 42 "" Testing/Compiler/Native/Arrays.range
 run copy-on-write 42 "" Testing/Compiler/Native/CopyOnWrite.range
+# remove(at:) and slice(at:) on every collection, over the drop slot primitive.
+run array-editing 42 "" Testing/Compiler/Native/ArrayEditing.range
+run remove-outside 134 "remove(at:) names a position outside the collection" \
+    "$(case_file remove-outside '{ state xs: Array<Int>() xs.append(value: 1) xs.remove(at: 1) return 0 }')"
+run slice-outside 134 "slice(at:) names positions outside the collection" \
+    "$(case_file slice-outside '{ state xs: Array<Int>() xs.append(value: 1) let s: xs.slice(at: 0..<2) return s.count }')"
 run lifetimes 42 "" Testing/Compiler/Native/Lifetimes.range
 run output 134 "Output.range:21:28: count is 5, expected at most 3" Testing/Compiler/Native/Output.range
 printf '%s\n' "Hello from Range!" "hello, world" "count: 5, last: 25, empty: false, capacity: 8" \

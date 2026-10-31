@@ -4558,6 +4558,7 @@ static int mutates(Typer *typer, RangeNode *function, RangeNode *key)
     typer->key = key;
     finding(typer,function)->found |= RangeFlagMutationKnown; /* recursion assumes no change until shown */
     int result = (function->flags & RangeFlagBuiltin) ? same(function->name,"resize") || same(function->name,"write")
+        || same(function->name,"drop")
         : mutatesIn(typer,ownerOf(typer,function),function->a);
     if (result) finding(typer,function)->found |= RangeFlagMutating;
     typer->key = outer;

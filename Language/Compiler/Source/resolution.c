@@ -1227,11 +1227,13 @@ static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
     }
 }
 
-/* Builtin functions are C primitives selected by name. resize, read, and write
- * act on their construct's @many member, so that construct needs exactly one. */
+/* Builtin functions are C primitives selected by name. resize, read, write,
+ * and drop act on their construct's @many member, so that construct needs
+ * exactly one. */
 int slotPrimitive(const RangeNode *function)
 {
-    return same(function->name,"resize") || same(function->name,"read") || same(function->name,"write");
+    return same(function->name,"resize") || same(function->name,"read") || same(function->name,"write")
+        || same(function->name,"drop");
 }
 
 int appliesBuiltin(const RangeNode *node, const char *name)
