@@ -1125,6 +1125,13 @@ reject constraint-splice "@wide cannot be a constraint: a #graph block it always
     'macro wide(): Construct { let w: 8 #graph { extension #target.name { let width: #w } } }
 function f<T: @wide>(let a: T): T { return a }
 { return 0 }'
+# A literal is a value of T when every type T admits is written with it.
+reject constraint-literal-shared "return requires T; found Int<bits: 64, signed: true>; in zero<T>" \
+    'function zero<T: @integer | @string>(): T { return 0 }
+{ return 0 }'
+reject constraint-literal-law "constraint-literal-law.range:1:41: error[law]: Int<bits: 8, signed: true> does not satisfy @integer" \
+    'function big<T: @integer>(): T { return 300 }
+{ let x: big<Int<bits: 8>>() return 0 }'
 reject constraint-undeclared "no declaration for macro 'intger' in the loaded sources" \
     'function larger<T: @intger>(let a: T): T { return a }
 { return larger(a: 1) }'

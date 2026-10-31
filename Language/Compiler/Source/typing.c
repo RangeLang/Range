@@ -1268,10 +1268,18 @@ static RangeNode *caseContext(Typer *typer, RangeNode *enumeration, const char *
 }
 
 /* The law checks `value`: the literal itself, or `-literal` as one value. */
+static int faceLiteral(const RangeNode *, const RangeNode *);
+
 static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value, RangeNode *expected)
 {
     RangeNode *rule = literal->resolvedDeclaration;
     if (!rule || !rule->literalDefault) return NULL;
+    // A literal of T, when every type T admits is written with it: each use
+    // types it again as its own type, whose laws check it there.
+    if (faceLiteral(expected,rule)) {
+        finding(typer,literal)->type = expected;
+        return expected;
+    }
     RangeNode *declaration = rule->literalDefault, *type;
     RangeNode *wrapped = optionalWrapped(typer,expected,NULL);
     if (wrapped && expected->resolvedDeclaration != declaration) expected = wrapped; /* promoted where it is used */
@@ -1455,6 +1463,13 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
     if (!type) return NULL;
     RangeNode *declaration = type->resolvedDeclaration;
     if (faceDeclaration(declaration)) {
+        // `T(0)` is the literal, as `Int<bits: 8>(5)` is.
+        RangeNode *given = count == 1 && !arguments[0]->name ? arguments[0]->a : NULL;
+        RangeNode *literal = given && given->kind == RangeNodeUnary && same(given->name,"-") ? given->a : given;
+        if (literal && isLiteral(literal) && faceLiteral(type,literal->resolvedDeclaration)) {
+            coerce(typer,given,type,typeOf(typer,scope,given,type,context),"the literal");
+            return type;
+        }
         typeError(typer,at,"%s cannot be constructed: a type parameter stands for any type its constraint admits, and their members differ",
                   declaration->name);
         return type;
@@ -2048,6 +2063,23 @@ static void faceReason(char *out, size_t size, const RangeNode *type)
     if (!generic->a) { snprintf(out,size,": %s has no constraint, so it has only the built-in '='",generic->name); return; }
     char written[160]; describeConstraint(written,sizeof(written),generic->a,0);
     snprintf(out,size,": its constraint %s does not give it",written);
+}
+
+/* Whether every type a constraint admits is written with this literal
+ * rule's literals: `&` when either side's is, `|` when both sides' are. */
+static int constraintLiteral(const RangeNode *constraint, const RangeNode *rule)
+{
+    if (constraintJoin(constraint,"&")) return constraintLiteral(constraint->a,rule) || constraintLiteral(constraint->b,rule);
+    if (constraintJoin(constraint,"|")) return constraintLiteral(constraint->a,rule) && constraintLiteral(constraint->b,rule);
+    return same(constraint->name,rule->name);
+}
+
+/* Whether a literal its rule selects is a value of `type`, a face. */
+static int faceLiteral(const RangeNode *type, const RangeNode *rule)
+{
+    if (!type || type->kind != RangeNodeSpecialization || !faceDeclaration(type->resolvedDeclaration) || !rule) return 0;
+    const RangeNode *constraint = type->resolvedDeclaration->owner->a;
+    return constraint && constraintLiteral(constraint,rule);
 }
 
 int faceDeclaration(const RangeNode *declaration)

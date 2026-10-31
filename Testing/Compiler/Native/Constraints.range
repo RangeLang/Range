@@ -8,6 +8,16 @@ function larger<T: @integer>(let a: T, let b: T): T {
     switch { a > b: return a, default: return b }
 }
 
+// @integer selects integer literals, so every type T: @integer admits is
+// written with them: `T(0)` and `return 1` are values of T. Each use types
+// the literal as its own type, whose law checks it there.
+function sum<T: @integer>(let values: Array<T>): T {
+    state total: T(0)
+    for value in values { total: total + value }
+    return total
+}
+function negative<T: @integer>(): T { return -1 }
+
 // @integer and @string both emit `+`, taking and giving the target itself.
 function joined<T: @integer | @string>(let a: T, let b: T): T { return a + b }
 
@@ -47,5 +57,11 @@ construct Money {
     switch { count.twice() != 4 | name.twice() != "AdaAda": return 4, default: {} }
     switch { greet(a: Dog(name: "rex")) != 2: return 5, default: {} }
     switch { kept(value: Money(cents: 4)).cents != 4: return 6, default: {} }
+    state wide: Array<Int>()
+    wide.append(value: 40)
+    wide.append(value: 2)
+    state narrow: Array<Int<bits: 8>>()
+    narrow.append(value: 3)
+    switch { sum(values: wide) != 42 | sum(values: narrow) != 3 | negative<Int<bits: 8>>() != -1: return 7, default: {} }
     return 42
 }
