@@ -1951,12 +1951,12 @@ static RangeNode *nativeLoadPlace(Native *native, RangeNode *type, int frameSlot
 
 static RangeNode *nativeExpressionValue(Native *, RangeNode *);
 
-/* The value in x0, of `type`, promoted to the optional `optional`: the
- * present case holding it, in a temporary. */
-static RangeNode *nativePromote(Native *native, RangeNode *at, RangeNode *optional)
+/* The value in x0, of `actual`, promoted to `optional`, an optional or a
+ * macro's values: the case holding it, in a temporary. */
+static RangeNode *nativePromote(Native *native, RangeNode *at, RangeNode *optional, RangeNode *actual)
 {
-    RangeNode *present = NULL;
-    if (!optionalWrapped(native->typer,optional,&present) || nativeKind(native,optional,at) != NativeAggregate) return NULL;
+    RangeNode *present = wrappingCase(native->typer,optional,actual);
+    if (!present || nativeKind(native,optional,at) != NativeAggregate) return NULL;
     int moved = nativeTakeTemp(native);
     nativeEmit(native,armPush(0));
     int32_t destination = nativeReserve(native,optional->size,optional->alignment);
@@ -1992,7 +1992,7 @@ static RangeNode *nativeExpression(Native *native, RangeNode *expr)
     RangeNode *resolved = runs ? found(native->key,runs)->resolvedDeclaration : NULL;
     int construction = runs && (runs->kind == RangeNodeCall || runs->kind == RangeNodeSwitch);
     if (!runs || (!construction && !(resolved && resolved->kind == RangeNodeEnumCase))) native->resultTemp = -1;
-    return type && facts->promoted ? nativePromote(native,expr,facts->promoted) : type;
+    return type && facts->promoted ? nativePromote(native,expr,facts->promoted,type) : type;
 }
 
 /* `a + b` on bytes (x0, x1 = their addresses): a new block holding a's bytes

@@ -755,6 +755,10 @@ int macroTimeType(Typer *typer, const RangeNode *type)
     return 0;
 }
 
+static int ordinaryValues(Typer *, const RangeNode *);
+static int appliesNamed(const RangeNode *, const char *);
+static RangeNode *macroValues(Typer *, RangeNode *, RangeNode *);
+
 /* `@member` as a type: the one macro of that name. */
 static RangeNode *macroTypeNamed(Typer *typer, const char *name, RangeNode *at)
 {
@@ -762,9 +766,11 @@ static RangeNode *macroTypeNamed(Typer *typer, const char *name, RangeNode *at)
     size_t found = 0;
     for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
         RangeNode *candidate = typer->report->units[u]->items[i];
-        if (candidate->kind == RangeNodeMacro && same(candidate->name,name)) { macro = candidate; ++found; }
+        if (candidate->kind == RangeNodeMacro && same(candidate->name,name) && !found++) macro = candidate;
     }
     if (!found) return NULL; /* undeclared is reported already */
+    // Ordinary types apply the macro, declared for each kind of target they are.
+    if (ordinaryValues(typer,macro)) return macroValues(typer,macro,at);
     if (found > 1) { typeError(typer,at,"'@%s' names %zu macros; a macro type names one",name,found); return NULL; }
     int created = 0;
     RangeNode *type = internSpecialization(typer,macro,NULL,NULL,macro,&created);
@@ -783,6 +789,91 @@ static int converts(const RangeNode *expected, const RangeNode *actual)
 {
     return isMacroType(expected) && actual && actual->kind == RangeNodeSpecialization
         && appliesMacro(actual->resolvedDeclaration,expected->resolvedDeclaration);
+}
+
+/* ---- values of macro types ----
+ * A macro that ordinary constructs and enums apply names, as a type, a value
+ * of any of them: `let fruit: @fruit` holds an Apple or a Banana, and
+ * Array<@fruit> holds both. Such a value is an enum the compiler writes for
+ * the macro and names for it, with one case per type applying it, in the
+ * order the program declares them, named for the type and holding its value
+ * as its one payload field. Where a @fruit is expected, an Apple is promoted
+ * to its case, as a value is to an optional's present case. `fruit = Apple`
+ * tests the case, and narrows a stable value to the Apple it holds; what the
+ * macro's face gives every type is read through each case. Source names no
+ * case: `fruit.Apple` and `.Apple` are not Range. */
+
+int macroUnion(const RangeNode *type)
+{
+    return isEnum(type) && type->resolvedDeclaration->owner && type->resolvedDeclaration->owner->kind == RangeNodeMacro;
+}
+
+/* Whether a macro's values are values of the ordinary types that apply it,
+ * rather than declarations, which grammar kinds are. */
+static int ordinaryValues(Typer *typer, const RangeNode *macro)
+{
+    int ordinary = 0;
+    for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+        RangeNode *kind = typer->report->units[u]->items[i];
+        if ((kind->kind != RangeNodeConstruct && kind->kind != RangeNodeEnum) || !appliesNamed(kind,macro->name)) continue;
+        if (graphConstruct(typer,kind)) return 0;
+        ordinary = 1;
+    }
+    return ordinary;
+}
+
+/* The enum a macro's values are, written on first use and owned by the
+ * first macro of that name; its overloads for other kinds of target share it. */
+static RangeNode *macroValues(Typer *typer, RangeNode *macro, RangeNode *at)
+{
+    RangeNode *values = NULL;
+    for (size_t i = 0; i < typer->unions->itemCount && !values; ++i)
+        if (typer->unions->items[i]->owner == macro) values = typer->unions->items[i];
+    RangeArena *arena = typer->report->arena;
+    if (!values) {
+        values = rangeNodeCreate(arena,RangeNodeEnum,macro->path,macro->line,macro->column);
+        char spelled[160];
+        snprintf(spelled,sizeof(spelled),"@%s",macro->name);
+        values->name = rangeArenaIntern(arena,spelled,strlen(spelled));
+        values->owner = macro;
+        rangeNodeAppend(arena,typer->unions,values);
+        long long ordinal = 0;
+        for (size_t u = 0; u < typer->report->count; ++u) for (size_t i = 0; i < typer->report->units[u]->itemCount; ++i) {
+            RangeNode *kind = typer->report->units[u]->items[i];
+            if ((kind->kind != RangeNodeConstruct && kind->kind != RangeNodeEnum) || !appliesNamed(kind,macro->name)) continue;
+            if (parametric(kind)) {
+                typeError(typer,at,"values of @%s are not implemented for generic types: %s applies @%s, so a @%s value "
+                          "would hold any specialization of it",macro->name,kind->name,macro->name,macro->name);
+                continue;
+            }
+            RangeNode *entry = rangeNodeCreate(arena,RangeNodeEnumCase,kind->path,kind->line,kind->column);
+            entry->name = kind->name;
+            entry->integer = ordinal++;
+            RangeNode *field = rangeNodeCreate(arena,RangeNodeLet,kind->path,kind->line,kind->column);
+            field->name = "0";
+            field->typeName = kind->name;
+            RangeFacts *facts = found(NULL,field);
+            facts->type = ownSpecialization(typer,kind);
+            facts->found |= RangeFlagTyped;
+            rangeNodeAppend(arena,entry,field);
+            rangeNodeAppend(arena,values,entry);
+        }
+    }
+    int created = 0;
+    RangeNode *type = internSpecialization(typer,values,NULL,NULL,at,&created);
+    if (created) type->found |= RangeFlagChecked; /* the types it holds ran their own laws */
+    return type;
+}
+
+/* The case of `type`, an optional or a macro's values, that holds a value of
+ * `actual`: what such a value is promoted to where `type` is expected. */
+RangeNode *wrappingCase(Typer *typer, RangeNode *type, RangeNode *actual)
+{
+    RangeNode *present = NULL, *wrapped = optionalWrapped(typer,type,&present);
+    if (wrapped) return wrapped == actual || converts(wrapped,actual) ? present : NULL;
+    if (!macroUnion(type) || !actual || actual->kind != RangeNodeSpecialization) return NULL;
+    RangeNode *entry = enumCase(type->resolvedDeclaration,actual->resolvedDeclaration->name);
+    return entry && memberTypeIn(typer,type,entry->items[0]) == actual ? entry : NULL;
 }
 
 RangeNode *resolveTypeReference(Typer *typer, SourceScope *scope, const char *name,
@@ -1121,6 +1212,11 @@ static RangeNode *optionalPath(Typer *typer, SourceScope *scope, RangeNode *path
 
 static RangeNode *namedCase(Typer *typer, RangeNode *type, const char *name, RangeNode *at)
 {
+    if (macroUnion(type) && !(at->flags & RangeFlagImplicit)) {
+        typeError(typer,at,"%s has no cases; related: '%s = %s' tests whether a %s value holds %s",
+                  type->name,"value",name,type->name,name);
+        return NULL;
+    }
     RangeNode *found = enumCase(type->resolvedDeclaration,name);
     if (!found) { char t[160]; describeType(t,sizeof(t),type); typeError(typer,at,"%s has no case '%s'",t,name); }
     return found;
@@ -1243,15 +1339,14 @@ RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **present)
 }
 
 /* Optional promotion, as in Swift: where `T?` is expected, a value of T is the
- * present case holding it. The optional is recorded beside the expression,
- * whose type stays T. */
+ * present case holding it; where a macro's values are expected, an Apple is
+ * the case holding it. The type promoted to is recorded beside the
+ * expression, whose type stays T. */
 static void coerce(Typer *typer, RangeNode *expr, RangeNode *expected, RangeNode *actual, const char *what)
 {
-    RangeNode *wrapped = NULL;
     if (expr) finding(typer,expr)->promoted = NULL; /* typing records it afresh */
     if (deferredType(typer,expected) || deferredType(typer,actual) || converts(expected,actual)) return;
-    if (expr && expected && actual && expected != actual && (wrapped = optionalWrapped(typer,expected,NULL))
-        && (wrapped == actual || converts(wrapped,actual))) {
+    if (expr && expected && actual && expected != actual && wrappingCase(typer,expected,actual)) {
         finding(typer,expr)->promoted = expected;
         return;
     }
@@ -2441,8 +2536,11 @@ static void typeSharedBindings(Typer *typer, RangeNode *pattern)
  * change and a call is computed again, so neither narrows. A test under `!`
  * or on one side of `|` narrows nothing beyond it, unless both sides of the
  * `|` narrow the same value. The optional is the enum applying @optional.
- * A value known only at macro time is not narrowed: typing does not know
- * that it holds an optional. */
+ * A test of a stable value of a macro's values for a type, `fruit = Apple`,
+ * narrows it in the same way to the Apple its case holds. A value is
+ * narrowed once: an optional @fruit narrowed to its @fruit is not narrowed
+ * again to an Apple. A value known only at macro time is not narrowed:
+ * typing does not know that it holds an optional. */
 
 static int narrowablePath(RangeNode *key, RangeNode *path)
 {
@@ -2496,6 +2594,7 @@ static RangeNode *narrowedRead(Typer *typer, RangeNode *expr, RangeNode *type)
 }
 
 static RangeNode *typeOperator(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
+static RangeNode *typeFaceRead(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
 
 /* `a | b` narrows what both sides narrow; each side's narrowing holds
  * only within it. */
@@ -2531,6 +2630,9 @@ static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test
     typeSharedBindings(typer,test->b);
     typer->narrowedCount = mark;
     RangeNode *present = NULL, *payload = optionalWrapped(typer,type,&present), *pattern = test->b;
+    // A macro's values narrow to the type the tested case holds.
+    if (macroUnion(type) && (present = found(typer->key,pattern)->resolvedDeclaration))
+        payload = memberTypeIn(typer,type,present->items[0]);
     if (payload && found(typer->key,pattern)->resolvedDeclaration == present && narrowablePath(typer->key,subject)) {
         RangeNode *bound = pattern->itemCount == 1 ? pattern->items[0]->a : NULL;
         if (!(pattern->flags & RangeFlagApplication)) pushNarrowed(typer,subject,present,payload);
@@ -2662,6 +2764,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             }
             return typer->deferred;
         }
+        if (macroUnion(receiver) && callee->name) return typeFaceRead(typer,scope,callee,call,receiver,context);
         if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
             // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
             RangeNode *test = finding(typer,call)->lowered = caseTest(typer->report->arena,call,callee->a,callee->name,call);
@@ -2884,6 +2987,131 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     return type;
 }
 
+/* What a macro's face gives every type applying it, as members a value of
+ * the macro's values reads; kept beside the enum, computed once. */
+static RangeNode *valuesFace(Typer *typer, RangeNode *type, RangeNode *at)
+{
+    RangeNode *values = type->resolvedDeclaration;
+    if (values->a) return values->a;
+    RangeNode *atom = rangeNodeCreate(typer->report->arena,RangeNodeName,at->path,at->line,at->column);
+    atom->name = values->owner->name;
+    atom->flags = RangeFlagMacroType;
+    return values->a = faceMembers(typer,atom,values->name,at,0);
+}
+
+/* Whether a face member's signature names the face itself, which stands for
+ * a different type in each case. */
+static int namesFace(const RangeNode *member, const char *face)
+{
+    if (member->kind != RangeNodeFunction) return same(member->typeName,face);
+    for (size_t i = 0; i < member->itemCount; ++i)
+        if (member->items[i]->kind == RangeNodeParameter && member->items[i]->b && same(member->items[i]->b->name,face)) return 1;
+    return member->b && same(member->b->name,face);
+}
+
+/* `fruit.weight()` or `fruit.name` on a value of a macro's values: what the
+ * macro's face gives every type, read through each case, as the switch over
+ * the cases it is lowered to, evaluating fruit once:
+ *
+ *   switch fruit { .Apple(let <face value>): <face value>.weight(), … }
+ *
+ * `access` is the member access, `call` the call of it, if any. */
+static RangeNode *typeFaceRead(Typer *typer, SourceScope *scope, RangeNode *access, RangeNode *call, RangeNode *type, RangeNode *context)
+{
+    RangeNode *values = type->resolvedDeclaration, *face = valuesFace(typer,type,access);
+    if (!face) return NULL;
+    RangeNode *member = call ? findCalledFunction(face,access->name,call) : findMember(face,access->name);
+    if (!member && !call && findFunction(face,access->name)) {
+        typeError(typer,access,"'%s.%s' is a function; call it",values->name,access->name);
+        return NULL;
+    }
+    if (!member) {
+        typeError(typer,access,"%s has no %s '%s': a %s value has what @%s gives every type applying it; "
+                  "related: 'value = %s' narrows a value to the type it holds",values->name,call ? "function" : "member",
+                  access->name,values->name,values->owner->name,values->itemCount ? values->items[0]->name : "Type");
+        return NULL;
+    }
+    if (namesFace(member,values->name)) {
+        typeError(typer,access,"a %s value has no '%s': its signature names the type applying @%s, which differs from "
+                  "value to value",values->name,access->name,values->owner->name);
+        return NULL;
+    }
+    RangeArena *arena = typer->report->arena;
+    RangeNode *node = rangeNodeCreate(arena,RangeNodeSwitch,access->path,access->line,access->column);
+    node->flags |= RangeFlagValue;
+    node->a = access->a;
+    for (size_t i = 0; i < values->itemCount; ++i) {
+        RangeNode *entry = values->items[i];
+        RangeNode *arm = rangeNodeCreate(arena,RangeNodeSwitchCase,access->path,access->line,access->column);
+        RangeNode *pattern = rangeNodeCreate(arena,RangeNodePattern,access->path,access->line,access->column);
+        pattern->integer = RangePatternCase;
+        pattern->name = entry->name;
+        pattern->flags |= RangeFlagApplication | RangeFlagImplicit;
+        pattern->c = rangeNodeCreate(arena,RangeNodeBlock,access->path,access->line,access->column);
+        pattern->c->name = "bindings";
+        RangeNode *held = rangeNodeCreate(arena,RangeNodeLet,access->path,access->line,access->column);
+        held->name = "face value";
+        held->flags |= RangeFlagImplicit;
+        rangeNodeAppend(arena,pattern->c,held);
+        RangeNode *bind = rangeNodeCreate(arena,RangeNodePattern,access->path,access->line,access->column);
+        bind->integer = RangePatternBind;
+        bind->a = held;
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,access->path,access->line,access->column);
+        argument->a = bind;
+        rangeNodeAppend(arena,pattern,argument);
+        arm->c = pattern->c;
+        rangeNodeAppend(arena,arm,pattern);
+        RangeNode *read = rangeNodeCreate(arena,RangeNodeMemberAccess,access->path,access->line,access->column);
+        read->name = access->name;
+        read->a = rangeNodeCreate(arena,RangeNodeName,access->path,access->line,access->column);
+        read->a->name = held->name;
+        arm->a = read;
+        if (call) {
+            // The arguments are written once; only the arm that runs evaluates them.
+            arm->a = rangeNodeCreate(arena,RangeNodeCall,call->path,call->line,call->column);
+            arm->a->a = read;
+            for (size_t j = 0; j < call->itemCount; ++j) rangeNodeAppend(arena,arm->a,call->items[j]);
+        }
+        rangeNodeAppend(arena,node,arm);
+    }
+    finding(typer,call ? call : access)->lowered = node;
+    return typeSwitch(typer,scope,node,NULL,context,typer->output);
+}
+
+/* `fruit = Apple`: whether a value of a macro's values holds an Apple, the
+ * case test it is lowered to, which narrows as a test of a case does;
+ * `fruit != Apple` is its negation, which narrows nothing. */
+static RangeNode *typeTypeTest(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *type, RangeNode *named, RangeNode *context)
+{
+    RangeNode *values = type->resolvedDeclaration, *entry = enumCase(values,named->name);
+    finding(typer,expr->b)->resolvedDeclaration = named;
+    if (!entry || memberTypeIn(typer,type,entry->items[0])->resolvedDeclaration != named) {
+        typeError(typer,expr->b,"%s does not apply @%s, so a %s value never holds one",named->name,values->owner->name,values->name);
+        return NULL;
+    }
+    RangeArena *arena = typer->report->arena;
+    RangeNode *test = caseTest(arena,expr,expr->a,entry->name,NULL);
+    test->b->flags |= RangeFlagImplicit;
+    size_t mark = typer->narrowedCount;
+    RangeNode *result = typeCaseTest(typer,scope,test,context);
+    if (same(expr->name,"=")) { finding(typer,expr)->lowered = test; return result; }
+    typer->narrowedCount = mark;
+    RangeNode *negation = rangeNodeCreate(arena,RangeNodeUnary,expr->path,expr->line,expr->column);
+    negation->name = "!";
+    negation->a = test;
+    finding(typer,expr)->lowered = negation;
+    return finding(typer,negation)->type = typeOperator(typer,scope,negation,result,NULL,context);
+}
+
+/* A bare name that names a construct or an enum: the type `fruit = Apple`
+ * tests for. */
+static RangeNode *namedType(Typer *typer, SourceScope *scope, RangeNode *expr)
+{
+    if (!expr || expr->kind != RangeNodeName || expr->generics || (expr->flags & ~RangeFlagEarlier)) return NULL;
+    RangeNode *declaration = nameLookup(typer->report,scope,expr);
+    return declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum) ? declaration : NULL;
+}
+
 static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
 {
     if (!expr) return NULL;
@@ -3005,6 +3233,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         if (!receiver) break;
         if (deferredType(typer,receiver)) { type = receiver; break; }
         if (isMacroType(receiver)) { type = macroTypeMember(typer,receiver,expr->name,expr); break; }
+        if (macroUnion(receiver)) { type = typeFaceRead(typer,scope,expr,NULL,receiver,context); break; }
         RangeNode *declaration = receiver->resolvedDeclaration;
         if (isEnum(receiver) && enumCase(declaration,expr->name)) {
             // `phase.loading`: whether phase holds the case.
@@ -3096,18 +3325,26 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             else if (!rightFirst) (void)typeOf(typer,scope,expr->b,NULL,context);
             break;
         }
+        RangeNode *named = !rightFirst ? namedType(typer,scope,expr->b) : NULL;
+        if (named && macroUnion(left)) { type = typeTypeTest(typer,scope,expr,left,named,context); break; }
+        if (named && left && !typer->macro && !typer->arguments && !deferredType(typer,left)) {
+            char l[160]; describeType(l,sizeof(l),left);
+            typeError(typer,expr->b,"'%s' names a type; '%s' tests which type a value holds only on a value of a macro "
+                      "type, and this one is %s",named->name,op,l);
+            break;
+        }
         if (!rightFirst) right = typeOf(typer,scope,expr->b,deferredType(typer,left) ? NULL : left,context);
         if (!left || !right) break;
         // `=` gives Bool: the built-in structural comparison, or the type's equality function.
         if (deferredType(typer,left) || deferredType(typer,right)) { type = typer->booleanType; break; }
         if (left != right) {
             // A kind's value compares with a value of a macro type it applies,
-            // and `maybe = 5` with the present case holding 5.
-            RangeNode *leftWrapped = optionalWrapped(typer,left,NULL), *rightWrapped = optionalWrapped(typer,right,NULL);
+            // `maybe = 5` with the present case holding 5, and `fruit = apple`
+            // with the case holding the apple.
             if (converts(left,right)) right = left;
             else if (converts(right,left)) left = right;
-            else if (leftWrapped && (leftWrapped == right || converts(leftWrapped,right))) { coerce(typer,expr->b,left,right,"operand"); right = left; }
-            else if (rightWrapped && (rightWrapped == left || converts(rightWrapped,left))) { coerce(typer,expr->a,right,left,"operand"); left = right; }
+            else if (wrappingCase(typer,left,right)) { coerce(typer,expr->b,left,right,"operand"); right = left; }
+            else if (wrappingCase(typer,right,left)) { coerce(typer,expr->a,right,left,"operand"); left = right; }
         }
         if (left != right) {
             char l[160], r[160]; describeType(l,sizeof(l),left); describeType(r,sizeof(r),right);
@@ -3592,11 +3829,11 @@ static RangeNode *armsType(Typer *typer, RangeNode *node, RangeNode *type, Range
 {
     if (!type || !actual || type == actual) return type ? type : actual;
     if (deferredType(typer,type) || deferredType(typer,actual)) return typer->deferred;
-    if (optionalWrapped(typer,type,NULL) == actual) {
+    if (wrappingCase(typer,type,actual)) {
         coerce(typer,arm,type,actual,"an arm of a switch expression");
         return type;
     }
-    if (optionalWrapped(typer,actual,NULL) == type) {
+    if (wrappingCase(typer,actual,type)) {
         // An earlier arm's value is promoted to the optional this one yields.
         for (size_t i = 0; i < node->itemCount && node->items[i]->a != arm; ++i) {
             RangeNode *earlier = node->items[i]->a;
@@ -4558,6 +4795,7 @@ Typer *newTyper(SourceReport *report, Resolver *vm)
     typer->specializations = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->instances = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->faces = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
+    typer->unions = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->functionTypes = rangeNodeCreate(report->arena,RangeNodeBlock,"<compiler>",1,1);
     typer->deferred = rangeNodeCreate(report->arena,RangeNodeType,"<compiler>",1,1);
     typer->deferred->name = "a value known at macro time";

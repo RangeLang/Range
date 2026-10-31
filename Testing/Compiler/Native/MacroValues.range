@@ -1,0 +1,93 @@
+// Values of a macro type: a @fruit value holds a value of any type that
+// applies @fruit. It shows what @fruit gives every such type, and `=` with a
+// type tests which one it holds, narrowing a stable value to it.
+macro fruit(): Construct {
+    #graph {
+        extension #target.name {
+            function weight(): Int { return mass() }
+            function heavier(let than: Int): Bool { return mass() > than }
+        }
+    }
+}
+// Enums apply it too; the face is what both give.
+macro fruit(): Enum {
+    #graph {
+        extension #target.name {
+            function weight(): Int { return mass() }
+            function heavier(let than: Int): Bool { return mass() > than }
+        }
+    }
+}
+
+@fruit construct Apple {
+    let grams: Int
+    let color: String
+    function mass(): Int { return grams }
+}
+@fruit construct Banana {
+    let grams: Int
+    let length: Int
+    function mass(): Int { return grams }
+}
+@fruit enum Cherry {
+    case single
+    case pair(Int)
+    function mass(): Int { return 0 }
+}
+
+function total(let a: @fruit, let b: @fruit): Int { return a.weight() + b.weight() }
+
+function kind(let f: @fruit): Int {
+    switch {
+        f = Apple & f.color = "red": return 1,
+        f = Apple: return 2,
+        f = Banana & f.length > 10: return f.length,
+        f != Cherry: return 4,
+        default: return 5
+    }
+}
+
+function largest(let a: Apple, let b: Banana): @fruit {
+    switch { a.grams > b.grams: return a, default: return b }
+}
+
+{
+    let apple: Apple(grams: 150, color: "red")
+    let banana: Banana(grams: 120, length: 20)
+    switch { total(a: apple, b: banana) != 270: return 1, default: {} }
+    switch { kind(f: apple) != 1: return 2, default: {} }
+    switch { kind(f: Apple(grams: 1, color: "green")) != 2: return 3, default: {} }
+    switch { kind(f: banana) != 20: return 4, default: {} }
+    switch { kind(f: Banana(grams: 1, length: 5)) != 4: return 5, default: {} }
+    switch { kind(f: Cherry.pair(2)) != 5: return 6, default: {} }
+
+    // Equality: the same type, then that type's `=`.
+    let big: largest(a: apple, b: banana)
+    switch { big != apple: return 7, default: {} }
+    switch { big = banana: return 8, default: {} }
+    switch { big = Apple(grams: 150, color: "green"): return 9, default: {} }
+    switch { !big.heavier(than: 100): return 10, default: {} }
+    let other: largest(a: Apple(grams: 1, color: "red"), b: banana)
+    switch { other = big: return 11, default: {} }
+
+    // A switch expression's arm promotes to the @fruit an earlier arm yields.
+    let picked: switch { big.weight() > 200: big, default: apple }
+    switch { picked != apple: return 12, default: {} }
+
+    // An Array<@fruit> holds them all, in order.
+    state fruits: Array<@fruit>()
+    fruits.append(value: apple)
+    fruits.append(value: banana)
+    fruits.append(value: Cherry.single)
+    fruits.append(value: Apple(grams: 90, color: "green"))
+    state weights: 0
+    for fruit in fruits { weights: weights + fruit.weight() }
+    switch { weights != 360: return 13, default: {} }
+    state colors: 0
+    for fruit in fruits & fruit = Apple { colors: colors + fruit.color.count }
+    switch { colors != 8: return 14, default: {} }
+    let head: fruits.first()
+    switch { head.present & head = apple & head = Apple: {}, default: return 15 }
+    print(message: "fruits \(fruits.count)")
+    return 42
+}
