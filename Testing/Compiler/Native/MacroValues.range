@@ -6,6 +6,7 @@ macro fruit(): Construct {
         extension #target.name {
             function weight(): Int { return mass() }
             function heavier(let than: Int): Bool { return mass() > than }
+            function show() { print(message: "mass \(mass())") }
         }
     }
 }
@@ -15,6 +16,7 @@ macro fruit(): Enum {
         extension #target.name {
             function weight(): Int { return mass() }
             function heavier(let than: Int): Bool { return mass() > than }
+            function show() { print(message: "mass \(mass())") }
         }
     }
 }
@@ -88,6 +90,8 @@ function largest(let a: Apple, let b: Banana): @fruit {
     switch { colors != 8: return 14, default: {} }
     let head: fruits.first()
     switch { head.present & head = apple & head = Apple: {}, default: return 15 }
+    // A function without a result is called on whichever type the value holds.
+    big.show()
     print(message: "fruits \(fruits.count)")
     return 42
 }

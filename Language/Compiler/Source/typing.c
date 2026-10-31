@@ -3009,13 +3009,18 @@ static int namesFace(const RangeNode *member, const char *face)
     return member->b && same(member->b->name,face);
 }
 
+static int mutates(Typer *, RangeNode *, RangeNode *);
+
 /* `fruit.weight()` or `fruit.name` on a value of a macro's values: what the
  * macro's face gives every type, read through each case, as the switch over
  * the cases it is lowered to, evaluating fruit once:
  *
  *   switch fruit { .Apple(let <face value>): <face value>.weight(), … }
  *
- * `access` is the member access, `call` the call of it, if any. */
+ * A function without a result is called in each arm's body instead. Each arm
+ * holds a copy of the value, so a function that changes its receiver is not
+ * called this way. `access` is the member access, `call` the call of it, if
+ * any. */
 static RangeNode *typeFaceRead(Typer *typer, SourceScope *scope, RangeNode *access, RangeNode *call, RangeNode *type, RangeNode *context)
 {
     RangeNode *values = type->resolvedDeclaration, *face = valuesFace(typer,type,access);
@@ -3036,9 +3041,19 @@ static RangeNode *typeFaceRead(Typer *typer, SourceScope *scope, RangeNode *acce
                   "value to value",values->name,access->name,values->owner->name);
         return NULL;
     }
+    for (size_t i = 0; call && i < values->itemCount; ++i) {
+        RangeNode *held = memberTypeIn(typer,type,values->items[i]->items[0]);
+        RangeNode *function = findCalledFunction(held->resolvedDeclaration,access->name,call);
+        if (function && mutates(typer,function,keyOf(held->resolvedDeclaration,held))) {
+            typeError(typer,access,"%s's '%s' changes its receiver; calling it on a %s value is not implemented",
+                      held->resolvedDeclaration->name,access->name,values->name);
+            return NULL;
+        }
+    }
     RangeArena *arena = typer->report->arena;
     RangeNode *node = rangeNodeCreate(arena,RangeNodeSwitch,access->path,access->line,access->column);
-    node->flags |= RangeFlagValue;
+    int yields = !call || member->b;
+    if (yields) node->flags |= RangeFlagValue;
     node->a = access->a;
     for (size_t i = 0; i < values->itemCount; ++i) {
         RangeNode *entry = values->items[i];
@@ -3071,6 +3086,13 @@ static RangeNode *typeFaceRead(Typer *typer, SourceScope *scope, RangeNode *acce
             arm->a = rangeNodeCreate(arena,RangeNodeCall,call->path,call->line,call->column);
             arm->a->a = read;
             for (size_t j = 0; j < call->itemCount; ++j) rangeNodeAppend(arena,arm->a,call->items[j]);
+        }
+        if (!yields) {
+            arm->b = rangeNodeCreate(arena,RangeNodeBlock,access->path,access->line,access->column);
+            RangeNode *statement = rangeNodeCreate(arena,RangeNodeExpressionStatement,access->path,access->line,access->column);
+            statement->a = arm->a;
+            rangeNodeAppend(arena,arm->b,statement);
+            arm->a = NULL;
         }
         rangeNodeAppend(arena,node,arm);
     }
