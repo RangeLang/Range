@@ -1,0 +1,97 @@
+// An Array<@fruit> keeps one block per type and an order list: reading,
+// writing either type, removing, copying, and comparing behave as for any
+// array, whatever position each type's values take in their own block.
+macro fruit(): Construct {
+    #graph { extension #target.name { function weight(): Int { return grams } } }
+}
+@fruit construct Apple { let grams: Int }
+@fruit construct Banana { let grams: Int  let spots: Array<Int> }
+@fruit construct Cherry { let grams: Int  let pit: Bool }
+
+// Each element as one digit, in order: Apple 1, Banana 2, Cherry 3.
+function kinds(let fruits: Array<@fruit>): Int {
+    state value: 0
+    for fruit in fruits {
+        let digit: switch { fruit = Apple: 1, fruit = Banana: 2, default: 3 }
+        value: value * 10 + digit
+    }
+    return value
+}
+
+function weights(let fruits: Array<@fruit>): Int {
+    state value: 0
+    for fruit in fruits { value: value * 10 + fruit.weight() }
+    return value
+}
+
+function spots(let n: Int): Array<Int> {
+    state xs: Array<Int>()
+    for i in 0..<n { xs.append(value: i) }
+    return xs
+}
+
+{
+    state fruits: Array<@fruit>()
+    fruits.append(value: Apple(grams: 1))
+    fruits.append(value: Banana(grams: 2, spots: spots(n: 3)))
+    fruits.append(value: Apple(grams: 3))
+    fruits.append(value: Banana(grams: 4, spots: spots(n: 1)))
+    fruits.append(value: Apple(grams: 5))
+    fruits.append(value: Cherry(grams: 6, pit: true))
+    fruits.append(value: Apple(grams: 7))
+    fruits.append(value: Apple(grams: 8))
+    fruits.append(value: Apple(grams: 9))
+    switch { kinds(fruits: fruits) != 121213111: return 1, default: {} }
+    switch { weights(fruits: fruits) != 123456789: return 2, default: {} }
+
+    // A copy keeps what it held; each changes apart.
+    let before: fruits
+    fruits.write(at: 0, value: Apple(grams: 9))
+    switch { weights(fruits: fruits) != 923456789 | weights(fruits: before) != 123456789: return 3, default: {} }
+
+    // Another type at a position: it leaves one block and joins another.
+    fruits.write(at: 2, value: Cherry(grams: 1, pit: false))
+    switch { kinds(fruits: fruits) != 123213111 | weights(fruits: fruits) != 921456789: return 4, default: {} }
+    fruits.write(at: 5, value: Banana(grams: 2, spots: spots(n: 2)))
+    switch { kinds(fruits: fruits) != 123212111 | weights(fruits: fruits) != 921452789: return 5, default: {} }
+    switch { kinds(fruits: before) != 121213111: return 6, default: {} }
+
+    // Removing moves the later positions down; the blocks follow.
+    fruits.remove(at: 1)
+    fruits.remove(at: 0)
+    switch { kinds(fruits: fruits) != 3212111 | weights(fruits: fruits) != 1452789: return 7, default: {} }
+    fruits.append(value: Banana(grams: 3, spots: spots(n: 4)))
+    switch { kinds(fruits: fruits) != 32121112 | weights(fruits: fruits) != 14527893: return 8, default: {} }
+    let third: fruits.read(at: 3)
+    switch { third = Banana & third.spots.count = 2: {}, default: return 9 }
+
+    // Equality is element by element, whatever the blocks hold.
+    state again: Array<@fruit>()
+    for fruit in fruits { again.append(value: fruit) }
+    switch { again != fruits: return 10, default: {} }
+    again.write(at: 0, value: Apple(grams: 1))
+    switch { again = fruits: return 11, default: {} }
+    switch { kinds(fruits: fruits.slice(at: 1..<4)) != 212: return 12, default: {} }
+
+    // Removing every element empties every block.
+    while !fruits.isEmpty() { fruits.remove(at: fruits.count - 1) }
+    fruits.append(value: Cherry(grams: 5, pit: true))
+    switch { kinds(fruits: fruits) != 3 | weights(fruits: fruits) != 5: return 13, default: {} }
+    switch { weights(fruits: before) != 123456789: return 14, default: {} }
+
+    // Many of each, in turn.
+    state many: Array<@fruit>()
+    for i in 0..<300 {
+        switch {
+            i % 3 = 0: many.append(value: Apple(grams: 1)),
+            i % 3 = 1: many.append(value: Banana(grams: 2, spots: spots(n: 1))),
+            default: many.append(value: Cherry(grams: 3, pit: false))
+        }
+    }
+    state total: 0
+    for fruit in many { total: total + fruit.weight() }
+    switch { total != 600 | many.count != 300: return 15, default: {} }
+    many.remove(at: 150)
+    switch { many.read(at: 150).weight() != 2 | many.count != 299: return 16, default: {} }
+    return 42
+}

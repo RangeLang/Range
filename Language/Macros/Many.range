@@ -19,5 +19,12 @@ macro many(): State
 // @many does not track count, capacity, or growth policy; the owning macro
 // declares those as ordinary members. The member is not a standalone value.
 //
+// When the element type is a macro type, as in Array<@fruit>, C partitions
+// the slots by type: one block per type applying the macro, holding its
+// values in their order among the elements, and one order list of (type,
+// index) per slot. The primitives behave the same; reading a slot is O(1),
+// and writing another type into one, or dropping one, is O(n). Each type's
+// block grows by doubling, a policy C holds.
+//
 // Open: behavior for out-of-range slots; layout computation for Element;
 // the allocator behind resize.

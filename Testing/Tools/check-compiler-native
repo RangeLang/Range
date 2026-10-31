@@ -150,6 +150,11 @@ run constraints 42 "" Testing/Compiler/Native/Constraints.range
 # shows the macro's face, and `=` with a type tests and narrows it.
 run macro-values 42 "" Testing/Compiler/Native/MacroValues.range
 [[ "$(cat "$work_root/stdout")" == "fruits 4" ]] || fail "macro values printed: $(cat "$work_root/stdout")"
+# Array<@fruit> keeps one block per type and an order list; random edits
+# match an Array<Int> model throughout.
+run partitioned 42 "" Testing/Compiler/Native/Partitioned.range
+run partitioned-model 42 "" Testing/Compiler/Native/PartitionedModel.range
+[[ "$(cat "$work_root/stdout")" == "count 270" ]] || fail "partitioned model printed: $(cat "$work_root/stdout")"
 # Closures: functions that take them are compiled inline, and so are they.
 run closures 42 "" Testing/Compiler/Native/Closures.range
 [[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"

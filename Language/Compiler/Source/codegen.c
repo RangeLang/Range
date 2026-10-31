@@ -49,7 +49,12 @@ typedef struct { int32_t offset; RangeNode *type; int consumed; } NativeTemp;
  * release a block of `type` elements (x0 = the block, or zero), write an
  * integer in decimal (x0 = the value, x1 = the file descriptor), or compare
  * two values of `type` (x0, x1 = their addresses; x0 = 1 when equal). */
-enum { NativeReleaseValue, NativeReleaseBlock, NativeWriteSigned, NativeWriteUnsigned, NativeEqual };
+enum { NativeReleaseValue, NativeReleaseBlock, NativeWriteSigned, NativeWriteUnsigned, NativeEqual,
+       /* Partitioned @many storage (see its section): x0 = the member's address,
+        * or for release and read its block; and a block of one type's values
+        * made a block of its own (x0 = its address). */
+       NativePartsRelease, NativePartsUnique, NativePartsResize, NativePartsRead, NativePartsWrite, NativePartsDrop,
+       NativePartsTake, NativeUniqueBlock };
 typedef struct { RangeNode *type; int block; size_t offset; int compiled; } NativeHelper;
 typedef struct { size_t at; size_t helper; } NativeHelperCall;
 /* What `break` and `continue` leave: a loop (continue branches to top), and
@@ -450,7 +455,9 @@ static int nativeImage(NativeImage *image, const RangeValue *value, RangeNode *t
     for (size_t i = 0; i < value->count; ++i) {
         if (type->memberOffsets[i] == SIZE_MAX) continue;
         RangeNode *member = declaration->items[i], *element = member->flags & RangeFlagMany ? manyElement(image->typer,type,member) : NULL;
-        if (element && value->values[i].count && (macroTimeType(image->typer,element) || !layoutOf(image->typer,element,NULL)
+        // Partitioned storage is built by the code that fills it.
+        if (element && value->values[i].count && (macroTimeType(image->typer,element) || macroUnion(element)
+            || !layoutOf(image->typer,element,NULL)
             || !nativeImageBlock(image,offset + type->memberOffsets[i],value->values[i].values,value->values[i].count,element,
                                  "could not allocate @many storage"))) return 0;
         if (!element && !nativeImage(image,&value->values[i],type->memberTypes[i],offset + type->memberOffsets[i])) return 0;
@@ -939,6 +946,8 @@ static void nativeReleaseSlots(Native *native, size_t from)
 
 typedef struct { size_t offset; RangeNode *element; } NativeSlots;
 
+static size_t nativePartCount(const RangeNode *);
+
 static int nativeSlotsOf(Native *native, RangeNode *self, RangeNode *at, NativeSlots *slots)
 {
     RangeNode *declaration = self->resolvedDeclaration, *member = NULL;
@@ -953,6 +962,12 @@ static int nativeSlotsOf(Native *native, RangeNode *self, RangeNode *at, NativeS
     }
     RangeNode *element = manyElement(native->typer,self,member);
     if (nativeKind(native,element,member) == NativeNone) return 0;
+    for (size_t k = 0; macroUnion(element) && k < nativePartCount(element); ++k)
+        if (element->memberBoxed[k]) {
+            nativeMissing(native,at,"@many storage of %s values is not implemented when %s holds %s values",
+                          element->name,element->resolvedDeclaration->items[k]->name,element->name);
+            return 0;
+        }
     slots->offset = self->memberOffsets[index];
     slots->element = element;
     return 1;
@@ -1105,6 +1120,676 @@ static void nativeUnique(Native *native, NativeSlots *slots, uint32_t depth, Ran
     nativeBranchHere(native,owned,armBcond(RangeLS,0));
 }
 
+
+/* ---- partitioned @many storage ----
+ * A @many member whose elements are a macro's values (see macroUnion) keeps
+ * them partitioned by type: each type applying the macro has a block of its
+ * own, holding its values alone, in their order among the elements, as
+ * ordinary @many storage does; and one order list says, per position, which
+ * type's block holds that element and where. The member's block is
+ *
+ *   [references][slots][live][block 0][count 0] … [block k-1][count k-1][order: slots × 8]
+ *
+ * where live is one past the last position holding an element, and an order
+ * entry is zero for an empty position, else (case + 1) << 32 | the index in
+ * that case's block. Each case's block is [references][slots][values], its
+ * slots past its count zero. Copies share the member's block and each
+ * case's, each copied on write apart. resize, read, write, and drop act on it
+ * through subroutines emitted once per element type; reading a position is
+ * O(1), and writing another type there, or dropping one, moves the entries
+ * after it, O(n). */
+
+static int nativePartitioned(const RangeNode *element) { return macroUnion(element); }
+
+static size_t nativePartCount(const RangeNode *type)
+{
+    size_t cases = 0;
+    for (size_t i = 0; i < type->resolvedDeclaration->itemCount; ++i)
+        if (type->resolvedDeclaration->items[i]->kind == RangeNodeEnumCase) ++cases;
+    return cases;
+}
+
+static uint32_t armLsr(int rd, int rn, int shift) { return 0xD340FC00u | (uint32_t)shift << 16 | (uint32_t)rn << 5 | (uint32_t)rd; }
+static uint32_t armLsl(int rd, int rn, int shift)
+{
+    return 0xD3400000u | (uint32_t)((64 - shift) & 63) << 16 | (uint32_t)(63 - shift) << 10 | (uint32_t)rn << 5 | (uint32_t)rd;
+}
+
+/* A subroutine's locals, below its frame pointer. */
+static void nativeLocalLoad(Native *native, int rt, int local) { nativeEmit(native,armLdur(rt,29,-8 * (local + 1))); }
+static void nativeLocalStore(Native *native, int rt, int local) { nativeEmit(native,armStur(rt,29,-8 * (local + 1))); }
+
+/* x0 = the member's block, from the member's address in local 0. */
+static void nativePartsBlock(Native *native, int rd)
+{
+    nativeLocalLoad(native,rd,0);
+    nativeEmit(native,armLdr(rd,rd,0));
+}
+
+/* Branch past this point unless x5 holds case t + 1. Uses x9. */
+static size_t nativeUnlessPart(Native *native, size_t t)
+{
+    nativeConstant(native,9,t + 1);
+    nativeEmit(native,armCmp(5,9));
+    return nativeEmit(native,armBcond(RangeNE,0));
+}
+
+/* rd = the address of value x[index] of the case block in rb, `size` bytes each. Uses x9. */
+static void nativePartSlot(Native *native, int rd, int rb, int index, size_t size)
+{
+    nativeConstant(native,9,size);
+    nativeEmit(native,armMul(9,index,9));
+    nativeEmit(native,armAdd(rd,rb,9));
+    nativeEmit(native,armAddImm(rd,rd,16));
+}
+
+/* Order entries of case x5 whose index compares to local `bound` as `cond`
+ * selects move by `step` (1 or -1). Uses x4, x6-x9, x13, x14. */
+static void nativePartsShift(Native *native, size_t header, int bound, int cond, int step)
+{
+    nativePartsBlock(native,0);
+    nativeEmit(native,armLdr(7,0,16));
+    nativeConstant(native,13,header);
+    nativeEmit(native,armAdd(13,0,13));
+    nativeEmit(native,armMovz(14,0,0));
+    nativeLocalLoad(native,8,bound);
+    size_t top = native->machine.size;
+    nativeEmit(native,armCmp(14,7));
+    size_t done = nativeEmit(native,armBcond(RangeHS,0));
+    nativeEmit(native,armLsl(9,14,3));
+    nativeEmit(native,armAdd(9,13,9));
+    nativeEmit(native,armLdr(4,9,0));
+    nativeEmit(native,armLsr(6,4,32));
+    nativeEmit(native,armCmp(6,5));
+    size_t other = nativeEmit(native,armBcond(RangeNE,0));
+    nativeEmit(native,armUbfx(6,4,32));
+    nativeEmit(native,armCmp(6,8));
+    size_t kept = nativeEmit(native,armBcond(cond ^ 1,0));
+    nativeEmit(native,step > 0 ? armAddImm(4,4,1) : armSubImm(4,4,1));
+    nativeEmit(native,armStr(4,9,0));
+    nativeBranchHere(native,other,armBcond(RangeNE,0));
+    nativeBranchHere(native,kept,armBcond(cond ^ 1,0));
+    nativeEmit(native,armAddImm(14,14,1));
+    nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
+    nativeBranchHere(native,done,armBcond(RangeHS,0));
+}
+
+static void nativePartsBody(Native *native, RangeNode *type, int kind)
+{
+    RangeNode *declaration = type->resolvedDeclaration;
+    size_t cases = nativePartCount(type), header = 24 + 16 * cases;
+    nativeEmit(native,armSubImm(31,31,96));  /* twelve locals */
+    NativeJump ends[256], done[256];
+    size_t endCount = 0, doneCount = 0;
+    if (cases > 256) { nativeMissing(native,declaration,"partitioned @many storage of more than 256 types is not implemented"); return; }
+    switch (kind) {
+    case NativePartsRelease: {
+        // x0 = the block: drop one reference; at zero release each case's block and free it.
+        size_t empty = nativeEmit(native,armCbz(0,0));
+        nativeEmit(native,armLdr(1,0,0));
+        nativeEmit(native,armSubImm(1,1,1));
+        nativeEmit(native,armStr(1,0,0));
+        size_t shared = nativeEmit(native,armCbnz(1,0));
+        nativeLocalStore(native,0,0);
+        for (size_t t = 0; t < cases; ++t) {
+            nativeLocalLoad(native,0,0);
+            nativeEmit(native,armLdr(0,0,24 + 16 * t));
+            nativeCallHelper(native,type->memberTypes[t],NativeReleaseBlock);
+        }
+        nativeLocalLoad(native,0,0);
+        rangeCallImport(&native->machine,"_free");
+        nativeBranchHere(native,empty,armCbz(0,0));
+        nativeBranchHere(native,shared,armCbnz(1,0));
+        break;
+    }
+    case NativeUniqueBlock: {
+        // x0 = the address of a block of `type` values: give it a block no other value shares.
+        nativeLocalStore(native,0,0);
+        nativeEmit(native,armLdr(1,0,0));
+        size_t empty = nativeEmit(native,armCbz(1,0));
+        nativeEmit(native,armLdr(2,1,0));
+        nativeEmit(native,armCmpImm(2,1));
+        size_t owned = nativeEmit(native,armBcond(RangeLS,0));
+        nativeLocalStore(native,1,1);
+        nativeEmit(native,armLdr(3,1,8));
+        nativeConstant(native,4,type->size);
+        nativeEmit(native,armMul(3,3,4));
+        nativeEmit(native,armAddImm(0,3,16));
+        nativeLocalStore(native,0,2);
+        rangeCallImport(&native->machine,"_malloc");
+        nativeTrap(native,armCbz(0,0),type->resolvedDeclaration,"could not allocate @many storage");
+        nativeLocalStore(native,0,3);
+        nativeLocalLoad(native,1,1);
+        nativeLocalLoad(native,2,2);
+        rangeCallImport(&native->machine,"_memcpy");
+        nativeLocalLoad(native,6,3);
+        nativeEmit(native,armMovz(9,1,0));
+        nativeEmit(native,armStr(9,6,0));
+        nativeEmit(native,armLdr(7,6,8));
+        nativeRetainElements(native,type);
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armLdr(2,1,0));
+        nativeEmit(native,armSubImm(2,2,1));
+        nativeEmit(native,armStr(2,1,0));
+        nativeLocalLoad(native,0,0);
+        nativeLocalLoad(native,6,3);
+        nativeEmit(native,armStr(6,0,0));
+        nativeBranchHere(native,empty,armCbz(1,0));
+        nativeBranchHere(native,owned,armBcond(RangeLS,0));
+        break;
+    }
+    case NativePartsUnique: {
+        // x0 = the member's address: give it a block no other value shares;
+        // the case blocks stay shared, each gaining a reference.
+        nativeLocalStore(native,0,0);
+        nativeEmit(native,armLdr(1,0,0));
+        size_t empty = nativeEmit(native,armCbz(1,0));
+        nativeEmit(native,armLdr(2,1,0));
+        nativeEmit(native,armCmpImm(2,1));
+        size_t owned = nativeEmit(native,armBcond(RangeLS,0));
+        nativeLocalStore(native,1,1);
+        nativeEmit(native,armLdr(3,1,8));
+        nativeEmit(native,armLsl(3,3,3));
+        nativeConstant(native,4,header);
+        nativeEmit(native,armAdd(0,3,4));
+        nativeLocalStore(native,0,2);
+        rangeCallImport(&native->machine,"_malloc");
+        nativeTrap(native,armCbz(0,0),declaration,"could not allocate @many storage");
+        nativeLocalStore(native,0,3);
+        nativeLocalLoad(native,1,1);
+        nativeLocalLoad(native,2,2);
+        rangeCallImport(&native->machine,"_memcpy");
+        nativeLocalLoad(native,6,3);
+        nativeEmit(native,armMovz(9,1,0));
+        nativeEmit(native,armStr(9,6,0));
+        for (size_t t = 0; t < cases; ++t) nativeRetainBlock(native,6,24 + 16 * t);
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armLdr(2,1,0));
+        nativeEmit(native,armSubImm(2,2,1));
+        nativeEmit(native,armStr(2,1,0));
+        nativeLocalLoad(native,0,0);
+        nativeLocalLoad(native,6,3);
+        nativeEmit(native,armStr(6,0,0));
+        nativeBranchHere(native,empty,armCbz(1,0));
+        nativeBranchHere(native,owned,armBcond(RangeLS,0));
+        break;
+    }
+    case NativePartsResize: {
+        // x0 = the member's address, x1 = the slot count.
+        nativeLocalStore(native,0,0);
+        nativeLocalStore(native,1,1);
+        nativeCallHelper(native,type,NativePartsUnique);
+        nativePartsBlock(native,1);
+        nativeLocalStore(native,1,2);
+        nativeEmit(native,armMovz(2,0,0));
+        size_t none = nativeEmit(native,armCbz(1,0));
+        nativeEmit(native,armLdr(2,1,8));
+        nativeEmit(native,armLdr(3,1,16));
+        nativeLocalLoad(native,4,1);
+        nativeEmit(native,armCmp(4,3));
+        nativeTrap(native,armBcond(RangeLO,0),declaration,"partitioned @many storage cannot shrink below the elements it holds");
+        nativeBranchHere(native,none,armCbz(1,0));
+        nativeLocalStore(native,2,3);
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armLsl(1,1,3));
+        nativeConstant(native,4,header);
+        nativeEmit(native,armAdd(1,1,4));
+        nativeLocalLoad(native,0,2);
+        rangeCallImport(&native->machine,"_realloc");
+        nativeTrap(native,armCbz(0,0),declaration,"resize could not allocate @many storage");
+        nativeLocalStore(native,0,4);
+        nativeLocalLoad(native,1,0);
+        nativeEmit(native,armStr(0,1,0));        /* the member holds the block */
+        nativeEmit(native,armMovz(9,1,0));
+        nativeEmit(native,armStr(9,0,0));
+        nativeLocalLoad(native,3,1);
+        nativeEmit(native,armStr(3,0,8));
+        // A new block starts with nothing in it.
+        nativeLocalLoad(native,2,2);
+        size_t had = nativeEmit(native,armCbnz(2,0));
+        nativeEmit(native,armAddImm(0,0,16));
+        nativeEmit(native,armMovz(1,0,0));
+        nativeConstant(native,2,header - 16);
+        rangeCallImport(&native->machine,"_memset");
+        nativeBranchHere(native,had,armCbnz(2,0));
+        // Zero the order entries past the old slot count.
+        nativeLocalLoad(native,2,3);
+        nativeLocalLoad(native,3,1);
+        nativeEmit(native,armCmp(3,2));
+        size_t smaller = nativeEmit(native,armBcond(RangeLS,0));
+        nativeEmit(native,armSub(5,3,2));
+        nativeEmit(native,armLsl(5,5,3));
+        nativeEmit(native,armLsl(6,2,3));
+        nativeLocalLoad(native,0,4);
+        nativeConstant(native,7,header);
+        nativeEmit(native,armAdd(0,0,7));
+        nativeEmit(native,armAdd(0,0,6));
+        nativeEmit(native,armMovz(1,0,0));
+        nativeEmit(native,armMov(2,5));
+        rangeCallImport(&native->machine,"_memset");
+        nativeBranchHere(native,smaller,armBcond(RangeLS,0));
+        break;
+    }
+    case NativePartsRead: {
+        // x0 = the block, x1 = the position, x2 = where the value goes. x0 = 1
+        // when the position holds an element, which is copied there, holding
+        // its own references; else 0.
+        nativeLocalStore(native,0,0);
+        nativeLocalStore(native,2,2);
+        nativeConstant(native,3,header);
+        nativeEmit(native,armAdd(3,0,3));
+        nativeEmit(native,armLsl(4,1,3));
+        nativeEmit(native,armAdd(3,3,4));
+        nativeEmit(native,armLdr(4,3,0));
+        nativeEmit(native,armMovz(0,0,0));
+        size_t empty = nativeEmit(native,armCbz(4,0));
+        nativeEmit(native,armLsr(5,4,32));
+        nativeEmit(native,armUbfx(6,4,32));
+        nativeLocalStore(native,6,3);
+        for (size_t t = 0; t < cases; ++t) {
+            RangeNode *payload = type->memberTypes[t];
+            size_t skip = nativeUnlessPart(native,t);
+            nativeLocalLoad(native,1,0);
+            nativeEmit(native,armLdr(1,1,24 + 16 * t));
+            nativeLocalLoad(native,6,3);
+            nativePartSlot(native,1,1,6,payload->size);
+            nativeLocalLoad(native,0,2);
+            nativeZero(native,0,type->size);
+            nativeConstant(native,9,t);
+            nativeEmit(native,armStoreSized((size_t)type->variantTag,9,0,0));
+            nativeAddOffset(native,0,0,type->memberOffsets[t]);
+            nativeCopyValue(native,0,1,payload,1);
+            ends[endCount++] = (NativeJump){.at=nativeEmit(native,armB(0)),.base=armB(0)};
+            nativeBranchHere(native,skip,armBcond(RangeNE,0));
+        }
+        for (size_t i = 0; i < endCount; ++i) nativeBranchHere(native,ends[i].at,ends[i].base);
+        nativeEmit(native,armMovz(0,1,0));
+        nativeBranchHere(native,empty,armCbz(4,0));
+        break;
+    }
+    case NativePartsTake: {
+        // x0 = the member's address (its block its own), x1 = case + 1, x2 =
+        // the index in that case's block: release that value; the ones after
+        // it move down one, and so do their order entries.
+        nativeLocalStore(native,0,0);
+        nativeLocalStore(native,1,1);
+        nativeLocalStore(native,2,2);
+        for (size_t t = 0; t < cases; ++t) {
+            RangeNode *payload = type->memberTypes[t];
+            nativeLocalLoad(native,5,1);
+            size_t skip = nativeUnlessPart(native,t);
+            nativePartsBlock(native,0);
+            nativeAddOffset(native,0,0,24 + 16 * t);
+            nativeCallHelper(native,payload,NativeUniqueBlock);
+            nativePartsBlock(native,0);
+            nativeEmit(native,armLdr(1,0,24 + 16 * t));
+            nativeLocalStore(native,1,4);
+            nativeEmit(native,armLdr(3,0,32 + 16 * t));
+            nativeLocalStore(native,3,5);
+            nativeLocalLoad(native,2,2);
+            nativePartSlot(native,0,1,2,payload->size);
+            nativeLocalStore(native,0,6);
+            nativeRelease(native,payload);
+            nativeLocalLoad(native,0,6);
+            nativeConstant(native,4,payload->size);
+            nativeEmit(native,armAdd(1,0,4));
+            nativeLocalLoad(native,3,5);
+            nativeLocalLoad(native,2,2);
+            nativeEmit(native,armSub(2,3,2));
+            nativeEmit(native,armSubImm(2,2,1));
+            nativeEmit(native,armMul(2,2,4));
+            rangeCallImport(&native->machine,"_memmove");
+            nativeLocalLoad(native,1,4);
+            nativeLocalLoad(native,3,5);
+            nativeEmit(native,armSubImm(3,3,1));
+            nativePartSlot(native,0,1,3,payload->size);
+            nativeEmit(native,armMovz(1,0,0));
+            nativeConstant(native,2,payload->size);
+            rangeCallImport(&native->machine,"_memset");
+            nativePartsBlock(native,0);
+            nativeEmit(native,armLdr(3,0,32 + 16 * t));
+            nativeEmit(native,armSubImm(3,3,1));
+            nativeEmit(native,armStr(3,0,32 + 16 * t));
+            ends[endCount++] = (NativeJump){.at=nativeEmit(native,armB(0)),.base=armB(0)};
+            nativeBranchHere(native,skip,armBcond(RangeNE,0));
+        }
+        for (size_t i = 0; i < endCount; ++i) nativeBranchHere(native,ends[i].at,ends[i].base);
+        nativeLocalLoad(native,5,1);
+        nativePartsShift(native,header,2,RangeHI,-1);
+        break;
+    }
+    case NativePartsDrop: {
+        // x0 = the member's address, x1 = the position: its element leaves
+        // its case's block, and the entries after it move down one.
+        nativeLocalStore(native,0,0);
+        nativeLocalStore(native,1,1);
+        nativeCallHelper(native,type,NativePartsUnique);
+        nativePartsBlock(native,0);
+        nativeConstant(native,3,header);
+        nativeEmit(native,armAdd(3,0,3));
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armLsl(4,1,3));
+        nativeEmit(native,armAdd(3,3,4));
+        nativeLocalStore(native,3,2);
+        nativeEmit(native,armLdr(4,3,0));
+        size_t empty = nativeEmit(native,armCbz(4,0));
+        nativeLocalLoad(native,0,0);
+        nativeEmit(native,armLsr(1,4,32));
+        nativeEmit(native,armUbfx(2,4,32));
+        nativeCallHelper(native,type,NativePartsTake);
+        nativeBranchHere(native,empty,armCbz(4,0));
+        // memmove(entry, entry + 8, (slots - position - 1) * 8)
+        nativePartsBlock(native,5);
+        nativeEmit(native,armLdr(6,5,8));
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armSub(2,6,1));
+        nativeEmit(native,armSubImm(2,2,1));
+        nativeEmit(native,armLsl(2,2,3));
+        nativeLocalLoad(native,0,2);
+        nativeEmit(native,armAddImm(1,0,8));
+        rangeCallImport(&native->machine,"_memmove");
+        // The last entry empties, and live drops by one past the position.
+        nativePartsBlock(native,5);
+        nativeEmit(native,armLdr(6,5,8));
+        nativeEmit(native,armSubImm(6,6,1));
+        nativeEmit(native,armLsl(6,6,3));
+        nativeConstant(native,7,header);
+        nativeEmit(native,armAdd(7,5,7));
+        nativeEmit(native,armAdd(7,7,6));
+        nativeEmit(native,armStr(31,7,0));
+        nativeEmit(native,armLdr(3,5,16));
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armCmp(1,3));
+        size_t past = nativeEmit(native,armBcond(RangeHS,0));
+        nativeEmit(native,armSubImm(3,3,1));
+        nativeEmit(native,armStr(3,5,16));
+        nativeBranchHere(native,past,armBcond(RangeHS,0));
+        break;
+    }
+    case NativePartsWrite: {
+        // x0 = the member's address, x1 = the position, x2 = the value's
+        // address, x3 = 1 when the value moves in, holding its references.
+        nativeLocalStore(native,0,0);
+        nativeLocalStore(native,1,1);
+        nativeLocalStore(native,2,2);
+        nativeLocalStore(native,3,3);
+        nativeCallHelper(native,type,NativePartsUnique);
+        nativeLocalLoad(native,2,2);
+        nativeEmit(native,armLoadSized((size_t)type->variantTag,0,5,2,0));
+        nativeEmit(native,armAddImm(5,5,1));
+        nativeLocalStore(native,5,4);            /* case + 1 */
+        nativePartsBlock(native,0);
+        nativeConstant(native,3,header);
+        nativeEmit(native,armAdd(3,0,3));
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armLsl(4,1,3));
+        nativeEmit(native,armAdd(3,3,4));
+        nativeLocalStore(native,3,5);            /* the order entry's address */
+        nativeEmit(native,armLdr(4,3,0));
+        size_t empty = nativeEmit(native,armCbz(4,0));
+        nativeEmit(native,armLsr(6,4,32));
+        nativeEmit(native,armCmp(6,5));
+        size_t other = nativeEmit(native,armBcond(RangeNE,0));
+        // The same type: the value replaces the one in place.
+        nativeEmit(native,armUbfx(6,4,32));
+        nativeLocalStore(native,6,6);
+        for (size_t t = 0; t < cases; ++t) {
+            RangeNode *payload = type->memberTypes[t];
+            nativeLocalLoad(native,5,4);
+            size_t skip = nativeUnlessPart(native,t);
+            nativePartsBlock(native,0);
+            nativeAddOffset(native,0,0,24 + 16 * t);
+            nativeCallHelper(native,payload,NativeUniqueBlock);
+            nativePartsBlock(native,0);
+            nativeEmit(native,armLdr(1,0,24 + 16 * t));
+            nativeLocalLoad(native,6,6);
+            nativePartSlot(native,1,1,6,payload->size);
+            nativeLocalStore(native,1,7);
+            if (nativeSharesSlots(payload)) {
+                // Retain the new value first, then release the one it replaces.
+                nativeLocalLoad(native,3,3);
+                size_t moved = nativeEmit(native,armCbnz(3,0));
+                nativeLocalLoad(native,2,2);
+                nativeAddOffset(native,2,2,type->memberOffsets[t]);
+                nativeRetain(native,2,0,payload);
+                nativeBranchHere(native,moved,armCbnz(3,0));
+                nativeLocalLoad(native,0,7);
+                nativeRelease(native,payload);
+            }
+            nativeLocalLoad(native,0,7);
+            nativeLocalLoad(native,1,2);
+            nativeAddOffset(native,1,1,type->memberOffsets[t]);
+            nativeCopy(native,0,1,payload->size);
+            done[doneCount++] = (NativeJump){.at=nativeEmit(native,armB(0)),.base=armB(0)};
+            nativeBranchHere(native,skip,armBcond(RangeNE,0));
+        }
+        // Another type: its element leaves its case's block, and the position empties.
+        nativeBranchHere(native,other,armBcond(RangeNE,0));
+        nativeLocalLoad(native,3,5);
+        nativeEmit(native,armLdr(4,3,0));
+        nativeLocalLoad(native,0,0);
+        nativeEmit(native,armLsr(1,4,32));
+        nativeEmit(native,armUbfx(2,4,32));
+        nativeCallHelper(native,type,NativePartsTake);
+        nativeLocalLoad(native,3,5);
+        nativeEmit(native,armStr(31,3,0));
+        nativeBranchHere(native,empty,armCbz(4,0));
+        // Its index among its type: past every element, the end of its
+        // case's block; else the elements of its type before it.
+        nativePartsBlock(native,0);
+        nativeEmit(native,armLdr(7,0,16));
+        nativeLocalLoad(native,1,1);
+        nativeLocalLoad(native,5,4);
+        nativeEmit(native,armCmp(1,7));
+        size_t inside = nativeEmit(native,armBcond(RangeLO,0));
+        nativeEmit(native,armLsl(9,5,4));
+        nativeEmit(native,armAdd(9,0,9));
+        nativeEmit(native,armLdr(8,9,16));       /* count of case + 1 - 1, at 32 + 16 * case */
+        nativeEmit(native,armMovz(10,1,0));
+        size_t counted = nativeEmit(native,armB(0));
+        nativeBranchHere(native,inside,armBcond(RangeLO,0));
+        nativeConstant(native,13,header);
+        nativeEmit(native,armAdd(13,0,13));
+        nativeEmit(native,armMovz(14,0,0));
+        nativeEmit(native,armMovz(8,0,0));
+        size_t top = native->machine.size;
+        nativeEmit(native,armCmp(14,1));
+        size_t scanned = nativeEmit(native,armBcond(RangeHS,0));
+        nativeEmit(native,armLsl(9,14,3));
+        nativeEmit(native,armAdd(9,13,9));
+        nativeEmit(native,armLdr(4,9,0));
+        nativeEmit(native,armLsr(6,4,32));
+        nativeEmit(native,armCmp(6,5));
+        nativeEmit(native,armBcond(RangeNE,2));
+        nativeEmit(native,armAddImm(8,8,1));
+        nativeEmit(native,armAddImm(14,14,1));
+        nativeEmit(native,armB(-(int32_t)((native->machine.size - top) / 4)));
+        nativeBranchHere(native,scanned,armBcond(RangeHS,0));
+        nativeEmit(native,armMovz(10,0,0));
+        nativeBranchHere(native,counted,armB(0));
+        nativeLocalStore(native,8,6);            /* the index */
+        nativeLocalStore(native,10,8);           /* appended */
+        for (size_t t = 0; t < cases; ++t) {
+            RangeNode *payload = type->memberTypes[t];
+            nativeLocalLoad(native,5,4);
+            size_t skip = nativeUnlessPart(native,t);
+            nativePartsBlock(native,0);
+            nativeAddOffset(native,0,0,24 + 16 * t);
+            nativeCallHelper(native,payload,NativeUniqueBlock);
+            // Room for one more: double the slots, starting at four.
+            nativePartsBlock(native,0);
+            nativeEmit(native,armLdr(1,0,24 + 16 * t));
+            nativeEmit(native,armLdr(3,0,32 + 16 * t));
+            nativeEmit(native,armMovz(2,0,0));
+            nativeEmit(native,armCbz(1,2));
+            nativeEmit(native,armLdr(2,1,8));
+            nativeEmit(native,armCmp(3,2));
+            size_t roomy = nativeEmit(native,armBcond(RangeLO,0));
+            nativeLocalStore(native,2,9);
+            nativeEmit(native,armAdd(4,2,2));
+            nativeEmit(native,armCmpImm(4,4));
+            nativeEmit(native,armBcond(RangeHS,2));
+            nativeEmit(native,armMovz(4,4,0));
+            nativeLocalStore(native,4,10);
+            nativeEmit(native,armMov(0,1));
+            nativeConstant(native,9,payload->size);
+            nativeEmit(native,armMul(1,4,9));
+            nativeEmit(native,armAddImm(1,1,16));
+            rangeCallImport(&native->machine,"_realloc");
+            nativeTrap(native,armCbz(0,0),declaration,"could not allocate @many storage");
+            nativeEmit(native,armMovz(9,1,0));
+            nativeEmit(native,armStr(9,0,0));
+            nativeLocalLoad(native,4,10);
+            nativeEmit(native,armStr(4,0,8));
+            nativePartsBlock(native,1);
+            nativeEmit(native,armStr(0,1,24 + 16 * t));
+            nativeLocalLoad(native,2,9);
+            nativeLocalLoad(native,4,10);
+            nativeEmit(native,armSub(5,4,2));
+            nativeConstant(native,9,payload->size);
+            nativeEmit(native,armMul(5,5,9));
+            nativeEmit(native,armMul(2,2,9));
+            nativeEmit(native,armAdd(0,0,2));
+            nativeEmit(native,armAddImm(0,0,16));
+            nativeEmit(native,armMovz(1,0,0));
+            nativeEmit(native,armMov(2,5));
+            rangeCallImport(&native->machine,"_memset");
+            nativeBranchHere(native,roomy,armBcond(RangeLO,0));
+            // Make room at the index: memmove(slot + 1, slot, (count - index) * size).
+            nativePartsBlock(native,0);
+            nativeEmit(native,armLdr(1,0,24 + 16 * t));
+            nativeEmit(native,armLdr(3,0,32 + 16 * t));
+            nativeLocalLoad(native,6,6);
+            nativePartSlot(native,1,1,6,payload->size);
+            nativeLocalStore(native,1,7);
+            nativeConstant(native,9,payload->size);
+            nativeEmit(native,armAdd(0,1,9));
+            nativeEmit(native,armSub(2,3,6));
+            nativeEmit(native,armMul(2,2,9));
+            rangeCallImport(&native->machine,"_memmove");
+            // The value goes in, holding its own references unless it moves in.
+            nativeLocalLoad(native,0,7);
+            nativeLocalLoad(native,1,2);
+            nativeAddOffset(native,1,1,type->memberOffsets[t]);
+            nativeCopy(native,0,1,payload->size);
+            if (nativeSharesSlots(payload)) {
+                nativeLocalLoad(native,3,3);
+                size_t moved = nativeEmit(native,armCbnz(3,0));
+                nativeLocalLoad(native,0,7);
+                nativeRetain(native,0,0,payload);
+                nativeBranchHere(native,moved,armCbnz(3,0));
+            }
+            nativePartsBlock(native,0);
+            nativeEmit(native,armLdr(3,0,32 + 16 * t));
+            nativeEmit(native,armAddImm(3,3,1));
+            nativeEmit(native,armStr(3,0,32 + 16 * t));
+            ends[endCount++] = (NativeJump){.at=nativeEmit(native,armB(0)),.base=armB(0)};
+            nativeBranchHere(native,skip,armBcond(RangeNE,0));
+        }
+        for (size_t i = 0; i < endCount; ++i) nativeBranchHere(native,ends[i].at,ends[i].base);
+        // Inserted before others of its type, they move up one.
+        nativeLocalLoad(native,9,8);
+        size_t appended = nativeEmit(native,armCbnz(9,0));
+        nativeLocalLoad(native,5,4);
+        nativePartsShift(native,header,6,RangeHS,1);
+        nativeBranchHere(native,appended,armCbnz(9,0));
+        // The entry, and live past it.
+        nativeLocalLoad(native,5,4);
+        nativeEmit(native,armLsl(4,5,32));
+        nativeLocalLoad(native,6,6);
+        nativeEmit(native,armAdd(4,4,6));
+        nativeLocalLoad(native,3,5);
+        nativeEmit(native,armStr(4,3,0));
+        nativePartsBlock(native,0);
+        nativeEmit(native,armLdr(7,0,16));
+        nativeLocalLoad(native,1,1);
+        nativeEmit(native,armCmp(1,7));
+        size_t within = nativeEmit(native,armBcond(RangeLO,0));
+        nativeEmit(native,armAddImm(1,1,1));
+        nativeEmit(native,armStr(1,0,16));
+        nativeBranchHere(native,within,armBcond(RangeLO,0));
+        for (size_t i = 0; i < doneCount; ++i) nativeBranchHere(native,done[i].at,done[i].base);
+        break;
+    }
+    }
+}
+
+/* Trap unless the position at [sp] is below the slot count of the receiver
+ * at [sp + depth]. */
+static void nativePartsPosition(Native *native, NativeSlots *slots, uint32_t depth, RangeNode *at)
+{
+    nativeEmit(native,armLdr(3,31,0));
+    nativeLoadBlock(native,slots,depth);
+    nativeEmit(native,armCmp(3,2));
+    nativeTrap(native,armBcond(RangeHS,0),at,"slot index is outside the @many storage");
+}
+
+/* resize, read, write, and drop on partitioned storage, the receiver's
+ * address pushed. */
+static RangeNode *nativePartsCall(Native *native, RangeNode *call, RangeNode *function, NativeSlots *slots)
+{
+    RangeNode *element = slots->element;
+    native->resultTemp = -1;
+    if (same(function->name,"resize")) {
+        if (!nativeExpression(native,call->items[0]->a)) return NULL;
+        nativeEmit(native,armCmpImm(0,0));
+        nativeTrap(native,armBcond(RangeLT,0),call,"resize to a negative slot count");
+        nativeEmit(native,armMov(1,0));
+        nativeEmit(native,armLdr(0,31,0));
+        nativeAddOffset(native,0,0,slots->offset);
+        nativeCallHelper(native,element,NativePartsResize);
+        nativeEmit(native,armAddImm(31,31,16));
+        native->resultTemp = -1;
+        return NULL;
+    }
+    if (same(function->name,"write")) {
+        RangeNode *at = NULL, *value = NULL;
+        for (size_t i = 0; i < call->itemCount; ++i) {
+            if (same(call->items[i]->name,"at")) at = call->items[i]->a;
+            if (same(call->items[i]->name,"value")) value = call->items[i]->a;
+        }
+        if (!at || !value || !nativeExpression(native,value)) return NULL;
+        int moved = nativeTakeTemp(native);
+        nativeEmit(native,armPush(0));            /* the value */
+        if (!nativeExpression(native,at)) return NULL;
+        nativeEmit(native,armPush(0));            /* the position */
+        nativePartsPosition(native,slots,32,call);
+        nativeEmit(native,armPop(1));
+        nativeEmit(native,armPop(2));
+        nativeEmit(native,armLdr(0,31,0));
+        nativeAddOffset(native,0,0,slots->offset);
+        nativeConstant(native,3,(uint64_t)moved);
+        nativeCallHelper(native,element,NativePartsWrite);
+        nativeEmit(native,armAddImm(31,31,16));
+        native->resultTemp = -1;
+        return NULL;
+    }
+    if (!nativeExpression(native,call->items[0]->a)) return NULL;
+    nativeEmit(native,armPush(0));                /* the position */
+    nativePartsPosition(native,slots,16,call);
+    if (same(function->name,"drop")) {
+        nativeEmit(native,armPop(1));
+        nativeEmit(native,armLdr(0,31,0));
+        nativeAddOffset(native,0,0,slots->offset);
+        nativeCallHelper(native,element,NativePartsDrop);
+        nativeEmit(native,armAddImm(31,31,16));
+        native->resultTemp = -1;
+        return NULL;
+    }
+    int32_t copy = nativeReserve(native,element->size,element->alignment);
+    nativeEmit(native,armPop(1));
+    nativeEmit(native,armLdr(0,31,0));
+    nativeAddOffset(native,0,0,slots->offset);
+    nativeEmit(native,armLdr(0,0,0));
+    nativeFrameAddress(native,2,copy);
+    nativeCallHelper(native,element,NativePartsRead);
+    nativeTrap(native,armCbz(0,0),call,"this position of the @many storage holds no element");
+    nativeEmit(native,armAddImm(31,31,16));      /* drop the receiver */
+    nativeTrackTemp(native,copy,element);
+    nativeFrameAddress(native,0,copy);
+    return element;
+}
+
 static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *function, RangeNode *self)
 {
     NativeSlots slots;
@@ -1112,6 +1797,7 @@ static RangeNode *nativeSlotCall(Native *native, RangeNode *call, RangeNode *fun
     // The receiver address is pushed; arguments follow in parameter order.
     if (!nativeSlotsOf(native,self,call,&slots)) return NULL;
     element = slots.element;
+    if (nativePartitioned(element)) return nativePartsCall(native,call,function,&slots);
     size_t size = element->size;
     if (same(function->name,"read")) {
         if (!nativeExpression(native,call->items[0]->a)) return NULL;
@@ -1398,6 +2084,7 @@ static void nativeHelperBody(Native *native, size_t index)
     nativeEmit(native,armPushFrame());
     nativeEmit(native,armAddImm(29,31,0));
     if (helper.block == NativeEqual) nativeEqualBody(native,type);
+    else if (helper.block >= NativePartsRelease) nativePartsBody(native,type,helper.block);
     else if (helper.block == NativeWriteSigned || helper.block == NativeWriteUnsigned) {
         // Digits are written backwards into a 32-byte buffer on the stack.
         nativeEmit(native,armSubImm(31,31,32));
@@ -1464,7 +2151,7 @@ static void nativeHelperBody(Native *native, size_t index)
                 nativeEmit(native,armLdr(0,31,0));
                 nativeAddOffset(native,0,0,type->memberOffsets[i]);
                 nativeEmit(native,armLdr(0,0,0));
-                nativeCallHelper(native,element,1);
+                nativeCallHelper(native,element,nativePartitioned(element) ? NativePartsRelease : NativeReleaseBlock);
             } else if (nativeSharesSlots(type->memberTypes[i])) {
                 nativeEmit(native,armLdr(0,31,0));
                 nativeAddOffset(native,0,0,type->memberOffsets[i]);

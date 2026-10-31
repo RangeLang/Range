@@ -1,0 +1,75 @@
+// Random appends, writes of either type, removals, and copies on an
+// Array<@fruit>, checked after each against an Array<Int> that holds each
+// element as type * 1000 + grams.
+macro fruit(): Construct {
+    #graph { extension #target.name { function weight(): Int { return grams } } }
+}
+@fruit construct Apple { let grams: Int }
+@fruit construct Banana { let grams: Int  let peel: Array<Int> }
+@fruit construct Cherry { let grams: Int }
+
+function code(let fruit: @fruit): Int {
+    switch {
+        fruit = Apple: return 1000 + fruit.grams,
+        fruit = Banana: return 2000 + fruit.grams + fruit.peel.count - 1,
+        default: return 3000 + fruit.weight()
+    }
+}
+
+function made(let kind: Int, let grams: Int): @fruit {
+    switch {
+        kind = 1: return Apple(grams: grams),
+        kind = 2: {
+            state peel: Array<Int>()
+            peel.append(value: grams)
+            return Banana(grams: grams, peel: peel)
+        },
+        default: return Cherry(grams: grams)
+    }
+}
+
+function same(let fruits: Array<@fruit>, let model: Array<Int>): Bool {
+    switch { fruits.count != model.count: return false, default: {} }
+    for i in 0..<model.count {
+        switch { code(fruit: fruits.read(at: i)) != model.read(at: i): return false, default: {} }
+    }
+    return true
+}
+
+{
+    state seed: 7
+    state fruits: Array<@fruit>()
+    state model: Array<Int>()
+    state saved: Array<@fruit>()
+    state savedModel: Array<Int>()
+    for step in 0..<1500 {
+        seed: (seed * 1103515245 + 12345) % 2147483648
+        let choice: seed / 65536 % 10
+        let kind: seed / 1024 % 3 + 1
+        let grams: seed / 16 % 100
+        switch {
+            choice < 4 | model.count = 0: {
+                fruits.append(value: made(kind: kind, grams: grams))
+                model.append(value: kind * 1000 + grams)
+            },
+            choice < 7: {
+                let at: seed / 8 % model.count
+                fruits.write(at: at, value: made(kind: kind, grams: grams))
+                model.write(at: at, value: kind * 1000 + grams)
+            },
+            choice < 9: {
+                let at: seed / 8 % model.count
+                fruits.remove(at: at)
+                model.remove(at: at)
+            },
+            default: {
+                saved: fruits
+                savedModel: model
+            }
+        }
+        switch { !same(fruits: fruits, model: model): return step % 200 + 1, default: {} }
+        switch { !same(fruits: saved, model: savedModel): return 250, default: {} }
+    }
+    print(message: "count \(model.count)")
+    return 42
+}
