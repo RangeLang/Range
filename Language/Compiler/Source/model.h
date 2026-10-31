@@ -95,7 +95,10 @@ enum {
     RangeFlagInvalid = 1 << 20,    /* function, macro: typing it reported errors, so it does not run at macro time */
     RangeFlagRequired = 1 << 21,   /* let, state: its type path names a type it requires, not a value */
     RangeFlagScalar = 1 << 22,     /* macro: the one integer literals select; a construct applying it is a scalar */
-    RangeFlagBytes = 1 << 23       /* macro: the one string literals select; a construct applying it holds bytes */
+    RangeFlagBytes = 1 << 23,      /* macro: the one string literals select; a construct applying it holds bytes */
+    RangeFlagFace = 1 << 24,       /* construct: a face, what a type parameter's constraint gives it */
+    RangeFlagOnce = 1 << 25        /* specialization: a generic declaration's own, each type parameter its face,
+                                    * where its bodies are checked once */
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of

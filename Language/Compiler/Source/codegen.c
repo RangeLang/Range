@@ -2945,7 +2945,7 @@ int emitNative(SourceReport *report, Typer *typer, const char *path, int asWritt
         for (size_t i = 0; i < typer->instances->itemCount; ++i) {
             RangeNode *key = typer->instances->items[i], *context = key->outer;
             if (nativeGraphValues(&native,key) || (context && nativeGraphValues(&native,context))
-                || nativeInlined(key->resolvedDeclaration)) continue;
+                || nativeInlined(key->resolvedDeclaration) || abstractType(key)) continue;
             nativeInstance(&native,key->resolvedDeclaration,key,context);
         }
         for (size_t u = 0; u < report->count; ++u) for (size_t i = 0; i < report->units[u]->itemCount; ++i)

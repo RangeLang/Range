@@ -78,6 +78,7 @@ struct Typer {
     /* Values compared with `=`, and the key they were typed under: checked once every type is known. */
     struct { RangeNode *type, *at, *key; } *equalities; size_t equalityCount, equalityCapacity;
     RangeNode *instances; /* interned specializations of generic functions, in the order typing met them */
+    RangeNode *faces;     /* faces of type parameters, each owned by the type parameter it stands for */
     RangeNode *typing[64]; size_t typingCount; /* declarations whose type is being derived from their value */
     RangeNode *functionTypes;   /* interned RangeNodeFunctionType nodes */
     RangeNode *closureSite;     /* the argument being typed for a function-typed parameter */
@@ -256,6 +257,8 @@ RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **present);
 int constructionInput(const RangeNode *member);
 RangeNode *declarationValue(RangeNode *key, RangeNode *node);
 int genericTemplate(const RangeNode *function);
+int faceDeclaration(const RangeNode *declaration);
+int abstractType(const RangeNode *type);
 RangeNode *closureResult(Typer *typer, RangeNode *key, RangeNode *closure);
 RangeNode *iterationFunction(const RangeNode *declaration, size_t *count);
 int builtinMember(const RangeNode *member);

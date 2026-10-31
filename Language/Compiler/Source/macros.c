@@ -288,7 +288,7 @@ static LawResult *lawResult(Typer *typer, RangeNode *type, RangeNode *value)
 static void checkLaws(Typer *typer, RangeNode *specialization, RangeNode *value, RangeNode *at)
 {
     RangeNode *declaration = specialization->resolvedDeclaration;
-    if (!declaration->c || !declaration->c->itemCount) return;
+    if (!declaration->c || !declaration->c->itemCount || abstractType(specialization)) return; /* laws run per use */
     if (!value) {
         if (specialization->found & RangeFlagChecked) return;
         specialization->found |= RangeFlagChecked;

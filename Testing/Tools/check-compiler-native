@@ -1047,18 +1047,30 @@ done
     || fail "Custom's ordinary equals method was not compiled as written"
 [[ "$(text_size "$work_root/demand-loose")" == "$(text_size "$work_root/demand-ignored")" ]] \
     || fail "Custom's equals method was compiled though nothing calls it"
-# Generic functions: a body is checked per instantiation, which the error names.
-reject generic-operation "'+' is not declared on Bool; in sum<T: Bool>, specialized at" \
+# A generic body is checked once, against its constraints, which the error
+# names; a type parameter without one has only the built-in '='.
+reject generic-operation "'+' is not declared on T: T has no constraint, so it has only the built-in '='; in sum<T>" \
     'function sum<T>(let a: T, let b: T): T { return a + b }
-{ switch { sum(a: true, b: false): return 1, default: {} } return sum(a: 1, b: 2) }'
+{ return sum(a: 1, b: 2) }'
+reject generic-unused "generic-unused.range:1:72: error[type]: '+' is not declared on T: T has no constraint, so it has only the built-in '='; in Unused<T>" \
+    'construct Unused<T> { let item: T  function doubled(): T { return item + item } }
+{ return 0 }'
+reject generic-face "'&' is not declared on T: its constraint @integer does not give it; in both<T>" \
+    'function both<T: @integer>(let a: T, let b: T): T { return a & b }
+{ return both(a: 1, b: 2) }'
+reject generic-construction "T cannot be constructed: a type parameter stands for any type its constraint admits, and their members differ; in Box<T>" \
+    'construct Box<T> { let a: T  function made(): T { return T(a) } }
+{ return 0 }'
 reject generic-equality "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare; in same<T: Bag>" \
     "$raw
 function same<T>(let a: T, let b: T): Bool { return a = b }
 { let b: Bag(items: Raw()) switch { same(a: b, b: b): return 1, default: {} } return 0 }"
-# A generic construct's method is checked per specialization too.
-reject generic-construct-operation "generic-construct-operation.range:1:71: error[type]: '+' is not declared on Bool; in Box<T: Bool>, specialized at" \
+# A generic construct's method is checked once too, and not again per use.
+reject generic-construct-operation "generic-construct-operation.range:1:71: error[type]: '+' is not declared on T: T has no constraint, so it has only the built-in '='; in Box<T>" \
     'construct Box<T> { let a: T  let b: T  function total(): T { return a + b } }
-{ let flags: Box<Bool>(a: true, b: false) switch { flags.total(): return 1, default: {} } return Box<Int>(a: 1, b: 2).total() }'
+{ return Box<Int>(a: 1, b: 2).total() }'
+! grep -Fq "specialized at" "$work_root/log" || fail "a body that failed its check once was checked again per use"
+
 reject generic-uninferred "cannot infer type parameter Value of 'nothing'; write it, as in nothing<…>(…)" \
     'function nothing<Value>(): Value? { return .absent }
 { let x: nothing() return 0 }'
@@ -1100,6 +1112,19 @@ reject constraint-either "'Labeled' requires T: @integer | @string; Bool does no
 reject constraint-both "'kept' requires T: @integer & @equatable; Int<bits: 64, signed: true> does not satisfy it" \
     'function kept<T: @integer & @equatable>(let value: T): T { return value }
 { return kept(value: 1) }'
+# A constraint gives T its face: what the macro's #graph statements emit,
+# with #target.name read as T. A face naming what only each target declares,
+# or splicing what depends on it, cannot be given.
+reject constraint-shared "'<' is not declared on T: its constraint @integer | @string does not give it; in less<T>" \
+    'function less<T: @integer | @string>(let a: T, let b: T): Bool { return a < b }
+{ return 0 }'
+reject constraint-foreign "@collection cannot be a constraint: its 'elements' names Element, which each target declares for itself" \
+    'function size<C: @collection>(let c: C): Int { return c.count }
+{ return 0 }'
+reject constraint-splice "@wide cannot be a constraint: a #graph block it always emits splices #w, which depends on the target" \
+    'macro wide(): Construct { let w: 8 #graph { extension #target.name { let width: #w } } }
+function f<T: @wide>(let a: T): T { return a }
+{ return 0 }'
 reject constraint-undeclared "no declaration for macro 'intger' in the loaded sources" \
     'function larger<T: @intger>(let a: T): T { return a }
 { return larger(a: 1) }'
