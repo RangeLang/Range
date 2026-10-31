@@ -72,69 +72,36 @@ of a collection by a shared property is central to heterogeneous collections.
 The path back is generic constraints, as the type of a type slot. See
 "Macros in place of protocols and classes" below.
 
-**Heterogeneous arrays: accepted 2026-10-31, to implement once constraints
-have landed.**
+**Heterogeneous arrays: accepted 2026-10-31.** `Array<@fruit>`, `@fruit`
+values with `@fruit`'s face, `fruit = Apple` with its narrowing, the
+partitioned storage, `remove(at:)` and `slice(at:)` are implemented; see
+Testing/Compiler/Native/MacroValues.range and Partitioned.range. Still to do:
 
-```range
-macro fruit(): Construct {
-    #graph { extension #target.name { function describe(): String { … } } }
-}
-@fruit construct Apple { let color: String }
-@fruit construct Banana { let length: Int }
-
-state fruits: Array<@fruit>()
-fruits.append(value: Apple(color: "red"))
-fruits.append(value: Banana(length: 4))
-fruits.remove(at: 0)                              // the Banana is now at 0
-
-for fruit in fruits {
-    print(message: fruit.describe())              // @fruit's face
-    switch {
-        fruit = Apple & fruit.color = "red": {},  // narrowed to Apple
-        default: {}
-    }
-}
-let apples: fruits.filter { fruit in fruit = Apple }    // Array<Apple>
-```
-
-- The element type is a macro type: `Array<@fruit>` holds values of every
-  type that applies `@fruit`. A `@fruit` value read on its own
-  (`fruits.first()`, a parameter `let fruit: @fruit`) is its type plus its
-  payload, and shows only `@fruit`'s face: what its unconditional `#graph`
-  blocks emit, as for constraints. `<T: @fruit>` stays a constraint, with
-  code per use.
-- Storage: one sub array per type that applies `@fruit`, each holding its
-  elements in array order. The main array keeps the order in one list of
-  `(type, index in its sub array)`, one entry per position. Reading a
-  position is O(1); `remove(at:)` shifts later entries of the order list and
-  of that type's sub array, O(n). A homogeneous array has no order list.
-- It has the face of a normal Array: count, append, iteration, `=`,
-  copy-on-write. `slice` and `remove(at:)` are added for every array.
-- Type test: `fruit = Apple`, and `fruit != Apple`, is a Bool condition. It
-  narrows a stable value for the rest of the `&` chain and the arm, as
-  `.present` does; there is no binding form. `fruit = Apple(color: "red")`
-  stays value equality, false for a Banana.
 - Selection: the narrowing that holds when `filter`'s predicate is true
   becomes the result's element type, so `fruits.filter { fruit in fruit =
   Apple }` is `Array<Apple>` and `names.filter { name in name.present }` is
-  `Array<String>`. When the predicate is exactly a type test, the result can
-  share that type's sub array, copy-on-write. `for fruit in fruits & fruit =
-  Apple { … }` already narrows. This replaces the 2026-09-08 note that
-  `filter` need not read narrowing from a predicate.
-- Needs from constraints: the face of a macro type, and member access
-  through it.
-- Needs from C: `@fruit` values (a type tag over the program's conforming
-  types, plus the payload); the partitioned `@many` layout with the order
-  list; the `=` type test and its narrowing; narrowing from a predicate into
-  a result type; sharing one sub array with another collection's `@many`
-  member, with Range code setting its count and capacity.
+  `Array<String>`. Today the result stays `Array<@fruit>`; `for fruit in
+  fruits & fruit = Apple { … }` narrows already. This replaces the
+  2026-09-08 note that `filter` need not read narrowing from a predicate.
+  - Open: how `filter`'s declaration in `@collection` says it, without C
+    naming `filter`. Candidate: a parameter macro, as in
+    `function filter<Kept>(@narrows(to: Kept) let where: (Element) -> Bool): Array<Kept>`,
+    where Kept is what a true result narrows the closure's parameter to, and
+    Element when it narrows nothing.
+  - When the predicate is exactly a type test, the result can share that
+    type's block, copy-on-write. That needs a slot primitive that hands one
+    type's block to another collection's `@many` member, with Range code
+    setting its count and capacity.
+- Decided while implementing, for George to confirm: a face member whose
+  signature names the face's own type, as `=(let other: #target.name)`
+  does, is not read through a `@fruit` value, since that type differs from
+  value to value. Two `@fruit` values compare with the built-in `=`: the
+  same type, then that type's `=`.
 - Payoff: `#target.members` as `Array<@member>`, which brings back
   `first(named:)`.
 - Open:
   - `fruits.filter(only: Apple)` as a shorter spelling; it passes a type as
     an argument, which Range does nowhere at run time.
-  - How `filter`'s declaration in `@collection` says its result's element
-    is `Element` narrowed by `where`, without C naming `filter`.
   - Whether `shape = .circle` tests an enum's case, ignoring its payload.
   - `{ fruit in fruit = Apple }` reads oddly: a closure's `in` reads like
     `for … in`, singular in plural.
@@ -224,6 +191,18 @@ of a generic declaration would differ between its own run and its law runs.
   whose bound state outlives the call needs lifetimes of what it binds.
 - `let s: make(1)`, where `make` is a closure parameter, is not compiled
   natively ("native values of <unknown> are not implemented").
+- Values of a macro's types (`@fruit`):
+  - only top-level types applying the macro are its types; a nested one,
+    as `Basket.Fig`, is not, and a generic one is reported as not
+    implemented;
+  - a value is narrowed once, so an optional `@fruit` narrowed to its
+    `@fruit` is not narrowed again by `head = Apple`, and `@fruit?` does not
+    compare with an Apple: promotion goes one step;
+  - a face function that changes its receiver is not called through a
+    `@fruit` value: each case's arm holds a copy;
+  - `Array<@fruit>` is not compiled when a type applying `@fruit` holds
+    `@fruit` values itself, and its storage cannot shrink below the
+    elements it holds.
 
 ### Macro gaps
 - `@holding(type: Array<@nominal>)` does not parse.
@@ -248,6 +227,8 @@ of a generic declaration would differ between its own run and its law runs.
     `evalBuiltin` and `evalEffect`.
 - `@literal` patterns are registered by C while reading, before typing.
 - setjmp/longjmp in the resolver and typer.
+- Partitioned `@many` storage grows each type's block by doubling from
+  four slots, a policy C holds.
 
 ### Code generation
 - Jump tables for `switch`.
