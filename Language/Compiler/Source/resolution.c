@@ -332,6 +332,18 @@ int appliesMacro(const RangeNode *declaration, const RangeNode *macro)
     return 0;
 }
 
+/* A construct applying the macro integer literals select is a scalar: C
+ * reads its width and signedness from its generics bits and signed. */
+int scalarDeclaration(const RangeNode *declaration)
+{
+    if (!declaration || declaration->kind != RangeNodeConstruct || !declaration->c) return 0;
+    for (size_t i = 0; i < declaration->c->itemCount; ++i) {
+        const RangeNode *macro = declaration->c->items[i]->resolvedDeclaration;
+        if (macro && macro->kind == RangeNodeMacro && (macro->found & RangeFlagScalar)) return 1;
+    }
+    return 0;
+}
+
 static RangeNode *macroType(Resolver *vm, RangeNode *at, const char *name)
 {
     RangeNode *found = NULL;
@@ -461,7 +473,10 @@ static void registerLiteralDefaults(Resolver *vm)
     for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
         RangeNode *macro = vm->units[u]->items[i];
         macro->literalDefault = NULL;
+        macro->found &= ~RangeFlagScalar;
         if (macro->kind != RangeNodeMacro || !macro->literalPattern || !isLanguageNode(macro)) continue;
+        // The macro integer literals select makes its constructs scalars.
+        if (literalMatch(vm,macro,macro->literalPattern,"0")) macro->found |= RangeFlagScalar;
         for (size_t v = 0; v < vm->count; ++v) for (size_t j = 0; j < vm->units[v]->itemCount; ++j) {
             RangeNode *construct = vm->units[v]->items[j];
             if ((construct->kind != RangeNodeConstruct && construct->kind != RangeNodeEnum)
@@ -1212,29 +1227,27 @@ int appliesBuiltin(const RangeNode *node, const char *name)
 }
 
 /* Builtin operators are C primitives selected by the operator and by the
- * owner's layout: integer arithmetic and comparison on a storage primitive,
+ * owner's layout: integer arithmetic and comparison on a scalar,
  * joining on the bytes primitive, and on an enum without payloads (the
  * condition type, which the type checker confirms) negation and the
  * short-circuit `&` and `|`. */
 static void diagnoseBuiltinOperator(SourceReport *report, RangeNode *owner, RangeNode *item, int bytes)
 {
     const char *op = item->name;
-    int storage = 0, payloads = 0;
-    for (size_t i = 0; i < owner->itemCount; ++i) {
-        if (builtinMember(owner->items[i]) && same(owner->items[i]->name,"storage")) storage = 1;
+    int scalar = scalarDeclaration(owner), payloads = 0;
+    for (size_t i = 0; i < owner->itemCount; ++i)
         if (owner->items[i]->kind == RangeNodeEnumCase && owner->items[i]->itemCount) payloads = 1;
-    }
     int binary = item->itemCount == 1, prefix = item->itemCount == 0;
     int arithmetic = same(op,"+") || same(op,"-") || same(op,"*") || same(op,"/") || same(op,"%");
     int comparison = same(op,"<") || same(op,">") || same(op,"<=") || same(op,">=");
     int tag = owner->kind == RangeNodeEnum && !payloads;
-    if (storage && binary && arithmetic)
-        sourceDiagnostic(report,item,1,"C-implementation","builtin function '%s' is integer arithmetic on the storage primitive in C, trapping when the result does not fit%s",
+    if (scalar && binary && arithmetic)
+        sourceDiagnostic(report,item,1,"C-implementation","builtin function '%s' is integer arithmetic on the scalar in C, trapping when the result does not fit%s",
             op,same(op,"/") || same(op,"%") ? " and on division by zero" : "");
-    else if (storage && binary && comparison)
-        sourceDiagnostic(report,item,1,"C-implementation","builtin function '%s' compares the storage primitive in C, signed or not as the specialization declares",op);
-    else if (storage && prefix && same(op,"-"))
-        sourceDiagnostic(report,item,1,"C-implementation","builtin prefix '-' negates the storage primitive in C, trapping when the result does not fit");
+    else if (scalar && binary && comparison)
+        sourceDiagnostic(report,item,1,"C-implementation","builtin function '%s' compares the scalar in C, signed or not as the specialization declares",op);
+    else if (scalar && prefix && same(op,"-"))
+        sourceDiagnostic(report,item,1,"C-implementation","builtin prefix '-' negates the scalar in C, trapping when the result does not fit");
     else if (bytes && binary && same(op,"+"))
         sourceDiagnostic(report,item,1,"C-implementation","builtin function '+' joins two values' bytes into a new block in C");
     else if (tag && prefix && same(op,"!"))
@@ -1261,6 +1274,9 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
     if (owner->kind == RangeNodeConstruct)
         for (size_t i = 0; i < owner->itemCount; ++i)
             if (rangeNodeDeclaresValue(owner->items[i]->kind) && appliesBuiltin(owner->items[i],"many")) ++slots;
+    if (scalarDeclaration(owner))
+        sourceDiagnostic(report,owner,1,"C-implementation","%s is a scalar in C, as wide as its generic 'bits' and signed as its "
+                         "generic 'signed' say in each specialization",owner->name);
     for (size_t i = 0; i < owner->itemCount; ++i) {
         RangeNode *item = owner->items[i];
         if (item->kind == RangeNodeConstruct || item->kind == RangeNodeEnum) diagnoseBuiltinFunctions(report,item);
@@ -1269,8 +1285,7 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
                              "a macro reading it gets what C provides, whose type is known only at macro time",item->name,owner->name);
         else if (builtinMember(item) && bytes && same(item->name,"count"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin member 'count' is the byte count the bytes primitive holds, read in C");
-        else if (builtinMember(item) && ((!same(item->name,"storage") && !same(item->name,"signed") && !same(item->name,"bytes"))
-            || owner->kind != RangeNodeConstruct))
+        else if (builtinMember(item) && (!same(item->name,"bytes") || owner->kind != RangeNodeConstruct))
             sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin member '%s'",item->name);
         else if (builtinMember(item))
             sourceDiagnostic(report,item,1,"C-implementation","builtin member '%s' is a C layout primitive",item->name);

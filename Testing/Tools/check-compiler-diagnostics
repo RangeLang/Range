@@ -41,7 +41,8 @@ assert language.returncode == 0 and not language.stdout, language.stdout + activ
 assert 'error[' not in active, active
 assert 'no entry block, so no executable was written' in active, active
 for provided in ('@many storage is a C heap block', "builtin function 'resize' is implemented in C",
-                 "builtin member 'storage' is a C layout primitive", "builtin member 'bytes' is a C layout primitive",
+                 "Int is a scalar in C, as wide as its generic 'bits' and signed as its generic 'signed' say",
+                 "builtin member 'bytes' is a C layout primitive",
                  "builtin member 'count' is the byte count the bytes primitive holds", "builtin function 'byte' reads one byte",
                  "'for … in' calls the function applying @iteration at positions 0, 1, 2",
                  "the @iteration law (one per type, one Int parameter, an optional result) is checked in C",

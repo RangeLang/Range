@@ -205,7 +205,7 @@ int main(void)
     assert(!reported(&c,"type","'a' needs an initial value"));
     rangeArenaDestroy(&c.arena);
 
-    // Layout: scalars from their storage width, constructs from members in order.
+    // Layout: scalars from their bits, constructs from members in order.
     compile(&c,"construct Pair { let flag: Bool let count: Int } "
         "construct Bytes { let a: Int<bits: 8> let b: Int<bits: 8> let c: Int<bits: 12> } "
         "construct Loop { let again: Loop } "

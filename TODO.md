@@ -181,7 +181,10 @@ of a generic declaration would differ between its own run and its law runs.
 
 ### C shortcuts to replace
 - Builtins selected by name:
-  - `resize`, `read`, `write`, `byte`, `storage` and `count`;
+  - `resize`, `read`, `write`, `byte`, `bytes` and `count`;
+  - a scalar's generics `bits` and `signed`: a construct applying the macro
+    integer literals select is a scalar, and C reads its width and
+    signedness from those two generics;
   - the labels `lower`, `upper`, `at` and `value`;
   - `print`, `diagnostic` and `warning`, in `nativeCall`, `nativeEffect`,
     `evalBuiltin` and `evalEffect`.

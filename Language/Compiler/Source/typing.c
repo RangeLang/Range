@@ -3589,30 +3589,20 @@ int builtinMember(const RangeNode *member)
 }
 
 /* ---- layout --------------------------------------------------------------
- * A construct with a builtin `storage` member is a scalar exactly that many
- * bits wide; its other members are its meaning, not separate storage. Any
- * other construct lays its members out in order with natural alignment. A
- * @many member is an 8-byte address. C reads widths from the specialization
- * it materialized; it never names a construct or a generic. */
+ * A scalar (see scalarDeclaration) is exactly `bits` wide, signed as `signed`
+ * says, both generics as its specialization holds them; its members are its
+ * meaning, not separate storage. Any other construct lays its members out in
+ * order with natural alignment. A @many member is an 8-byte address. C reads
+ * widths from the specialization it materialized; it never names a construct. */
 
-/* A builtin member's value in a specialization: the generic its value
- * names, as the specialization holds it, or the value written. */
-RangeNode *builtinValue(RangeNode *specialization, RangeNode *member)
+/* A scalar's generic `name` (bits or signed) as a specialization holds it. */
+RangeNode *scalarGeneric(const RangeNode *specialization, const char *name)
 {
-    RangeNode *value = rangeNodeRHS(member), *declared = specialization->resolvedDeclaration->generics;
-    for (size_t i = 0; value && value->kind == RangeNodeName && declared && specialization->values && i < declared->itemCount; ++i)
-        if (same(declared->items[i]->name,value->name)) return specialization->values[i];
-    return value;
-}
-
-static long long storageBits(Typer *typer, RangeNode *specialization, RangeNode *storage)
-{
-    RangeNode *value = builtinValue(specialization,storage);
-    if (!value || value->kind != RangeNodeInteger) {
-        sourceDiagnostic(typer->report,storage,0,"layout","builtin 'storage' requires an integer bit width");
-        return 0;
-    }
-    return value->integer;
+    RangeNode *declared = specialization->resolvedDeclaration->generics;
+    for (size_t i = 0; declared && i < declared->itemCount; ++i)
+        if (declared->items[i]->kind != RangeNodeTypeParameter && same(declared->items[i]->name,name))
+            return specialization->values ? specialization->values[i] : rangeNodeRHS(declared->items[i]);
+    return NULL;
 }
 
 /* Grammar constructs describe C's graph nodes: C provides their values at
@@ -3744,27 +3734,26 @@ int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
     if (declaration->kind == RangeNodeEnum) return layoutVariant(typer,specialization,at);
     size_t size = 0, alignment = 1;
     int known = 1;
-    RangeNode *storage = NULL, *sign = NULL, *bytes = NULL;
-    for (size_t i = 0; i < declaration->itemCount; ++i) {
-        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"storage")) storage = declaration->items[i];
-        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"signed")) sign = declaration->items[i];
+    RangeNode *bytes = NULL;
+    for (size_t i = 0; i < declaration->itemCount; ++i)
         if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"bytes")) bytes = declaration->items[i];
-    }
     if (bytes) {
         // UTF-8 bytes held by C: an address, a byte count, and the block that
         // owns them, or zero for a literal's bytes in the executable. Its
         // other members are its meaning, not separate storage.
         size = 24;
         alignment = 8;
-    } else if (storage) {
-        long long bits = storageBits(typer,specialization,storage);
-        RangeNode *signedness = sign ? builtinValue(specialization,sign) : NULL;
-        if (sign && (!signedness || signedness->kind != RangeNodeBool))
-            sourceDiagnostic(typer->report,sign,0,"layout","builtin 'signed' requires a boolean");
+    } else if (scalarDeclaration(declaration)) {
+        RangeNode *width = scalarGeneric(specialization,"bits"), *signedness = scalarGeneric(specialization,"signed");
+        long long bits = width && width->kind == RangeNodeInteger ? width->integer : 0;
+        if (!width || width->kind != RangeNodeInteger)
+            sourceDiagnostic(typer->report,declaration,0,"layout","%s is a scalar, so its generic 'bits' must be an integer bit width",declaration->name);
+        if (!signedness || signedness->kind != RangeNodeBool)
+            sourceDiagnostic(typer->report,declaration,0,"layout","%s is a scalar, so its generic 'signed' must be a boolean",declaration->name);
         specialization->scalarBits = bits > 0 && bits <= 64 ? (int)bits : 0;
         specialization->scalarSigned = signedness && signedness->kind == RangeNodeBool && signedness->integer;
         if (bits <= 0 || bits > 64) {
-            if (bits > 64) sourceDiagnostic(typer->report,storage,0,"layout","scalars wider than 64 bits are not implemented");
+            if (bits > 64) sourceDiagnostic(typer->report,declaration,0,"layout","scalars wider than 64 bits are not implemented");
             known = 0;
         } else {
             size = (size_t)((bits + 7) / 8);

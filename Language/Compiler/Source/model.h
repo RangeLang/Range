@@ -93,7 +93,8 @@ enum {
                                     * declaration was typed, so later statements may read it */
     RangeFlagShape = 1 << 19,      /* #graph: a shape-only block, emitted before any macro body runs */
     RangeFlagInvalid = 1 << 20,    /* function, macro: typing it reported errors, so it does not run at macro time */
-    RangeFlagRequired = 1 << 21    /* let, state: its type path names a type it requires, not a value */
+    RangeFlagRequired = 1 << 21,   /* let, state: its type path names a type it requires, not a value */
+    RangeFlagScalar = 1 << 22      /* macro: the one integer literals select; a construct applying it is a scalar */
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of
@@ -197,7 +198,7 @@ struct RangeNode {
     };
     size_t size, alignment; /* specialization layout in bytes; layout 0 unknown, 1 computing, 2 done */
     int layout;
-    int scalarBits, scalarSigned; /* from the builtin storage and signed members; 0 bits if not a scalar */
+    int scalarBits, scalarSigned; /* from a scalar's generics bits and signed; 0 bits if not a scalar */
     int variantTag; /* union specialization: bytes of its leading tag; 0 for other layouts */
     unsigned char *memberBoxed; /* union specialization: per payload field, stored out of line */
     size_t *memberOffsets;   /* specialization: byte offset per declaration item, SIZE_MAX if not stored */

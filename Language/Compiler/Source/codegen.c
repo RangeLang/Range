@@ -9,9 +9,9 @@
 #include <string.h>
 
 /* ---- native code -----------------------------------------------------------
- * Lowers typed Range to ARM64. A scalar (a type with a storage primitive) lives
- * in a 64-bit register, sign- or zero-extended by the width its storage and
- * signed primitives declare. Any other value lives in memory and expressions
+ * Lowers typed Range to ARM64. A scalar (see scalarDeclaration) lives in a
+ * 64-bit register, sign- or zero-extended by the width its generics bits and
+ * signed hold. Any other value lives in memory and expressions
  * carry its address. Calling convention, internal to Range: a method receives
  * its receiver's address in x0 and parameters after it; scalars pass by value,
  * aggregates by address (the callee copies); an aggregate result is written to

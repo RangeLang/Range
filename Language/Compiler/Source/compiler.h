@@ -106,8 +106,8 @@ struct EvalFrame;
 
 /* A known value. A literal has no type yet: a member kind's `.value` is the
  * literal its declaration writes, and it takes the type of its use, node
- * being the literal. A scalar is a value of a type with a storage primitive,
- * integer its bits. Text is a value of a type with the bytes primitive, or a
+ * being the literal. A scalar is a value of a scalar type (see
+ * scalarDeclaration), integer its bits. Text is a value of a type with the bytes primitive, or a
  * name C holds; node is the string literal it was written as, or the
  * declaration whose name it is, which a splice writes as a reference to it.
  * A case is a value of an enum: node the case, values its payload; Bool's
@@ -189,6 +189,7 @@ int macroBuiltin(RangeNode *node, const char *name);
 int builtinFunction(const RangeNode *node, const char *name);
 int roleMacro(RangeNode *node);
 int appliesMacro(const RangeNode *declaration, const RangeNode *macro);
+int scalarDeclaration(const RangeNode *declaration);
 void linkGrammarNodes(Resolver *vm, RangeNode *node);
 void resolveLiteralDefaults(Resolver *vm, RangeNode *node);
 int matchLiteralRule(RangeArena *arena, RangeNode **units, size_t count, const char *name, const char *input, int *matched, char *error, size_t errorSize);
@@ -258,7 +259,7 @@ int genericTemplate(const RangeNode *function);
 RangeNode *closureResult(Typer *typer, RangeNode *key, RangeNode *closure);
 RangeNode *iterationFunction(const RangeNode *declaration, size_t *count);
 int builtinMember(const RangeNode *member);
-RangeNode *builtinValue(RangeNode *specialization, RangeNode *member);
+RangeNode *scalarGeneric(const RangeNode *specialization, const char *name);
 int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at);
 RangeNode *equalityFunction(const RangeNode *type);
 void noteWritten(Typer *typer, RangeNode *node);
