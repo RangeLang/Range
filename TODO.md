@@ -62,15 +62,82 @@ an enum with one case per alternative, because `|` is logical or. Reusing
 `||` for types was rejected. Discuss together with `?`.
 
 Constraints are being reopened as logic over types (`@comparable |
-@hashable`), and the heterogeneous-array design uses `Triangle | Circle`. In
-both, `|` in a type reads as logical or: "a value of this type or that one".
-That reverses the reason they were removed.
+@hashable`), where `|` reads as logical or: "this face or that one". That
+reverses the reason they were removed. Heterogeneous arrays do not use them:
+they hold a macro type, `Array<@shape>` (below).
 
 ### `named:` lookup and heterogeneous collections
 `#target.members.first(named: "value")` will come back. Selecting elements
 of a collection by a shared property is central to heterogeneous collections.
 The path back is generic constraints, as the type of a type slot. See
 "Macros in place of protocols and classes" below.
+
+**Heterogeneous arrays: accepted 2026-10-31, to implement once constraints
+have landed.**
+
+```range
+macro shape(): Construct {
+    #graph { extension #target.name { function describe(): String { … } } }
+}
+@shape construct Apple { let color: String }
+@shape construct Banana { let length: Int }
+
+state fruits: Array<@shape>()
+fruits.append(value: Apple(color: "red"))
+fruits.append(value: Banana(length: 4))
+fruits.remove(at: 0)                              // the Banana is now at 0
+
+for fruit in fruits {
+    print(message: fruit.describe())              // @shape's face
+    switch {
+        fruit = Apple & fruit.color = "red": {},  // narrowed to Apple
+        default: {}
+    }
+}
+let apples: fruits.filter { fruit in fruit = Apple }    // Array<Apple>
+```
+
+- The element type is a macro type: `Array<@shape>` holds values of every
+  type that applies `@shape`. A `@shape` value read on its own
+  (`fruits.first()`, a parameter `let fruit: @shape`) is its type plus its
+  payload, and shows only `@shape`'s face: what its unconditional `#graph`
+  blocks emit, as for constraints. `<T: @shape>` stays a constraint, with
+  code per use.
+- Storage: one sub array per type that applies `@shape`, each holding its
+  elements in array order. The main array keeps the order in one list of
+  `(type, index in its sub array)`, one entry per position. Reading a
+  position is O(1); `remove(at:)` shifts later entries of the order list and
+  of that type's sub array, O(n). A homogeneous array has no order list.
+- It has the face of a normal Array: count, append, iteration, `=`,
+  copy-on-write. `slice` and `remove(at:)` are added for every array.
+- Type test: `fruit = Apple`, and `fruit != Apple`, is a Bool condition. It
+  narrows a stable value for the rest of the `&` chain and the arm, as
+  `.present` does; there is no binding form. `fruit = Apple(color: "red")`
+  stays value equality, false for a Banana.
+- Selection: the narrowing that holds when `filter`'s predicate is true
+  becomes the result's element type, so `fruits.filter { fruit in fruit =
+  Apple }` is `Array<Apple>` and `names.filter { name in name.present }` is
+  `Array<String>`. When the predicate is exactly a type test, the result can
+  share that type's sub array, copy-on-write. `for fruit in fruits & fruit =
+  Apple { … }` already narrows. This replaces the 2026-09-08 note that
+  `filter` need not read narrowing from a predicate.
+- Needs from constraints: the face of a macro type, and member access
+  through it.
+- Needs from C: `@shape` values (a type tag over the program's conforming
+  types, plus the payload); the partitioned `@many` layout with the order
+  list; the `=` type test and its narrowing; narrowing from a predicate into
+  a result type; sharing one sub array with another collection's `@many`
+  member, with Range code setting its count and capacity.
+- Payoff: `#target.members` as `Array<@member>`, which brings back
+  `first(named:)`.
+- Open:
+  - `fruits.filter(only: Apple)` as a shorter spelling; it passes a type as
+    an argument, which Range does nowhere at run time.
+  - How `filter`'s declaration in `@collection` says its result's element
+    is `Element` narrowed by `where`, without C naming `filter`.
+  - Whether `shape = .circle` tests an enum's case, ignoring its payload.
+  - `{ fruit in fruit = Apple }` reads oddly: a closure's `in` reads like
+    `for … in`, singular in plural.
 
 ### Macros in place of protocols and classes
 Range has neither protocols nor classes; macros cover conformance checks,
@@ -83,14 +150,8 @@ extension). What protocols and classes give that Range does not have yet:
   Element, which each target declares for itself". Generic code over
   collections writes `Array<T>`. Protocols answer this with associated types;
   Range has no design for it yet.
-- **Values of different types at run time.** This is the heterogeneous array
-  (see `named:` above). Its design is a partitioned array: one concrete buffer
-  per member type, plus one buffer of `(type, index)` references in source
-  order. It has the face of a normal array. `filter(for: Triangle)` returns
-  `Array<Triangle>`, which is that type's buffer. History: 457104e3 TODO.md
-  ("nominally partitioned multibuffer") and e0823c81
-  Development/CompilerFlow/GoalAudit.md ("Collection predicates and explicit
-  type selection", 2026-09-08).
+- **Values of different types at run time.** This is the heterogeneous
+  array, `Array<@shape>`, accepted 2026-10-31 (see `named:` above).
 - **Shared identity.** Range does not nest values that point at each other; it
   references them by ID, as in `let parent: ID?`. No ID type exists in
   Language/Types today. The July 2026 model had
