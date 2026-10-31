@@ -64,7 +64,7 @@ an enum with one case per alternative, because `|` is logical or. Reusing
 Constraints are being reopened as logic over types (`@comparable |
 @hashable`), where `|` reads as logical or: "this face or that one". That
 reverses the reason they were removed. Heterogeneous arrays do not use them:
-they hold a macro type, `Array<@shape>` (below).
+they hold a macro type, `Array<@fruit>` (below).
 
 ### `named:` lookup and heterogeneous collections
 `#target.members.first(named: "value")` will come back. Selecting elements
@@ -76,19 +76,19 @@ The path back is generic constraints, as the type of a type slot. See
 have landed.**
 
 ```range
-macro shape(): Construct {
+macro fruit(): Construct {
     #graph { extension #target.name { function describe(): String { … } } }
 }
-@shape construct Apple { let color: String }
-@shape construct Banana { let length: Int }
+@fruit construct Apple { let color: String }
+@fruit construct Banana { let length: Int }
 
-state fruits: Array<@shape>()
+state fruits: Array<@fruit>()
 fruits.append(value: Apple(color: "red"))
 fruits.append(value: Banana(length: 4))
 fruits.remove(at: 0)                              // the Banana is now at 0
 
 for fruit in fruits {
-    print(message: fruit.describe())              // @shape's face
+    print(message: fruit.describe())              // @fruit's face
     switch {
         fruit = Apple & fruit.color = "red": {},  // narrowed to Apple
         default: {}
@@ -97,13 +97,13 @@ for fruit in fruits {
 let apples: fruits.filter { fruit in fruit = Apple }    // Array<Apple>
 ```
 
-- The element type is a macro type: `Array<@shape>` holds values of every
-  type that applies `@shape`. A `@shape` value read on its own
-  (`fruits.first()`, a parameter `let fruit: @shape`) is its type plus its
-  payload, and shows only `@shape`'s face: what its unconditional `#graph`
-  blocks emit, as for constraints. `<T: @shape>` stays a constraint, with
+- The element type is a macro type: `Array<@fruit>` holds values of every
+  type that applies `@fruit`. A `@fruit` value read on its own
+  (`fruits.first()`, a parameter `let fruit: @fruit`) is its type plus its
+  payload, and shows only `@fruit`'s face: what its unconditional `#graph`
+  blocks emit, as for constraints. `<T: @fruit>` stays a constraint, with
   code per use.
-- Storage: one sub array per type that applies `@shape`, each holding its
+- Storage: one sub array per type that applies `@fruit`, each holding its
   elements in array order. The main array keeps the order in one list of
   `(type, index in its sub array)`, one entry per position. Reading a
   position is O(1); `remove(at:)` shifts later entries of the order list and
@@ -123,7 +123,7 @@ let apples: fruits.filter { fruit in fruit = Apple }    // Array<Apple>
   `filter` need not read narrowing from a predicate.
 - Needs from constraints: the face of a macro type, and member access
   through it.
-- Needs from C: `@shape` values (a type tag over the program's conforming
+- Needs from C: `@fruit` values (a type tag over the program's conforming
   types, plus the payload); the partitioned `@many` layout with the order
   list; the `=` type test and its narrowing; narrowing from a predicate into
   a result type; sharing one sub array with another collection's `@many`
@@ -151,7 +151,7 @@ extension). What protocols and classes give that Range does not have yet:
   collections writes `Array<T>`. Protocols answer this with associated types;
   Range has no design for it yet.
 - **Values of different types at run time.** This is the heterogeneous
-  array, `Array<@shape>`, accepted 2026-10-31 (see `named:` above).
+  array, `Array<@fruit>`, accepted 2026-10-31 (see `named:` above).
 - **Shared identity.** Range does not nest values that point at each other; it
   references them by ID, as in `let parent: ID?`. No ID type exists in
   Language/Types today. The July 2026 model had
