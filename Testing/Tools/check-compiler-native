@@ -139,6 +139,7 @@ done
 ! grep -Fq "warning[unused]" <(grep -v "unused-bindings.range" "$work_root/log") || fail "the language sources bind names they never use"
 run generic-methods 42 "" Testing/Compiler/Native/GenericMethods.range
 run generic-bodies 42 "" Testing/Compiler/Native/GenericBodies.range
+run constraints 42 "" Testing/Compiler/Native/Constraints.range
 # Closures: functions that take them are compiled inline, and so are they.
 run closures 42 "" Testing/Compiler/Native/Closures.range
 [[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"
@@ -1089,6 +1090,19 @@ reject construct-value-required "'Grid' requires generic width" \
 reject generic-method-inference "cannot infer type parameter T of 'get'; write it, as in get<…>(…)" \
     'construct Box { let n: Int  function get<T>(): Int { return n } }
 { return Box(n: 1).get() }'
+# A type given for a constrained type parameter applies the macro types it names.
+reject constraint-unapplied "'larger' requires T: @integer; Bool does not apply @integer" \
+    'function larger<T: @integer>(let a: T, let b: T): T { return a }
+{ let x: larger(a: true, b: false) return 0 }'
+reject constraint-either "'Labeled' requires T: @integer | @string; Bool does not satisfy it" \
+    'construct Labeled<T: @integer | @string> { let value: T }
+{ let b: Labeled<Bool>(value: true) return 0 }'
+reject constraint-both "'kept' requires T: @integer & @equatable; Int<bits: 64, signed: true> does not satisfy it" \
+    'function kept<T: @integer & @equatable>(let value: T): T { return value }
+{ return kept(value: 1) }'
+reject constraint-undeclared "no declaration for macro 'intger' in the loaded sources" \
+    'function larger<T: @intger>(let a: T): T { return a }
+{ return larger(a: 1) }'
 # A closure runs only while the call it is passed to runs: it is an argument
 # for a function-typed parameter, and nothing else holds it.
 take='function count(let xs: Array<Int>, let where: (Int) -> Bool): Int { return 0 }'

@@ -1,0 +1,35 @@
+// A type parameter's constraint names macro types: a type given for it must
+// apply them, where it is declared or through an extension. `&` requires
+// both sides and `|` either.
+function larger<T: @integer>(let a: T, let b: T): T {
+    switch { a > b: return a, default: return b }
+}
+
+construct Labeled<T: @integer | @string> {
+    let value: T
+    let label: String
+}
+
+macro tagged(): Construct {}
+construct Point { let x: Int  let y: Int }
+@tagged extension Point {}
+
+function kept<T: @tagged & @equatable>(let value: T): T { return value }
+
+@equatable
+construct Money {
+    let cents: Int
+    function =(let other: Money): Bool { return cents = other.cents }
+}
+@tagged extension Money {}
+
+{
+    switch { larger(a: 3, b: 7) != 7: return 1, default: {} }
+    let small: Int<bits: 8>(5)
+    switch { larger(a: small, b: 2) != 5: return 2, default: {} }
+    let count: Labeled<Int>(value: 2, label: "count")
+    let name: Labeled<String>(value: "Ada", label: "name")
+    switch { count.value != 2 | name.value != "Ada": return 3, default: {} }
+    switch { kept(value: Money(cents: 4)).cents != 4: return 4, default: {} }
+    return 42
+}

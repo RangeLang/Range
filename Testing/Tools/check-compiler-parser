@@ -39,9 +39,15 @@ grep -Eq '^ +let name=size rhs=' "$work_root/generic-tree" || fail "value generi
 grep -Eq '^ +typeParameter name=Second$' "$work_root/generic-tree" || fail "trailing type parameter is missing"
 printf 'construct Broken<T: Int> {}\n' > "$probe"
 if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
-    fail "value generic without let was accepted"
+    fail "a type as a constraint was accepted"
 fi
-grep -q 'value generics require explicit let' "$work_root/error" || fail "missing let diagnostic changed"
+grep -q "a type parameter's constraint is a macro type, such as @integer" "$work_root/error" || fail "constraint diagnostic changed"
+printf 'construct Listed<T: @integer, @string> {}\n' > "$probe"
+if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
+    fail "a plain list of constraints was accepted"
+fi
+grep -q 'a type parameter takes one constraint; combine macros with & (both faces) or | (what both share)' "$work_root/error" \
+    || fail "constraint list diagnostic changed"
 printf '@builtin("literal") macro spelling(let pattern: String): Macro\n' > "$probe"
 if "$compiler" "$probe" > /dev/null 2> "$work_root/error"; then
     fail "builtin selector argument was accepted"

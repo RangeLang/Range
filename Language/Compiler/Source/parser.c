@@ -1490,9 +1490,60 @@ static RangeNode *parseBlock(RangeParser *parser)
     return node;
 }
 
+/* A type parameter's constraint: macro types joined by `&` (both faces) and
+ * `|` (what both share), `&` binding tighter, as in logic; parentheses
+ * group. Each macro type is a name flagged as one; `&` and `|` are binary
+ * nodes, a holding the left side and b the right. */
+static RangeNode *parseConstraint(RangeParser *parser);
+
+static RangeNode *parseConstraintTerm(RangeParser *parser)
+{
+    if (parserAt(parser, "(")) {
+        parserAdvance(parser);
+        RangeNode *inner = parseConstraint(parser);
+        parserExpect(parser, ")");
+        return inner;
+    }
+    RangeNode *atom = parserNode(parser, RangeNodeName);
+    if (!parserAt(parser, "@") || parserPeek(parser)->kind != RangeTokenName) {
+        parserFail(parser, &parser->current, "a type parameter's constraint is a macro type, such as @integer; "
+                   "a value generic is written with let, as in <let n: 3>");
+        return atom;
+    }
+    parserAdvance(parser);
+    atom->name = parserExpectName(parser);
+    atom->flags = RangeFlagMacroType;
+    return atom;
+}
+
+static RangeNode *parseConstraintJoined(RangeParser *parser, const char *symbol, RangeNode *(*side)(RangeParser *))
+{
+    RangeNode *left = side(parser);
+    while (!parser->failed && parserAt(parser, symbol)) {
+        RangeNode *joined = parserNode(parser, RangeNodeBinary);
+        joined->name = rangeArenaIntern(parser->arena, symbol, strlen(symbol));
+        parserAdvance(parser);
+        joined->a = left;
+        joined->b = side(parser);
+        left = joined;
+    }
+    return left;
+}
+
+static RangeNode *parseConstraintAll(RangeParser *parser)
+{
+    return parseConstraintJoined(parser, "&", parseConstraintTerm);
+}
+
+static RangeNode *parseConstraint(RangeParser *parser)
+{
+    return parseConstraintJoined(parser, "|", parseConstraintAll);
+}
+
 /* A value generic is a Let, `let name: rhs`, whose RHS is a parsed
  * expression: a type requirement, default literal, or ordinary application.
- * A type parameter is a bare name and its own node kind. */
+ * A type parameter is a bare name and its own node kind; its a holds its
+ * constraint, when it has one: `<T: @integer>`. */
 static RangeNode *parseGenericMembers(RangeParser *parser)
 {
     RangeNode *list = parserNode(parser, RangeNodeBlock);
@@ -1509,8 +1560,14 @@ static RangeNode *parseGenericMembers(RangeParser *parser)
             parserFail(parser, &parser->current, "generic members require a single named identity");
         if (!value) {
             member->kind = RangeNodeTypeParameter;
-            if (parserAt(parser, ":"))
-                parserFail(parser, &parser->current, "value generics require explicit let");
+            if (parserAt(parser, ":")) {
+                parserAdvance(parser);
+                member->a = parseConstraint(parser);
+                // `<T: @a, @b>` could mean either combination.
+                if (parserAt(parser, ",") && rangeTokenIs(parserPeek(parser), "@"))
+                    parserFail(parser, &parser->current, "a type parameter takes one constraint; combine macros "
+                               "with & (both faces) or | (what both share)");
+            }
             rangeNodeAppend(parser->arena, list, member);
             parseSeparator(parser, ">", "generic members");
             continue;

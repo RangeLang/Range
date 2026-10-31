@@ -573,6 +573,8 @@ RangeNode **genericSlot(RangeNode *specialization, RangeNode *generic)
     return NULL;
 }
 
+static void checkConstraint(Typer *, RangeNode *, RangeNode *, RangeNode *, RangeNode *);
+
 /* Build the specialization named by generic arguments, in the context whose
  * type parameters the arguments may mention. */
 RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declaration,
@@ -598,6 +600,7 @@ RangeNode *specialize(Typer *typer, SourceScope *scope, RangeNode *declaration,
                 if (!reference || reference->kind != RangeNodeName) { typeError(typer,argument,"generic %s requires a type",generic->name); return NULL; }
                 RangeNode *type = resolveTypeReference(typer,scope,reference->name,reference->generics,reference->flags,context,reference);
                 if (!type) return NULL;
+                checkConstraint(typer,declaration,generic,type,argument);
                 values[i] = type;
                 isDefault = 0;
             } else if (argument) {
@@ -1630,6 +1633,67 @@ static int mentionsParameter(const RangeNode *function, const char *name, const 
     return result && mentionsParameter(function,result->name,result->generics);
 }
 
+/* ---- constraints ----
+ * `<T: @integer>`: T admits the types that apply @integer. `&` admits the
+ * types both sides admit and `|` those either side admits. The macro types
+ * a constraint names are found by name: a macro declared for several target
+ * kinds, such as @equatable on Construct and on Enum, is one macro type. */
+
+static int constraintAtom(const RangeNode *constraint)
+{
+    return constraint->kind == RangeNodeName;
+}
+
+static int constraintJoin(const RangeNode *constraint, const char *symbol)
+{
+    return constraint->kind == RangeNodeBinary && same(constraint->name,symbol);
+}
+
+/* The constraint as written: `@integer & (@a | @b)`. */
+static size_t describeConstraint(char *out, size_t size, const RangeNode *constraint, int grouped)
+{
+    if (constraintAtom(constraint)) return (size_t)snprintf(out,size,"@%s",constraint->name);
+    size_t n = grouped ? (size_t)snprintf(out,size,"(") : 0;
+    int inner = constraintJoin(constraint,"&");
+    if (n < size) n += describeConstraint(out + n,size - n,constraint->a,inner && constraintJoin(constraint->a,"|"));
+    if (n < size) n += (size_t)snprintf(out + n,size - n," %s ",constraint->name);
+    if (n < size) n += describeConstraint(out + n,size - n,constraint->b,inner && constraintJoin(constraint->b,"|"));
+    if (grouped && n < size) n += (size_t)snprintf(out + n,size - n,")");
+    return n;
+}
+
+/* Whether a declaration applies a macro of this name, where it is declared
+ * or through an extension. */
+static int appliesNamed(const RangeNode *declaration, const char *name)
+{
+    for (size_t i = 0; declaration && declaration->c && i < declaration->c->itemCount; ++i) {
+        const RangeNode *macro = declaration->c->items[i]->resolvedDeclaration;
+        if (macro && macro->kind == RangeNodeMacro && same(macro->name,name)) return 1;
+    }
+    return 0;
+}
+
+/* Whether a type is one the constraint admits. */
+static int admits(const RangeNode *constraint, const RangeNode *type)
+{
+    if (constraintJoin(constraint,"&")) return admits(constraint->a,type) && admits(constraint->b,type);
+    if (constraintJoin(constraint,"|")) return admits(constraint->a,type) || admits(constraint->b,type);
+    return type && type->kind == RangeNodeSpecialization && appliesNamed(type->resolvedDeclaration,constraint->name);
+}
+
+/* A type given for a constrained type parameter of `declaration`, at `at`. */
+static void checkConstraint(Typer *typer, RangeNode *declaration, RangeNode *generic, RangeNode *type, RangeNode *at)
+{
+    RangeNode *constraint = generic->kind == RangeNodeTypeParameter ? generic->a : NULL;
+    if (!constraint || !type || admits(constraint,type)) return;
+    char wanted[160], given[160];
+    describeConstraint(wanted,sizeof(wanted),constraint,0);
+    describeType(given,sizeof(given),type);
+    if (constraintAtom(constraint))
+        typeError(typer,at,"'%s' requires %s: %s; %s does not apply %s",declaration->name,generic->name,wanted,given,wanted);
+    else typeError(typer,at,"'%s' requires %s: %s; %s does not satisfy it",declaration->name,generic->name,wanted,given);
+}
+
 /* Bind the type parameters a written type mentions by matching it against a
  * type: `Array<Element>` against Array<Int> binds Element to Int, and
  * `Element?` binds it to the wrapped type, or to a plain value promoted there.
@@ -1809,6 +1873,9 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
                       typeParameterName(function,k),function->name,function->name);
             return NULL;
         }
+    for (size_t i = 0, k = 0; i < function->generics->itemCount; ++i)
+        if (function->generics->items[i]->kind == RangeNodeTypeParameter)
+            checkConstraint(typer,function,function->generics->items[i],bound[k++],call);
     // A value generic is a literal of its declared type, checked by that type's laws.
     for (size_t v = 0; v < valueCount; ++v) {
         RangeNode *generic = valueGeneric(function,v);
