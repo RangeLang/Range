@@ -8,18 +8,18 @@ macro string(): Construct {
     value.present: {}
   }
 
-  // Layout: UTF-8 bytes held by C, as an address, a byte count, and the
-  // reference-counted block that owns them (none for a literal, whose bytes
-  // are in the executable). C reads the bytes primitive; it never names String.
+  // Layout: a construct applying this macro holds UTF-8 bytes in C, as an
+  // address, a byte count, and the reference-counted block that owns them
+  // (none for a literal, whose bytes are in the executable). C finds this
+  // macro as the one string literals select; it never names String.
   //
   // The byte primitives are C builtins selected by name: count is the byte
-  // count the bytes primitive holds, and byte(at:) reads one byte, checking
+  // count C holds, and byte(at:) reads one byte, checking
   // the index against that count. `a + b` calls `+`, which joins the two
   // values' bytes into a new block. `=` is the built-in structural
   // comparison, which compares the bytes.
   #graph {
     extension #target.name {
-      @builtin let bytes
       @builtin let count: Int
       @builtin function byte(let at: Int): Int<bits: 8, signed: false>
       @builtin function +(let other: #target.name): #target.name

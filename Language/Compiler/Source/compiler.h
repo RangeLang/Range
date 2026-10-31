@@ -107,7 +107,7 @@ struct EvalFrame;
 /* A known value. A literal has no type yet: a member kind's `.value` is the
  * literal its declaration writes, and it takes the type of its use, node
  * being the literal. A scalar is a value of a scalar type (see
- * scalarDeclaration), integer its bits. Text is a value of a type with the bytes primitive, or a
+ * scalarDeclaration), integer its bits. Text is a value of a bytes type (see bytesDeclaration), or a
  * name C holds; node is the string literal it was written as, or the
  * declaration whose name it is, which a splice writes as a reference to it.
  * A case is a value of an enum: node the case, values its payload; Bool's
@@ -190,6 +190,7 @@ int builtinFunction(const RangeNode *node, const char *name);
 int roleMacro(RangeNode *node);
 int appliesMacro(const RangeNode *declaration, const RangeNode *macro);
 int scalarDeclaration(const RangeNode *declaration);
+int bytesDeclaration(const RangeNode *declaration);
 void linkGrammarNodes(Resolver *vm, RangeNode *node);
 void resolveLiteralDefaults(Resolver *vm, RangeNode *node);
 int matchLiteralRule(RangeArena *arena, RangeNode **units, size_t count, const char *name, const char *input, int *matched, char *error, size_t errorSize);
@@ -247,7 +248,6 @@ RangeNode *memberType(Typer *typer, RangeNode *declaration, RangeNode *member, R
 int isEnum(const RangeNode *type);
 RangeNode *enumCase(const RangeNode *declaration, const char *name);
 RangeNode *literalCase(const RangeNode *declaration, const RangeNode *literal);
-int bytesDeclaration(const RangeNode *declaration);
 int bytesType(const RangeNode *type);
 RangeNode *operatorFunction(const RangeNode *declaration, const char *symbol, size_t arity);
 int operatorName(const char *name);

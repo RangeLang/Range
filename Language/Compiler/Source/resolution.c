@@ -332,16 +332,29 @@ int appliesMacro(const RangeNode *declaration, const RangeNode *macro)
     return 0;
 }
 
-/* A construct applying the macro integer literals select is a scalar: C
- * reads its width and signedness from its generics bits and signed. */
-int scalarDeclaration(const RangeNode *declaration)
+/* Whether a construct applies the macro some literals select, as flagged. */
+static int appliesLiteralMacro(const RangeNode *declaration, int flag)
 {
     if (!declaration || declaration->kind != RangeNodeConstruct || !declaration->c) return 0;
     for (size_t i = 0; i < declaration->c->itemCount; ++i) {
         const RangeNode *macro = declaration->c->items[i]->resolvedDeclaration;
-        if (macro && macro->kind == RangeNodeMacro && (macro->found & RangeFlagScalar)) return 1;
+        if (macro && macro->kind == RangeNodeMacro && (macro->found & flag)) return 1;
     }
     return 0;
+}
+
+/* A construct applying the macro integer literals select is a scalar: C
+ * reads its width and signedness from its generics bits and signed. */
+int scalarDeclaration(const RangeNode *declaration)
+{
+    return appliesLiteralMacro(declaration,RangeFlagScalar);
+}
+
+/* A construct applying the macro string literals select holds UTF-8 bytes
+ * in C: an address, a byte count, and the block that owns them. */
+int bytesDeclaration(const RangeNode *declaration)
+{
+    return appliesLiteralMacro(declaration,RangeFlagBytes);
 }
 
 static RangeNode *macroType(Resolver *vm, RangeNode *at, const char *name)
@@ -473,10 +486,12 @@ static void registerLiteralDefaults(Resolver *vm)
     for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
         RangeNode *macro = vm->units[u]->items[i];
         macro->literalDefault = NULL;
-        macro->found &= ~RangeFlagScalar;
+        macro->found &= ~(RangeFlagScalar | RangeFlagBytes);
         if (macro->kind != RangeNodeMacro || !macro->literalPattern || !isLanguageNode(macro)) continue;
-        // The macro integer literals select makes its constructs scalars.
+        // The macro integer literals select makes its constructs scalars; the
+        // one string literals select makes its constructs hold bytes.
         if (literalMatch(vm,macro,macro->literalPattern,"0")) macro->found |= RangeFlagScalar;
+        if (literalMatch(vm,macro,macro->literalPattern,"\"\"")) macro->found |= RangeFlagBytes;
         for (size_t v = 0; v < vm->count; ++v) for (size_t j = 0; j < vm->units[v]->itemCount; ++j) {
             RangeNode *construct = vm->units[v]->items[j];
             if ((construct->kind != RangeNodeConstruct && construct->kind != RangeNodeEnum)
@@ -1228,7 +1243,7 @@ int appliesBuiltin(const RangeNode *node, const char *name)
 
 /* Builtin operators are C primitives selected by the operator and by the
  * owner's layout: integer arithmetic and comparison on a scalar,
- * joining on the bytes primitive, and on an enum without payloads (the
+ * joining on bytes, and on an enum without payloads (the
  * condition type, which the type checker confirms) negation and the
  * short-circuit `&` and `|`. */
 static void diagnoseBuiltinOperator(SourceReport *report, RangeNode *owner, RangeNode *item, int bytes)
@@ -1277,6 +1292,9 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
     if (scalarDeclaration(owner))
         sourceDiagnostic(report,owner,1,"C-implementation","%s is a scalar in C, as wide as its generic 'bits' and signed as its "
                          "generic 'signed' say in each specialization",owner->name);
+    if (bytes)
+        sourceDiagnostic(report,owner,1,"C-implementation","%s holds UTF-8 bytes in C: an address, a byte count, and the block "
+                         "that owns them",owner->name);
     for (size_t i = 0; i < owner->itemCount; ++i) {
         RangeNode *item = owner->items[i];
         if (item->kind == RangeNodeConstruct || item->kind == RangeNodeEnum) diagnoseBuiltinFunctions(report,item);
@@ -1284,11 +1302,9 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
             sourceDiagnostic(report,item,1,"C-implementation","builtin member '%s' of %s is C's reflection of the declaration: "
                              "a macro reading it gets what C provides, whose type is known only at macro time",item->name,owner->name);
         else if (builtinMember(item) && bytes && same(item->name,"count"))
-            sourceDiagnostic(report,item,1,"C-implementation","builtin member 'count' is the byte count the bytes primitive holds, read in C");
-        else if (builtinMember(item) && (!same(item->name,"bytes") || owner->kind != RangeNodeConstruct))
-            sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin member '%s'",item->name);
+            sourceDiagnostic(report,item,1,"C-implementation","builtin member 'count' is the byte count C holds, read in C");
         else if (builtinMember(item))
-            sourceDiagnostic(report,item,1,"C-implementation","builtin member '%s' is a C layout primitive",item->name);
+            sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin member '%s'",item->name);
         if (item->kind != RangeNodeFunction || !(item->flags & RangeFlagBuiltin)) continue;
         if (builtinFunction(item,"print"))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function 'print' writes through libSystem write in C, formatting "
@@ -1303,7 +1319,7 @@ void diagnoseBuiltinFunctions(SourceReport *report, RangeNode *owner)
         else if (same(item->name,"="))
             sourceDiagnostic(report,item,1,"C-implementation","builtin function '=' is C's structural comparison: every stored member, or the tag then the payload; it is emitted only for the types a program compares");
         else if (bytes && same(item->name,"byte"))
-            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'byte' reads one byte of the bytes primitive in C, checking the index");
+            sourceDiagnostic(report,item,1,"C-implementation","builtin function 'byte' reads one byte in C, checking the index");
         else if (operatorName(item->name)) diagnoseBuiltinOperator(report,owner,item,bytes);
         else if (!slotPrimitive(item) || owner->kind != RangeNodeConstruct)
             sourceDiagnostic(report,item,0,"not-implemented","no C primitive is implemented for builtin function '%s'",item->name);

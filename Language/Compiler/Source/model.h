@@ -94,7 +94,8 @@ enum {
     RangeFlagShape = 1 << 19,      /* #graph: a shape-only block, emitted before any macro body runs */
     RangeFlagInvalid = 1 << 20,    /* function, macro: typing it reported errors, so it does not run at macro time */
     RangeFlagRequired = 1 << 21,   /* let, state: its type path names a type it requires, not a value */
-    RangeFlagScalar = 1 << 22      /* macro: the one integer literals select; a construct applying it is a scalar */
+    RangeFlagScalar = 1 << 22,     /* macro: the one integer literals select; a construct applying it is a scalar */
+    RangeFlagBytes = 1 << 23       /* macro: the one string literals select; a construct applying it holds bytes */
 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of

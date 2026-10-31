@@ -1148,14 +1148,6 @@ static int contextual(const RangeNode *node)
         || (node->kind == RangeNodeCall && node->a && node->a->kind == RangeNodeCase));
 }
 
-/* A construct whose layout is the bytes primitive: UTF-8 bytes C holds. */
-int bytesDeclaration(const RangeNode *declaration)
-{
-    for (size_t i = 0; declaration && i < declaration->itemCount; ++i)
-        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"bytes")) return 1;
-    return 0;
-}
-
 int bytesType(const RangeNode *type)
 {
     return type && type->kind == RangeNodeSpecialization && bytesDeclaration(type->resolvedDeclaration);
@@ -3734,10 +3726,7 @@ int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
     if (declaration->kind == RangeNodeEnum) return layoutVariant(typer,specialization,at);
     size_t size = 0, alignment = 1;
     int known = 1;
-    RangeNode *bytes = NULL;
-    for (size_t i = 0; i < declaration->itemCount; ++i)
-        if (builtinMember(declaration->items[i]) && same(declaration->items[i]->name,"bytes")) bytes = declaration->items[i];
-    if (bytes) {
+    if (bytesDeclaration(declaration)) {
         // UTF-8 bytes held by C: an address, a byte count, and the block that
         // owns them, or zero for a literal's bytes in the executable. Its
         // other members are its meaning, not separate storage.

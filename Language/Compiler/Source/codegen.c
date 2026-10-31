@@ -1893,7 +1893,7 @@ static RangeNode *nativePlainAddress(Native *native, RangeNode *expr, int *frame
         if (!receiver) return NULL;
         if (member && member->kind == RangeNodeDerived) return nativeDerivedPlace(native,expr,nativeDerived(native,expr,member,receiver),frameSlot);
         if (bytesType(receiver) && member && builtinMember(member) && same(member->name,"count")) {
-            // The byte count is the bytes primitive's second word.
+            // The byte count is the second word of the bytes.
             nativeEmit(native,armAddImm(0,0,8));
             return facts->type;
         }
@@ -2090,7 +2090,7 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         if (expr->itemCount != 1 || !(expr->items[0]->flags & RangeFlagLiteral))
             nativeMissing(native,expr,"runtime string interpolation is not implemented");
         else if (nativeKind(native,type,expr) != NativeAggregate || !bytesType(type))
-            nativeMissing(native,expr,"string literals need a construct with the bytes primitive");
+            nativeMissing(native,expr,"string literals need a construct that holds bytes");
         return NULL;
     case RangeNodeName: case RangeNodeMemberAccess: {
         if (expr->kind == RangeNodeName && facts->resolvedDeclaration && genericSlot(native->key,facts->resolvedDeclaration)) {

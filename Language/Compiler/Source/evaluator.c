@@ -662,7 +662,7 @@ static int evalEffect(Eval *eval, RangeNode *function, RangeValue message, Range
 }
 
 /* A C primitive a function declares with @builtin: on its receiver, one
- * byte of the bytes primitive, or the slot primitives on the receiver's one
+ * byte of a bytes value, or the slot primitives on the receiver's one
  * @many member, whose new slots hold zero values, each new slot a step; at
  * the top level, the effects print, warning, and diagnostic. */
 static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeValue *arguments, RangeNode *at, RangeValue *out)
