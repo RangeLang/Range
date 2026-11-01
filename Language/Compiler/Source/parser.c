@@ -980,7 +980,7 @@ static void parseArm(RangeParser *parser, RangeNode *entry, int value)
 
 /* ---- conditions ------------------------------------------------------
  * A switch arm's condition, and a for filter, may bind names through case
- * tests, `phase.failed(let reason)`. A name is bound only where the result
+ * tests, `phase = .failed(let reason)`. A name is bound only where the result
  * reaches the arm: in a case test that `&` and `|` join into the condition,
  * not inside another expression's operand. It is visible to the right of
  * its test, through `&`, and in the body; to its left the same name is
@@ -1103,7 +1103,7 @@ static void scanCondition(RangeParser *parser, RangeNode *node, int joined, Boun
     }
     case RangeNodeName:
         // Left of the test that binds it, a name is what it names outside:
-        // in `limit > 0 & bound.present(let limit)` the first limit is the outer one.
+        // in `limit > 0 & bound = .present(let limit)` the first limit is the outer one.
         if (bindingsName(bindings, node->name) && !boundNamed(visible, node->name)) node->flags |= RangeFlagEarlier;
         return;
     case RangeNodeClosure: case RangeNodeSwitch:
@@ -1196,7 +1196,7 @@ static RangeNode *parseSwitch(RangeParser *parser, int value)
     parserExpect(parser, "switch");
     if (!parser->failed && !parserAt(parser, "{")) {
         parserFail(parser, &parser->current, "expected '{' after 'switch', found '%.*s'; related: each arm of a switch "
-                   "is a condition, as in switch { phase.loading: … }", (int)parser->current.length, parser->current.text);
+                   "is a condition, as in switch { phase = .loading: … }", (int)parser->current.length, parser->current.text);
         return node;
     }
     return parseConditionSwitch(parser, node, value);
@@ -1258,7 +1258,7 @@ static RangeNode *forSwitch(RangeParser *parser, RangeNode *at, RangeNode *subje
  * sequence's type declares with @iteration, at positions 0, 1, 2, … until it
  * returns absence. The element is a name or `_`. The condition filters the
  * elements, and its case tests bind names for the body:
- * `for s in shapes & s.group(let items) & items.count > 3 { … }`. It never
+ * `for s in shapes & s = .group(let items) & items.count > 3 { … }`. It never
  * ends the loop.
  * The loop is written in ordinary nodes; the names it adds contain a space,
  * so source cannot name them:

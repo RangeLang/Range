@@ -12,7 +12,7 @@ macro counted(): Parameter {
 // A parameter that takes a closure has no nominal type.
 macro closured(): Parameter {
     switch {
-        #target.type.present: diagnostic(message: "'\(#target.name)' must take a closure"),
+        #target.type = .present: diagnostic(message: "'\(#target.name)' must take a closure"),
         default: warning(message: "'\(#target.name)' takes a closure")
     }
 }

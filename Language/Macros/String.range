@@ -4,8 +4,8 @@
 macro string(): Construct {
   let value: #target.members.first(where: { member in member.name = "value" })
   switch {
-    value.absent: diagnostic(message: "Construct must specify value"),
-    value.present: {}
+    value = .absent: diagnostic(message: "Construct must specify value"),
+    value = .present: {}
   }
 
   // Layout: a construct applying this macro holds UTF-8 bytes in C, as an

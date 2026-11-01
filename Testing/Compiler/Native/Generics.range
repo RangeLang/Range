@@ -44,7 +44,7 @@ function repeated<Element>(let value: Element, let times: Int): Array<Element> {
 }
 
 function orDefault<Value>(let maybe: Value?, let fallback: Value): Value {
-    switch { maybe.present(let v): return v, maybe.absent: {} }
+    switch { maybe = .present(let v): return v, maybe = .absent: {} }
     return fallback
 }
 

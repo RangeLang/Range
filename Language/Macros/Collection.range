@@ -99,7 +99,7 @@ macro collection(): Construct {
             // The elements for which `where` is true, in order, as an Array
             // of what a true result narrows them to: `fruits.filter { fruit
             // in fruit = Apple }` is Array<Apple>, `names.filter { name in
-            // name.present }` Array<String>, and a predicate that narrows
+            // name = .present }` Array<String>, and a predicate that narrows
             // nothing keeps Element. Like every function that takes a
             // closure, it is compiled inline where it is called.
             function filter<Kept>(@narrows(to: Kept) let where: (Element) -> Bool): Array<Kept> {
@@ -126,7 +126,7 @@ macro collection(): Construct {
 
             // Whether any element makes `where` true.
             function contains(let where: (Element) -> Bool): Bool {
-                return first(where: where).present
+                return first(where: where) = .present
             }
 
             // Each element transformed, in order, as an Array of the results.

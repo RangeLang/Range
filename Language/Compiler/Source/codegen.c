@@ -3360,7 +3360,7 @@ static void nativeBindMatch(Native *native, NativeMatch *match, int replace)
     }
 }
 
-/* `phase.failed(let reason)`: x0 = 1 when the subject holds the case and
+/* `phase = .failed(let reason)`: x0 = 1 when the subject holds the case and
  * its payload matches, its bindings copied into their slots; else 0. The
  * subject's temporaries end here. */
 static RangeNode *nativeCaseTest(Native *native, RangeNode *test)

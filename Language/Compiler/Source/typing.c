@@ -36,15 +36,17 @@ RangeFacts *found(RangeNode *key, RangeNode *node)
 }
 
 /* ---- case tests ----
- * `phase.loading` and `phase.failed(let reason)` read a case off a value: a
- * Bool, true when the value holds that case. Inside the parentheses each
- * argument is a pattern for its payload field: `let x` binds it, `_` ignores
- * it, `.case(…)` tests it in turn, and any other expression is a value the
- * field must equal, by its type's `=`. Inside an enum's own functions a bare
- * case name tests the receiver. Once the subject is known to hold an enum
- * with that case, typing records beside the member access or call the
- * RangeNodeCaseTest that runs in its place: a the subject, b the case
- * pattern. */
+ * `.` is member access; `=` tests a case. In `phase = .failed(let reason)`
+ * the right side is a form of a case, written `.name` or `Type.name`, and
+ * what the form writes decides what `=` does. A bare case, or a form with
+ * `let`, `_`, or a case in its arguments, is a case test: a Bool, true when
+ * the subject holds that case, whose arguments are patterns for the payload
+ * fields: `let x` binds one, `_` ignores it, and a case tests it in turn. A
+ * form whose arguments are values is a value, compared by `=` as any other
+ * is. `!=` is the negation. Inside an enum's own functions the subject may be
+ * the enum's bare name, which reads the receiver. Typing records a test
+ * beside the comparison as the RangeNodeCaseTest that runs in its place: a
+ * the subject, b the case pattern. */
 
 /* The form of a case an expression writes: `.name` or `Type.name`, with or
  * without arguments. name is NULL for any other expression; path is the type
@@ -143,13 +145,12 @@ static size_t patternMissing(RangeArena *arena, Typer *typer, RangeNode ***rows,
         }
         if (valid && useful(typer,rows,count,q,types,width)) {
             char text[256]; size_t used = 0;
-            // Named subjects read as the condition that tests them: 'value.present & bits.absent'.
+            // Named subjects read as the condition that tests them: 'value = .present & bits = .absent'.
             for (size_t k = 0, written = 0; k < width; ++k) {
                 if (names && !q[k]) continue;
                 const char *subject = names ? names[k] : "";
-                used += (size_t)snprintf(text + used,sizeof(text) > used ? sizeof(text) - used : 0,"%s%s%s%s",
-                                         written++ ? " & " : "",subject,q[k] && (!names || *subject) ? "." : q[k] ? "" : "_",
-                                         q[k] ? q[k]->name : "");
+                used += (size_t)snprintf(text + used,sizeof(text) > used ? sizeof(text) - used : 0,"%s%s%s%s%s",
+                                         written++ ? " & " : "",subject,names ? " = " : "",q[k] ? "." : "_",q[k] ? q[k]->name : "");
             }
             if (length + strlen(text) + 8 < size)
                 length += (size_t)snprintf(missing + length,size - length,"%s'%s'",found ? ", " : "",text);
@@ -197,17 +198,14 @@ static int samePath(RangeNode *key, RangeNode *a, RangeNode *b)
     return a->kind != RangeNodeMemberAccess || samePath(key,a->a,b->a);
 }
 
-/* A subject as written, with the case of each narrowing it reads through:
- * `value.present.bits`. */
+/* A subject as written; the receiver is written with its enum's name. */
 static const char *pathText(RangeArena *arena, RangeNode *key, RangeNode *path)
 {
-    if (path->flags & RangeFlagImplicit) return "";
+    if (path->flags & RangeFlagImplicit) return found(key,path)->type->resolvedDeclaration->name;
     const char *owner = path->kind == RangeNodeMemberAccess ? pathText(arena,key,path->a) : path->kind == RangeNodeEnvironment ? "#" : "";
-    RangeNode *step = found(key,path)->narrowed;
-    const char *narrowed = step ? step->name : "";
-    size_t length = strlen(owner) + strlen(path->name) + strlen(narrowed) + 3;
+    size_t length = strlen(owner) + strlen(path->name) + 2;
     char *text = rangeArenaAllocate(arena,length);
-    snprintf(text,length,"%s%s%s%s%s",owner,path->kind == RangeNodeMemberAccess ? "." : "",path->name,*narrowed ? "." : "",narrowed);
+    snprintf(text,length,"%s%s%s",owner,path->kind == RangeNodeMemberAccess ? "." : "",path->name);
     return text;
 }
 
@@ -2643,13 +2641,6 @@ static RangeNode *typeClosureCall(Typer *typer, SourceScope *scope, RangeNode *c
 
 static void typePattern(Typer *, SourceScope *, RangeNode *, RangeNode *, RangeNode *);
 
-/* Inside an enum's own functions, a bare name that is one of its cases
- * tests the receiver; the enum declares no member of that name. */
-static int receiverCase(Typer *typer, RangeNode *context, const char *name)
-{
-    return typer->function && typer->function->typeName && isEnum(context) && enumCase(context->resolvedDeclaration,name);
-}
-
 /* A name bound on the right of `|` stands for the left side's: same type. */
 static void typeSharedBindings(Typer *typer, RangeNode *pattern)
 {
@@ -2669,7 +2660,7 @@ static void typeSharedBindings(Typer *typer, RangeNode *pattern)
 
 /* ---- narrowing ----
  * A test of a stable optional value for its present case, with no pattern,
- * as in `manager.present`, narrows the value: to the right of the test in
+ * as in `manager = .present`, narrows the value: to the right of the test in
  * the same `&` chain, and in the arm's body or the loop's, the value is the
  * payload of the present case, read with no check. A stable value is a let,
  * a parameter, a #target value, or a member path of one; a state can
@@ -2819,6 +2810,13 @@ static void typeArguments(Typer *typer, SourceScope *scope, RangeNode *site, Ran
     }
 }
 
+/* `.` reads a member, and a case is none. */
+static void caseOffValue(Typer *typer, RangeNode *access, RangeNode *type)
+{
+    char t[160]; describeType(t,sizeof(t),type);
+    typeError(typer,access,"%s has no member '%s'; '%s' is a case, tested with =",t,access->name,access->name);
+}
+
 static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *expected, RangeNode *context)
 {
     RangeNode *callee = call->a, *function = NULL, *receiver = NULL;
@@ -2860,10 +2858,6 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
     if (callee->kind == RangeNodeName) {
         // `where(element)` calls the closure a function-typed parameter holds.
         RangeNode *value = sourceLookup(typer->report,scope,callee->name,0);
-        if (!value && receiverCase(typer,context,callee->name)) {
-            RangeNode *test = finding(typer,call)->lowered = caseTest(typer,scope,call,receiverSubject(typer->report->arena,callee),(CaseForm){callee->name,call,NULL},context);
-            return typeCaseTest(typer,scope,test,context);
-        }
         if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(found(typer->key,value)->type))
             return typeClosureCall(typer,scope,call,value,context);
         function = lookupFunction(typer->report,scope,callee->name);
@@ -2906,13 +2900,9 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
             return typer->deferred;
         }
         if (macroUnion(receiver) && callee->name) return typeFaceRead(typer,scope,callee,call,receiver,context);
-        if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
-            // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
-            RangeNode *test = finding(typer,call)->lowered = caseTest(typer,scope,call,callee->a,(CaseForm){callee->name,call,NULL},context);
-            return typeCaseTest(typer,scope,test,context);
-        }
         // A member with no name is one `for … in` resolved by its @iteration role.
         function = callee->name ? findCalledFunction(receiver->resolvedDeclaration,callee->name,call) : found(typer->key,callee)->resolvedDeclaration;
+        if (!function && isEnum(receiver) && enumCase(receiver->resolvedDeclaration,callee->name)) { caseOffValue(typer,callee,receiver); return NULL; }
         if (!function) {
             char type[160], why[200]; describeType(type,sizeof(type),receiver); faceReason(why,sizeof(why),receiver);
             typeError(typer,callee,"%s has no function '%s'%s",type,callee->name,why);
@@ -3392,11 +3382,6 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             typeError(typer,expr,"'%s' is read before its declaration",expr->name);
             break;
         }
-        if (!declaration && receiverCase(typer,context,expr->name)) {
-            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer,scope,expr,receiverSubject(typer->report->arena,expr),(CaseForm){expr->name,NULL,NULL},context);
-            type = typeCaseTest(typer,scope,test,context);
-            break;
-        }
         if (!declaration) break;
         if (rangeNodeDeclaresValue(declaration->kind) || declaration->kind == RangeNodeParameter) {
             if (declaration->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
@@ -3488,21 +3473,16 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         if (isMacroType(receiver)) { type = macroTypeMember(typer,receiver,expr->name,expr); break; }
         if (macroUnion(receiver)) { type = typeFaceRead(typer,scope,expr,NULL,receiver,context); break; }
         RangeNode *declaration = receiver->resolvedDeclaration;
-        if (isEnum(receiver) && enumCase(declaration,expr->name)) {
-            // `phase.loading`: whether phase holds the case.
-            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer,scope,expr,expr->a,(CaseForm){expr->name,NULL,NULL},context);
-            type = typeCaseTest(typer,scope,test,context);
-            break;
-        }
         RangeNode *member = findMember(declaration,expr->name);
         finding(typer,expr)->resolvedDeclaration = member;
         if (member) {
             if (member->flags & RangeFlagMany) typeError(typer,expr,"'%s' holds @many storage and is not a value",expr->name);
             else type = memberType(typer,declaration,member,receiver);
         } else if (findFunction(declaration,expr->name)) typeError(typer,expr,"'%s.%s' is a function; call it",declaration->name,expr->name);
+        else if (isEnum(receiver) && enumCase(declaration,expr->name)) caseOffValue(typer,expr,receiver);
         else {
             char t[160], why[200]; describeType(t,sizeof(t),receiver); faceReason(why,sizeof(why),receiver);
-            typeError(typer,expr,"%s has no %s '%s'%s",t,isEnum(receiver) ? "case" : "member",expr->name,why);
+            typeError(typer,expr,"%s has no member '%s'%s",t,expr->name,why);
         }
         break;
     }

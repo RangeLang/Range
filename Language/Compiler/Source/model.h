@@ -58,7 +58,7 @@ typedef enum {
     RangeNodeBreak,
     RangeNodeContinue,
     RangeNodeFunctionType,   /* (A, B) -> R: items are the parameter types, a the result */
-    RangeNodeCaseTest,       /* what typing lowers phase.failed(let reason) to, beside it: a Bool, whether
+    RangeNodeCaseTest,       /* what typing lowers phase = .failed(let reason) to, beside it: a Bool, whether
                               * the value a holds the case its pattern b names; b's `let` arguments bind
                               * the payload fields */
     RangeNodeKindCount
@@ -78,7 +78,7 @@ enum {
                                     * parameter types as arguments and the result as a */
     RangeFlagImplicit = 1 << 15,   /* switch arm: a default the compiler wrote for a lowering;
                                     * binding: one a lowering wrote, not a pattern's `let`;
-                                    * name: the receiver a bare case name tests */
+                                    * name: the receiver a case test reads */
     RangeFlagEarlier = 1 << 16     /* name: read to the left of the case test that binds the same name
                                     * in its condition, so it names what it names outside the condition */
 };

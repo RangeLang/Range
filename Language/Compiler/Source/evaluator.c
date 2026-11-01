@@ -1158,14 +1158,11 @@ static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, Range
         *out = (RangeValue){.kind=ValueScalar,.integer=(long long)receiver.length,
             .type=memberType(eval->typer,declaration,findMember(declaration,"count"),receiver.type)};
         return EvalNormal;
-    case ValueCase:
-        if (!enumCase(declaration,expr->name)) break;
-        *out = evalBool(eval,receiver.node == enumCase(declaration,expr->name));
-        return EvalNormal;
     default: break;
     }
     char type[160]; describeType(type,sizeof(type),receiver.type);
-    return evalFail(eval,expr,"%s has no member '%s'",type,expr->name);
+    return evalFail(eval,expr,"%s has no member '%s'%s",type,expr->name,
+                    receiver.kind == ValueCase && enumCase(declaration,expr->name) ? "; it is a case, tested with =" : "");
 }
 
 /* Whether `pattern` matches `value`; what it binds joins the frame. A name

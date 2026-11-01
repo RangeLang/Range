@@ -16,8 +16,8 @@ construct Message {
     switch { big.count != 2 | big.read(at: 1) != 6: return 1, default: {} }
     let none: xs.filter { x in x > 100 }.isEmpty()
     switch { !none: return 2, default: {} }
-    switch { xs.first(where: { x in x > 5 }).present(8): {}, default: return 3 }
-    switch { xs.first(where: { x in x > 50 }).absent: {}, default: return 4 }
+    switch { xs.first(where: { x in x > 5 }) = .present(8): {}, default: return 3 }
+    switch { xs.first(where: { x in x > 50 }) = .absent: {}, default: return 4 }
     switch { xs.contains(where: { x in x = 6 }): {}, default: return 5 }
     let doubled: xs.map { x in x * 2 }
     switch { doubled.read(at: 1) != 16: return 6, default: {} }

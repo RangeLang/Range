@@ -4,8 +4,8 @@ enum Direction { case north, south }
 
 function classify(let direction: Direction): Int {
     switch {
-    direction.north: return 40,
-    direction.south: return 9
+    direction = .north: return 40,
+    direction = .south: return 9
     }
 }
 

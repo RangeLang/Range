@@ -24,7 +24,7 @@ construct Pair<T> {
 enum Either<L: @integer, R> {
     case left(L), right(R)
     function sum(let other: L): L {
-        return switch { left(let v): v + other, default: other }
+        return switch { Either = .left(let v): v + other, default: other }
     }
 }
 

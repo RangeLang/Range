@@ -15,9 +15,9 @@ construct Light {
 
     function next(): Color {
         switch {
-        color.red: return .green,
-        color.green: return Color.amber,
-        color.amber: return .red
+        color = .red: return .green,
+        color = .green: return Color.amber,
+        color = .amber: return .red
         }
     }
 
@@ -32,9 +32,9 @@ construct Holder {
 
 function name(let c: Light.Color): Int {
     switch {
-    c.red: return 1,
-    c.amber: return 2,
-    c.green: return 3
+    c = .red: return 1,
+    c = .amber: return 2,
+    c = .green: return 3
     }
 }
 
@@ -79,18 +79,18 @@ enum Statement {
 
 function evaluate(let e: Expr): Int {
     switch {
-    e.number(let n): return n,
-    e.add(let pair): return evaluate(e: pair.left) + evaluate(e: pair.right),
-    e.negate(let inner): return -evaluate(e: inner),
-    e.scaled(by: .double, let inner): return 2 * evaluate(e: inner),
-    e.scaled(by: .triple, let inner): return 3 * evaluate(e: inner)
+    e = .number(let n): return n,
+    e = .add(let pair): return evaluate(e: pair.left) + evaluate(e: pair.right),
+    e = .negate(let inner): return -evaluate(e: inner),
+    e = .scaled(by: .double, let inner): return 2 * evaluate(e: inner),
+    e = .scaled(by: .triple, let inner): return 3 * evaluate(e: inner)
     }
 }
 
 function run(let s: Statement): Int {
     switch {
-    s.print(let e): return evaluate(e: e),
-    s.block(let statements): {
+    s = .print(let e): return evaluate(e: e),
+    s = .block(let statements): {
         state total: 0
         state i: 0
         while i < statements.count {

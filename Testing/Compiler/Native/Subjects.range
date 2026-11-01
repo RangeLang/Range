@@ -10,27 +10,27 @@ enum Shape { case circle(Int), square(Int), group(Array<Int>), nothing }
 // Two subjects, alternatives joined by `|`.
 function same(let a: Power, let b: Power): Int {
     switch {
-        a.on & b.on | a.off & b.off: return 1,
-        a.on & b.off: return 2,
-        a.off & b.on: return 3
+        a = .on & b = .on | a = .off & b = .off: return 1,
+        a = .on & b = .off: return 2,
+        a = .off & b = .on: return 3
     }
 }
 
 // A group: (d.north | d.south) & p.on is two alternatives.
 function axis(let d: Direction, let p: Power): Int {
     return switch {
-        (d.north | d.south) & p.on: 1,
-        (d.east | d.west) & p.on: 2,
-        p.off: 0
+        (d = .north | d = .south) & p = .on: 1,
+        (d = .east | d = .west) & p = .on: 2,
+        p = .off: 0
     }
 }
 
 // Three subjects, some untested in an arm, and bindings from several.
 function mix(let a: Int?, let b: Int?, let c: Power): Int {
     return switch {
-        a.present(let x) & b.present(let y) & c.on: x + y,
-        a.present(let x) & c.off: x,
-        a.absent & b.present(let y): 100 + y,
+        a = .present(let x) & b = .present(let y) & c = .on: x + y,
+        a = .present(let x) & c = .off: x,
+        a = .absent & b = .present(let y): 100 + y,
         default: -1
     }
 }
@@ -39,7 +39,7 @@ function mix(let a: Int?, let b: Int?, let c: Power): Int {
 // `d.north & p.on | d.south & p.off & ready` it guards the second.
 function perRow(let d: Direction, let p: Power, let ready: Bool): Int {
     switch {
-        d.north & p.on | d.south & p.off & ready: return 1,
+        d = .north & p = .on | d = .south & p = .off & ready: return 1,
         default: return 0
     }
 }
@@ -47,7 +47,7 @@ function perRow(let d: Direction, let p: Power, let ready: Bool): Int {
 // Parenthesized alternatives share the guard after them.
 function wholeArm(let d: Direction, let p: Power, let ready: Bool): Int {
     switch {
-        (d.north & p.on | d.south & p.off) & ready: return 1,
+        (d = .north & p = .on | d = .south & p = .off) & ready: return 1,
         default: return 0
     }
 }
@@ -56,18 +56,18 @@ function wholeArm(let d: Direction, let p: Power, let ready: Bool): Int {
 // left, and guards join with `&`.
 function single(let o: Int?): Int {
     return switch {
-        o.present(let x) & x > 3 & x < 10: 1,
-        o.present(let x) & (x = 0 | x = 1): 2,
-        o.present: 3,
-        o.absent: 4
+        o = .present(let x) & x > 3 & x < 10: 1,
+        o = .present(let x) & (x = 0 | x = 1): 2,
+        o = .present: 3,
+        o = .absent: 4
     }
 }
 
 // Alternatives that bind the same names, with a guard on each.
 function measure(let s: Shape, let limit: Int): Int {
     return switch {
-        s.circle(let n) & limit < 10 | s.square(let n) & limit < 10 & n > 0: n,
-        s.group(let items) & items.count > 2: 1000,
+        s = .circle(let n) & limit < 10 | s = .square(let n) & limit < 10 & n > 0: n,
+        s = .group(let items) & items.count > 2: 1000,
         default: 0
     }
 }
@@ -91,9 +91,9 @@ function agrees(let flag: Bool, let a: Bool, let b: Bool): Int {
 // Exhaustive over combinations without a default.
 function both(let a: Bool, let b: Bool): Int {
     return switch {
-        a.true & b.true: 3,
-        a.true & b.false: 2,
-        a.false: 0
+        a = .true & b = .true: 3,
+        a = .true & b = .false: 2,
+        a = .false: 0
     }
 }
 
@@ -129,7 +129,7 @@ function both(let a: Bool, let b: Bool): Int {
     shapes.append(value: .group(Array<Int>()))
     shapes.append(value: .group(xs))
     state counted: 0
-    for s in shapes & s.group(let items) & items.count > 2 & counted < 100 { counted: counted + items.count }
+    for s in shapes & s = .group(let items) & items.count > 2 & counted < 100 { counted: counted + items.count }
     switch { counted != 6: return 13, default: {} }
     state odd: 0
     for x in xs & (x = 1 | x = 3) { odd: odd + x }

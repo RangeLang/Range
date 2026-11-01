@@ -16,8 +16,8 @@ function find(let xs: Array<Int>, let wanted: Int): Int? {
 
 function describe(let maybe: Int?): Int {
     switch {
-        maybe.present(let value): return value,
-        maybe.absent: return -1
+        maybe = .present(let value): return value,
+        maybe = .absent: return -1
     }
     return -2
 }
@@ -28,25 +28,25 @@ function describe(let maybe: Int?): Int {
     xs.append(value: 9)
     let nine: find(xs: xs, wanted: 9)
     switch {
-        nine.present(let index): switch { index != 1: return 1, default: {} },
-        nine.absent: return 2
+        nine = .present(let index): switch { index != 1: return 1, default: {} },
+        nine = .absent: return 2
     }
-    switch { find(xs: xs, wanted: 4).present: return 3, default: {} }
+    switch { find(xs: xs, wanted: 4) = .present: return 3, default: {} }
     let boss: Person(age: 40, manager: .absent)
     let worker: Person(age: 30, manager: .present(1))
     switch { describe(maybe: boss.manager) != -1: return 4, default: {} }
     switch { describe(maybe: worker.manager) != 1: return 5, default: {} }
     let found: find(xs: xs, wanted: 5)
     switch {
-        found.present: switch { found != 0: return 6, default: {} },
-        found.absent: return 7
+        found = .present: switch { found != 0: return 6, default: {} },
+        found = .absent: return 7
     }
     state names: Array<String?>()
     names.append(value: .present("Ada"))
     names.append(value: .absent)
     let second: names.read(at: 1)
     switch {
-    second.present: return 8,
-    second.absent: return 42
+    second = .present: return 8,
+    second = .absent: return 42
     }
 }

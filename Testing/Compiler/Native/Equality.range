@@ -13,8 +13,8 @@ enum Tree {
 enum Wrapper { case token(Token), none }
 function classify(let t: Token): Int {
     switch {
-    t.pair(1, 2): return 12,
-    t.end: return 0,
+    t = .pair(1, 2): return 12,
+    t = .end: return 0,
     default: return -1
     }
 }

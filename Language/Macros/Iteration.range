@@ -10,7 +10,7 @@
 // calls the function at positions 0, 1, 2, …; on absence the loop ends.
 // Otherwise the element (a name or `_`) is filtered by the condition (it
 // never ends the loop; its case tests bind names for the body, as in
-// `for s in shapes & s.group(let items)`), the body runs for a match, and
+// `for s in shapes & s = .group(let items)`), the body runs for a match, and
 // the position advances by one, also on `continue`. C writes the loop as
 // switches and finds the function by this role; it never names the function,
 // its parameter, or the type.

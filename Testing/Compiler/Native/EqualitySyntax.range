@@ -17,7 +17,7 @@ function bucket(let n: Int): Int {
     }
 }
 function level(let s: Shade): Int {
-    let l: switch { s.dark(let l): l, default: { return -1 } }
+    let l: switch { s = .dark(let l): l, default: { return -1 } }
     return l
 }
 {
@@ -48,8 +48,8 @@ function level(let s: Shade): Int {
     switch { a < b = true: return 10, default: {} }
     // Case tests, payload bindings, and arm bodies next to `=`.
     let maybe: Int?.present(3)
-    switch { maybe.present(let m): switch { !((m = a)): return 11, default: {} }, maybe.absent: return 12 }
-    switch { maybe.present(let m): x: m = 3, default: return 13 }
+    switch { maybe = .present(let m): switch { !((m = a)): return 11, default: {} }, maybe = .absent: return 12 }
+    switch { maybe = .present(let m): x: m = 3, default: return 13 }
     switch { !x: return 14, default: {} }
     switch { level(s: .dark(level: 2)) != 2 | level(s: .light) != -1: return 15, default: {} }
     switch { bucket(n: 0) != 0 | bucket(n: 1) != 1 | bucket(n: 4) != 2 | bucket(n: 5) != 3: return 16, default: {} }

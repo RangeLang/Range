@@ -6,16 +6,16 @@ enum Direction {
 
 function horizontal(let d: Direction): Bool {
     switch {
-    d.east | d.west: return true,
-    d.north | d.south: return false
+    d = .east | d = .west: return true,
+    d = .north | d = .south: return false
     }
 }
 
 function score(let d: Direction): Int {
     state total: 0
     switch {
-    d.north: total: 1,
-    d.east: total: 2,
+    d = .north: total: 1,
+    d = .east: total: 2,
     default: total: 10
     }
     return total

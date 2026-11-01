@@ -18,8 +18,8 @@ function build(let depth: Int, let start: Int): Tree {
 
 function sum(let tree: Tree): Int {
     switch {
-    tree.leaf(let value): return value,
-    tree.node(let left, let right): return sum(tree: left) + sum(tree: right)
+    tree = .leaf(let value): return value,
+    tree = .node(let left, let right): return sum(tree: left) + sum(tree: right)
     }
 }
 
@@ -29,8 +29,8 @@ function count(let list: List): Int {
     state going: true
     while going {
         switch {
-        rest.end: going: false,
-        rest.link(let value, let next): {
+        rest = .end: going: false,
+        rest = .link(let value, let next): {
             total: total + value
             rest: next
         }

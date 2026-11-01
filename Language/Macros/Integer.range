@@ -1,7 +1,7 @@
 @literal(pattern: "[0-9]+")
 macro integer(): Construct {
   // The law runs per specialization and per supplied literal, so the stored
-  // value and bits are the specialized ones here. Each `.present` test narrows its
+  // value and bits are the specialized ones here. Each `= .present` test narrows its
   // value to the declaration it holds, for the rest of the arm. An arm with a
   // guard covers nothing for the arms after it, so the third arm accepts
   // every value that passed.
@@ -9,14 +9,14 @@ macro integer(): Construct {
   let bits: #target.generics.first(where: { generic in generic.name = "bits" })
   let signed: #target.generics.first(where: { generic in generic.name = "signed" })
   switch {
-      stored.present & bits.present & signed.present & bits.value <= 0:
+      stored = .present & bits = .present & signed = .present & bits.value <= 0:
           diagnostic(message: "Integer bits must be positive"),
 
-      stored.present & bits.present & signed.present &
+      stored = .present & bits = .present & signed = .present &
       !integerValueFits(value: stored.value, bits: bits.value, signed: signed.value):
           diagnostic(message: "Integer value does not fit the declared bits and signedness"),
 
-      stored.present & bits.present & signed.present: {},
+      stored = .present & bits = .present & signed = .present: {},
       default: diagnostic(message: "Construct must specify value, bits and signed")
   }
 

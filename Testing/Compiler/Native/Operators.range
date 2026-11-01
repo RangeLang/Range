@@ -17,14 +17,14 @@ enum Level {
 
     function <(let other: Level): Bool {
         switch {
-        low: return other = .high,
-        high: return false
+        Level = .low: return other = .high,
+        Level = .high: return false
         }
     }
     function !(): Level {
         switch {
-        low: return .high,
-        high: return .low
+        Level = .low: return .high,
+        Level = .high: return .low
         }
     }
 }

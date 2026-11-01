@@ -3,9 +3,9 @@ macro boolean(): Enum {
   let no: #target.cases.first(where: { entry in entry.name = "false" })
   let yes: #target.cases.first(where: { entry in entry.name = "true" })
   switch {
-    no.present & yes.present: {},
-    no.absent: diagnostic(message: "Enum must declare case false"),
-    yes.absent: diagnostic(message: "Enum must declare case true")
+    no = .present & yes = .present: {},
+    no = .absent: diagnostic(message: "Enum must declare case false"),
+    yes = .absent: diagnostic(message: "Enum must declare case true")
   }
 
   // Layout: an enum without payloads is its tag, so the tag is the storage.

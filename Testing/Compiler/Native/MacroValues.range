@@ -89,7 +89,7 @@ function largest(let a: Apple, let b: Banana): @fruit {
     for fruit in fruits & fruit = Apple { colors: colors + fruit.color.count }
     switch { colors != 8: return 14, default: {} }
     let head: fruits.first()
-    switch { head.present & head = apple & head = Apple: {}, default: return 15 }
+    switch { head = .present & head = apple & head = Apple: {}, default: return 15 }
     // A function without a result is called on whichever type the value holds.
     big.show()
     print(message: "fruits \(fruits.count)")

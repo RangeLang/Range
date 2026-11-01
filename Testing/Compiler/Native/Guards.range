@@ -12,17 +12,17 @@ function first(let xs: Array<Int>): Int? {
 }
 
 function double(let maybe: Int?): Int {
-    let n: switch { maybe.present(let n): n, maybe.absent: { return -1 } }
+    let n: switch { maybe = .present(let n): n, maybe = .absent: { return -1 } }
     return n * 2
 }
 
 function unwrap(let maybe: Int?): Int {
-    let value: switch { maybe.present(let value): value, maybe.absent: { return 0 } }
+    let value: switch { maybe = .present(let value): value, maybe = .absent: { return 0 } }
     return value
 }
 
 function number(let t: Token): Int {
-    let n: switch { t.value(let n): n, default: { return -1 } }
+    let n: switch { t = .value(let n): n, default: { return -1 } }
     let twice: n + n
     return twice
 }
@@ -60,13 +60,13 @@ function longest(let groups: Array<Array<Int>>): Int {
 
 {
     state xs: Array<Int>()
-    switch { first(xs: xs).present: return 1, default: {} }
+    switch { first(xs: xs) = .present: return 1, default: {} }
     xs.append(value: 1)
     xs.append(value: 2)
     xs.append(value: 3)
     xs.append(value: 4)
     xs.append(value: 5)
-    let f: switch { first(xs: xs).present(let f): f, default: { return 2 } }
+    let f: switch { first(xs: xs) = .present(let f): f, default: { return 2 } }
     switch { f != 1: return 3, default: {} }
     switch { double(maybe: .present(4)) != 8 | double(maybe: .absent) != -1: return 4, default: {} }
     switch { unwrap(maybe: .present(7)) != 7 | unwrap(maybe: .absent) != 0: return 5, default: {} }

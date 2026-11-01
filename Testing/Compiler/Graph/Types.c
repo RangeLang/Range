@@ -172,7 +172,7 @@ int main(void)
     compile(&c,"macro sized(): Construct { "
         "let extra: #target.members.first(where: { member in member.name = \"extra\" }) "
         "let n: #target.generics.first(where: { generic in generic.name = \"n\" }) "
-        "switch { extra.present: diagnostic(message: \"sees what it emits\"), n.present & n.value > 2: diagnostic(message: \"n is too big\"), default: {} } "
+        "switch { extra = .present: diagnostic(message: \"sees what it emits\"), n = .present & n.value > 2: diagnostic(message: \"n is too big\"), default: {} } "
         "let zero: 0 #graph { extension #target.name { let extra: #zero } } } "
         "@sized construct Pair<T, let n: 1> { let first: T } "
         "function pairs(): Int { let small: Pair<Int, n: 2>(first: 1) let big: Pair<Bool, n: 3>(first: true) return small.extra + big.extra }");
@@ -258,18 +258,18 @@ int main(void)
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
-    // A case test runs as the test typing records beside the member access or call.
+    // A case test runs as the test typing records beside the comparison.
     compile(&c,"enum Phase { case idle case failed(reason: Int) "
-        "function quiet(): Bool { return idle | failed(reason: 3) } } "
-        "function check(let p: Phase): Int { switch { p.failed(let r) & r > 0: return r, p.idle | p.quiet(): return 0, default: {} } return 1 }");
+        "function quiet(): Bool { return Phase = .idle | Phase = .failed(reason: 3) } } "
+        "function check(let p: Phase): Int { switch { p = .failed(let r) & r > 0: return r, p = .idle | p.quiet(): return 0, default: {} } return 1 }");
     assert(!errorsIn(&c,"type"));
     RangeNode *test = named(c.project,"check")->a->items[0]->items[0]->items[0]->b->a;
-    assert(test->kind == RangeNodeCall && test->lowered && test->lowered->kind == RangeNodeCaseTest);
+    assert(test->kind == RangeNodeBinary && test->lowered && test->lowered->kind == RangeNodeCaseTest);
     assert(!writtenChanged(c.typer,"Project.range"));
     rangeArenaDestroy(&c.arena);
 
     // A narrowed read keeps its written form; the present case it reads through is recorded beside it.
-    compile(&c,"function sizes(let a: Int?, let b: Int?): Int { switch { a.present & b.present: return a + b, default: {} } return 0 }");
+    compile(&c,"function sizes(let a: Int?, let b: Int?): Int { switch { a = .present & b = .present: return a + b, default: {} } return 0 }");
     assert(!errorsIn(&c,"type"));
     RangeNode *payload = named(c.project,"sizes")->a->items[0]->items[0]->b->items[0]->a->a;
     assert(payload->kind == RangeNodeName && same(payload->name,"a") && payload->narrowed && same(payload->narrowed->name,"present"));
@@ -296,12 +296,12 @@ int main(void)
     // `let v: T?` keeps its written form; the absent case it starts as is recorded beside it.
     compile(&c,"construct Box { let size: Int? let label: Int } "
         "function boxes(let box: Box?): Int { let empty: Int? let made: Box(label: 1) "
-        "switch { box.present & box.size.present: return 1, box.absent: return 0 } } "
+        "switch { box = .present & box.size = .present: return 1, box = .absent: return 0 } } "
         "macro probe(): Construct { let first: #target.members.first() "
-        "switch { first.present(let m) & m.value.absent: warning(message: \"starts absent\"), default: {} } } "
+        "switch { first = .present(let m) & m.value = .absent: warning(message: \"starts absent\"), default: {} } } "
         "@probe construct Starts { let size: Int? }");
     assert(errorsIn(&c,"type") == 1);
-    assert(reported(&c,"type","switch must be exhaustive: 'box.present & box.present.size.absent' is not handled"));
+    assert(reported(&c,"type","switch must be exhaustive: 'box = .present & box.size = .absent' is not handled"));
     RangeNode *empty = local(&c,"boxes","empty");
     assert(same(empty->typeName,"Int") && empty->lowered && empty->lowered->kind == RangeNodeCase && same(empty->lowered->name,"absent"));
     expectDescription(empty->type,"Optional<Wrapped: Int<bits: 64, signed: true>>");
@@ -402,7 +402,7 @@ int main(void)
     // A generic construct's member is typed per specialization it is read in:
     // each keeps the absent case its optional starts as.
     compile(&c,"construct Box<T> { let v: T? } "
-        "function boxes(let a: Box<Int>, let b: Box<Bool>): Bool { let x: a.v let y: b.v return x.absent & y.absent }");
+        "function boxes(let a: Box<Int>, let b: Box<Bool>): Bool { let x: a.v let y: b.v return x = .absent & y = .absent }");
     assert(!errorsIn(&c,"type"));
     RangeNode *boxes = named(c.project,"boxes"), *v = named(named(c.project,"Box"),"v");
     RangeNode *ints = boxes->items[0]->type, *bools = boxes->items[1]->type;

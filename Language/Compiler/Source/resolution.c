@@ -793,8 +793,8 @@ static int sourceMatches(RangeNode *node, const char *name, int kind)
 
 /* A method's receiver: an implicit let of the method, made on first use and
  * never found by name. Range has no `self`: members are reached by their bare
- * names, and inside an enum's own functions a bare case name tests the
- * current value. The type checker gives it the method's receiver
+ * names, and inside an enum's own functions a case test reads it through the
+ * enum's name. The type checker gives it the method's receiver
  * specialization. */
 RangeNode *methodReceiver(SourceReport *report, RangeNode *function)
 {
@@ -983,28 +983,6 @@ static void diagnoseUnusedBindings(SourceReport *report, RangeNode *arm)
     }
 }
 
-/* Inside an enum's own functions, a bare name that is one of its cases and
- * declares nothing nearer: a case test of the receiver. */
-static int receiverCaseName(SourceScope *scope, const char *name)
-{
-    int function = 0;
-    for (; scope; scope = scope->parent) {
-        RangeNode *owner = scope->owner;
-        if (!owner) continue;
-        for (size_t i = 0; owner->kind != RangeNodeEnum && i < owner->itemCount; ++i)
-            if (sourceMatches(owner->items[i],name,0)) return 0;
-        if (owner->kind == RangeNodeFunction) function = 1;
-        if (owner->kind == RangeNodeConstruct) return 0;
-        if (owner->kind == RangeNodeEnum) {
-            if (!function) return 0;
-            for (size_t i = 0; i < owner->itemCount; ++i)
-                if (owner->items[i]->kind == RangeNodeEnumCase && same(owner->items[i]->name,name)) return 1;
-            return 0;
-        }
-    }
-    return 0;
-}
-
 static void diagnoseDuplicate(SourceReport *, RangeNode *, RangeNode *, const char *);
 
 void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *node, int metadata)
@@ -1083,7 +1061,6 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         break;
     }
     case RangeNodeName:
-        if (!(node->flags & RangeFlagMacroType) && receiverCaseName(scope,node->name)) break; /* tests the receiver */
         if (node->flags & RangeFlagEarlier) {
             if (!nameLookup(report,scope,node))
                 sourceDiagnostic(report,node,0,"undeclared","no declaration for '%s' here; the case test that binds it is to its right",node->name);
@@ -1208,18 +1185,6 @@ static int scopeDeclaration(const RangeNode *node)
 
 static void diagnoseDuplicateMembers(SourceReport *report, RangeNode *construct)
 {
-    // `phase.loading` reads a case off a value, so no member of the enum
-    // (a function, or a nested type, reported below) has a case's name.
-    for (size_t i = 0; construct->kind == RangeNodeEnum && i < construct->itemCount; ++i) {
-        RangeNode *item = construct->items[i];
-        if (item->kind != RangeNodeFunction || !item->name) continue;
-        for (size_t j = 0; j < construct->itemCount; ++j)
-            if (construct->items[j]->kind == RangeNodeEnumCase && same(construct->items[j]->name,item->name)) {
-                sourceDiagnostic(report,item->emittedBy ? item->emittedBy : item,0,"duplicate",
-                    "'%s' is a case of %s, so %s declares no function of that name",item->name,construct->name,construct->name);
-                break;
-            }
-    }
     for (size_t i = 0; i < construct->itemCount; ++i) {
         RangeNode *item = construct->items[i];
         if (!scopeDeclaration(item) || !item->name) continue;

@@ -50,11 +50,11 @@ function firstKept<Kept>(let all: Array<Int>, @narrows(to: Kept) let where: (Int
     names.append(value: "ab")
     names.append(value: .absent)
     names.append(value: "cde")
-    let present: chosenNames(all: names) { name in name.present }
+    let present: chosenNames(all: names) { name in name = .present }
     state numbers: Array<Int>()
     numbers.append(value: 2)
     numbers.append(value: 7)
     let big: firstKept(all: numbers) { n in n > 5 }
     print(message: "\(apples.count) \(apples.read(at: 0).color) \(apples.read(at: 1).grams) \(bananas.read(at: 0).length) \(heavy.count) \(present.count) \(present.read(at: 1).count)")
-    switch { big.present(let b): return b + 35, default: return 1 }
+    switch { big = .present(let b): return b + 35, default: return 1 }
 }

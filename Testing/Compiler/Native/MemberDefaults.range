@@ -43,8 +43,8 @@ enum Shape { case square(Frame), none }
     switch { p.inner.n != 5 | p.total != 15: return 6, default: {} }
     let shape: Shape.square(Frame(width: 4))
     switch {
-    shape.square(let f): switch { f.area != 16: return 7, default: {} },
-    shape.none: return 8
+    shape = .square(let f): switch { f.area != 16: return 7, default: {} },
+    shape = .none: return 8
     }
     return 42
 }

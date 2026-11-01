@@ -1,16 +1,16 @@
 // Methods in an enum body and in an extension. Range has no self: inside an
-// enum's own functions a bare case name tests the current value, and the
-// enum's name is the type.
+// enum's own functions the enum's name, on the left of `=` or `!=`, tests the
+// current value.
 // Calls are value.method().
 enum Direction {
     case north, east, south, west
 
     function turned(): Direction {
         switch {
-        north: return .east,
-        east: return .south,
-        south: return .west,
-        west: return .north
+        Direction = .north: return .east,
+        Direction = .east: return .south,
+        Direction = .south: return .west,
+        Direction = .west: return .north
         }
     }
 
@@ -22,14 +22,14 @@ enum Direction {
 extension Direction {
     function vertical(): Bool {
         switch {
-        north | south: return true,
+        Direction = .north | Direction = .south: return true,
         default: return false
         }
     }
 
-    // The enum's name is the type: Direction.north makes a value.
+    // Direction.north makes a value, which `=` tests in turn.
     function isStart(): Bool {
-        switch { north: return Direction.north = .north, default: {} }
+        switch { Direction = .north: return Direction.north = .north, default: {} }
         return false
     }
 }
@@ -40,8 +40,8 @@ enum Tree {
 
     function sum(): Int {
         switch {
-        leaf(let value): return value,
-        node(let left, let right): return left.sum() + right.sum()
+        Tree = .leaf(let value): return value,
+        Tree = .node(let left, let right): return left.sum() + right.sum()
         }
     }
 }
@@ -54,19 +54,19 @@ enum Either<Left, Right> {
 
 extension Either {
     function isLeft(): Bool {
-        switch { left(_): return true, default: {} }
+        switch { Either = .left(_): return true, default: {} }
         return false
     }
 
     function leftOr(let fallback: Left): Left {
-        let value: switch { left(let value): value, default: { return fallback } }
+        let value: switch { Either = .left(let value): value, default: { return fallback } }
         return value
     }
 }
 
 extension Optional {
     function isPresent(): Bool {
-        switch { present(_): return true, default: {} }
+        switch { Optional = .present(_): return true, default: {} }
         return false
     }
 }
@@ -80,16 +80,16 @@ enum Light {
 
         function swapped(): Color {
             switch {
-            red: return .green,
-            green: return .red
+            Color = .red: return .green,
+            Color = .green: return .red
             }
         }
     }
 
     function color(): Color {
         switch {
-        on(let c): return c,
-        off: return .red
+        Light = .on(let c): return c,
+        Light = .off: return .red
         }
     }
 }

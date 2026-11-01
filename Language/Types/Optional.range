@@ -1,7 +1,7 @@
 // `Wrapped?` is Optional<Wrapped>; a Wrapped value is promoted where an
 // optional is expected. In a switch arm's condition,
-// `optional.present(let value)` binds the payload of the present case, and
-// `optional.present` alone narrows a stable optional (a let, a parameter, a
+// `optional = .present(let value)` binds the payload of the present case, and
+// `optional = .present` alone narrows a stable optional (a let, a parameter, a
 // #target value, or a member path of one) to that payload for the rest
 // of the condition's `&` chain and the arm's body.
 @optional

@@ -125,21 +125,21 @@ run promotion 42 "" Testing/Compiler/Native/Promotion.range
 # in macros alike; a read in the arm's condition or body uses it.
 run unused-bindings 1 "" "$(case_file unused-bindings 'enum Pair { case one(Int), two(Int, Int) }
 function f(let p: Pair): Int {
-    switch { p.one(let v): return 1, p.two(let a, let b) & a > 2: return a, p.two: return 0 }
+    switch { p = .one(let v): return 1, p = .two(let a, let b) & a > 2: return a, p = .two: return 0 }
 }
 function g(let o: Int?, let p: Int?): Int {
-    switch { o.present(let x) & x > 0 | p.present(let x): return 1, default: return 0 }
+    switch { o = .present(let x) & x > 0 | p = .present(let x): return 1, default: return 0 }
 }
 macro checked(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
-    switch { on.present(let c): {}, on.absent: diagnostic(message: "\(#target.name) has no case on") }
+    switch { on = .present(let c): {}, on = .absent: diagnostic(message: "\(#target.name) has no case on") }
 }
 @checked
 enum Light { case on, off }
 { return f(p: .one(1)) + g(o: .absent, p: .absent) }')"
-for unused in "3:24: warning[unused]: 'v' is bound but never used; write the pattern without 'let v'" \
-    "3:55: warning[unused]: 'b' is bound but never used; write the pattern without 'let b'" \
-    "10:29: warning[unused]: 'c' is bound but never used; write the pattern without 'let c'"; do
+for unused in "3:27: warning[unused]: 'v' is bound but never used; write the pattern without 'let v'" \
+    "3:61: warning[unused]: 'b' is bound but never used; write the pattern without 'let b'" \
+    "10:32: warning[unused]: 'c' is bound but never used; write the pattern without 'let c'"; do
     grep -Fq "unused-bindings.range:$unused" "$work_root/log" || fail "unused binding was not warned: $unused"
 done
 ! grep -Eq "'(a|x)' is bound but never used" "$work_root/log" || fail "a binding read in a condition or body was warned"
@@ -200,7 +200,7 @@ grep -Fq "compile-time-closures.range:19:1: warning[macro]: Light has 2 other ca
 run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro checked(): Enum {
     let wanted: "on"
     switch {
-        #target.cases.first(where: { c in c.name = wanted }).present(let c): warning(message: "\(#target.name) has \(c.name)"),
+        #target.cases.first(where: { c in c.name = wanted }) = .present(let c): warning(message: "\(#target.name) has \(c.name)"),
         default: diagnostic(message: "\(#target.name) has no case on")
     }
     state seen: 0
@@ -211,7 +211,7 @@ run compile-time-collections 0 "" "$(case_file compile-time-collections 'macro c
     let total: #target.cases.reduce(initial: 0) { sum, c in sum + 1 }
     let names: #target.cases.map { c in c.name }
     switch {
-        names.first().present(let n): warning(message: "\(#target.name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
+        names.first() = .present(let n): warning(message: "\(#target.name) has \(others.count) other cases of \(seen), \(total) in all, first \(n)"),
         default: {}
     }
     switch {
@@ -232,7 +232,7 @@ printf '%s\n' "local: hi" "hello, world" "ababab ab! ababab?" | cmp -s - "$work_
 # A known value holding blocks is built from its image where it is used: an
 # array and a recursive enum; a let holding one is built once and read in place.
 run known-blocks 0 "" "$(case_file known-blocks 'enum Tree { case leaf(Int), node(Tree, Tree) }
-function sum(let t: Tree): Int { switch { t.leaf(let v): return v, t.node(let a, let b): return sum(t: a) + sum(t: b) } }
+function sum(let t: Tree): Int { switch { t = .leaf(let v): return v, t = .node(let a, let b): return sum(t: a) + sum(t: b) } }
 function words(): Array<String> { state ws: Array<String>()  ws.append(value: "one")  ws.append(value: "two")  return ws }
 {
     let ws: words()
@@ -309,26 +309,26 @@ reject() {
     done
     rejections=$((rejections + 1))
 }
-reject non-exhaustive "switch must be exhaustive: 'd.west' is not handled; add an arm for it or a default" \
+reject non-exhaustive "switch must be exhaustive: 'd = .west' is not handled; add an arm for it or a default" \
     'enum Direction { case north, east, south, west }
-function f(let d: Direction): Int { switch { d.north | d.south: return 1, d.east: return 2 } }
+function f(let d: Direction): Int { switch { d = .north | d = .south: return 1, d = .east: return 2 } }
 { return f(d: .east) }'
 reject integer-default "switch must be exhaustive; add a default" \
     'function f(let n: Int): Int { switch { n = 0: return 1, n < 0: return 2 } }
 { return f(n: 1) }'
 reject unknown-case "Direction has no case 'up'" \
     'enum Direction { case north, south }
-function f(let d: Direction): Int { switch { d.north: return 1, d.up: return 2, default: return 3 } }
+function f(let d: Direction): Int { switch { d = .north: return 1, d = .up: return 2, default: return 3 } }
 { return f(d: .north) }'
 reject unknown-case-value "Direction has no case 'up'" \
     'enum Direction { case north, south }
 { let d: Direction.up return 0 }'
 reject duplicate-case "this condition is already handled by earlier arms" \
     'enum Direction { case north, south }
-function f(let d: Direction): Int { switch { d.north: return 1, d.south | d.north: return 2 } }
+function f(let d: Direction): Int { switch { d = .north: return 1, d = .south | d = .north: return 2 } }
 { return f(d: .north) }'
 reject unreachable-default "'default' is never reached" \
-    'function f(let b: Bool): Int { switch { b.true: return 1, b.false: return 0, default: return 2 } }
+    'function f(let b: Bool): Int { switch { b = .true: return 1, b = .false: return 0, default: return 2 } }
 { return f(b: true) }'
 reject duplicate-declaration "'north' is declared more than once in Direction" \
     'enum Direction { case north, south, north }
@@ -338,7 +338,7 @@ reject binding-outside "no declaration for 'n' in the loaded sources" \
 function f(let t: Token): Int { switch { t.value(let n): return n, t.end: return 0 } return n }
 { return f(t: .end) }'
 reject binding-outside-arm "no declaration for 'n' in the loaded sources" \
-    'function f(let o: Int?): Int { switch { o.present(let n): return n, o.absent: {} } return n }
+    'function f(let o: Int?): Int { switch { o = .present(let n): return n, o = .absent: {} } return n }
 { return f(o: .absent) }'
 reject unshared-binding "'b' is bound on one side of '|' only; both sides bind the same names" \
     'enum Pair { case one(Int), two(Int, Int) }
@@ -347,8 +347,8 @@ function f(let p: Pair): Int { switch { p.one(let a) | p.two(let a, let b): retu
 reject missing-payload "case 'value' carries a payload" \
     'enum Token { case value(Int), end }
 { let t: Token.value return 0 }'
-reject case-of-integer "Int<bits: 64, signed: true> has no function 'present'" \
-    '{ let n: 3 switch { n.present(let m): return m, default: {} } return 0 }'
+reject case-of-integer "'.present' matches an enum case, but the subject is Int<bits: 64, signed: true>" \
+    '{ let n: 3 switch { n = .present(let m): return m, default: {} } return 0 }'
 reject break-outside "'break' is only allowed inside a loop" \
     '{ break return 0 }'
 reject continue-outside "'continue' is only allowed inside a loop" \
@@ -401,7 +401,7 @@ run never-unreached 7 "" "$(case_file never-unreached 'enum Outcome { case done(
 function absurd(let n: Never): Int { return 1 }
 construct Box<T> { let value: T }
 function open(let b: Box<Never>): Int { return 0 }
-{ let o: Outcome.done(7) switch { o.done(let v): return v, default: return 0 } }')"
+{ let o: Outcome.done(7) switch { o = .done(let v): return v, default: return 0 } }')"
 reject print-label "argument 1 of 'print' requires label 'message'" '{ print(text: "hi") return 0 }'
 reject print-arguments "'print' takes 1 arguments; 2 supplied" '{ print(message: "hi", message: "again") return 0 }'
 reject print-interpolation "an interpolated value is an integer, a case without payloads, or a string; this one is Array<Element: Int<bits: 64, signed: true>>" \
@@ -417,7 +417,7 @@ run warning-run 0 "warning-run.range:2:22: warning: 3 is low" "$(case_file warni
     || fail "warning at run wrote: $(cat "$work_root/stdout") / $(cat "$work_root/stderr")"
 reject effect-attribute "'@print' applies to the declaration written after it, and none follows" '{ @print("hi") return 0 }'
 reject binding-in-other-arm "no declaration for 'v' in the loaded sources" \
-    'function f(let o: Int?): Int { let w: switch { o.present(let v): v, o.absent: { return v } } return w }
+    'function f(let o: Int?): Int { let w: switch { o = .present(let v): v, o = .absent: { return v } } return w }
 { return f(o: .absent) }'
 # switch is the only selector: if, else, and guard are ordinary names, so
 # these do not parse.
@@ -488,18 +488,16 @@ reject assignment-in-expression "an assignment yields no value; an arm of a swit
 reject no-arm-yields "no arm of this switch expression yields a value" \
     'function f(let b: Bool): Int { let v: switch { b: { return 1 }, default: { return 2 } } return 0 }
 { return f(b: true) }'
-reject non-exhaustive-expression "switch must be exhaustive: 'l.green' is not handled; add an arm for it or a default" \
+reject non-exhaustive-expression "switch must be exhaustive: 'l = .green' is not handled; add an arm for it or a default" \
     'enum Light { case red, green }
-function f(let l: Light): Int { return switch { l.red: 1 } }
+function f(let l: Light): Int { return switch { l = .red: 1 } }
 { return f(l: .red) }'
-# A case read off a value is a Bool; its `let` binds only where an arm or
-# a for filter receives the name, and an enum's cases and members never
-# share a name.
-reject case-member-clash "'on' is a case of Power, so Power declares no function of that name" \
-    'enum Power { case on, off  function on(): Bool { return true } }
-{ return 0 }'
+# A case test's `let` binds only where an arm or a for filter receives the name. A function may share a case's name: `.` reads
+# the function, and `=` tests the case.
+run case-member-names 42 "" "$(case_file case-member-names 'enum Power { case on, off  function on(): Bool { return Power = .on } }
+{ let p: Power.on switch { p.on() & p = .on & !Power.off.on(): return 42, default: return 1 } }')"
 reject binding-outside "'let x' binds a name only in a switch arm's condition or a 'for' filter" \
-    'function f(let o: Int?): Bool { let b: o.present(let x) return b }
+    'function f(let o: Int?): Bool { let b: o = .present(let x) return b }
 { return 0 }'
 reject binding-negated "a negated test binds nothing; 'let x' is under a negation" \
     'function f(let o: Int?): Int { switch { !(o = .present(let x)): return 1, default: return 0 } }
@@ -509,58 +507,58 @@ reject binding-different "a negated test binds nothing; 'let x' is under a negat
 { return 0 }'
 reject binding-operand "'let x' binds a name only in a case test that '&' or '|' joins into the condition" \
     'function g(let b: Bool): Bool { return b }
-function f(let o: Int?): Int { switch { g(b: o.present(let x)): return x, default: return 0 } }
+function f(let o: Int?): Int { switch { g(b: o = .present(let x)): return x, default: return 0 } }
 { return 0 }'
 reject binding-call "'let x' binds a payload field only in a case test" \
     'function g(let a: Int): Bool { return true }
 function f(let o: Int?): Int { switch { g(a: let x): return 1, default: return 0 } }
 { return 0 }'
 reject binding-one-side "'y' is bound on one side of '|' only; both sides bind the same names" \
-    'function f(let o: Int?, let p: Int?): Int { switch { o.present(let x) | p.present(let y): return 1, default: return 0 } }
+    'function f(let o: Int?, let p: Int?): Int { switch { o = .present(let x) | p = .present(let y): return 1, default: return 0 } }
 { return 0 }'
 reject binding-types "both sides of '|' bind 'x' with one type; the left side binds Int<bits: 64, signed: true>, this side String" \
-    'function f(let o: Int?, let p: String?): Int { switch { o.present(let x) | p.present(let x): return 1, default: return 0 } }
+    'function f(let o: Int?, let p: String?): Int { switch { o = .present(let x) | p = .present(let x): return 1, default: return 0 } }
 { return 0 }'
 reject binding-before "no declaration for 'x' here; the case test that binds it is to its right" \
-    'function f(let o: Int?): Int { switch { x > 0 & o.present(let x): return x, default: return 0 } }
+    'function f(let o: Int?): Int { switch { x > 0 & o = .present(let x): return x, default: return 0 } }
 { return 0 }'
 reject binding-twice "'x' is bound twice in this condition" \
-    'function f(let o: Int?, let p: Int?): Int { switch { o.present(let x) & p.present(let x): return x, default: return 0 } }
+    'function f(let o: Int?, let p: Int?): Int { switch { o = .present(let x) & p = .present(let x): return x, default: return 0 } }
 { return 0 }'
 # A switch's case tests on one subject are a table: the arms must cover
 # every combination of their subjects' cases unless a default ends them, a
 # guarded arm covers nothing after it, and every arm must be reachable.
-reject missing-case "switch must be exhaustive: 'phase.loaded' is not handled; add an arm for it or a default" \
+reject missing-case "switch must be exhaustive: 'phase = .loaded' is not handled; add an arm for it or a default" \
     'enum Phase { case loading, loaded(Int), failed(String) }
-function f(let phase: Phase): Int { switch { phase.loading: return 1, phase.failed: return 2 } }
+function f(let phase: Phase): Int { switch { phase = .loading: return 1, phase = .failed: return 2 } }
 { return 0 }'
-reject missing-combinations "switch must be exhaustive: 'value.present & bits.absent' is not handled; add an arm for it or a default" \
-    'function f(let value: Int?, let bits: Int?): Int { switch { value.present & bits.present: return 1, value.absent: return 0 } }
+reject missing-combinations "switch must be exhaustive: 'value = .present & bits = .absent' is not handled; add an arm for it or a default" \
+    'function f(let value: Int?, let bits: Int?): Int { switch { value = .present & bits = .present: return 1, value = .absent: return 0 } }
 { return 0 }'
-reject missing-guarded "switch must be exhaustive: 'value.present & bits.absent', 'value.present & bits.present' are not handled; add arms for them or a default" \
-    'function f(let value: Int?, let bits: Int?): Int { switch { value.present(let v) & v > 0 & bits.present: return 1, value.absent: return 0 } }
+reject missing-guarded "switch must be exhaustive: 'value = .present & bits = .absent', 'value = .present & bits = .present' are not handled; add arms for them or a default" \
+    'function f(let value: Int?, let bits: Int?): Int { switch { value = .present(let v) & v > 0 & bits = .present: return 1, value = .absent: return 0 } }
 { return 0 }'
 reject guards-only "switch must be exhaustive; add a default" \
     'function f(let n: Int): Int { switch { n > 0: return 1, n <= 0: return 0 } }
 { return 0 }'
 reject call-subject "switch must be exhaustive; add a default" \
     'function g(): Int? { return 1 }
-function f(): Int { switch { g().present: return 1, g().absent: return 0 } }
+function f(): Int { switch { g() = .present: return 1, g() = .absent: return 0 } }
 { return 0 }'
 reject condition-unreachable "this condition is already handled by earlier arms" \
     'enum Phase { case loading, loaded(Int), failed(String) }
-function f(let phase: Phase): Int { switch { phase.loading | phase.failed: return 1, phase.failed(let s): return 2, default: return 0 } }
+function f(let phase: Phase): Int { switch { phase = .loading | phase = .failed: return 1, phase = .failed(let s): return 2, default: return 0 } }
 { return 0 }'
 reject condition-default-unreached "'default' is never reached: the arms above match every value" \
-    'function f(let o: Int?): Int { switch { o.present: return 1, o.absent: return 0, default: return 2 } }
+    'function f(let o: Int?): Int { switch { o = .present: return 1, o = .absent: return 0, default: return 2 } }
 { return 0 }'
 # Case tests run at compile time too, in conditions and as plain Bools.
 paired='macro paired(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
     let off: #target.cases.first(where: { c in c.name = "off" })
-    let both: on.present & off.present
+    let both: on = .present & off = .present
     switch {
-        on.present(let c) & c.name != "on": diagnostic(message: "\(#target.name) misnames on"),
+        on = .present(let c) & c.name != "on": diagnostic(message: "\(#target.name) misnames on"),
         both: warning(message: "\(#target.name) has on and off"),
         default: diagnostic(message: "\(#target.name) needs on and off")
     }
@@ -574,10 +572,10 @@ reject macro-case-missing "Half needs on and off" "$paired
 @paired
 enum Half { case on }
 { return 0 }"
-reject macro-case-coverage "switch must be exhaustive: 'off.absent' is not handled; add an arm for it or a default" \
+reject macro-case-coverage "switch must be exhaustive: 'off = .absent' is not handled; add an arm for it or a default" \
     'macro both(): Enum {
     let off: #target.cases.first(where: { c in c.name = "off" })
-    switch { off.present(let c) & c.name = "off": {}, off.present: {} }
+    switch { off = .present(let c) & c.name = "off": {}, off = .present: {} }
 }
 @both
 enum Light { case on, off }
@@ -585,7 +583,7 @@ enum Light { case on, off }
 reject macro-case-unreachable "this condition is already handled by earlier arms" \
     'macro both(): Enum {
     let off: #target.cases.first(where: { c in c.name = "off" })
-    switch { off.present: {}, off.absent: {}, off.present(let c): {} }
+    switch { off = .present: {}, off = .absent: {}, off = .present(let c): {} }
 }
 @both
 enum Light { case on, off }
@@ -593,11 +591,11 @@ enum Light { case on, off }
 
 # `subject = .case`: the right side decides what `=` does.
 phase='enum Phase { case loading, loaded(Int), failed(String) }'
-reject equality-missing "switch must be exhaustive: 'phase.loaded' is not handled; add an arm for it or a default" \
+reject equality-missing "switch must be exhaustive: 'phase = .loaded' is not handled; add an arm for it or a default" \
     "$phase
 function f(let phase: Phase): Int { switch { phase = .loading: return 1, phase = .failed: return 2 } }
 { return 0 }"
-reject equality-value-covers-nothing "switch must be exhaustive: 'phase.loaded' is not handled; add an arm for it or a default" \
+reject equality-value-covers-nothing "switch must be exhaustive: 'phase = .loaded' is not handled; add an arm for it or a default" \
     "$phase
 function f(let phase: Phase): Int { switch { phase = .loading: return 1, phase = .loaded(0): return 2, phase = .failed: return 2 } }
 { return 0 }"
@@ -684,27 +682,27 @@ grep -Fq "warning[macro]: Light has on and off" "$work_root/log" || fail "a comp
 # the payload: right of the test in its `&` chain and in the arm's body.
 run narrowing 42 "" Testing/Compiler/Native/Narrowing.range
 optional='Optional<Wrapped: Int<bits: 64, signed: true>>'
-reject narrowing-shadow "narrowing-shadow.range:1:55: error[type]: 'x' is already narrowed to the payload here; related: a test of an optional value for its present case narrows that value" \
-    'function f(let x: Int?): Int { switch { x.present(let x): return x, default: return 0 } }
+reject narrowing-shadow "narrowing-shadow.range:1:58: error[type]: 'x' is already narrowed to the payload here; related: a test of an optional value for its present case narrows that value" \
+    'function f(let x: Int?): Int { switch { x = .present(let x): return x, default: return 0 } }
 { return f(x: 1) }'
 # A state can change in the arm, and a call is computed again: neither narrows.
 reject narrowing-state "'+' is not declared on $optional" \
-    '{ state s: Int?.absent  s: 3  switch { s.present: return s + 1, default: return 0 } }'
+    '{ state s: Int?.absent  s: 3  switch { s = .present: return s + 1, default: return 0 } }'
 reject narrowing-call "'+' is not declared on $optional" \
     'function g(): Int? { return 3 }
-{ switch { g().present: return g() + 1, default: return 0 } }'
+{ switch { g() = .present: return g() + 1, default: return 0 } }'
 # Under `!`, on one side of `|`, and left of the test, nothing is narrowed.
 reject narrowing-negated "'+' is not declared on $optional" \
-    'function f(let x: Int?): Int { switch { !(!x.present): return x + 1, default: return 0 } }
+    'function f(let x: Int?): Int { switch { !(x != .present): return x + 1, default: return 0 } }
 { return f(x: 1) }'
 reject narrowing-one-side "'+' is not declared on $optional" \
-    'function f(let x: Int?, let y: Int?): Int { switch { x.present | y.present: return x + 1, default: return 0 } }
+    'function f(let x: Int?, let y: Int?): Int { switch { x = .present | y = .present: return x + 1, default: return 0 } }
 { return f(x: 1, y: 2) }'
 reject narrowing-left "'>' is not declared on $optional" \
-    'function f(let x: Int?): Int { switch { x > 0 & x.present: return 1, default: return 0 } }
+    'function f(let x: Int?): Int { switch { x > 0 & x = .present: return 1, default: return 0 } }
 { return f(x: 1) }'
 reject narrowing-after-switch "'+' is not declared on $optional" \
-    'function f(let x: Int?): Int { switch { x.present: {}, default: return 0 } return x + 1 }
+    'function f(let x: Int?): Int { switch { x = .present: {}, default: return 0 } return x + 1 }
 { return f(x: 1) }'
 # A @fruit value shows what @fruit gives every type, and names none of its cases.
 fruit='macro fruit(): Construct { #graph { extension #target.name { function weight(): Int { return 1 } } } }
@@ -753,7 +751,7 @@ function f(let x: @fruit): Int { return 1 }
 reject narrowing-other-enum "'+' is not declared on Box" \
     'enum Box { case empty
     case full(Int) }
-function f(let b: Box): Int { switch { b.full: return b + 1, default: return 0 } }
+function f(let b: Box): Int { switch { b = .full: return b + 1, default: return 0 } }
 { return f(b: .full(1)) }'
 # At compile time too: a macro's lets narrow through `&`, through `|` when
 # both sides narrow, and in the arm's body.
@@ -761,8 +759,8 @@ run macro-narrowing 0 "" "$(case_file macro-narrowing 'macro named(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
     let off: #target.cases.first(where: { c in c.name = "off" })
     switch {
-        on.present & on.name != "on": diagnostic(message: "\(#target.name) misnames on"),
-        on.present & off.present | on.present & on.name = "on": warning(message: "\(#target.name) has \(on.name)"),
+        on = .present & on.name != "on": diagnostic(message: "\(#target.name) misnames on"),
+        on = .present & off = .present | on = .present & on.name = "on": warning(message: "\(#target.name) has \(on.name)"),
         default: diagnostic(message: "\(#target.name) has no case on")
     }
 }
@@ -773,15 +771,15 @@ grep -Fq "warning[macro]: Light has on" "$work_root/log" || fail "a compile-time
 reject macro-narrowing-shadow "'on' is already narrowed to the payload here" \
     'macro named(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
-    switch { on.present(let on): warning(message: "\(on.name)"), default: {} }
+    switch { on = .present(let on): warning(message: "\(on.name)"), default: {} }
 }
 @named
 enum Light { case on, off }
 { return 0 }'
-reject macro-narrowing-state "Optional<Wrapped: EnumCase> has no case 'name'" \
+reject macro-narrowing-state "Optional<Wrapped: EnumCase> has no member 'name'" \
     'macro named(): Enum {
     state on: #target.cases.first(where: { c in c.name = "on" })
-    switch { on.present: warning(message: "\(on.name)"), default: {} }
+    switch { on = .present: warning(message: "\(on.name)"), default: {} }
 }
 @named
 enum Light { case on, off }
@@ -813,7 +811,7 @@ reject macro-grammar-field "Macro has no member 'target'" \
 run macro-time-value 0 "" "$(case_file macro-time-value 'macro sized(): Construct {
     let width: #target.generics.first(where: { generic in generic.name = "width" })
     switch {
-        width.present & width.value > 4: warning(message: "\(#target.name) is \(width.value) wide"),
+        width = .present & width.value > 4: warning(message: "\(#target.name) is \(width.value) wide"),
         default: {}
     }
 }
@@ -834,6 +832,33 @@ reject macro-effect-type "argument 'message' of 'diagnostic' requires String; fo
 
 reject case-test-not-enum "Int<bits: 64, signed: true> has no member 'present'" \
     'function f(let o: Int): Int { switch { o.present: return 1, default: return 0 } }
+{ return 0 }'
+# `.` is member access: a case is no member, and a bare case name is no test.
+reject case-off-value "Phase has no member 'loading'; 'loading' is a case, tested with =" \
+    "$phase
+function f(let phase: Phase): Bool { return phase.loading }
+{ return 0 }"
+reject case-off-value-call "Phase has no member 'failed'; 'failed' is a case, tested with =" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase.failed(let r): return r.count, default: return 0 } }
+{ return 0 }"
+reject case-off-optional "Optional<Wrapped: Int<bits: 64, signed: true>> has no member 'present'; 'present' is a case, tested with =" \
+    'function f(let o: Int?): Bool { return o.present }
+{ return 0 }'
+reject case-off-macro-value "Optional<Wrapped: EnumCase> has no member 'present'; 'present' is a case, tested with =" \
+    'macro named(): Enum { switch { #target.cases.first().present: {}, default: {} } }
+@named
+enum Light { case on, off }
+{ return 0 }'
+reject no-member-of-enum "Phase has no member 'gone'" \
+    "$phase
+function f(let phase: Phase): Bool { return phase.gone }
+{ return 0 }"
+reject bare-case "no declaration for 'loading' in the loaded sources" \
+    'enum Phase { case loading, done  function busy(): Bool { return loading } }
+{ return 0 }'
+reject bare-case-call "no declaration for 'done' in the loaded sources" \
+    'enum Phase { case loading, done(Int)  function busy(): Int { switch { done(let n): return n, default: return 0 } } }
 { return 0 }'
 reject for-non-iterable "'for … in' cannot iterate Int<bits: 64, signed: true>: it declares no @iteration function" \
     '{ let n: 5 for x in n { } return 0 }'
@@ -890,7 +915,7 @@ reject uncomparable-field "'=' cannot compare Bag: field 'items' is Raw, and fie
 reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case 'at' is Bag, and field 'items' is Raw" \
     "$raw
 enum Place { case at(Bag), nowhere }
-function f(let p: Place): Int { switch { p.nowhere: return 0, default: return 1 } }
+function f(let p: Place): Int { switch { p = .nowhere: return 0, default: return 1 } }
 { let p: Place.nowhere let q: Place.nowhere switch { p = q: return 1, default: {} } return 0 }"
 # A case test compares nothing, so it needs no `=`.
 run case-test-compares-nothing 7 "" "$(case_file case-test-compares-nothing "$raw
@@ -1192,31 +1217,31 @@ reject double-equals "double-equals.range:1:23: unexpected '=='" \
 # Case tests on several subjects are checked as a table of their combinations;
 # a guard narrows its arm, which then covers nothing after it.
 power='enum Power { case on, off }'
-reject combinations "switch must be exhaustive: 'p.on & q.off' is not handled; add an arm for it or a default" \
+reject combinations "switch must be exhaustive: 'p = .on & q = .off' is not handled; add an arm for it or a default" \
     "$power
-function f(let p: Power, let q: Power): Int { switch { p.on & q.on: return 1, p.off: return 0 } }
+function f(let p: Power, let q: Power): Int { switch { p = .on & q = .on: return 1, p = .off: return 0 } }
 { return f(p: .on, q: .on) }"
-reject guarded-combinations "switch must be exhaustive: 'p.on & q.off' is not handled; add an arm for it or a default" \
+reject guarded-combinations "switch must be exhaustive: 'p = .on & q = .off' is not handled; add an arm for it or a default" \
     "$power
-function f(let p: Power, let q: Power, let ready: Bool): Int { switch { p.on & ready & q.off: return 1, p.on & q.on: return 2, p.off: return 0 } }
+function f(let p: Power, let q: Power, let ready: Bool): Int { switch { p = .on & ready & q = .off: return 1, p = .on & q = .on: return 2, p = .off: return 0 } }
 { return f(p: .on, q: .on, ready: true) }"
 reject handled-row "this condition is already handled by earlier arms" \
     "$power
-function f(let p: Power, let q: Power): Int { switch { q.on: return 1, p.off & q.on: return 2, default: return 0 } }
+function f(let p: Power, let q: Power): Int { switch { q = .on: return 1, p = .off & q = .on: return 2, default: return 0 } }
 { return f(p: .on, q: .on) }"
 reject unreachable-default-rows "'default' is never reached: the arms above match every value" \
     "$power
-function f(let p: Power, let q: Power): Int { switch { p.on: return 1, p.off: return 2, default: return 0 } }
+function f(let p: Power, let q: Power): Int { switch { p = .on: return 1, p = .off: return 2, default: return 0 } }
 { return f(p: .on, q: .on) }"
 reject condition-other-arm "no declaration for 'x' in the loaded sources" \
-    'function f(let o: Int?): Int { switch { o.present(let x): return x, o.absent & x > 0: return 1, o.absent: return 0 } }
+    'function f(let o: Int?): Int { switch { o = .present(let x): return x, o = .absent & x > 0: return 1, o = .absent: return 0 } }
 { return f(o: .absent) }'
 reject condition-type "condition requires Bool; found Int<bits: 64, signed: true>" \
     'function f(let n: Int): Int { switch { n + 1: return n, default: return 0 } }
 { return f(n: 1) }'
 # `where` is not Range: a condition joins its parts with `&`.
 reject where-arm "expected ':', found 'where'" \
-    'function f(let o: Int?): Int { switch { o.present(let x) where x > 3: return x, default: return 0 } }
+    'function f(let o: Int?): Int { switch { o = .present(let x) where x > 3: return x, default: return 0 } }
 { return f(o: .absent) }'
 reject where-for "expected '{', found 'where'" \
     '{ state n: 0  for x in 0..<5 where x > 2 { n: n + x } return n }'
@@ -1655,5 +1680,5 @@ core=("${full[@]}")
 # A macro reads a reflection element's name as its own field; compiled code
 # has no declarations, and Array has no name lookup of its own.
 reject named-removed "'first' takes 0 arguments; 1 supplied" \
-    '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a").present(let v): return v, default: return 0 } }'
+    '{ state xs: Array<Int>() xs.append(value: 3) switch { xs.first(named: "a") = .present(let v): return v, default: return 0 } }'
 echo "compiler native: programs=$programs rejections=$rejections case-tests=pass closures=pass collections=pass logic=pass subjects=pass signatures=pass traps=pass literal-law=pass aggregates=pass arrays=pass copy-on-write=pass lifetimes=pass output=pass enums=pass switches=pass payloads=pass recursive-enums=pass optionals=pass loops=pass intervals=pass guards=pass switch-expressions=pass enum-methods=pass equality=pass equatable=pass equality-on-demand=pass equality-syntax=pass operators=pass array-equality=pass extension-macros=pass member-defaults=pass expressions=pass generics=pass promotion=pass unused-bindings=pass strings=pass converted=pass"

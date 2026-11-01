@@ -1,6 +1,6 @@
 // filter returns an Array of what a true result of its predicate narrows the
 // element to: Array<Apple> from a @fruit array and a type test, Array<String>
-// from a String? array and `.present`, and Array<Element> otherwise.
+// from a String? array and `= .present`, and Array<Element> otherwise.
 macro fruit(): Construct {
     #graph { extension #target.name { function weight(): Int { return grams } } }
 }
@@ -42,7 +42,7 @@ function kept(let fruits: Array<@fruit>, let test: (@fruit) -> Bool): Array<@fru
     names.append(value: "ab")
     names.append(value: .absent)
     names.append(value: "cde")
-    let present: names.filter { name in name.present }
+    let present: names.filter { name in name = .present }
 
     state numbers: Array<Int>()
     for n in 0..<10 { numbers.append(value: n) }

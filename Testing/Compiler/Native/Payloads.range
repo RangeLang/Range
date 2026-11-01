@@ -19,11 +19,11 @@ construct Lexer {
 
 function weigh(let t: Token): Int {
     switch {
-    t.value(let number) & number > 100: return 100,
-    t.value(let number): return number,
-    t.pair(let a, let b): return a + b,
-    t.word(text: _, let count): return count,
-    t.end: return 0
+    t = .value(let number) & number > 100: return 100,
+    t = .value(let number): return number,
+    t = .pair(let a, let b): return a + b,
+    t = .word(text: _, let count): return count,
+    t = .end: return 0
     }
 }
 
@@ -47,9 +47,9 @@ function make(let n: Int): Token {
     switch { weigh(t: lexer.last) != 2: return 7, default: {} }
     switch { weigh(t: lexer.seen.read(at: 0)) != 9: return 8, default: {} }
     switch {
-        lexer.seen.read(at: 0).value(let n): switch { n != 9: return 9, default: {} },
+        lexer.seen.read(at: 0) = .value(let n): switch { n != 9: return 9, default: {} },
         default: return 10
     }
-    switch { t.end: return 11, default: switch { t.value(number: 7): {}, default: return 12 } }
+    switch { t = .end: return 11, default: switch { t = .value(number: 7): {}, default: return 12 } }
     return 42
 }

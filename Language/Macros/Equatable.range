@@ -19,13 +19,13 @@ macro equatable(): Construct {
     let written: #target.functions.first { candidate in candidate.name = "=" }
 
     switch {
-        written.present: {
+        written = .present: {
             let parameter: written.parameters.first()
             switch {
-                parameter.present & parameter.name != "other":
+                parameter = .present & parameter.name != "other":
                     diagnostic(message: "the parameter of \(#target.name)'s '=' must be labeled 'other', as in 'function =(let other: \(#target.name)): Bool'; it is labeled '\(parameter.name)'"),
 
-                parameter.present & parameter.type != written.receiver:
+                parameter = .present & parameter.type != written.receiver:
                     diagnostic(message: "the parameter of \(#target.name)'s '=' must be of type \(#target.name), the type it compares"),
 
                 default: {}
@@ -36,7 +36,7 @@ macro equatable(): Construct {
             }
         },
 
-        written.absent:
+        written = .absent:
             warning(message: "\(#target.name) applies @equatable but declares no '='; the built-in structural '=' is used")
     }
 }
@@ -46,13 +46,13 @@ macro equatable(): Enum {
     let written: #target.functions.first { candidate in candidate.name = "=" }
 
     switch {
-        written.present: {
+        written = .present: {
             let parameter: written.parameters.first()
             switch {
-                parameter.present & parameter.name != "other":
+                parameter = .present & parameter.name != "other":
                     diagnostic(message: "the parameter of \(#target.name)'s '=' must be labeled 'other', as in 'function =(let other: \(#target.name)): Bool'; it is labeled '\(parameter.name)'"),
 
-                parameter.present & parameter.type != written.receiver:
+                parameter = .present & parameter.type != written.receiver:
                     diagnostic(message: "the parameter of \(#target.name)'s '=' must be of type \(#target.name), the type it compares"),
 
                 default: {}
@@ -63,7 +63,7 @@ macro equatable(): Enum {
             }
         },
 
-        written.absent:
+        written = .absent:
             warning(message: "\(#target.name) applies @equatable but declares no '='; the built-in structural '=' is used")
     }
 }

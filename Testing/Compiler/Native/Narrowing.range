@@ -12,14 +12,14 @@ construct Person {
 }
 function boss(let p: Person): Person? { return p.manager }
 function twice(let maybe: Int?): Int {
-    switch { maybe.present: return maybe * 2, default: return 0 }
+    switch { maybe = .present: return maybe * 2, default: return 0 }
 }
 function largest(let a: Int?, let b: Int?): Int {
     let best: switch {
-        a.present & b.present & a > b: a,
-        a.present & b.present: b,
-        a.present: a,
-        b.present: b,
+        a = .present & b = .present & a > b: a,
+        a = .present & b = .present: b,
+        a = .present: a,
+        b = .present: b,
         default: 0
     }
     return best
@@ -27,18 +27,18 @@ function largest(let a: Int?, let b: Int?): Int {
 function chain(let p: Person): Int {
     // A member path narrows, and a path through a narrowed value narrows in turn.
     switch {
-        p.manager.present & p.manager.manager.present: return p.manager.manager.age,
-        p.manager.present: return p.manager.age,
+        p.manager = .present & p.manager.manager = .present: return p.manager.manager.age,
+        p.manager = .present: return p.manager.age,
         default: return 0
     }
 }
 function radius(let p: Person): Int {
     // The payload is an enum: its cases are tested on the narrowed value.
-    switch { p.shape.present & p.shape.circle(let r): return r, default: return -1 }
+    switch { p.shape = .present & p.shape = .circle(let r): return r, default: return -1 }
 }
 function either(let a: Int?, let b: Int?): Int {
     // Both sides of `|` narrow a, so the body reads a's payload.
-    switch { a.present & b.absent | a.present & a > 10: return a, default: return -1 }
+    switch { a = .present & b = .absent | a = .present & a > 10: return a, default: return -1 }
 }
 {
     switch { twice(maybe: 21) != 42: return 1, default: {} }
@@ -63,11 +63,11 @@ function either(let a: Int?, let b: Int?): Int {
     names.append(value: .absent)
     names.append(value: "Grace")
     state letters: 0
-    for name in names & name.present { letters: letters + name.count }
+    for name in names & name = .present { letters: letters + name.count }
     switch { letters != 8: return 14, default: {} }
     // A let local narrows; a narrowed payload is passed on as its own type.
     let found: boss(p: low)
-    switch { found.present & found.age = 50: {}, default: return 15 }
-    switch { found.present: switch { chain(p: found) != 70: return 16, default: {} }, default: return 17 }
+    switch { found = .present & found.age = 50: {}, default: return 15 }
+    switch { found = .present: switch { chain(p: found) != 70: return 16, default: {} }, default: return 17 }
     return 42
 }

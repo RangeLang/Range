@@ -2,7 +2,7 @@ macro example(): Construct {
     let ignored: "#graph is only text here"
     let first: #target.members.first()
     switch {
-        first.present: {
+        first = .present: {
             #graph {
                 // Keep the emitted declarations, including nested code.
                 construct Message {
@@ -17,7 +17,7 @@ macro example(): Construct {
             }
         },
 
-        first.absent: {}
+        first = .absent: {}
     }
     #graph {}
 }

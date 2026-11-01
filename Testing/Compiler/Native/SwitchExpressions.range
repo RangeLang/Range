@@ -51,10 +51,10 @@ function loop(let xs: Array<Int>): Int {
 // for both, and a payload binding.
 function measure(let s: Shape): Int {
     return switch {
-        (s.circle(radius: let n) | s.square(side: let n)) & n > 10: 1000,
-        s.circle(let n) | s.square(let n): n,
-        s.group(let items): items.count,
-        s.nothing: 0
+        (s = .circle(radius: let n) | s = .square(side: let n)) & n > 10: 1000,
+        s = .circle(let n) | s = .square(let n): n,
+        s = .group(let items): items.count,
+        s = .nothing: 0
     }
 }
 
@@ -92,7 +92,7 @@ function twice(let n: Int): Int {
 }
 
 function next(let l: Light): Light {
-    return switch { l.red: .green, l.amber: .red, l.green: .amber }
+    return switch { l = .red: .green, l = .amber: .red, l = .green: .amber }
 }
 
 function lookup(let found: Bool): Int? {
@@ -146,14 +146,14 @@ function partial(let xs: Array<Int>): Int {
     // In a let, an argument, and an operand.
     let light: switch { xs.count > 3: Light.red, default: .green }
     switch { next(l: light) != .green: return 10, default: {} }
-    let doubled: twice(n: switch { light.red: 21, light.amber | light.green: 0 })
+    let doubled: twice(n: switch { light = .red: 21, light = .amber | light = .green: 0 })
     switch { doubled != 42: return 11, default: {} }
-    let sum: 1 + switch { light.red: 2, default: 0 } * 10
+    let sum: 1 + switch { light = .red: 2, default: 0 } * 10
     switch { sum != 21: return 12, default: {} }
     // Optional promotion across arms, and Type?.case.
     switch { lookup(found: true) != Int?.present(5) | lookup(found: false) != .absent: return 13, default: {} }
     let none: Int?.absent
-    switch { none.present: return 14, none.absent: {} }
+    switch { none = .present: return 14, none = .absent: {} }
     let chosen: pick(left: false, a: xs, b: made(n: 3))
     switch { chosen.count != 3 | pick(left: true, a: made(n: 2), b: xs).count != 2: return 15, default: {} }
     let text: switch { chosen.count = 3: "three", default: "other" }
@@ -170,8 +170,8 @@ function partial(let xs: Array<Int>): Int {
     shapes.append(value: .group(made(n: 5)))
     shapes.append(value: .circle(radius: 1))
     state counted: 0
-    for s in shapes & s.group(let items) & items.count > 3 { counted: counted + items.count }
-    for s in shapes & s.group { counted: counted + 100 }
+    for s in shapes & s = .group(let items) & items.count > 3 { counted: counted + items.count }
+    for s in shapes & s = .group { counted: counted + 100 }
     switch { counted != 205: return 20, default: {} }
     return 42
 }
