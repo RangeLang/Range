@@ -1161,8 +1161,9 @@ static int evalMemberAccess(Eval *eval, EvalFrame *frame, RangeNode *expr, Range
     default: break;
     }
     char type[160]; describeType(type,sizeof(type),receiver.type);
-    return evalFail(eval,expr,"%s has no member '%s'%s",type,expr->name,
-                    receiver.kind == ValueCase && enumCase(declaration,expr->name) ? "; it is a case, tested with =" : "");
+    if (receiver.kind == ValueCase && enumCase(declaration,expr->name))
+        return evalFail(eval,expr,"%s has no member '%s'; '%s' is a case, tested with =",type,expr->name,expr->name);
+    return evalFail(eval,expr,"%s has no member '%s'",type,expr->name);
 }
 
 /* Whether `pattern` matches `value`; what it binds joins the frame. A name
@@ -1188,11 +1189,6 @@ static int evalMatch(Eval *eval, EvalFrame *frame, RangeNode *pattern, RangeValu
         for (size_t i = 0; *matched && !status && (pattern->flags & RangeFlagApplication) && i < pattern->itemCount && i < value.count; ++i)
             status = evalMatch(eval,frame,pattern->items[i]->a,value.values[i],matched);
         return status;
-    }
-    case RangePatternValue: {
-        RangeValue other;
-        if ((status = evalExpression(eval,frame,pattern->a,&other))) return status;
-        return evalEquals(eval,value,other,pattern,matched);
     }
     default: return evalFail(eval,pattern,"this pattern form is not run at macro time");
     }

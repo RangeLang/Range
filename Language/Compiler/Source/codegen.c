@@ -3319,17 +3319,6 @@ static void nativeMatch(Native *native, NativeMatch *match, RangeNode *pattern, 
         }
         return;
     }
-    case RangePatternValue: {
-        // A value the field must equal, by its type's `=`.
-        nativePlaceLoad(native,place,type);
-        nativeEmit(native,armPush(0));
-        nativeExpression(native,pattern->a);
-        nativeEmit(native,armMov(1,0));
-        nativeEmit(native,armPop(0));
-        nativeEquals(native,type);
-        nativeFail(match,nativeEmit(native,armCbz(0,0)),armCbz(0,0));
-        return;
-    }
     default:
         nativeMissing(native,pattern,"this pattern form is not implemented natively");
     }

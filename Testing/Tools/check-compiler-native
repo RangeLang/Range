@@ -646,6 +646,32 @@ reject equality-macro-values "@fruit has no cases; related: 'value = Apple' test
 @fruit construct Apple { let weight: Int }
 function f(let v: @fruit): Bool { return v = .Apple }
 { return 0 }'
+# A form of a case binds or compares, not both.
+coded='enum Coded { case failed(reason: String, code: Int), pair(Coded, Int), done }'
+reject form-mixed "a case form binds or compares, not both: bind 'code' with let and test it with &" \
+    "$coded
+function f(let a: Coded): Int { switch { a = .failed(reason: let r, code: 0): return r.count, default: return 0 } }
+{ return 0 }"
+reject form-mixed-typed "a case form binds or compares, not both: bind 'code' with let and test it with &" \
+    "$coded
+function f(let a: Coded): Int { switch { a = Coded.failed(reason: let r, code: 0): return r.count, default: return 0 } }
+{ return 0 }"
+reject form-mixed-ignored "a case form binds or compares, not both: bind this field with let and test it with &" \
+    "$coded
+function f(let a: Coded): Bool { return a = .failed(_, 0) }
+{ return 0 }"
+reject form-mixed-negated "a case form binds or compares, not both: bind this field with let and test it with &" \
+    "$coded
+function f(let a: Coded): Bool { return a != .pair(_, 0) }
+{ return 0 }"
+reject form-mixed-nested "a case form binds or compares, not both: bind 'code' with let and test it with &" \
+    "$coded
+function f(let a: Coded): Int { switch { a = .pair(.failed(reason: let r, code: 0), _): return r.count, default: return 0 } }
+{ return 0 }"
+reject form-mixed-receiver "a case form binds or compares, not both: bind 'code' with let and test it with &" \
+    'enum Coded { case failed(reason: String, code: Int), done
+    function f(): Int { switch { Coded = .failed(reason: let r, code: 0): return r.count, default: return 0 } } }
+{ return 0 }'
 # The receiver is the enum's name, in the enum's own functions only.
 reject receiver-outside "'Phase' names a type; its receiver is available only in its own functions" \
     "$phase
@@ -659,9 +685,22 @@ reject receiver-construct "'Phase' names a type; its receiver is available only 
     "$phase
 construct Holder { function f(): Bool { return Phase != Phase.loading } }
 { return 0 }"
-reject receiver-missing "switch must be exhaustive" \
+reject receiver-missing "switch must be exhaustive: 'Phase = .loaded' is not handled; add an arm for it or a default" \
     'enum Phase { case loading, loaded(Int)  function f(): Int { switch { Phase = .loading: return 1 } } }
 { return 0 }'
+reject receiver-unreachable "this condition is already handled by earlier arms" \
+    'enum Phase { case loading, loaded(Int)  function f(): Int { switch { Phase = .loaded: return 1, Phase = .loaded(let n): return n, default: return 0 } } }
+{ return 0 }'
+# Emitted functions are the enum's own, with its name written or spliced.
+run receiver-emitted 3 "" "$(case_file receiver-emitted 'macro emits(): Enum {
+    #graph { extension #target.name {
+        function isOn(): Bool { return Light = .on }
+        function count(): Int { switch { #target.name = .on: return 3, #target.name = .off: return 2 } }
+    } }
+}
+@emits
+enum Light { case on, off }
+{ let l: Light.on switch { l.isOn(): return l.count(), default: return 0 } }')"
 # At macro time a case test reads the value's case when it runs.
 run macro-case-comparisons 0 "" "$(case_file macro-case-comparisons 'macro paired(): Enum {
     let on: #target.cases.first(where: { c in c.name = "on" })
@@ -849,6 +888,21 @@ reject case-off-macro-value "Optional<Wrapped: EnumCase> has no member 'present'
     'macro named(): Enum { switch { #target.cases.first().present: {}, default: {} } }
 @named
 enum Light { case on, off }
+{ return 0 }'
+reject case-off-macro-time "has no member 'present'; 'present' is a case, tested with =" \
+    'macro named(): Construct {
+    switch { #target.members.first() = .present(let m): switch { m.value.present: {}, default: {} }, default: {} }
+}
+@named
+construct Holder { let x: Int? }
+{ return 0 }'
+# A value known only at macro time gives a form of values no context; the known gap in TODO.md.
+reject case-values-macro-time "'.present' needs a context that names its enum" \
+    'macro named(): Construct {
+    switch { #target.members.first() = .present(let m): switch { m.value = .present(1): {}, default: {} }, default: {} }
+}
+@named
+construct Holder { let x: Int? }
 { return 0 }'
 reject no-member-of-enum "Phase has no member 'gone'" \
     "$phase

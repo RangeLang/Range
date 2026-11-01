@@ -83,6 +83,21 @@ function compared(let phase: Phase): Int {
     }
 }
 
+// A form binds or compares, so a test binds its field and `&` compares it:
+// in a group, or on each side of `|`, which bind the same names.
+function coded(let phase: Phase): Int {
+    switch {
+        phase = .failed(reason: let r, code: let c) & (c = 0 | c = 1): return r.count,
+        phase = .failed(reason: let r, code: let c) & c = 2 | phase = .failed(reason: let r, code: let c) & c = 3: return 10 + r.count,
+        default: return 0
+    }
+}
+
+// A case among values is a value too.
+enum Slot { case held(Light, Int), free }
+
+function slotted(let slot: Slot): Bool { return slot = .held(.on, 1) }
+
 // An enum that writes its own `=` still has its payload-less cases tested:
 // `.a` is a case test, whatever `=` says, while a form of values calls `=`.
 enum Odd {
@@ -237,6 +252,11 @@ enum Direction {
     // A case of what an optional holds compares with the value it is promoted to.
     let lit: Light?.present(.on)
     switch { !(lit = .on) | lit = Light.off: return 34, default: {} }
+
+    let failing: Phase.failed(reason: "abc", code: 1)
+    switch { coded(phase: failing) != 3 | coded(phase: Phase.failed(reason: "abc", code: 3)) != 13: return 36, default: {} }
+    switch { coded(phase: Phase.failed(reason: "abc", code: 4)) != 0 | coded(phase: Phase.loading) != 0: return 37, default: {} }
+    switch { !slotted(slot: Slot.held(.on, 1)) | slotted(slot: Slot.held(.off, 1)) | slotted(slot: Slot.free): return 38, default: {} }
 
     // A switch's value reads what its arm's test bound.
     let doubled: switch {

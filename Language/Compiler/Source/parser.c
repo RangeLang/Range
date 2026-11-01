@@ -469,7 +469,7 @@ static RangeNode *parseString(RangeParser *parser)
 
 /* A case test's argument that is not a value: `let name` binds the payload
  * field to name, in the arm or filter that receives it; `_` ignores it.
- * Returns NULL for any other argument, a value the field must equal. */
+ * Returns NULL for any other argument. */
 static RangeNode *parseArgumentPattern(RangeParser *parser)
 {
     if (parserAt(parser, "_") && (rangeTokenIs(parserPeek(parser), ",") || rangeTokenIs(parserPeek(parser), ")"))) {

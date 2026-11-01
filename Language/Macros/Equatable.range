@@ -1,6 +1,5 @@
-// `a = b` compares two values of one type; `a != b` is `!(a = b)`, and a
-// case test's value argument compares the same way. An optional operand is
-// promoted first, so `maybe = 5` compares two Int? values.
+// `a = b` compares two values of one type; `a != b` is `!(a = b)`. An optional
+// operand is promoted first, so `maybe = 5` compares two Int? values.
 //
 // Every construct and enum has `=` built in: C compares a construct's stored
 // members in order, or an enum's case and then that case's payload fields,

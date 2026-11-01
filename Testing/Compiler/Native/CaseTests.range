@@ -35,8 +35,7 @@ function combine(let a: Phase, let b: Phase): Int {
     }
 }
 
-// Inside the parentheses, an expression is a value the field must equal,
-// `_` ignores a field, and `.case` tests it.
+// Inside the parentheses, `_` ignores a field and a case tests it.
 function lights(let p: Pair): Int {
     switch {
         p = .pair(_, Light.on): return 1,
@@ -79,7 +78,7 @@ function unwrapped(let value: Int?): Int {
 function longer(let a: Phase, let limit: Int): Int {
     switch {
         a = .failed(reason: let r, code: let c) & r.count > limit & c > 0: return r.count,
-        a = .failed(reason: let r, code: 0) | a = .failed(reason: let r, code: 1): return 0 - r.count,
+        a = .failed(reason: let r, code: let c) & (c = 0 | c = 1): return 0 - r.count,
         default: return 0
     }
 }

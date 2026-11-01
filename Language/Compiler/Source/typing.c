@@ -55,20 +55,8 @@ typedef struct { const char *name; RangeNode *call, *path; } CaseForm;
 
 static CaseForm caseForm(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context);
 
-static RangeNode *casePattern(Typer *typer, SourceScope *scope, RangeNode *at, CaseForm form, RangeNode *context);
-
-/* An argument of a case test, as the pattern it is. */
-static RangeNode *argumentPattern(Typer *typer, SourceScope *scope, RangeNode *value, RangeNode *context)
-{
-    if (value->kind == RangeNodePattern) return value;
-    CaseForm form = caseForm(typer,scope,value,context);
-    if (form.name) return casePattern(typer,scope,value,form,context);
-    RangeNode *pattern = rangeNodeCreate(typer->report->arena,RangeNodePattern,value->path,value->line,value->column);
-    pattern->integer = RangePatternValue;
-    pattern->a = value;
-    return pattern;
-}
-
+/* The pattern a case form is: its arguments hold `let`, `_` and cases only,
+ * which caseFormReads has checked. */
 static RangeNode *casePattern(Typer *typer, SourceScope *scope, RangeNode *at, CaseForm form, RangeNode *context)
 {
     RangeArena *arena = typer->report->arena;
@@ -82,7 +70,8 @@ static RangeNode *casePattern(Typer *typer, SourceScope *scope, RangeNode *at, C
         RangeNode *written = form.call->items[i];
         RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,written->path,written->line,written->column);
         argument->name = written->name;
-        argument->a = argumentPattern(typer,scope,written->a,context);
+        argument->a = written->a->kind == RangeNodePattern ? written->a
+            : casePattern(typer,scope,written->a,caseForm(typer,scope,written->a,context),context);
         rangeNodeAppend(arena,pattern,argument);
     }
     return pattern;
@@ -3310,6 +3299,20 @@ static int caseFormReads(Typer *typer, SourceScope *scope, CaseForm form, RangeN
     return reads;
 }
 
+/* The first argument of a form that is a value. */
+static RangeNode *comparedArgument(Typer *typer, SourceScope *scope, CaseForm form, RangeNode *context)
+{
+    for (size_t i = 0; form.call && i < form.call->itemCount; ++i) {
+        RangeNode *value = form.call->items[i]->a;
+        if (value->kind == RangeNodePattern) continue;
+        CaseForm inner = caseForm(typer,scope,value,context);
+        if (!inner.name) return form.call->items[i];
+        RangeNode *nested = comparedArgument(typer,scope,inner,context);
+        if (nested) return nested;
+    }
+    return NULL;
+}
+
 /* `subject = form` when the form is a case test: *tests is set, and the
  * result is its type. A form of values only is left to be compared by `=`,
  * and so is a case of what an optional subject holds, or of another type,
@@ -3317,7 +3320,15 @@ static int caseFormReads(Typer *typer, SourceScope *scope, CaseForm form, RangeN
 static RangeNode *typeCaseComparison(Typer *typer, SourceScope *scope, RangeNode *expr, CaseForm form, RangeNode *left, RangeNode *context, int *tests)
 {
     int reads = caseFormReads(typer,scope,form,context), binds = (reads & CaseBinds) != 0;
-    if (macroUnion(left) || (reads == CaseCompares)) return NULL;
+    if (reads == (CaseBinds | CaseCompares)) {
+        RangeNode *compared = comparedArgument(typer,scope,form,context);
+        char field[128] = "this field";
+        if (compared->name) snprintf(field,sizeof(field),"'%s'",compared->name);
+        typeError(typer,compared,"a case form binds or compares, not both: bind %s with let and test it with &",field);
+        *tests = 1;
+        return NULL;
+    }
+    if (macroUnion(left) || reads == CaseCompares) return NULL;
     if (left && !deferredType(typer,left) && !binds) {
         if (form.path && caseFormType(typer,scope,form.path,left,context,expr) != left) return NULL;
         RangeNode *held = isEnum(left) && !enumCase(left->resolvedDeclaration,form.name) ? optionalWrapped(typer,left,NULL) : NULL;
@@ -3899,8 +3910,8 @@ static void typeStatementOnly(Typer *typer, SourceScope *scope, RangeNode *node,
  * arms or a default, and runs exactly one arm; an arm that no earlier arm
  * leaves anything for is an error. Coverage is the usefulness of a pattern
  * vector over the rows before it (Maranget's algorithm), one column per
- * subject: an enum case splits a column into its payload fields; values and
- * rows with a guard cover nothing for the rows after them. */
+ * subject: an enum case splits a column into its payload fields; rows with a
+ * guard cover nothing for the rows after them. */
 
 static int patternWild(const RangeNode *pattern)
 {
@@ -3915,24 +3926,6 @@ static RangeNode *patternCase(RangeNode *key, RangeNode *pattern)
 static RangeNode *patternField(const RangeNode *pattern, size_t index)
 {
     return pattern && (pattern->flags & RangeFlagApplication) && index < pattern->itemCount ? pattern->items[index]->a : NULL;
-}
-
-static int literalValue(const RangeNode *value, long long *out)
-{
-    if (!value) return 0;
-    if (value->kind == RangeNodeInteger || value->kind == RangeNodeBool) { *out = value->integer; return 1; }
-    if (value->kind == RangeNodeUnary && same(value->name,"-") && value->a && value->a->kind == RangeNodeInteger) {
-        *out = -value->a->integer;
-        return 1;
-    }
-    return 0;
-}
-
-static int sameValuePattern(const RangeNode *a, const RangeNode *b)
-{
-    long long x, y;
-    return a && b && a->integer == RangePatternValue && b->integer == RangePatternValue
-        && literalValue(a->a,&x) && literalValue(b->a,&y) && x == y;
 }
 
 /* Rows and the vector specialized to one case: its payload fields replace the column. */
@@ -3968,12 +3961,6 @@ static int useful(Typer *typer, RangeNode ***rows, size_t count, RangeNode **q, 
     }
     RangeNode ***rest = rangeArenaAllocate(arena,(count ? count : 1) * sizeof(*rest));
     size_t n = 0;
-    if (!patternWild(head)) {
-        // A value or a relation: only rows that are wild here or the same value remain.
-        for (size_t r = 0; r < count; ++r)
-            if (patternWild(rows[r][0]) || sameValuePattern(rows[r][0],head)) rest[n++] = rows[r] + 1;
-        return useful(typer,rest,n,q + 1,types + 1,width - 1);
-    }
     if (isEnum(type)) {
         RangeNode *declaration = type->resolvedDeclaration;
         int complete = 1;
@@ -4006,7 +3993,6 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
         // Which cases the subject has is known at macro time: what the
         // pattern binds is known then too.
         if (pattern->integer == RangePatternBind) finding(typer,pattern->a)->type = type;
-        else if (pattern->integer == RangePatternValue) (void)typeOf(typer,scope,pattern->a,NULL,context);
         else for (size_t i = 0; i < pattern->itemCount; ++i) typePattern(typer,scope,pattern->items[i]->a,type,context);
         return;
     }
@@ -4053,21 +4039,6 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
             finding(typer,argument)->resolvedDeclaration = field;
             typePattern(typer,scope,argument->a,memberTypeIn(typer,type,field),context);
         }
-        return;
-    }
-    case RangePatternValue: {
-        RangeNode *actual = typeOf(typer,scope,pattern->a,type,context);
-        expectType(typer,pattern->a,type,actual,"pattern");
-        // A literal that names a case of a literal enum is that case's pattern.
-        if (isEnum(type) && actual == type) {
-            RangeNode *value = pattern->a, *entry = NULL;
-            if (isLiteral(value)) entry = literalCase(type->resolvedDeclaration,value);
-            else if (found(typer->key,value)->resolvedDeclaration && found(typer->key,value)->resolvedDeclaration->kind == RangeNodeEnumCase)
-                entry = found(typer->key,value)->resolvedDeclaration;
-            if (entry) { pattern->integer = RangePatternCase; finding(typer,pattern)->resolvedDeclaration = entry; pattern->name = entry->name; return; }
-        }
-        // Any other value is compared with `=`.
-        if (actual == type) noteEquality(typer,type,pattern);
         return;
     }
     }

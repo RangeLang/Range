@@ -91,7 +91,6 @@ Testing/Compiler/Native/MacroValues.range and Partitioned.range. Still to do:
 - Open:
   - `fruits.filter(only: Apple)` as a shorter spelling; it passes a type as
     an argument, which Range does nowhere at run time.
-  - Whether `shape = .circle` tests an enum's case, ignoring its payload.
   - `{ fruit in fruit = Apple }` reads oddly: a closure's `in` reads like
     `for … in`, singular in plural.
 
@@ -148,6 +147,9 @@ Revisit the `$` spelling for passing a state to a binding
 (`Stepper(quantity: $amount)`); George chose `$` for visibility at the call
 site on 2026-10-29, to be revisited.
 
+### Enum cases as a macro target
+For example `@cyclic` on a case for custom equality (360° = 0°).
+
 ### Reflected types as specializations
 `Parameter.type`, `Function.output` and `Function.receiver` are declarations,
 generic arguments aside. A type written with generic arguments is a
@@ -189,6 +191,10 @@ of a generic declaration would differ between its own run and its law runs.
   nothing, so Kept is its parameter's type. A call of a function with
   `@narrows` typed at macro time before that application has run is
   reported as not implemented.
+- A form of a case whose arguments are values, as in `a = .degrees(0)`, is
+  typed from its left side, so one compared with a value known only at macro
+  time is reported: "'.degrees' needs a context that names its enum". Bind the
+  field and compare it: `a = .degrees(let d) & d = 0`.
 - `let s: make(1)`, where `make` is a closure parameter, is not compiled
   natively ("native values of <unknown> are not implemented").
 - Values of a macro's types (`@fruit`):

@@ -112,7 +112,6 @@ enum {
     RangePatternBind,     /* let name: a is the Let it declares */
     RangePatternCase,     /* .name(…): a case, with one sub-pattern per payload field; unnamed, the
                            * payload case `for … in` unwraps */
-    RangePatternValue,    /* a value compared for equality, by its type's `=`: a */
     RangePatternRow       /* a row of a switch over conditions: no items, b its condition */
 };
 
