@@ -1,0 +1,60 @@
+// Inside a function, a call of its @narrows parameter in a condition narrows
+// the argument to Kept for the rest of the `&` chain and the arm, as a type
+// test does, so the body is checked once against Kept. At run, the element
+// is read as Kept holds it: an Apple held in a @fruit is read out of it, and
+// a present String? is its String.
+macro fruit(): Construct {
+    #graph { extension #target.name { function weight(): Int { return grams } } }
+}
+@fruit construct Apple { let grams: Int  let color: String }
+@fruit construct Banana { let grams: Int  let length: Int }
+
+function chosen<Kept>(let all: Array<@fruit>, @narrows(to: Kept) let where: (@fruit) -> Bool): Array<Kept> {
+    state result: Array<Kept>()
+    for index in 0..<all.count {
+        let element: all.read(at: index)
+        switch { where(element): result.append(value: element), default: {} }
+    }
+    return result
+}
+
+// Through `&`, and in a for loop's condition.
+function chosenNames<Kept>(let all: Array<String?>, @narrows(to: Kept) let where: (String?) -> Bool): Array<Kept> {
+    state result: Array<Kept>()
+    for index in 0..<all.count {
+        let element: all.read(at: index)
+        switch { index >= 0 & where(element) & index < 100: result.append(value: element), default: {} }
+    }
+    state again: Array<Kept>()
+    for name in all & where(name) { again.append(value: name) }
+    switch { again.count != result.count: return again, default: {} }
+    return result
+}
+
+function firstKept<Kept>(let all: Array<Int>, @narrows(to: Kept) let where: (Int) -> Bool): Kept? {
+    for n in all { switch { where(n): return n, default: {} } }
+    return .absent
+}
+
+{
+    // Array<@fruit> keeps one block per type; the result keeps only Apples.
+    state all: Array<@fruit>()
+    all.append(value: Apple(grams: 100, color: "red"))
+    all.append(value: Banana(grams: 120, length: 12))
+    all.append(value: Apple(grams: 150, color: "green"))
+    all.append(value: Banana(grams: 90, length: 9))
+    let apples: chosen(all: all) { fruit in fruit = Apple }
+    let bananas: chosen(all: all) { fruit in fruit = Banana & fruit.length > 10 }
+    let heavy: chosen(all: all) { fruit in fruit.weight() > 110 }
+    state names: Array<String?>()
+    names.append(value: "ab")
+    names.append(value: .absent)
+    names.append(value: "cde")
+    let present: chosenNames(all: names) { name in name.present }
+    state numbers: Array<Int>()
+    numbers.append(value: 2)
+    numbers.append(value: 7)
+    let big: firstKept(all: numbers) { n in n > 5 }
+    print(message: "\(apples.count) \(apples.read(at: 0).color) \(apples.read(at: 1).grams) \(bananas.read(at: 0).length) \(heavy.count) \(present.count) \(present.read(at: 1).count)")
+    switch { big.present(let b): return b + 35, default: return 1 }
+}

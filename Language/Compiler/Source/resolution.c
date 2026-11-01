@@ -1047,7 +1047,8 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
         }
         else if (macroBuiltin(node,"narrows"))
             sourceDiagnostic(report,node,1,"C-implementation","@narrows is checked and applied in C: at each call, C fills the type "
-                             "parameter it names with what a true result of the closure written there narrows the closure's parameter to");
+                             "parameter it names with what a true result of the closure written there narrows the closure's parameter to, "
+                             "and a call of the parameter in a condition narrows its argument to that type");
         else if (macroBuiltin(node,"interval"))
             sourceDiagnostic(report,node,1,"C-implementation","'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal"))

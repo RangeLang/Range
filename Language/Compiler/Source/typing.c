@@ -2576,6 +2576,38 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
     return functionType(typer,parameters,expected->itemCount,result,closure);
 }
 
+static int narrowablePath(RangeNode *, RangeNode *);
+static void pushNarrowed(Typer *, RangeNode *, RangeNode *, RangeNode *);
+
+/* `where(element)`, where `where` applies @narrows(to: Kept): a true result
+ * narrows its argument, a stable value, to Kept, the type the call of the
+ * function filled it with, as `element = Apple` narrows it to the Apple it
+ * holds. Checked once, Kept is its face. */
+static void narrowCalled(Typer *typer, RangeNode *call, RangeNode *parameter)
+{
+    RangeNode *named = narrowsGeneric(parameter,NULL);
+    if (!named || call->itemCount != 1) return;
+    RangeNode *path = call->items[0]->a, *from = found(typer->key,path)->type, **slot = genericSlot(typer->key,named);
+    RangeNode *kept = slot ? *slot : NULL;
+    if (!kept || !from || kept == from || !narrowablePath(typer->key,path)) return;
+    RangeNode *entry = wrappingCase(typer,from,kept);
+    if (!entry && !abstractType(kept)) {
+        char k[160], f[160]; describeType(k,sizeof(k),kept); describeType(f,sizeof(f),from);
+        typeError(typer,path,"narrowing %s to %s, what '%s' narrows it to, is not implemented: %s holds no case of it",f,k,parameter->name,f);
+        return;
+    }
+    pushNarrowed(typer,path,entry,kept);
+}
+
+/* Whether an expression is a call that narrows its argument: its narrowing
+ * holds beyond it as a case test's does. */
+static int narrowingCall(Typer *typer, RangeNode *expr)
+{
+    if (expr->kind != RangeNodeCall || !expr->a || expr->a->kind != RangeNodeName) return 0;
+    RangeNode *callee = found(typer->key,expr->a)->resolvedDeclaration;
+    return callee && callee->kind == RangeNodeParameter && narrowsGeneric(callee,NULL);
+}
+
 /* `where(element)`: a call of the closure a parameter holds, with one
  * unlabeled argument per parameter of its type. */
 static RangeNode *typeClosureCall(Typer *typer, SourceScope *scope, RangeNode *call, RangeNode *value, RangeNode *context)
@@ -2597,6 +2629,7 @@ static RangeNode *typeClosureCall(Typer *typer, SourceScope *scope, RangeNode *c
         char what[160]; snprintf(what,sizeof(what),"argument %zu of '%s'",i + 1,callee->name);
         coerce(typer,argument->a,expected,actual,what);
     }
+    narrowCalled(typer,call,value);
     return type->a;
 }
 
@@ -3085,7 +3118,7 @@ static RangeNode *typeOf(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
         finding(typer,expr)->type = type;
     } else type = typeExpression(typer,scope,expr,expected,context);
     RangeNode *lowered = found(typer->key,expr)->lowered;
-    if (!logic && !(lowered && lowered->kind == RangeNodeCaseTest)) typer->narrowedCount = mark;
+    if (!logic && !(lowered && lowered->kind == RangeNodeCaseTest) && !narrowingCall(typer,expr)) typer->narrowedCount = mark;
     type = narrowedRead(typer,expr,type);
     return type;
 }

@@ -10,5 +10,12 @@
 // closure parameter's own type when the closure narrows nothing, when the
 // two sides of `|` narrow it differently, or when the argument is not a
 // closure written there, such as a parameter passed on.
+//
+// Inside the function, a call of the parameter in a condition, as in
+// `switch { where(element): … }`, narrows its argument, a stable value, to
+// Kept for the rest of the `&` chain and the arm, as a type test does, so
+// the body is checked once against Kept. At run nothing changes: the
+// argument is read as Kept holds it, the Apple out of its @fruit, the
+// String out of its present String?.
 @builtin
 macro narrows(let to: TypeParameter): Parameter

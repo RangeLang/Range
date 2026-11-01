@@ -997,6 +997,22 @@ reject narrows-foreign "narrows-foreign.range:2:34: @narrows(to:) names a type p
 reject narrows-type "argument 'to' of '@narrows' requires TypeParameter; found Construct" \
     'function kept<Kept>(@narrows(to: Int) let where: (Int) -> Bool): Array<Kept> { return Array<Kept>() }
 { return 0 }'
+# A call of a @narrows parameter in a condition narrows its argument to Kept
+# there; the element is read as Kept holds it.
+run narrowed-calls 42 "" Testing/Compiler/Native/NarrowedCalls.range
+[[ "$(cat "$work_root/stdout")" == "2 red 150 12 2 2 3" ]] || fail "narrowed calls printed: $(cat "$work_root/stdout")"
+if command -v leaks > /dev/null; then
+    leaks --atExit -- "$work_root/narrowed-calls" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" || fail "narrowed-calls leaks heap storage"
+fi
+for condition in 'where(n) | n > 3' '!where(n)'; do
+    reject narrowed-call-outside "argument 'value' of 'append' requires Kept; found Int<bits: 64, signed: true>; in chosen<Kept>" \
+        "function chosen<Kept>(let all: Array<Int>, @narrows(to: Kept) let where: (Int) -> Bool): Array<Kept> {
+    state result: Array<Kept>()
+    for n in all { switch { $condition: result.append(value: n), default: {} } }
+    return result
+}
+{ return 0 }"
+done
 # #target is the declaration a macro is attached to: an ordinary value, and
 # spliced alone into #graph it names that declaration.
 run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {
