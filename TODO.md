@@ -134,6 +134,12 @@ their constraints, so there is nothing for biunification to solve.
 - If union types return, they are joins, with `Never` as bottom.
 - Value collections are copy-on-write, so `Array<T>` can be covariant safely.
 
+### Parameter macros
+Parameter macros are also the way to auto-closures later (a parameter whose
+argument is wrapped in a closure at the call). `#graph` in a macro applied to
+a parameter is not implemented: where its code would land is not decided. A
+closure literal's parameters, as in `{ n in … }`, take no macros.
+
 ### Parameter defaults
 Functions have none, so macros have none, and overloads cover it for now.
 Decide for both together.

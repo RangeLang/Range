@@ -934,6 +934,41 @@ reject twice-emitted "@equatable is already applied to 'Array' at" \
 extension Array {}
 { return 0 }'
 grep -Fq "a macro applies once per declaration; @collection emits it again" "$work_root/log" || fail "twice-emitted named no emitter"
+# A macro may target Parameter: written before a parameter's let, it reads the
+# parameter through #target and runs once per parameter, arguments and all.
+run parameter-macros 42 "" Testing/Compiler/Native/ParameterMacros.range
+for expected in "27:15: warning[macro]: 'value' is counted" "29:16: warning[macro]: 'body' takes a closure" \
+    "29:50: warning[macro]: 'at' is limited below 10" "29:70: warning[macro]: 'at' is counted" "34:18: warning[macro]: 'count' is counted"; do
+    grep -Fq "ParameterMacros.range:$expected" "$work_root/log" || fail "a parameter macro did not report: $expected"
+done
+counted='macro counted(): Parameter {
+    switch { #target.type != Int: diagnostic(message: "'"'"'\(#target.name)'"'"' must be an Int"), default: {} }
+}'
+reject parameter-macro-diagnostic "parameter-macro-diagnostic.range:2:35: 'value' must be an Int" "$counted
+function keep(@counted let value: String): String { return value }
+{ return 0 }"
+reject parameter-macro-closure "parameter-macro-closure.range:2:35: 'body' must be an Int" "$counted
+function apply(@counted let body: (Int) -> Int): Int { return body(1) }
+{ return apply { n in n } }"
+reject parameter-macro-target "parameter-macro-target.range:4:1: no macro 'counted' targets Construct" "$counted
+@counted
+construct Box { let n: Int }
+{ return 0 }"
+reject parameter-macro-kind "parameter-macro-kind.range:1:15: no macro 'equatable' targets Parameter" \
+    'function keep(@equatable let value: Int): Int { return value }
+{ return 0 }'
+reject parameter-macro-twice "parameter-macro-twice.range:4:24: @counted is already applied to 'value' at" "$counted
+function keep(@counted @counted let value: Int): Int { return value }
+{ return 0 }"
+grep -Fq "parameter-macro-twice.range:4:15; a macro applies once per declaration" "$work_root/log" || fail "parameter-macro-twice named no first application"
+reject parameter-macro-argument "argument 'below' of '@limited' requires Int<bits: 64, signed: true>; found String" \
+    'macro limited(let below: Int): Parameter {}
+function keep(@limited(below: "ten") let value: Int): Int { return value }
+{ return 0 }'
+reject parameter-macro-graph "parameter-macro-graph.range:1:38: #graph in a macro applied to a parameter is not implemented: where code emitted for parameter 'value' of 'keep' would land is not decided" \
+    'macro emitting(): Parameter { #graph { function extra(): Int { return 1 } } }
+function keep(@emitting let value: Int): Int { return value }
+{ return 0 }'
 # #target is the declaration a macro is attached to: an ordinary value, and
 # spliced alone into #graph it names that declaration.
 run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {

@@ -141,7 +141,8 @@ void resolveGraphTarget(Resolver *vm, RangeNode *target)
         singleApplication(vm,target,attributes->items[a]);
         resolveApplication(vm,target,attributes->items[a]);
     }
-    if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
+    // A function's items are its parameters, which macros attach to as well.
+    if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeFunction)
         for (size_t i = 0; i < target->itemCount; ++i) resolveGraphTarget(vm,target->items[i]);
 }
 
@@ -653,6 +654,7 @@ void resolveSignatureTypes(Resolver *vm, RangeNode *node, RangeNode *owner)
             output->resolvedDeclaration = namedDeclaration(vm,node,output->name,output->flags,output,"graph output");
         for (size_t i = 0; i < node->itemCount; ++i) {
             RangeNode *parameter = node->items[i];
+            if (parameter->kind == RangeNodeParameter) parameter->owner = node; /* the function a parameter macro's target belongs to */
             if (parameter->kind == RangeNodeParameter && parameter->b && parameter->b->kind == RangeNodeName)
                 parameter->b->resolvedDeclaration = namedDeclaration(vm,node,parameter->b->name,parameter->flags,parameter->b,"parameter type");
         }

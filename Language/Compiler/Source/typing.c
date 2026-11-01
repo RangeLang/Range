@@ -4922,7 +4922,11 @@ int typeApplicationOnDemand(Typer *typer, RangeMacroApplication *app)
     if (!app->argued) {
         RangeNode *macro = app->declaration;
         SourceScope written[33], declared[33], unit = {.owner=app->unit};
-        SourceScope *scope = enclosingScope(typer,app->target,written);
+        // A parameter's applications are written in its function's
+        // signature, so they see the function's own generics.
+        RangeNode *function = app->target->kind == RangeNodeParameter ? app->target->owner : NULL;
+        SourceScope *scope = enclosingScope(typer,function ? function : app->target,written), within;
+        if (function) { within = (SourceScope){.owner=function,.parent=scope}; scope = &within; }
         SourceScope signature = {.owner=macro,.parent=enclosingScope(typer,macro,declared)};
         size_t errors = typer->report->errors;
         TyperContext outer = typerTop(typer);
@@ -4940,7 +4944,7 @@ static void typeApplications(Typer *typer, RangeNode *declaration)
     for (size_t i = 0; declaration->c && i < declaration->c->itemCount; ++i)
         if (declaration->c->items[i]->kind == RangeNodeAttribute && declaration->c->items[i]->macroApplication)
             (void)typeApplicationOnDemand(typer,declaration->c->items[i]->macroApplication);
-    if (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)
+    if (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum || declaration->kind == RangeNodeFunction)
         for (size_t i = 0; i < declaration->itemCount; ++i) typeApplications(typer,declaration->items[i]);
 }
 

@@ -1,0 +1,40 @@
+// A macro may target Parameter: it applies to a function's parameter, written
+// before its `let`, and reads it through #target, as macros on other
+// declarations read theirs. It runs once per parameter, with its arguments
+// checked and known at macro time where it is written.
+macro counted(): Parameter {
+    switch {
+        #target.type != Int: diagnostic(message: "'\(#target.name)' must be an Int"),
+        default: warning(message: "'\(#target.name)' is counted")
+    }
+}
+
+// A parameter that takes a closure has no nominal type.
+macro closured(): Parameter {
+    switch {
+        #target.type.present: diagnostic(message: "'\(#target.name)' must take a closure"),
+        default: warning(message: "'\(#target.name)' takes a closure")
+    }
+}
+
+macro limited(let below: Int): Parameter {
+    switch {
+        below < 1: diagnostic(message: "'\(#target.name)' needs a positive limit"),
+        default: warning(message: "'\(#target.name)' is limited below \(below)")
+    }
+}
+
+function keep(@counted let value: Int): Int { return value }
+
+function apply(@closured let body: (Int) -> Int, @limited(below: 10) @counted let at: Int): Int { return body(at) }
+
+// A method's parameter, and one of a generic method, apply macros the same way.
+construct Box<T> {
+    let held: T
+    function put(@counted let count: Int, let value: T): Int { return count }
+}
+
+{
+    let box: Box<String>(held: "a")
+    return keep(value: 20) + apply(body: { n in n * 2 }, at: 10) + box.put(count: 2, value: "b")
+}

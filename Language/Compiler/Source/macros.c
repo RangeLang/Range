@@ -178,8 +178,9 @@ static int applyTarget(Resolver *vm, SourceReport *report, RangeNode *unit, Rang
         ++vm->checked;
         guarded(vm,report,"macro-validation",applyAndMerge,attribute);
     }
-    // Members merged during this round wait for the next one.
-    if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum)
+    // Members merged during this round wait for the next one. A function's
+    // items are its parameters.
+    if (target->kind == RangeNodeConstruct || target->kind == RangeNodeEnum || target->kind == RangeNodeFunction)
         for (size_t i = 0, n = target->itemCount; i < n; ++i)
             ran |= applyTarget(vm,report,unit,target->items[i],shape);
     return ran;

@@ -1625,7 +1625,10 @@ static RangeNode *parseFunction(RangeParser *parser, RangeNode *attributes,
     if (attributesContain(attributes, "builtin")) node->flags |= RangeFlagBuiltin;
     parserExpect(parser, "(");
     while (!parser->failed && !parserAt(parser, ")")) {
+        /* `@marked let value: Int`: macros applied to the parameter, as to any declaration. */
+        RangeNode *attributes = parserAt(parser, "@") ? parseAttributes(parser) : NULL;
         RangeNode *parameter = parserNode(parser, RangeNodeParameter);
+        parameter->c = attributes;
         if (parserAt(parser, "binding")) parameter->flags |= RangeFlagBinding;
         else if (!parserAt(parser, "let")) {
             parserFail(parser, &parser->current, "inputs require explicit let or binding");

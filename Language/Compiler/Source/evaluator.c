@@ -592,6 +592,13 @@ static int evalEmitNode(Eval *eval, EvalFrame *frame, RangeNode *node, int splic
 /* A #graph block's declarations, into the running application's output. */
 static int evalEmit(Eval *eval, EvalFrame *frame, RangeNode *emission)
 {
+    // A parameter belongs to its function's signature, which is read before
+    // macros run; what a parameter's macro would emit, and where it lands, is
+    // not decided.
+    if (eval->application->target->kind == RangeNodeParameter)
+        return evalFail(eval,emission,"#graph in a macro applied to a parameter is not implemented: where code emitted for "
+                        "parameter '%s' of '%s' would land is not decided",eval->application->target->name,
+                        eval->application->target->owner ? eval->application->target->owner->name : "?");
     for (size_t i = 0; i < emission->b->itemCount; ++i) {
         // Each emitted declaration is a fresh copy, sharing only within itself.
         if (eval->emittedCapacity) memset(eval->emittedFrom,0,eval->emittedCapacity * sizeof(*eval->emittedFrom));
