@@ -96,11 +96,14 @@ macro collection(): Construct {
                 return .absent
             }
 
-            // The elements for which `where` is true, in order, as a new
-            // collection. Like every function that takes a closure, it is
-            // compiled inline where it is called.
-            function filter(let where: (Element) -> Bool): #target.name {
-                state result: #target.name()
+            // The elements for which `where` is true, in order, as an Array
+            // of what a true result narrows them to: `fruits.filter { fruit
+            // in fruit = Apple }` is Array<Apple>, `names.filter { name in
+            // name.present }` Array<String>, and a predicate that narrows
+            // nothing keeps Element. Like every function that takes a
+            // closure, it is compiled inline where it is called.
+            function filter<Kept>(@narrows(to: Kept) let where: (Element) -> Bool): Array<Kept> {
+                state result: Array<Kept>()
                 state index: 0
                 while index < count {
                     let element: read(at: index)

@@ -6,6 +6,7 @@
 @collection
 construct Array<Element> {}
 
-// Proposed Array behavior: elements are ordered, and filtering preserves that
-// order. The resulting collection is another Array<Element>.
+// Elements are ordered, and filtering preserves that order. The result is an
+// Array of what a true result of the predicate narrows each element to, or
+// another Array<Element> when it narrows nothing (filter in Collection.range).
 // Array has no written members: its value is the members @collection emits.

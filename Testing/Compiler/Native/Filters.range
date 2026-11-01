@@ -1,0 +1,54 @@
+// filter returns an Array of what a true result of its predicate narrows the
+// element to: Array<Apple> from a @fruit array and a type test, Array<String>
+// from a String? array and `.present`, and Array<Element> otherwise.
+macro fruit(): Construct {
+    #graph { extension #target.name { function weight(): Int { return grams } } }
+}
+@fruit construct Apple { let grams: Int  let color: String }
+@fruit construct Banana { let grams: Int  let length: Int }
+
+function colors(let apples: Array<Apple>): String {
+    state joined: ""
+    for apple in apples { joined: joined + apple.color }
+    return joined
+}
+
+function lengths(let names: Array<String>): Int {
+    return names.reduce(initial: 0) { total, name in total + name.count }
+}
+
+// A predicate passed on narrows nothing: the result keeps Element.
+function kept(let fruits: Array<@fruit>, let test: (@fruit) -> Bool): Array<@fruit> { return fruits.filter(where: test) }
+
+{
+    // The elements live in partitioned storage, one block per type.
+    state fruits: Array<@fruit>()
+    fruits.append(value: Apple(grams: 100, color: "red"))
+    fruits.append(value: Banana(grams: 120, length: 12))
+    fruits.append(value: Apple(grams: 150, color: "green"))
+    fruits.append(value: Banana(grams: 90, length: 9))
+    fruits.append(value: Apple(grams: 80, color: "gold"))
+
+    let apples: fruits.filter { fruit in fruit = Apple }
+    let red: fruits.filter { fruit in fruit = Apple & fruit.color = "red" }
+    let long: fruits.filter { fruit in fruit = Banana & fruit.length > 10 }
+    let either: fruits.filter { fruit in fruit = Apple | fruit = Banana }
+    let heavy: fruits.filter { fruit in fruit.weight() > 95 }
+    let passed: kept(fruits: fruits) { fruit in fruit = Apple }
+    // Filtering what was filtered narrows again from Apple.
+    let ripe: apples.filter { apple in apple.grams > 90 }
+
+    state names: Array<String?>()
+    names.append(value: "ab")
+    names.append(value: .absent)
+    names.append(value: "cde")
+    let present: names.filter { name in name.present }
+
+    state numbers: Array<Int>()
+    for n in 0..<10 { numbers.append(value: n) }
+    let even: numbers.filter { n in n % 2 = 0 }
+
+    print(message: "\(colors(apples: apples)) \(red.read(at: 0).grams) \(long.read(at: 0).length) \(either.count) \(heavy.count) \(passed.count) \(colors(apples: ripe))")
+    print(message: "\(lengths(names: present)) \(present.read(at: 1)) \(even.count) \(even.read(at: 4))")
+    return apples.count + present.count + even.count + 32
+}

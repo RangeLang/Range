@@ -77,21 +77,10 @@ values with `@fruit`'s face, `fruit = Apple` with its narrowing, the
 partitioned storage, `remove(at:)` and `slice(at:)` are implemented; see
 Testing/Compiler/Native/MacroValues.range and Partitioned.range. Still to do:
 
-- Selection: the narrowing that holds when `filter`'s predicate is true
-  becomes the result's element type, so `fruits.filter { fruit in fruit =
-  Apple }` is `Array<Apple>` and `names.filter { name in name.present }` is
-  `Array<String>`. Today the result stays `Array<@fruit>`; `for fruit in
-  fruits & fruit = Apple { … }` narrows already. This replaces the
-  2026-09-08 note that `filter` need not read narrowing from a predicate.
-  - Open: how `filter`'s declaration in `@collection` says it, without C
-    naming `filter`. Candidate: a parameter macro, as in
-    `function filter<Kept>(@narrows(to: Kept) let where: (Element) -> Bool): Array<Kept>`,
-    where Kept is what a true result narrows the closure's parameter to, and
-    Element when it narrows nothing.
-  - When the predicate is exactly a type test, the result can share that
-    type's block, copy-on-write. That needs a slot primitive that hands one
-    type's block to another collection's `@many` member, with Range code
-    setting its count and capacity.
+- When `filter`'s predicate is exactly a type test, the result can share
+  that type's block, copy-on-write, instead of copying the Apples out. That
+  needs a slot primitive that hands one type's block to another collection's
+  `@many` member, with Range code setting its count and capacity.
 - Decided while implementing, for George to confirm: a face member whose
   signature names the face's own type, as `=(let other: #target.name)`
   does, is not read through a `@fruit` value, since that type differs from

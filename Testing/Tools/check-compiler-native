@@ -155,6 +155,14 @@ printf '%s\n' "mass 150" "fruits 4" | cmp -s - "$work_root/stdout" || fail "macr
 run partitioned 42 "" Testing/Compiler/Native/Partitioned.range
 run partitioned-model 42 "" Testing/Compiler/Native/PartitionedModel.range
 [[ "$(cat "$work_root/stdout")" == "count 270" ]] || fail "partitioned model printed: $(cat "$work_root/stdout")"
+# filter returns an Array of what its predicate's true result narrows the
+# element to: Apples out of their @fruit, Strings out of their String?.
+run filters 42 "" Testing/Compiler/Native/Filters.range
+printf '%s\n' "redgreengold 100 12 5 3 3 redgreen" "5 cde 5 8" | cmp -s - "$work_root/stdout" \
+    || fail "filters printed: $(cat "$work_root/stdout")"
+if command -v leaks > /dev/null; then
+    leaks --atExit -- "$work_root/filters" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" || fail "filters leaks heap storage"
+fi
 # Closures: functions that take them are compiled inline, and so are they.
 run closures 42 "" Testing/Compiler/Native/Closures.range
 [[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"
@@ -1004,6 +1012,14 @@ run narrowed-calls 42 "" Testing/Compiler/Native/NarrowedCalls.range
 if command -v leaks > /dev/null; then
     leaks --atExit -- "$work_root/narrowed-calls" 2>&1 | grep -q ": 0 leaks for 0 total leaked bytes" || fail "narrowed-calls leaks heap storage"
 fi
+filtered='macro fruit(): Construct { #graph { extension #target.name { function weight(): Int { return grams } } } }
+@fruit construct Apple { let grams: Int  let color: String }
+@fruit construct Banana { let grams: Int  let length: Int }
+function all(let fruits: Array<@fruit>): Int { return fruits.count }'
+reject filter-narrowed "argument 'fruits' of 'all' requires Array<Element: @fruit>; found Array<Element: Apple>" "$filtered
+{ state fruits: Array<@fruit>() return all(fruits: fruits.filter { fruit in fruit = Apple }) }"
+reject filter-either "@fruit has no member 'length'" "$filtered
+{ state fruits: Array<@fruit>() let some: fruits.filter { fruit in fruit = Apple | fruit = Banana } return some.read(at: 0).length }"
 for condition in 'where(n) | n > 3' '!where(n)'; do
     reject narrowed-call-outside "argument 'value' of 'append' requires Kept; found Int<bits: 64, signed: true>; in chosen<Kept>" \
         "function chosen<Kept>(let all: Array<Int>, @narrows(to: Kept) let where: (Int) -> Bool): Array<Kept> {
