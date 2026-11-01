@@ -1105,6 +1105,10 @@ static int evalName(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *o
         int status = evalExpression(eval,&none,constant,out);
         return status ? status : evalAdopt(eval,out,found(frame->key,declaration)->type,expr);
     }
+    if (declaration && declaration->kind == RangeNodeTypeParameter && !expr->generics) {
+        *out = (RangeValue){.kind=ValueDeclaration,.node=declaration}; /* a type parameter is its declaration */
+        return EvalNormal;
+    }
     if (declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
         // Written with generic arguments, the specialization typing selected,
         // or none, when typing reported why; one holding only defaults is

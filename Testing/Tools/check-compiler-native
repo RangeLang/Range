@@ -969,6 +969,34 @@ reject parameter-macro-graph "parameter-macro-graph.range:1:38: #graph in a macr
     'macro emitting(): Parameter { #graph { function extra(): Int { return 1 } } }
 function keep(@emitting let value: Int): Int { return value }
 { return 0 }'
+# @narrows(to: Kept) fills Kept at each call with what a true result of the
+# closure written there narrows the closure's parameter to.
+run narrows 42 "" Testing/Compiler/Native/Narrows.range
+grep -Fq "warning[C-implementation]: @narrows is checked and applied in C" "$work_root/log" || fail "@narrows is not reported as C's"
+fruit='macro fruit(): Construct { #graph { extension #target.name { function weight(): Int { return grams } } } }
+@fruit construct Apple { let grams: Int  let color: String }
+@fruit construct Banana { let grams: Int  let length: Int }
+function kept<Kept>(@narrows(to: Kept) let where: (@fruit) -> Bool): Array<Kept> { return Array<Kept>() }'
+reject narrows-filled "argument 'xs' of 'names' requires Array<Element: String>; found Array<Element: Apple>" "$fruit
+function names(let xs: Array<String>): Int { return xs.count }
+{ return names(xs: kept { fruit in fruit = Apple }) }"
+reject narrows-written "type parameter Kept of 'kept' is Apple, what a true result of 'where' narrows its argument to; it cannot also be Banana" "$fruit
+{ return kept<Banana>(where: { fruit in fruit = Apple }).count }"
+reject narrows-either "@fruit has no member 'length'" "$fruit
+function long(let fruit: @fruit): Int { switch { fruit = Apple | fruit = Banana: return fruit.length, default: return 0 } }
+{ return 0 }"
+for shape in 'Int' '(Int) -> Int' '(Int, Int) -> Bool'; do
+    reject "narrows-shape" "1:21: @narrows applies to a parameter that takes a closure of one argument returning Bool, as in (Element) -> Bool; 'where' of 'kept' does not" \
+        "function kept<Kept>(@narrows(to: Kept) let where: $shape): Array<Kept> { return Array<Kept>() }
+{ return 0 }"
+done
+reject narrows-foreign "narrows-foreign.range:2:34: @narrows(to:) names a type parameter of 'kept' itself, which each call fills; T is not one" \
+    'construct Box<T> { let value: T
+    function kept<Kept>(@narrows(to: T) let where: (T) -> Bool): Array<Kept> { return Array<Kept>() } }
+{ return 0 }'
+reject narrows-type "argument 'to' of '@narrows' requires TypeParameter; found Construct" \
+    'function kept<Kept>(@narrows(to: Int) let where: (Int) -> Bool): Array<Kept> { return Array<Kept>() }
+{ return 0 }'
 # #target is the declaration a macro is attached to: an ordinary value, and
 # spliced alone into #graph it names that declaration.
 run target-value 2 "" "$(case_file target-value 'macro sized(): Construct {

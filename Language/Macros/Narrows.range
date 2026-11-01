@@ -1,0 +1,14 @@
+// C primitive: `@narrows(to: Kept)` on a parameter that takes a closure of
+// one argument returning Bool, where Kept is one of its function's own type
+// parameters, as in
+//
+//   function filter<Kept>(@narrows(to: Kept) let where: (Element) -> Bool): Array<Kept>
+//
+// At each call, Kept is what a true result of the closure written there
+// narrows the closure's parameter to: an Apple for `{ fruit in fruit = Apple }`,
+// the String for `{ name in name.present }`, through `&` chains. It is the
+// closure parameter's own type when the closure narrows nothing, when the
+// two sides of `|` narrow it differently, or when the argument is not a
+// closure written there, such as a parameter passed on.
+@builtin
+macro narrows(let to: TypeParameter): Parameter

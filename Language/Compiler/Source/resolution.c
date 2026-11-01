@@ -1045,6 +1045,9 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
             sourceDiagnostic(report,node,1,"C-implementation","C builds each reflection list by calling the function applying @insertion on its collection once per declaration");
             sourceDiagnostic(report,node,1,"C-implementation","the @insertion law (at most one per type, one parameter of the element its @iteration function yields) is checked in C");
         }
+        else if (macroBuiltin(node,"narrows"))
+            sourceDiagnostic(report,node,1,"C-implementation","@narrows is checked and applied in C: at each call, C fills the type "
+                             "parameter it names with what a true result of the closure written there narrows the closure's parameter to");
         else if (macroBuiltin(node,"interval"))
             sourceDiagnostic(report,node,1,"C-implementation","'a..<b' resolves to the construct applying @interval, constructed with lower: a, upper: b, in C");
         else if (node->kind == RangeNodeMacro && node->c && !macroBuiltin(node,"literal"))

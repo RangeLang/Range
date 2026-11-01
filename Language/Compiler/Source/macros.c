@@ -45,6 +45,12 @@ RangeNode *runMacroApplication(Resolver *vm, RangeNode *attribute)
     // them has no compile-time effect.
     if (macroBuiltin(app->declaration,"many") || macroBuiltin(app->declaration,"optional")
         || macroBuiltin(app->declaration,"interval") || roleMacro(app->declaration)) return emitted;
+    // @narrows fills a generic at each call, which typing does; applying it
+    // computes its argument and checks where it is written.
+    if (macroBuiltin(app->declaration,"narrows")) {
+        if (evalApplication(vm,app,0)) checkNarrows(vm->typer,app);
+        return emitted;
+    }
     if (app->declaration->c) for (size_t j = 0; j < app->declaration->c->itemCount; ++j)
         if (same(app->declaration->c->items[j]->name,"builtin"))
             fail(vm,attribute,"no C primitive is implemented for builtin macro '%s'",app->declaration->name);

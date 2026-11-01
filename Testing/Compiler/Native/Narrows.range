@@ -1,0 +1,42 @@
+// @narrows(to: Kept) on a closure parameter fills Kept at each call with
+// what a true result of the closure written there narrows the closure's
+// parameter to, or with that parameter's own type when it narrows nothing.
+macro fruit(): Construct {
+    #graph { extension #target.name { function weight(): Int { return grams } } }
+}
+@fruit construct Apple { let grams: Int  let color: String }
+@fruit construct Banana { let grams: Int  let length: Int }
+
+// Each returns an empty Array<Kept>: the type alone is what is tested.
+function kept<Kept>(@narrows(to: Kept) let where: (@fruit) -> Bool): Array<Kept> { return Array<Kept>() }
+function keptName<Kept>(@narrows(to: Kept) let where: (String?) -> Bool): Array<Kept> { return Array<Kept>() }
+function keptNumber<Kept>(@narrows(to: Kept) let where: (Int) -> Bool): Array<Kept> { return Array<Kept>() }
+
+// Each accepts only an Array of its own element type.
+function apples(let xs: Array<Apple>): Int { return xs.count + 1 }
+function fruits(let xs: Array<@fruit>): Int { return xs.count + 1 }
+function names(let xs: Array<String>): Int { return xs.count + 1 }
+function numbers(let xs: Array<Int>): Int { return xs.count + 1 }
+
+// A closure passed on is not written at the call: Kept is its parameter's type.
+function passed(let test: (@fruit) -> Bool): Int { return fruits(xs: kept(where: test)) }
+
+{
+    // A type test narrows to the type; `.present`, to the payload.
+    let a: apples(xs: kept { fruit in fruit = Apple })
+    let b: names(xs: keptName { name in name.present })
+    // Nothing narrowed: the parameter's type.
+    let c: numbers(xs: keptNumber { n in n > 3 })
+    // `&` keeps what its left side narrows.
+    let d: apples(xs: kept { fruit in fruit = Apple & fruit.color = "red" })
+    // The two sides of `|` narrow to different types, so neither holds.
+    let e: fruits(xs: kept { fruit in fruit = Apple | fruit = Banana })
+    // `!=` narrows nothing.
+    let f: fruits(xs: kept { fruit in fruit != Apple })
+    // A closure whose body is statements narrows nothing.
+    let g: fruits(xs: kept { fruit in
+        let heavy: fruit.weight() > 100
+        return heavy
+    })
+    return a + b + c + d + e + f + g + passed { fruit in fruit = Apple } + 34
+}

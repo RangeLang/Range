@@ -90,6 +90,7 @@ struct Typer {
     struct { RangeNode *path, *entry, *type; } *narrowed;
     size_t narrowedCount, narrowedCapacity, narrowedFloor;
     RangeNode *deferred; /* the type of a value known only at macro time */
+    RangeNode *kept;     /* what a true result of the closure typed last narrows its one parameter to, or NULL */
     RangeNode *macro;    /* the macro whose body is being typed */
     int arguments;       /* typing an application's arguments: macro-time code outside any macro body */
     /* Laws to run: typing never runs Range code, so a specialization or a
@@ -276,6 +277,7 @@ RangeNode *typeOnDemand(Typer *typer, RangeNode *function, RangeNode *receiver);
 void typeValueOnDemand(Typer *typer, RangeNode *member);
 int typeMacroOnDemand(Typer *typer, RangeMacroApplication *app);
 int typeApplicationOnDemand(Typer *typer, RangeMacroApplication *app);
+void checkNarrows(Typer *typer, RangeMacroApplication *app);
 void typeCheck(Typer *typer);
 
 /* evaluator.c */

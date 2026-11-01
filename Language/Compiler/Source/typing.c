@@ -2276,6 +2276,83 @@ static void checkBodiesOnce(Typer *typer, RangeNode *declaration)
 }
 
 
+/* ---- @narrows ----
+ * `@narrows(to: Kept) let where: (Element) -> Bool`: at each call, Kept is
+ * what a true result of the closure written there narrows the closure's
+ * parameter to, or that parameter's type when it narrows nothing or the
+ * argument is not a closure written there. C checks the application once,
+ * where it is applied; typing reads its argument, the TypeParameter. */
+
+/* The type parameter of its own function a parameter's @narrows names, once
+ * the application has run; NULL when it applies none. *pending is set when
+ * it applies one that has not run yet. */
+static RangeNode *narrowsGeneric(const RangeNode *parameter, int *pending)
+{
+    if (pending) *pending = 0;
+    for (size_t i = 0; parameter && parameter->kind == RangeNodeParameter && parameter->c && i < parameter->c->itemCount; ++i) {
+        RangeMacroApplication *app = parameter->c->items[i]->macroApplication;
+        if (!app || !macroBuiltin(app->declaration,"narrows")) continue;
+        RangeNode *named = app->arguments && app->arguments[0].kind == ValueDeclaration ? app->arguments[0].node : NULL;
+        for (size_t k = 0; named && parameter->owner && parameter->owner->generics && k < parameter->owner->generics->itemCount; ++k)
+            if (parameter->owner->generics->items[k] == named) return named;
+        if (pending && !app->applied) *pending = 1;
+    }
+    return NULL;
+}
+
+/* @narrows(to: Kept) where it is applied: Kept is a type parameter of the
+ * parameter's own function, and the parameter takes a closure of one
+ * argument returning Bool. */
+void checkNarrows(Typer *typer, RangeMacroApplication *app)
+{
+    Resolver *vm = typer->vm;
+    RangeNode *parameter = app->target, *function = parameter->owner, *argument = app->attribute->items[0];
+    if (!narrowsGeneric(parameter,NULL)) {
+        const RangeValue *to = app->arguments ? &app->arguments[0] : NULL;
+        fail(vm,argument,"@narrows(to:) names a type parameter of '%s' itself, which each call fills; %s is not one",
+             function ? function->name : "its function",
+             to && to->kind == ValueDeclaration && to->node->name ? to->node->name : "this");
+    }
+    RangeNode *written = parameter->b, *result = NULL;
+    if (written && (written->flags & RangeFlagFunction) && written->generics && written->generics->itemCount == 1 && written->generics->a) {
+        RangeNode *returns = written->generics->a;
+        SourceScope scopes[33], scope = {.owner=function,.parent=enclosingScope(typer,function,scopes)};
+        TyperContext outer = typerTop(typer);
+        result = resolveTypeReference(typer,&scope,returns->name,returns->generics,returns->flags,NULL,returns);
+        typerRestore(typer,outer);
+    }
+    if (!result || result != typer->booleanType)
+        fail(vm,app->attribute,"@narrows applies to a parameter that takes a closure of one argument returning Bool, as in "
+             "(Element) -> Bool; '%s' of '%s' does not",parameter->name,function->name);
+}
+
+/* At a call, the type parameter a parameter's @narrows names: what the
+ * closure just typed for it narrows its parameter to, else that
+ * parameter's type. Whether the call can go on. */
+static int fillNarrowed(Typer *typer, RangeNode *function, RangeNode *parameter, RangeNode *value, RangeNode *want, RangeNode **bound)
+{
+    int pending = 0;
+    RangeNode *named = narrowsGeneric(parameter,&pending);
+    if (pending) {
+        typeError(typer,value,"'%s' of '%s' applies @narrows, which has not run where this call is typed at macro time; "
+                  "typing such a call before it runs is not implemented",parameter->name,function->name);
+        return 0;
+    }
+    if (!named || !isFunctionType(want) || want->itemCount != 1) return 1;
+    RangeNode *kept = value->kind == RangeNodeClosure && typer->kept ? typer->kept : want->items[0];
+    size_t k = typeParameterIndex(function,named->name);
+    if (k == SIZE_MAX) return 1;
+    if (bound[k] && bound[k] != kept) {
+        char first[160], second[160];
+        describeType(first,sizeof(first),kept); describeType(second,sizeof(second),bound[k]);
+        typeError(typer,value,"type parameter %s of '%s' is %s, what a true result of '%s' narrows its argument to; it cannot also be %s",
+                  named->name,function->name,first,parameter->name,second);
+        return 0;
+    }
+    bound[k] = kept;
+    return 1;
+}
+
 /* A call of a generic function: infer its type arguments, then call the
  * specialization for them. Arguments are typed once each: those whose parameter
  * names no type parameter first, with that parameter's type; then the others
@@ -2341,9 +2418,11 @@ static RangeNode *typeGenericCall(Typer *typer, SourceScope *scope, RangeNode *c
             }
             RangeNode *site = typer->closureSite;
             typer->closureSite = isFunctionType(want) ? value : NULL;
+            typer->kept = NULL;
             actual[i] = typeOf(typer,scope,value,want,context);
             typer->closureSite = site;
             done[i] = 1;
+            if (!fillNarrowed(typer,function,parameter,value,want,bound)) return NULL;
             if (generic && !unifyType(typer,function,parameter->b->name,parameter->b->generics,parameter->flags,actual[i],bound,&conflict)) {
                 char first[160], second[160];
                 describeType(first,sizeof(first),bound[conflict]); describeType(second,sizeof(second),actual[i]);
@@ -2431,6 +2510,21 @@ RangeNode *closureResult(Typer *typer, RangeNode *key, RangeNode *closure)
     return value && !(isFunctionType(type) && unitType(typer,type->a)) ? value : NULL;
 }
 
+/* What a true result of a closure's one expression narrows its one
+ * parameter to: the last narrowing typing it pushed, from `mark` on, of the
+ * parameter itself; NULL when it narrows none. */
+static RangeNode *closureKept(Typer *typer, RangeNode *closure, size_t mark)
+{
+    if (closure->itemCount != 1) return NULL;
+    for (size_t i = typer->narrowedCount; i-- > mark;) {
+        RangeNode *path = typer->narrowed[i].path;
+        RangeFacts *facts = found(typer->key,path);
+        if (path->kind == RangeNodeName && facts->resolvedDeclaration == closure->items[0] && !facts->narrowed)
+            return typer->narrowed[i].type;
+    }
+    return NULL;
+}
+
 static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closure, RangeNode *expected, RangeNode *context)
 {
     char t[320]; describeType(t,sizeof(t),expected);
@@ -2457,10 +2551,14 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
     typer->output = result;
     typer->inferring = !result;
     typer->inferred = NULL;
+    RangeNode *kept = NULL;
     if (value && !unit) {
+        size_t mark = typer->narrowedCount;
         RangeNode *actual = typeOf(typer,&own,value,result,context);
         if (result) coerce(typer,value,result,actual,"the result of this closure");
         else result = actual;
+        kept = closureKept(typer,closure,mark);
+        typer->narrowedCount = mark;
     } else {
         typeBlock(typer,&own,closure->a,context,result);
         if (!result) result = typer->inferred;
@@ -2471,6 +2569,7 @@ static RangeNode *typeClosure(Typer *typer, SourceScope *scope, RangeNode *closu
     }
     typer->loops = loops; typer->inferring = inferring; typer->closures -= 1;
     typer->output = output; typer->inferred = inferred; typer->closureSite = site;
+    typer->kept = kept;
     if (!result) return NULL;
     RangeNode **parameters = rangeArenaAllocate(typer->report->arena,(expected->itemCount ? expected->itemCount : 1) * sizeof(*parameters));
     for (size_t i = 0; i < expected->itemCount; ++i) parameters[i] = expected->items[i];
@@ -2604,13 +2703,17 @@ static RangeNode *typeEither(Typer *typer, SourceScope *scope, RangeNode *expr, 
     RangeNode *left = typeOf(typer,scope,expr->a,NULL,context);
     size_t leftCount = typer->narrowedCount - mark;
     RangeNode **paths = rangeArenaAllocate(typer->report->arena,(leftCount ? leftCount : 1) * sizeof(*paths));
-    for (size_t i = 0; i < leftCount; ++i) paths[i] = typer->narrowed[mark + i].path;
+    RangeNode **types = rangeArenaAllocate(typer->report->arena,(leftCount ? leftCount : 1) * sizeof(*types));
+    for (size_t i = 0; i < leftCount; ++i) { paths[i] = typer->narrowed[mark + i].path; types[i] = typer->narrowed[mark + i].type; }
     typer->narrowedCount = mark;
     RangeNode *type = left ? typeOperator(typer,scope,expr,left,NULL,context) : (typeOf(typer,scope,expr->b,NULL,context), NULL);
     size_t end = typer->narrowedCount, kept = mark;
+    // Both sides narrow a value alike only to one type: `fruit = Apple |
+    // fruit = Banana` leaves it a @fruit.
     for (size_t i = mark; i < end; ++i) {
         int both = 0;
-        for (size_t k = 0; k < leftCount && !both; ++k) both = sameNarrowedPath(typer->key,paths[k],typer->narrowed[i].path);
+        for (size_t k = 0; k < leftCount && !both; ++k)
+            both = types[k] == typer->narrowed[i].type && sameNarrowedPath(typer->key,paths[k],typer->narrowed[i].path);
         if (both) typer->narrowed[kept++] = typer->narrowed[i];
     }
     typer->narrowedCount = kept;
@@ -3190,10 +3293,12 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
                 --typer->typingCount;
             }
         } else if (declaration->kind == RangeNodeFunction) typeError(typer,expr,"'%s' is a function; call it",expr->name);
-        else if ((typer->macro || typer->arguments) && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum)) {
+        else if ((typer->macro || typer->arguments) && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum
+                                                         || (declaration->kind == RangeNodeTypeParameter && !expr->generics))) {
             // At macro time a type is a value of its grammar kind. Written
             // bare, it is the declaration: `written.output != Bool` compares
-            // declarations, and `@wraps(type: Int)` passes one. Written with
+            // declarations, and `@wraps(type: Int)` passes one; a type
+            // parameter is its TypeParameter, as `@narrows(to: Kept)` passes. Written with
             // generic arguments, it is the specialization they select, which
             // is interned, so `Array<Int> = Array<Int>`; one that holds only
             // its declaration's defaults is what the bare name names, the

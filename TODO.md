@@ -195,6 +195,11 @@ of a generic declaration would differ between its own run and its law runs.
   returned from a function, never held by a state member or @many storage,
   and assigned only to a local of the assignment's own block. Returning one
   whose bound state outlives the call needs lifetimes of what it binds.
+- `@narrows` reads what a closure narrows only from a closure written at the
+  call whose body is one expression; one whose body is statements narrows
+  nothing, so Kept is its parameter's type. A call of a function with
+  `@narrows` typed at macro time before that application has run is
+  reported as not implemented.
 - `let s: make(1)`, where `make` is a closure parameter, is not compiled
   natively ("native values of <unknown> are not implemented").
 - Values of a macro's types (`@fruit`):
@@ -231,6 +236,8 @@ of a generic declaration would differ between its own run and its law runs.
   - the labels `lower`, `upper`, `at` and `value`;
   - `print`, `diagnostic` and `warning`, in `nativeCall`, `nativeEffect`,
     `evalBuiltin` and `evalEffect`.
+  - the macro `@narrows`, applied in `runMacroApplication` and read by
+    typing at calls of its function and of its parameter.
 - `@literal` patterns are registered by C while reading, before typing.
 - setjmp/longjmp in the resolver and typer.
 - Partitioned `@many` storage grows each type's block by doubling from
