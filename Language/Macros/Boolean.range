@@ -8,10 +8,13 @@ macro boolean(): Enum {
     yes = .absent: diagnostic(message: "Enum must declare case true")
   }
 
+  // A literal of an enum is the case with the same text: `true` is `.true`,
+  // read once, and needs no context because the pattern above names this enum.
+  //
   // Layout: an enum without payloads is its tag, so the tag is the storage.
-  // A literal names the case spelled like it. Conditions branch on the tag
-  // and comparisons produce it, so C requires case false to be tag 0 and
-  // case true tag 1, and checks that where it finds the condition type.
+  // Conditions branch on the tag and comparisons produce it, so C requires
+  // case false to be tag 0 and case true tag 1, and checks that where it finds
+  // the condition type.
   //
   // `!a` calls the function `!` declared here, a C primitive on the tag.
   // `a & b` (and) and `a | b` (or) short-circuit: b is evaluated only when a

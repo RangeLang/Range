@@ -2765,7 +2765,7 @@ static RangeNode *nativeJoin(Native *native, RangeNode *at, RangeNode *type)
     return type;
 }
 
-/* A leaf, compiled as written in either mode: a boolean or string literal,
+/* A leaf, compiled as written in either mode: a string literal,
  * but a string with interpolated values, which is built at run; the name of
  * a value generic, the constant of the specialization the body was typed
  * in, or of one it is typed within, its receiver's; or a case of a scalar
@@ -2774,8 +2774,7 @@ static int nativeLeaf(Native *native, RangeNode *expr, RangeValue *value)
 {
     RangeFacts *facts = found(native->key,expr);
     RangeNode *declaration = facts->resolvedDeclaration, *type = facts->type;
-    int leaf = expr->kind == RangeNodeBool
-        || (expr->kind == RangeNodeString && expr->itemCount == 1 && (expr->items[0]->flags & RangeFlagLiteral))
+    int leaf = (expr->kind == RangeNodeString && expr->itemCount == 1 && (expr->items[0]->flags & RangeFlagLiteral))
         || (expr->kind == RangeNodeName && declaration && declaration->kind == RangeNodeLet && genericSlot(native->key,declaration))
         || (declaration && declaration->kind == RangeNodeEnumCase && expr->kind != RangeNodeCall && type
             && !macroTimeType(native->typer,type) && layoutOf(native->typer,type,expr) && type->scalarBits);
@@ -2803,9 +2802,6 @@ static RangeNode *nativeExpressionValue(Native *native, RangeNode *expr)
         if (nativeKind(native,type,expr) != NativeScalar) return NULL;
         nativeConstant(native,0,(uint64_t)expr->integer);
         return type;
-    case RangeNodeBool:
-        (void)nativeKind(native,type,expr); /* a type without native values is reported */
-        return NULL;
     case RangeNodeString:
         // A literal is its UTF-8 bytes in __text, in the layout the bytes
         // primitive declares.

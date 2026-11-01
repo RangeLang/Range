@@ -250,7 +250,9 @@ RangeNode *findCalledFunction(RangeNode *owner, const char *name, const RangeNod
 RangeNode *memberType(Typer *typer, RangeNode *declaration, RangeNode *member, RangeNode *receiver);
 int isEnum(const RangeNode *type);
 RangeNode *enumCase(const RangeNode *declaration, const char *name);
-RangeNode *literalCase(const RangeNode *declaration, const RangeNode *literal);
+int literalWord(const RangeNode *node);
+RangeNode *literalRule(const RangeNode *declaration);
+int scalarSigned(Typer *typer, const RangeNode *specialization);
 int bytesType(const RangeNode *type);
 RangeNode *operatorFunction(const RangeNode *declaration, const char *symbol, size_t arity);
 int operatorName(const char *name);

@@ -37,7 +37,6 @@ typedef enum {
     RangeNodeMemberAccess,
     RangeNodeName,
     RangeNodeInteger,
-    RangeNodeBool,
     RangeNodeString,
     RangeNodeStringPart,
     RangeNodeCase,
@@ -100,6 +99,10 @@ enum {
     RangeFlagOnce = 1 << 25        /* specialization: a generic declaration's own, each type parameter its face,
                                     * where its bodies are checked once */
 };
+
+/* A name's integer: written where an expression reads it, so a literal rule may
+ * select it. A name in a type position, or one a desugaring writes, is 0. */
+enum { RangeNameRead = 1 };
 
 /* Pattern forms: a case test's pattern and its arguments, and the rows of
  * a switch's arms. A case pattern's items are arguments (label,
@@ -166,7 +169,8 @@ struct RangeMacroApplication {
 
 struct RangeNode {
     /* What was written: read once, then never changed. The parser, a parser
-     * desugaring, or a #graph block writes these; the guard in the type
+     * desugaring, or a #graph block writes these, and reading the words literal
+     * rules select settles them before any code is typed; the guard in the type
      * checker proves nothing changes them after they are read. */
     RangeNodeKind kind;
     const char *path;
@@ -194,7 +198,7 @@ struct RangeNode {
 
     /* What the compiler found: beside the written code, never in it. */
     const char *source;    /* unit owns the text; inspected children borrow it */
-    RangeNode *resolvedType; /* resolved literal representation */
+    RangeNode *resolvedType; /* a literal: the declaration its rule selects */
     union {
         RangeFacts facts;  /* the node's own findings */
         struct { RangeNode *resolvedDeclaration, *type, *lowered, *narrowed, *promoted, *specialization; int found; };

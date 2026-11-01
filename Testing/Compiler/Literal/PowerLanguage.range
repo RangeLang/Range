@@ -1,0 +1,10 @@
+// Copied into a language of its own by check-compiler-literal: a second enum
+// whose literals are words, with a word its rule selects and no case spells.
+@literal(pattern: "on|off|idle")
+macro power(): Enum {}
+
+@power
+enum Power {
+    case off
+    case on
+}

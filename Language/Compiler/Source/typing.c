@@ -37,9 +37,10 @@ RangeFacts *found(RangeNode *key, RangeNode *node)
 
 /* ---- case tests ----
  * `.` is member access; `=` tests a case. In `phase = .failed(let reason)`
- * the right side is a form of a case, written `.name` or `Type.name`, and
- * what the form writes decides what `=` does. A bare case, or a form with
- * `let`, `_`, or a case in its arguments, is a case test: a Bool, true when
+ * the right side is a form of a case, written `.name` or `Type.name`, or a
+ * literal of the enum, as `true` is case true, and what the form writes
+ * decides what `=` does. A bare case, or a form with `let`, `_`, or a case in
+ * its arguments, is a case test: a Bool, true when
  * the subject holds that case, whose arguments are patterns for the payload
  * fields: `let x` binds one, `_` ignores it, and a case tests it in turn. A
  * form whose arguments are values is a value, compared by `=` as any other
@@ -48,9 +49,10 @@ RangeFacts *found(RangeNode *key, RangeNode *node)
  * beside the comparison as the RangeNodeCaseTest that runs in its place: a
  * the subject, b the case pattern. */
 
-/* The form of a case an expression writes: `.name` or `Type.name`, with or
- * without arguments. name is NULL for any other expression; path is the type
- * written, or NULL. */
+/* The form of a case an expression writes: `.name`, `Type.name` or a literal
+ * such as `true`, with or without arguments. name is NULL for any other
+ * expression; path is what names its type, a type written or the literal
+ * itself, or NULL. */
 typedef struct { const char *name; RangeNode *call, *path; } CaseForm;
 
 static CaseForm caseForm(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context);
@@ -479,7 +481,7 @@ void describeType(char *out, size_t size, const RangeNode *type)
             if (!value) snprintf(inner,sizeof(inner),"?");
             else if (!lawInputs(value,&kind,&integer,&text)) snprintf(inner,sizeof(inner),"%s",value->name ? value->name : "?");
             else if (kind == RangeNodeInteger) snprintf(inner,sizeof(inner),"%lld",integer);
-            else if (kind == RangeNodeBool) snprintf(inner,sizeof(inner),"%s",integer ? "true" : "false");
+            else if (kind == RangeNodeCase) snprintf(inner,sizeof(inner),"%s",text);
             else snprintf(inner,sizeof(inner),"\"%s\"",text);
         }
         n += (size_t)snprintf(out + n,size - n,"%s%s: %s",i ? ", " : "",generic->name,inner);
@@ -545,7 +547,8 @@ static RangeNode *internSpecialization(Typer *typer, RangeNode *declaration, Ran
     return specialization;
 }
 
-/* The inputs a literal gives a law: its kind and value, `-n` as one value. */
+/* The inputs a literal gives a law: its kind and value, `-n` as one value; a
+ * case its name, written `true` or `.true`. */
 int lawInputs(const RangeNode *value, RangeNodeKind *kind, long long *integer, const char **text)
 {
     *integer = 0; *text = NULL;
@@ -555,7 +558,8 @@ int lawInputs(const RangeNode *value, RangeNodeKind *kind, long long *integer, c
         return value->a->integer != LLONG_MIN;
     }
     *kind = value->kind;
-    if (value->kind == RangeNodeInteger || value->kind == RangeNodeBool) { *integer = value->integer; return 1; }
+    if (value->kind == RangeNodeInteger) { *integer = value->integer; return 1; }
+    if (value->kind == RangeNodeCase) { *text = value->name; return 1; }
     if (value->kind == RangeNodeString && value->itemCount == 1 && (value->items[0]->flags & RangeFlagLiteral)) {
         *text = value->items[0]->name;
         return 1;
@@ -1159,22 +1163,35 @@ static int parametric(const RangeNode *declaration)
     return 0;
 }
 
-/* A literal of an enum names the case spelled like it: `true` is case true. */
-static const char *literalSpelling(const RangeNode *literal)
+/* A word a literal rule selected: the case node that holds the enum it names. */
+int literalWord(const RangeNode *node)
 {
-    if (literal->kind == RangeNodeBool) return literal->integer ? "true" : "false";
-    if (literal->kind == RangeNodeInteger) return literal->name;
+    return node && node->kind == RangeNodeCase && node->resolvedType;
+}
+
+/* The macro whose literal rule selects `declaration`. */
+RangeNode *literalRule(const RangeNode *declaration)
+{
+    for (size_t i = 0; declaration && declaration->c && i < declaration->c->itemCount; ++i) {
+        RangeNode *macro = declaration->c->items[i]->resolvedDeclaration;
+        if (macro && macro->literalDefault == declaration) return macro;
+    }
     return NULL;
 }
 
-RangeNode *literalCase(const RangeNode *declaration, const RangeNode *literal)
+/* A literal of an enum is the case with the same text: of the enum its rule
+ * selects, or of the one expected, if that one applies the same macro. */
+static RangeNode *literalEnum(Typer *typer, RangeNode *literal, RangeNode *expected)
 {
-    return enumCase(declaration,literalSpelling(literal));
+    RangeNode *wrapped = optionalWrapped(typer,expected,NULL), *held = wrapped ? wrapped : expected;
+    if (isEnum(held) && appliesMacro(held->resolvedDeclaration,literalRule(literal->resolvedType))) return held;
+    return specialize(typer,NULL,literal->resolvedType,NULL,NULL,literal);
 }
 
-/* The enum a `.case` names: the one its context expects. */
+/* The enum a `.case` names: the one its context expects. A literal names its own. */
 static RangeNode *contextualEnum(Typer *typer, RangeNode *at, RangeNode *expected)
 {
+    if (literalWord(at)) return literalEnum(typer,at,expected);
     if (isEnum(expected)) return expected;
     if (expected) {
         char want[160]; describeType(want,sizeof(want),expected);
@@ -1240,7 +1257,7 @@ static void typePayload(Typer *typer, SourceScope *scope, RangeNode *at, RangeNo
 
 static int isLiteral(const RangeNode *node)
 {
-    return node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString;
+    return node->kind == RangeNodeInteger || node->kind == RangeNodeString || literalWord(node);
 }
 
 /* Operands typed from the other side: literals and `.case` forms. */
@@ -1375,11 +1392,9 @@ static RangeNode *typeLiteral(Typer *typer, RangeNode *literal, RangeNode *value
     if (wrapped && expected->resolvedDeclaration != declaration) expected = wrapped; /* promoted where it is used */
     if (expected && expected->kind == RangeNodeSpecialization && expected->resolvedDeclaration == declaration) type = expected;
     else type = specialize(typer,NULL,declaration,NULL,NULL,literal);
-    if (type && declaration->kind == RangeNodeEnum) {
-        // The literal is one of the enum's cases; the enum's laws ran on the declaration.
-        if (value != literal || !literalCase(declaration,literal))
-            typeError(typer,value,"this literal names no case of %s",declaration->name);
-    } else if (type) queueLaws(typer,type,value,value);
+    // A case is named by a word; no case is spelled as a number or a string.
+    if (type && declaration->kind == RangeNodeEnum) typeError(typer,value,"this literal names no case of %s",declaration->name);
+    else if (type) queueLaws(typer,type,value,value);
     finding(typer,literal)->type = type;
     return type;
 }
@@ -1556,7 +1571,7 @@ static RangeNode *typeConstructionOf(Typer *typer, SourceScope *scope, RangeNode
         // `T(0)` is the literal, as `Int<bits: 8>(5)` is.
         RangeNode *given = count == 1 && !arguments[0]->name ? arguments[0]->a : NULL;
         RangeNode *literal = given && given->kind == RangeNodeUnary && same(given->name,"-") ? given->a : given;
-        if (literal && isLiteral(literal) && faceLiteral(type,literal->resolvedDeclaration)) {
+        if (literal && isLiteral(literal) && faceLiteral(type,literalWord(literal) ? literalRule(literal->resolvedType) : literal->resolvedDeclaration)) {
             coerce(typer,given,type,typeOf(typer,scope,given,type,context),"the literal");
             return type;
         }
@@ -3264,6 +3279,7 @@ static CaseForm caseForm(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
     CaseForm form = {0};
     RangeNode *callee = expr && expr->kind == RangeNodeCall ? expr->a : expr;
     if (!callee || (callee->kind != RangeNodeCase && callee->kind != RangeNodeMemberAccess) || !callee->name) return form;
+    if (literalWord(callee)) form.path = callee;
     if (callee->kind == RangeNodeMemberAccess) {
         RangeNode *optional = optionalPath(typer,scope,callee->a,context);
         RangeNode *owner = optional ? optional->resolvedDeclaration : typePath(typer->report,scope,callee->a);
@@ -3278,6 +3294,7 @@ static CaseForm caseForm(Typer *typer, SourceScope *scope, RangeNode *expr, Rang
 /* The enum a form's written type path names, in the place of `expected`. */
 static RangeNode *caseFormType(Typer *typer, SourceScope *scope, RangeNode *path, RangeNode *expected, RangeNode *context, RangeNode *at)
 {
+    if (literalWord(path)) return literalEnum(typer,path,expected);
     RangeNode *optional = optionalPath(typer,scope,path,context);
     return optional ? optional : pathEnum(typer,scope,typePath(typer->report,scope,path),path,expected,context,at);
 }
@@ -3363,7 +3380,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
     if (!expr) return NULL;
     RangeNode *type = NULL;
     switch (expr->kind) {
-    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString:
+    case RangeNodeInteger: case RangeNodeString:
         type = typeLiteral(typer,expr,expr,expected);
         // An interpolated value is typed where it is written, and written as
         // text: an integer, a case without payloads (a boolean among them),
@@ -3451,6 +3468,9 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         type = typeClosure(typer,scope,expr,expected,context);
         break;
     case RangeNodeCase: {
+        // A literal of T, when every type T admits is written with it, as
+        // typeLiteral says: each use types it again as its own type.
+        if (literalWord(expr) && faceLiteral(expected,literalRule(expr->resolvedType))) { type = expected; break; }
         // `.red`: a case of the enum the context expects.
         RangeNode *enumeration = caseContext(typer,contextualEnum(typer,expr,expected),expr->name);
         RangeNode *entry = enumeration ? namedCase(typer,enumeration,expr->name,expr) : NULL;
@@ -4007,6 +4027,7 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
         // of the type it writes, which must be the subject's.
         if (!type) return;
         if (pattern->b) {
+            if (literalWord(pattern->b) && faceLiteral(type,literalRule(pattern->b->resolvedType))) return; /* each use tests it */
             RangeNode *written = caseFormType(typer,scope,pattern->b,type,context,pattern);
             if (!written) return;
             if (written != type) {
@@ -4530,6 +4551,15 @@ RangeNode *scalarGeneric(const RangeNode *specialization, const char *name)
     return NULL;
 }
 
+/* A scalar's generic `signed`, a case of the condition type: its tag is the
+ * truth. -1 when it holds anything else. */
+int scalarSigned(Typer *typer, const RangeNode *specialization)
+{
+    RangeNode *signedness = scalarGeneric(specialization,"signed");
+    RangeNode *entry = signedness && signedness->kind == RangeNodeCase ? enumCase(typer->boolean,signedness->name) : NULL;
+    return entry ? entry->integer != 0 : -1;
+}
+
 /* Grammar constructs describe C's graph nodes: C provides their values at
  * compile time, and they have no runtime layout. */
 static int graphConstruct(Typer *typer, const RangeNode *declaration)
@@ -4666,14 +4696,15 @@ int layoutOf(Typer *typer, RangeNode *specialization, RangeNode *at)
         size = 24;
         alignment = 8;
     } else if (scalarDeclaration(declaration)) {
-        RangeNode *width = scalarGeneric(specialization,"bits"), *signedness = scalarGeneric(specialization,"signed");
+        RangeNode *width = scalarGeneric(specialization,"bits");
+        int isSigned = scalarSigned(typer,specialization);
         long long bits = width && width->kind == RangeNodeInteger ? width->integer : 0;
         if (!width || width->kind != RangeNodeInteger)
             sourceDiagnostic(typer->report,declaration,0,"layout","%s is a scalar, so its generic 'bits' must be an integer bit width",declaration->name);
-        if (!signedness || signedness->kind != RangeNodeBool)
+        if (isSigned < 0)
             sourceDiagnostic(typer->report,declaration,0,"layout","%s is a scalar, so its generic 'signed' must be a boolean",declaration->name);
         specialization->scalarBits = bits > 0 && bits <= 64 ? (int)bits : 0;
-        specialization->scalarSigned = signedness && signedness->kind == RangeNodeBool && signedness->integer;
+        specialization->scalarSigned = isSigned > 0;
         if (bits <= 0 || bits > 64) {
             if (bits > 64) sourceDiagnostic(typer->report,declaration,0,"layout","scalars wider than 64 bits are not implemented");
             known = 0;

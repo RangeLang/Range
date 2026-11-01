@@ -78,6 +78,7 @@ run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 run subjects 42 "" Testing/Compiler/Native/Subjects.range
 run case-tests 42 "" Testing/Compiler/Native/CaseTests.range
 run case-comparisons 42 "" Testing/Compiler/Native/CaseComparisons.range
+run case-literals 42 "" Testing/Compiler/Native/CaseLiterals.range
 run logic 42 "" Testing/Compiler/Native/Logic.range
 printf '%s\n' "touched 3" "touched 4" | cmp -s - "$work_root/stdout" || fail "logic short-circuit printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
@@ -671,6 +672,70 @@ function f(let a: Coded): Int { switch { a = .pair(.failed(reason: let r, code: 
 reject form-mixed-receiver "a case form binds or compares, not both: bind 'code' with let and test it with &" \
     'enum Coded { case failed(reason: String, code: Int), done
     function f(): Int { switch { Coded = .failed(reason: let r, code: 0): return r.count, default: return 0 } } }
+{ return 0 }'
+# A literal of an enum is the case with the same text: it tests and covers as
+# the case does, and elsewhere is an ordinary value of its own enum.
+reject literal-missing "switch must be exhaustive: 'b = .false' is not handled; add an arm for it or a default" \
+    'function f(let b: Bool): Int { switch { b = true: return 1 } }
+{ return 0 }'
+reject literal-unreachable "this condition is already handled by earlier arms" \
+    'function f(let b: Bool): Int { switch { b = true: return 1, b = true: return 2, default: return 3 } }
+{ return 0 }'
+reject literal-unreachable-dotted "this condition is already handled by earlier arms" \
+    'function f(let b: Bool): Int { switch { b = .true: return 1, b = true: return 2, default: return 3 } }
+{ return 0 }'
+reject literal-unreachable-nested "this condition is already handled by earlier arms" \
+    'function f(let o: Bool?): Int { switch { o = .present(true): return 1, o = .present(.true): return 2, default: return 3 } }
+{ return 0 }'
+reject literal-held-missing "switch must be exhaustive: 'o = .present' is not handled; add an arm for it or a default" \
+    'function f(let o: Bool?): Int { switch { o = .present(true): return 1, o = .absent: return 2 } }
+{ return 0 }'
+# Beside a value the form is a value, which covers nothing; a binding beside a
+# literal is a test.
+reject literal-beside-value "switch must be exhaustive: 'e = .pair' is not handled; add an arm for it or a default" \
+    'enum E { case pair(Bool, Int), none }
+function f(let e: E): Int { switch { e = .pair(true, 1): return 1, e = .pair(false, _): return 2, e = .none: return 3 } }
+{ return 0 }'
+reject literal-non-enum "operator '=' requires matching types; found Int<bits: 64, signed: true> and Bool" \
+    'function f(let x: Int): Bool { return x = true }
+{ return 0 }'
+reject literal-non-enum-negated "operator '!=' requires matching types; found String and Bool" \
+    'function f(let s: String): Bool { return s != false }
+{ return 0 }'
+reject literal-non-enum-held "operator '=' requires matching types; found Optional<Wrapped: Int<bits: 64, signed: true>> and Bool" \
+    'function f(let o: Int?): Bool { return o = true }
+{ return 0 }'
+reject literal-non-enum-field "'Bool.true' is a case of Bool; the subject is Int<bits: 64, signed: true>" \
+    'function f(let o: Int?): Bool { return o = .present(true) }
+{ return 0 }'
+# A case spelled like a literal is not that literal, unless its enum applies the macro.
+reject literal-other-enum "operator '=' requires matching types; found E and Bool" \
+    'enum E { case true, other }
+function f(let e: E): Bool { return e = true }
+{ return 0 }'
+reject literal-other-enum-field "'Bool.true' is a case of Bool; the subject is E" \
+    'enum E { case true, other, held(E) }
+function f(let e: E): Bool { return e = .held(true) }
+{ return 0 }'
+reject literal-no-payload "case 'true' has no payload; write .true" \
+    'function f(): Bool { return true(1) }
+{ return 0 }'
+# Unlike a literal, `.true` needs a context that names its enum.
+reject literal-dotted-context "'.true' needs a context that names its enum" \
+    'function f(): Bool { let c: .true return c }
+{ return 0 }'
+# The literal is never a name: a declaration spelled like it is not read, and it names no type.
+reject literal-shadow "return requires Int<bits: 64, signed: true>; found Bool" \
+    'function f(let true: Int): Int { return true }
+{ return 0 }'
+reject literal-shadow-local "return requires Int<bits: 64, signed: true>; found Bool" \
+    'function f(): Int { let false: 1 return false }
+{ return 0 }'
+reject literal-not-a-type "no declaration for 'true' in the loaded sources" \
+    'function f(let a: true): Int { return 1 }
+{ return 0 }'
+reject literal-not-extended "extension of undeclared 'true'" \
+    'extension true { function f(): Int { return 1 } }
 { return 0 }'
 # The receiver is the enum's name, in the enum's own functions only.
 reject receiver-outside "'Phase' names a type; its receiver is available only in its own functions" \

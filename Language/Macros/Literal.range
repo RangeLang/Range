@@ -1,4 +1,5 @@
 // Bootstrap primitive: compile a POSIX extended regex and match a whole literal.
-// Recognition only; conversion and automatic token dispatch are deferred.
+// Recognition only. A word a rule selects is the case with its text, in the enum
+// that rule's macro selects; converting numbers and strings is deferred.
 @builtin
 macro literal(let pattern: String): Macro

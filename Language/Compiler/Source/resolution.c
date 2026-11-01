@@ -518,20 +518,52 @@ static const char *stringSpelling(Resolver *vm, const RangeNode *node)
     return rangeArenaIntern(vm->arena,node->source + node->spanStart,node->spanEnd - node->spanStart);
 }
 
+/* The literal rule that selects this spelling. */
+static RangeNode *selectedLiteralRule(Resolver *vm, RangeNode *at, const char *spelling)
+{
+    RangeNode *selected = NULL;
+    for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
+        RangeNode *macro = vm->units[u]->items[i];
+        if (!macro->literalPattern || !macro->literalDefault || !spelling
+            || !literalMatch(vm,at,macro->literalPattern,spelling)) continue;
+        if (selected) fail(vm,at,"ambiguous Core literal '%s'",spelling);
+        selected = macro;
+    }
+    return selected;
+}
+
+/* A word is a name until a rule selects it, since rules are known only after
+ * parsing, and a literal of an enum is the case with the same text. So a word
+ * is read here, once: it becomes the case node `.true` is, holding the enum it
+ * names for itself, and every later pass has one path. */
+static void readLiteralWord(Resolver *vm, RangeNode *node)
+{
+    // `let c: true` stood where a type may, so the parser left its name there;
+    // it is the value any other expression would have been.
+    if (node->typeName && node->rhsReference && !node->generics && selectedLiteralRule(vm,node,node->typeName)) {
+        RangeNode *argument = rangeNodeCreate(vm->arena,RangeNodeArgument,node->path,node->line,node->column);
+        argument->a = node->rhsReference;
+        argument->a->integer = RangeNameRead;
+        node->rhsReference = NULL;
+        node->typeName = NULL;
+        rangeNodeAppend(vm->arena,node,argument);
+    }
+    if (node->kind != RangeNodeName || node->integer != RangeNameRead || node->generics || (node->flags & ~RangeFlagEarlier)) return;
+    RangeNode *rule = selectedLiteralRule(vm,node,node->name);
+    if (!rule) return;
+    if (rule->literalDefault->kind != RangeNodeEnum)
+        fail(vm,node,"the literal '%s' names a case, and macro '%s' selects %s, which is not an enum",node->name,rule->name,rule->literalDefault->name);
+    node->kind = RangeNodeCase;
+    node->flags = 0;
+    node->resolvedType = rule->literalDefault;
+}
+
 void resolveLiteralDefaults(Resolver *vm, RangeNode *node)
 {
     if (!node) return;
-    if (node->kind == RangeNodeInteger || node->kind == RangeNodeBool || node->kind == RangeNodeString) {
-        const char *spelling = node->kind == RangeNodeBool ? (node->integer ? "true" : "false")
-            : node->kind == RangeNodeString ? stringSpelling(vm,node) : node->name;
-        RangeNode *selected = NULL;
-        for (size_t u = 0; u < vm->count; ++u) for (size_t i = 0; i < vm->units[u]->itemCount; ++i) {
-            RangeNode *macro = vm->units[u]->items[i];
-            if (!macro->literalPattern || !macro->literalDefault || !spelling
-                || !literalMatch(vm,node,macro->literalPattern,spelling)) continue;
-            if (selected) fail(vm,node,"ambiguous Core literal '%s'",spelling);
-            selected = macro;
-        }
+    readLiteralWord(vm,node);
+    if (node->kind == RangeNodeInteger || node->kind == RangeNodeString) {
+        RangeNode *selected = selectedLiteralRule(vm,node,node->kind == RangeNodeString ? stringSpelling(vm,node) : node->name);
         node->resolvedDeclaration = selected;
         node->resolvedType = selected ? selected->literalDefault : NULL;
     }
@@ -1088,10 +1120,6 @@ void diagnoseSourceNode(SourceReport *report, SourceScope *scope, RangeNode *nod
     case RangeNodeInteger:
         if (!metadata) sourceDiagnostic(report,node,1,"C-implementation",
             "numeric literal values use C signed 64-bit storage; Range literal materialization is not implemented");
-        break;
-    case RangeNodeBool:
-        if (!metadata) sourceDiagnostic(report,node,1,"C-implementation",
-            "boolean literals are recognized by the C parser and name the enum case spelled like them; Range literal materialization is not implemented");
         break;
     case RangeNodeString:
         if (!metadata) sourceDiagnostic(report,node,1,"C-implementation",

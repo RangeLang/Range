@@ -81,5 +81,28 @@ for mode in ordinary sanitized; do
     [[ "$status" == 65 ]] || fail "$mode missing rule was accepted"
     grep -Fq "has no literal rule" "$work_root/error" || fail "$mode missing rule wrong error"
     rejections=$((rejections + 1))
-    echo "compiler literal: $mode matches=$matches rejections=$rejections normal-resolution=pass"
+    # A second enum with word literals, in a language of its own: the rule is
+    # general, and C knows no enum by name.
+    language="$work_root/$mode-language"
+    mkdir -p "$language"
+    language="$(cd "$language" && pwd -P)"
+    cp -R Language/Functions Language/Grammar Language/Macros Language/Types "$language/"
+    cp "$fixtures/PowerLanguage.range" "$language/Macros/Power.range"
+    clang -std=c17 -Wall -Wextra -Werror -O1 ${native_options[@]+"${native_options[@]}"} \
+        "-DRANGE_LANGUAGE_DIR=\"$language\"" Language/Compiler/Source/*.c -o "$work_root/$mode-power"
+    power_core=("$language/Functions" "$language/Grammar" "$language/Macros" "$language/Types")
+    "$work_root/$mode-power" -o "$work_root/$mode-power-program" "${power_core[@]}" "$fixtures/Power.range" \
+        > "$work_root/out" 2> "$work_root/error" || fail "$mode a second word literal did not compile: $(grep -v 'warning\[' "$work_root/error")"
+    if [[ "$(uname -sm)" == "Darwin arm64" ]]; then
+        status=0
+        "$work_root/$mode-power-program" || status=$?
+        [[ "$status" == 42 ]] || fail "$mode a second word literal exited $status"
+    fi
+    printf 'function f(): Power { return idle }\n{ return 0 }\n' > "$work_root/idle.range"
+    status=0
+    "$work_root/$mode-power" -o "$work_root/$mode-idle" "${power_core[@]}" "$work_root/idle.range" > "$work_root/out" 2> "$work_root/error" || status=$?
+    [[ "$status" == 65 ]] || fail "$mode a word naming no case compiled"
+    grep -Fq "error[type]: Power has no case 'idle'" "$work_root/error" || fail "$mode a word naming no case: $(grep 'error\[' "$work_root/error")"
+    rejections=$((rejections + 1))
+    echo "compiler literal: $mode matches=$matches rejections=$rejections normal-resolution=pass word-enums=pass"
 done

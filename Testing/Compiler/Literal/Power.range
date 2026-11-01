@@ -1,0 +1,39 @@
+// A literal of an enum is the case with the same text, for any enum the
+// literal's rule belongs to, not one the compiler knows by name.
+function reading(let p: Power): Int {
+    switch { p = on: return 1, p = off: return 2 }
+}
+
+function held(let o: Power?): Int {
+    switch {
+        o = .present(on): return 1,
+        o = .present(.off): return 2,
+        o = .absent: return 3
+    }
+}
+
+// Another enum applying the macro takes the literal from its context; the same
+// text is a different tag here.
+@power
+enum Breaker {
+    case on
+    case tripped
+    case off
+}
+
+function position(let b: Breaker): Int {
+    switch { b = on: return 1, b = off: return 2, b = .tripped: return 3 }
+}
+
+function opened(): Breaker { return off }
+function closed<T: @power>(): T { return on }
+
+{
+    let lit: on
+    switch { reading(p: lit) != 1 | reading(p: .off) != 2 | reading(p: Power.on) != 1: return 1, default: {} }
+    switch { held(o: on) != 1 | held(o: .present(off)) != 2 | held(o: .absent) != 3: return 2, default: {} }
+    switch { position(b: on) != 1 | position(b: opened()) != 2 | position(b: .tripped) != 3: return 3, default: {} }
+    let shut: closed<T: Breaker>()
+    switch { position(b: shut) != 1 | closed<T: Power>() != lit: return 4, default: {} }
+    return 42
+}

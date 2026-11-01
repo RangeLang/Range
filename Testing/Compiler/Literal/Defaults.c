@@ -12,8 +12,8 @@ int main(void)
         "@builtin macro literal(let pattern: String): Macro "
         "@literal(pattern: \"[0-9]+\") macro number(): Construct {} "
         "@number construct Whole<let bits: 64> { let value: 0 } "
-        "@literal(pattern: \"true|false\") macro truth(): Construct {} "
-        "@truth construct Logical { let value: false } "
+        "@literal(pattern: \"true|false\") macro truth(): Enum {} "
+        "@truth enum Logical { case false case true } "
         "@literal(pattern: \"\\\".*\\\"\") macro quoted(): Construct {} "
         "@quoted construct Text { let value: \"\" }";
     const char *project =
@@ -57,6 +57,17 @@ int main(void)
     assert(!resolveGraphApplications(&arena,units,3,error,sizeof(error)));
     assert(strstr(error,"ambiguous Core literal"));
     rangeArenaDestroy(&arena);
-    puts("literal defaults: Core uniqueness, project isolation, number/bool/string links, self literals, missing and ambiguous=pass");
+    // A word names a case: a rule that selects one for a construct has no meaning.
+    rangeArenaInit(&arena);
+    rangeGraphInitTypes(&arena);
+    const char *word="@builtin macro literal(let pattern: String): Macro "
+        "@literal(pattern: \"yes\") macro answer(): Construct {} "
+        "@answer construct Answer {} function ask(): Answer { return yes }";
+    units[0]=rangeParseUnit(&arena,RANGE_LANGUAGE_DIR "/Macros/Word.range",word,strlen(word),error,sizeof(error));
+    assert(units[0]);
+    assert(!resolveGraphApplications(&arena,units,1,error,sizeof(error)));
+    assert(strstr(error,"the literal 'yes' names a case, and macro 'answer' selects Answer, which is not an enum"));
+    rangeArenaDestroy(&arena);
+    puts("literal defaults: Core uniqueness, project isolation, number/word/string links, self literals, missing and ambiguous, words of constructs=pass");
     return 0;
 }

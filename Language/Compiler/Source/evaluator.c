@@ -122,16 +122,14 @@ static RangeValue *evalValues(Eval *eval, size_t count)
 }
 
 /* A Bool: the condition type's case whose tag is the truth. Without the
- * condition type a boolean literal stands for it. */
+ * condition type, a number of no type stands for it. */
 static RangeValue evalBool(Eval *eval, int truth)
 {
     RangeNode *condition = eval->typer->boolean;
     for (size_t i = 0; condition && condition->kind == RangeNodeEnum && i < condition->itemCount; ++i)
         if (condition->items[i]->kind == RangeNodeEnumCase && condition->items[i]->integer == truth)
             return (RangeValue){.kind=ValueCase,.type=eval->typer->booleanType,.node=condition->items[i]};
-    RangeNode *literal = rangeNodeCreate(eval->vm->arena,RangeNodeBool,"<compiler>",1,1);
-    literal->integer = truth;
-    return (RangeValue){.kind=ValueLiteral,.node=literal,.integer=truth};
+    return (RangeValue){.kind=ValueScalar,.integer=truth};
 }
 
 int evalTruth(RangeValue value)
@@ -141,13 +139,13 @@ int evalTruth(RangeValue value)
 
 /* A scalar type (see scalarDeclaration) is that many bits wide, signed or
  * not, as its specialization's generics bits and signed hold. */
-static int scalarShape(RangeNode *type, int *bits, int *isSigned)
+static int scalarShape(Typer *typer, RangeNode *type, int *bits, int *isSigned)
 {
     if (!type || type->kind != RangeNodeSpecialization || !scalarDeclaration(type->resolvedDeclaration)) return 0;
-    RangeNode *width = scalarGeneric(type,"bits"), *signedness = scalarGeneric(type,"signed");
+    RangeNode *width = scalarGeneric(type,"bits");
     if (!width || width->kind != RangeNodeInteger || width->integer <= 0 || width->integer > 64) return 0;
     *bits = (int)width->integer;
-    *isSigned = signedness && signedness->kind == RangeNodeBool && signedness->integer;
+    *isSigned = scalarSigned(typer,type) > 0;
     return 1;
 }
 
@@ -194,17 +192,13 @@ static int evalAdopt(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *
         *value = (RangeValue){.kind=ValueText,.type=type,.node=literal,.text=value->text,.length=value->length};
         return EvalNormal;
     }
-    if (literal->kind == RangeNodeBool && declaration->kind == RangeNodeEnum) {
-        RangeNode spelled = {.kind=RangeNodeBool,.integer=value->integer}, *entry = literalCase(declaration,&spelled);
-        if (entry) { *value = (RangeValue){.kind=ValueCase,.type=type,.node=entry}; return EvalNormal; }
-    }
-    if (literal->kind == RangeNodeInteger && scalarShape(type,&bits,&isSigned)) {
+    if (literal->kind == RangeNodeInteger && scalarShape(eval->typer,type,&bits,&isSigned)) {
         if (!scalarFits(value->integer,bits,isSigned)) return evalFail(eval,at,"%lld does not fit %s",value->integer,name);
         *value = (RangeValue){.kind=ValueScalar,.type=type,.integer=value->integer};
         return EvalNormal;
     }
     return evalFail(eval,at,"a %s literal is not a value of %s",
-                    literal->kind == RangeNodeString ? "string" : literal->kind == RangeNodeBool ? "boolean" : "numeric",name);
+                    literal->kind == RangeNodeString ? "string" : "numeric",name);
 }
 
 /* ---- text ---- */
@@ -220,11 +214,10 @@ int evalWrite(Eval *eval, RangeValue value, RangeNode *at, const char **text, si
     case ValueText: *text = value.text; *length = value.length; return EvalNormal;
     case ValueLiteral:
         if (value.node->kind == RangeNodeString) { *text = value.text; *length = value.length; return EvalNormal; }
-        if (value.node->kind == RangeNodeBool) { *text = value.integer ? "true" : "false"; *length = strlen(*text); return EvalNormal; }
         snprintf(piece,sizeof(piece),"%lld",value.integer);
         break;
     case ValueScalar:
-        (void)scalarShape(value.type,&bits,&isSigned);
+        (void)scalarShape(eval->typer,value.type,&bits,&isSigned);
         snprintf(piece,sizeof(piece),isSigned ? "%lld" : "%llu",value.integer);
         break;
     case ValueCase:
@@ -335,7 +328,7 @@ static int evalInitializer(Eval *eval, RangeNode *declaration, RangeNode *at, Ra
         rhs = raw.kind == RangeGraphNode ? raw.node : NULL;
     }
     RangeNodeKind kind; long long integer; const char *text;
-    if (rhs && lawInputs(rhs,&kind,&integer,&text)) {
+    if (rhs && lawInputs(rhs,&kind,&integer,&text) && kind != RangeNodeCase) {
         *out = (RangeValue){.kind=ValueLiteral,.node=rhs->kind == RangeNodeUnary ? rhs->a : rhs,.integer=integer,
                             .text=text,.length=text ? strlen(text) : 0};
         return EvalNormal;
@@ -484,7 +477,7 @@ static int evalSpliced(Eval *eval, RangeValue value, RangeNode *at, RangeNode **
     }
     case ValueLiteral: case ValueScalar:
         if (value.kind == ValueLiteral && value.node->kind != RangeNodeInteger) break;
-        (void)scalarShape(value.type,&bits,&isSigned);
+        (void)scalarShape(eval->typer,value.type,&bits,&isSigned);
         node = rangeNodeCreate(arena,RangeNodeInteger,at->path,at->line,at->column);
         node->integer = isSigned && value.integer < 0 ? -value.integer : value.integer;
         snprintf(spelled,sizeof(spelled),isSigned ? "%lld" : "%llu",node->integer);
@@ -497,16 +490,18 @@ static int evalSpliced(Eval *eval, RangeValue value, RangeNode *at, RangeNode **
         }
         break;
     case ValueCase:
-        if (value.type && value.type->resolvedDeclaration == eval->typer->boolean) {
-            node = rangeNodeCreate(arena,RangeNodeBool,at->path,at->line,at->column);
-            node->integer = value.node->integer;
-            break;
-        }
-        return evalFail(eval,at,"cannot splice a compile-time enum value");
+        // A case a literal writes is written as that literal.
+        if (value.count || !value.type || !literalRule(value.type->resolvedDeclaration)
+            || !literalMatch(eval->vm,at,literalRule(value.type->resolvedDeclaration)->literalPattern,value.node->name))
+            return evalFail(eval,at,"cannot splice a compile-time enum value");
+        node = rangeNodeCreate(arena,RangeNodeCase,at->path,at->line,at->column);
+        node->name = value.node->name;
+        node->resolvedType = value.type->resolvedDeclaration;
+        break;
     default: return evalFail(eval,at,"cannot splice a compile-time %s value",value.kind == ValueClosure ? "closure" : "construct");
     }
     if (!node) {
-        // A string or boolean literal, copied where the splice stands.
+        // A string literal, copied where the splice stands.
         node = rangeArenaAllocate(arena,sizeof(*node));
         *node = *value.node;
         forgetFacts(node);
@@ -629,7 +624,7 @@ static RangeValue evalZero(Eval *eval, RangeNode *type, unsigned depth)
     int bits, isSigned;
     if (!type || type->kind != RangeNodeSpecialization || depth > 16) return (RangeValue){0};
     RangeNode *declaration = type->resolvedDeclaration;
-    if (scalarShape(type,&bits,&isSigned)) return (RangeValue){.kind=ValueScalar,.type=type};
+    if (scalarShape(eval->typer,type,&bits,&isSigned)) return (RangeValue){.kind=ValueScalar,.type=type};
     if (bytesDeclaration(declaration)) return (RangeValue){.kind=ValueText,.type=type,.text=""};
     int variant = declaration->kind == RangeNodeEnum;
     RangeValue zero = {.kind=variant ? ValueCase : ValueInstance,.type=type,.count=variant ? 0 : declaration->itemCount};
@@ -824,7 +819,7 @@ static int evalConstruct(Eval *eval, EvalFrame *frame, RangeNode *type, RangeNod
     evalPrepare(eval,declaration);
     EvalFrame defaults = {.key=keyOf(declaration,type)};
     int status, bits, isSigned, defaulted;
-    if (bytesDeclaration(declaration) || scalarShape(type,&bits,&isSigned)) {
+    if (bytesDeclaration(declaration) || scalarShape(eval->typer,type,&bits,&isSigned)) {
         for (size_t i = 0; i < declaration->itemCount; ++i)
             if (constructionInput(declaration->items[i])) (void)memberTypeIn(eval->typer,type,declaration->items[i]); /* its default, as this specialization has it */
         RangeNode *value = constructionSingle(defaults.key,declaration,arguments,count,&defaulted);
@@ -994,7 +989,7 @@ static int evalPrimitive(Eval *eval, RangeNode *expr, RangeValue left, RangeValu
         *out = (RangeValue){.kind=ValueText,.type=left.type,.text=joined,.length=left.length + right.length};
         return EvalNormal;
     }
-    if (left.kind != ValueScalar || !scalarShape(left.type,&bits,&isSigned))
+    if (left.kind != ValueScalar || !scalarShape(eval->typer,left.type,&bits,&isSigned))
         return evalFail(eval,expr,"no C primitive implements builtin operator '%s' on %s",op,name);
     __int128 a = scalarValue(left,isSigned), b = scalarValue(right,isSigned), result = 0;
     if (expr->kind == RangeNodeUnary) result = -a;
@@ -1262,7 +1257,7 @@ int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
     int status = evalStep(eval,expr);
     if (status) return status;
     switch (expr->kind) {
-    case RangeNodeInteger: case RangeNodeBool: case RangeNodeString: return evalLiteral(eval,frame,expr,out);
+    case RangeNodeInteger: case RangeNodeString: return evalLiteral(eval,frame,expr,out);
     case RangeNodeName: return evalName(eval,frame,expr,out);
     case RangeNodeEnvironment:
         // A splice of a macro local, or #target: the application's target.
@@ -1271,10 +1266,18 @@ int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
         if (eval->outside) return EvalUnknown; /* declarations are values of macros only */
         *out = (RangeValue){.kind=ValueDeclaration,.node=eval->application->target,.type=found(frame->key,expr)->type};
         return EvalNormal;
-    case RangeNodeCase:
-        if (!found(frame->key,expr)->resolvedDeclaration) return evalStop(eval);
-        *out = (RangeValue){.kind=ValueCase,.type=found(frame->key,expr)->type,.node=found(frame->key,expr)->resolvedDeclaration};
+    case RangeNodeCase: {
+        RangeFacts *facts = found(frame->key,expr);
+        if (facts->resolvedDeclaration) {
+            *out = (RangeValue){.kind=ValueCase,.type=facts->type,.node=facts->resolvedDeclaration};
+            return EvalNormal;
+        }
+        // A generic's value is read where nothing types it: a literal names its own enum.
+        RangeNode *entry = literalWord(expr) ? enumCase(expr->resolvedType,expr->name) : NULL;
+        if (!entry) return evalStop(eval);
+        *out = (RangeValue){.kind=ValueCase,.type=literalType(eval->typer,expr),.node=entry};
         return EvalNormal;
+    }
     case RangeNodeMemberAccess: return evalMemberAccess(eval,frame,expr,out);
     case RangeNodeCall: return evalCall(eval,frame,expr,out);
     case RangeNodeCaseTest: {

@@ -1,0 +1,132 @@
+// A literal of an enum is the case with the same text: `true` is `.true`, and
+// names its own enum where `.true` needs a context.
+enum Slot {
+    case pair(Bool, Int)
+    case flag(Bool)
+    case none
+}
+
+// A test of each case: no default.
+function bare(let b: Bool): Int {
+    switch { b = true: return 1, b = false: return 2 }
+}
+
+function dotted(let b: Bool): Int {
+    switch { b = .true: return 1, b = .false: return 2 }
+}
+
+function mixed(let b: Bool): Int {
+    switch { b = true: return 1, b = Bool.false: return 2 }
+}
+
+// Inside a form, a literal tests the payload as a case does.
+function held(let o: Bool?): Int {
+    switch {
+        o = .present(true): return 1,
+        o = .present(false): return 2,
+        o = .absent: return 3
+    }
+}
+
+function heldDotted(let o: Bool?): Int {
+    switch {
+        o = .present(.true): return 1,
+        o = .present(false): return 2,
+        o = Bool?.absent: return 3
+    }
+}
+
+// Beside `_` it is a test; every case of the payload is covered.
+function slotted(let s: Slot): Int {
+    switch {
+        s = .pair(true, _): return 1,
+        s = .pair(false, let n): return n,
+        s = .flag(true): return 3,
+        s = .flag(.false): return 4,
+        s = .none: return 5
+    }
+}
+
+// Beside a value it is a value: the form is compared, as with `.true`.
+function compared(let s: Slot): Bool { return s = .pair(true, 1) }
+function comparedDotted(let s: Slot): Bool { return s = .pair(.true, 1) }
+
+// As a value it is what `.true` is, where a context names the enum or none does.
+function yes(): Bool { return true }
+function no(): Bool { return .false }
+function given(let b: Bool): Bool { return b }
+function not(let b: Bool): Bool { return b != true }
+function flipped(let b: Bool): Bool { return true = b }
+function promoted(let o: Bool?): Bool { return o = true }
+function nested(let s: Slot): Int {
+    return switch { s = .flag(let b) & b = true: 1, default: 0 }
+}
+
+// The name is never read: it stays the literal.
+function shadowed(let true: Int): Bool { return true }
+
+// A value generic holds it, in either spelling, as one specialization.
+construct Tagged<let on: true> {
+    let weight: Int
+    function isOn(): Bool { return on }
+}
+function weighed(let t: Tagged<on: .false>): Int { return t.weight }
+
+// A type parameter whose constraint selects the literal: each use types it.
+function truth<T: @boolean>(): T { return true }
+function isTrue<T: @boolean>(let value: T): Bool { return value = true }
+function heldTrue<T: @boolean>(let value: T?): Bool {
+    return switch { value = .present(true): true, default: false }
+}
+
+// Macro time reads the same case, and a splice writes it back.
+macro decided(): Construct {
+    let on: true
+    let off: !on
+    switch { on = true: {}, on = false: diagnostic(message: "true is case true") }
+    switch { off = .false: {}, default: diagnostic(message: "false is case false") }
+    #graph {
+        extension #target.name {
+            function on(): Bool { return #on }
+            function off(): Bool { let value: #off return value }
+            function tested(let b: Bool): Int { switch { b = true: return 7, b = false: return 8 } }
+        }
+    }
+}
+@decided construct Decision { let weight: Int }
+
+{
+    let c: true
+    state s: false
+    switch { bare(b: true) != 1 | bare(b: .false) != 2 | dotted(b: .true) != 1 | dotted(b: false) != 2: return 1, default: {} }
+    switch { mixed(b: c) != 1 | mixed(b: s) != 2: return 2, default: {} }
+    switch { held(o: true) != 1 | held(o: .present(false)) != 2 | held(o: .absent) != 3: return 3, default: {} }
+    switch { heldDotted(o: .present(.true)) != 1 | heldDotted(o: false) != 2 | heldDotted(o: Bool?.absent) != 3: return 4, default: {} }
+    switch { slotted(s: Slot.pair(true, 9)) != 1 | slotted(s: Slot.pair(.false, 9)) != 9: return 5, default: {} }
+    switch { slotted(s: Slot.flag(true)) != 3 | slotted(s: Slot.flag(.false)) != 4 | slotted(s: Slot.none) != 5: return 6, default: {} }
+    switch { !compared(s: Slot.pair(.true, 1)) | compared(s: Slot.pair(true, 2)) | compared(s: Slot.pair(false, 1)): return 7, default: {} }
+    switch { !comparedDotted(s: Slot.pair(true, 1)) | comparedDotted(s: Slot.none): return 8, default: {} }
+    switch { !yes() | no() | !given(b: true) | given(b: .false): return 9, default: {} }
+    switch { not(b: true) | !not(b: false) | !flipped(b: .true) | flipped(b: false): return 10, default: {} }
+    switch { !promoted(o: true) | promoted(o: .false) | promoted(o: .absent): return 11, default: {} }
+    switch { nested(s: Slot.flag(.true)) != 1 | nested(s: Slot.flag(false)) != 0: return 12, default: {} }
+    switch { !shadowed(true: 0): return 13, default: {} }
+    // A literal stands in a let with Bool as its type, and is what state holds.
+    switch { c = false | !(c = .true) | s = true: return 14, default: {} }
+    s: true
+    switch { s != .true: return 15, default: {} }
+    s: .false
+    switch { s != false: return 16, default: {} }
+    // One specialization, whichever way its value is written.
+    let tagged: Tagged<on: false>(weight: 3)
+    switch { tagged.isOn() | weighed(t: tagged) != 3 | !Tagged<on: .true>(weight: 1).isOn(): return 17, default: {} }
+    // Int's own generic is one of these literals.
+    let narrow: Int<bits: 8, signed: .false>(200)
+    let same: Int<bits: 8, signed: false>(200)
+    switch { narrow != same: return 18, default: {} }
+    let t: truth<T: Bool>()
+    switch { !t | !isTrue(value: t) | !heldTrue(value: Bool?.present(true)) | heldTrue(value: Bool?.present(false)): return 19, default: {} }
+    let decision: Decision(weight: 1)
+    switch { !decision.on() | decision.off() | decision.tested(b: true) != 7 | decision.tested(b: .false) != 8: return 20, default: {} }
+    return 42
+}

@@ -195,6 +195,8 @@ of a generic declaration would differ between its own run and its law runs.
   typed from its left side, so one compared with a value known only at macro
   time is reported: "'.degrees' needs a context that names its enum". Bind the
   field and compare it: `a = .degrees(let d) & d = 0`.
+- A value generic holds a literal or a `.case`; `Int<signed: Bool.true>` is
+  reported: "Int is a scalar, so its generic 'signed' must be a boolean".
 - `let s: make(1)`, where `make` is a closure parameter, is not compiled
   natively ("native values of <unknown> are not implemented").
 - Values of a macro's types (`@fruit`):
@@ -234,6 +236,14 @@ of a generic declaration would differ between its own run and its law runs.
   - the macro `@narrows`, applied in `runMacroApplication` and read by
     typing at calls of its function and of its parameter.
 - `@literal` patterns are registered by C while reading, before typing.
+- The condition type: conditions branch on a tag and comparisons produce one,
+  so C finds this type as the enum the literal `true` selects
+  (`literalFamily(typer,"true")`) and requires case false as tag 0 and case true
+  as tag 1. That is the one place C spells either word. The parser and the
+  rest of the compiler read `true` through its literal rule.
+- A word is a literal only after the literal rules are registered, so the parser
+  marks names written as expressions, and `readLiteralWord` turns those a rule
+  selects into cases, and `let c: true` from a type position into a value.
 - setjmp/longjmp in the resolver and typer.
 - Partitioned `@many` storage grows each type's block by doubling from
   four slots, a policy C holds.

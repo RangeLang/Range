@@ -287,7 +287,6 @@ static int startsClosure(RangeParser *parser);
 static int atTypePosition(RangeParser *parser)
 {
     if (parser->current.kind == RangeTokenName) {
-        if (parserAt(parser,"true") || parserAt(parser,"false")) return 0;
         // `let x: switch { … }` is a value.
         if (parserAt(parser, "switch")) return 0;
         // `let s: bag.snapshot()` and `let n: a + 1` are expressions; a `<`
@@ -699,12 +698,6 @@ static RangeNode *parsePrimary(RangeParser *parser)
         return node;
     }
     if (token.kind == RangeTokenString) return parseString(parser);
-    if (rangeTokenIs(&token, "true") || rangeTokenIs(&token, "false")) {
-        RangeNode *node = parserNode(parser, RangeNodeBool);
-        node->integer = rangeTokenIs(&token, "true") ? 1 : 0;
-        parserAdvance(parser);
-        return node;
-    }
     if (parserAt(parser, ".")) {
         RangeNode *node = parserNode(parser, RangeNodeCase);
         parserAdvance(parser);
@@ -768,6 +761,7 @@ static RangeNode *parsePrimary(RangeParser *parser)
     if (token.kind == RangeTokenName) {
         RangeNode *node = parserNode(parser, RangeNodeName);
         node->name = parserExpectName(parser);
+        node->integer = RangeNameRead;
         return node;
     }
     parserFail(parser, &token, "unexpected '%.*s' in expression",
@@ -1803,8 +1797,10 @@ static RangeNode *parseExtension(RangeParser *parser, RangeNode *attributes)
     parser->conditionDepth -= 1;
     RangeNode *root = node->a;
     while (root && (root->kind == RangeNodeMemberAccess || root->kind == RangeNodeCall)) root = root->a;
-    if (node->a && node->a->kind == RangeNodeName && !node->a->generics) node->name = node->a->name;
-    else if (!root || root->kind != RangeNodeEnvironment)
+    if (node->a && node->a->kind == RangeNodeName && !node->a->generics) {
+        node->name = node->a->name;
+        node->a->integer = 0; /* names a declaration; no literal rule reads it */
+    } else if (!root || root->kind != RangeNodeEnvironment)
         parserFail(parser, &parser->current, "extension requires a declaration name");
     parseConstructBody(parser, node, node->name);
     return node;
