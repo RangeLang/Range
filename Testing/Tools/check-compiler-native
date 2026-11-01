@@ -49,6 +49,12 @@ run aggregates 42 "" Testing/Compiler/Native/Aggregates.range
 # Array's emitted methods over @many storage.
 run arrays 42 "" Testing/Compiler/Native/Arrays.range
 run copy-on-write 42 "" Testing/Compiler/Native/CopyOnWrite.range
+# remove(at:) and slice(at:) on every collection, over the drop slot primitive.
+run array-editing 42 "" Testing/Compiler/Native/ArrayEditing.range
+run remove-outside 134 "remove(at:) names a position outside the collection" \
+    "$(case_file remove-outside '{ state xs: Array<Int>() xs.append(value: 1) xs.remove(at: 1) return 0 }')"
+run slice-outside 134 "slice(at:) names positions outside the collection" \
+    "$(case_file slice-outside '{ state xs: Array<Int>() xs.append(value: 1) let s: xs.slice(at: 0..<2) return s.count }')"
 run lifetimes 42 "" Testing/Compiler/Native/Lifetimes.range
 run output 134 "Output.range:21:28: count is 5, expected at most 3" Testing/Compiler/Native/Output.range
 printf '%s\n' "Hello from Range!" "hello, world" "count: 5, last: 25, empty: false, capacity: 8" \
@@ -140,6 +146,15 @@ done
 run generic-methods 42 "" Testing/Compiler/Native/GenericMethods.range
 run generic-bodies 42 "" Testing/Compiler/Native/GenericBodies.range
 run constraints 42 "" Testing/Compiler/Native/Constraints.range
+# A macro ordinary types apply is a type: a @fruit value holds any of them,
+# shows the macro's face, and `=` with a type tests and narrows it.
+run macro-values 42 "" Testing/Compiler/Native/MacroValues.range
+printf '%s\n' "mass 150" "fruits 4" | cmp -s - "$work_root/stdout" || fail "macro values printed: $(cat "$work_root/stdout")"
+# Array<@fruit> keeps one block per type and an order list; random edits
+# match an Array<Int> model throughout.
+run partitioned 42 "" Testing/Compiler/Native/Partitioned.range
+run partitioned-model 42 "" Testing/Compiler/Native/PartitionedModel.range
+[[ "$(cat "$work_root/stdout")" == "count 270" ]] || fail "partitioned model printed: $(cat "$work_root/stdout")"
 # Closures: functions that take them are compiled inline, and so are they.
 run closures 42 "" Testing/Compiler/Native/Closures.range
 [[ "$(cat "$work_root/stdout")" == "calls: 4, pairs: 3" ]] || fail "closures printed: $(cat "$work_root/stdout")"
@@ -590,6 +605,49 @@ reject narrowing-left "'>' is not declared on $optional" \
 reject narrowing-after-switch "'+' is not declared on $optional" \
     'function f(let x: Int?): Int { switch { x.present: {}, default: return 0 } return x + 1 }
 { return f(x: 1) }'
+# A @fruit value shows what @fruit gives every type, and names none of its cases.
+fruit='macro fruit(): Construct { #graph { extension #target.name { function weight(): Int { return 1 } } } }
+@fruit construct Apple { let color: Int }
+@fruit construct Banana { let length: Int }'
+reject macro-value-member "@fruit has no member 'color': a @fruit value has what @fruit gives every type applying it; related: 'value = Apple' narrows a value to the type it holds" \
+    "$fruit"'
+function f(let x: @fruit): Int { return x.color }
+{ return f(x: Apple(color: 1)) }'
+reject macro-value-case "@fruit has no member 'Apple'" \
+    "$fruit"'
+function f(let x: @fruit): Bool { return x.Apple }
+{ return 0 }'
+reject macro-value-case-value "@fruit has no cases; related: 'value = Apple' tests whether a @fruit value holds Apple" \
+    "$fruit"'
+function f(let x: @fruit): Int { return 1 }
+{ return f(x: .Apple) }'
+reject macro-value-foreign "Pear does not apply @fruit, so a @fruit value never holds one" \
+    "$fruit"'
+construct Pear { let size: Int }
+function f(let x: @fruit): Bool { return x = Pear }
+{ return 0 }'
+reject macro-value-plain "'Int' names a type; '=' tests which type a value holds only on a value of a macro type, and this one is Int<bits: 64, signed: true>" \
+    '{ let n: 3 switch { n = Int: return 1, default: return 0 } }'
+reject macro-value-generic "values of @fruit are not implemented for generic types: Crate applies @fruit, so a @fruit value would hold any specialization of it" \
+    "$fruit"'
+@fruit construct Crate<T> { let held: T }
+function f(let x: @fruit): Int { return x.weight() }
+{ return f(x: Apple(color: 1)) }'
+reject macro-value-own-type "a @fruit value has no 'same': its signature names the type applying @fruit, which differs from value to value" \
+    'macro fruit(): Construct { #graph { extension #target.name { function same(let other: #target.name): Bool { return true } } } }
+@fruit construct Apple { let color: Int }
+function f(let x: @fruit): Bool { return x.same(other: x) }
+{ return 0 }'
+reject macro-value-mutating "Apple's 'ripen' changes its receiver; calling it on a @fruit value is not implemented" \
+    'macro fruit(): Construct { #graph { extension #target.name { function ripen() { grams: grams + 1 } } } }
+@fruit construct Apple { state grams: Int }
+function pick(): @fruit { return Apple(grams: 1) }
+{ state f: pick() f.ripen() return 0 }'
+reject macro-value-unpromoted "requires @fruit; found Pear" \
+    "$fruit"'
+construct Pear { let size: Int }
+function f(let x: @fruit): Int { return 1 }
+{ return f(x: Pear(size: 1)) }'
 # Only the enum applying @optional narrows; other enums bind their payloads.
 reject narrowing-other-enum "'+' is not declared on Box" \
     'enum Box { case empty

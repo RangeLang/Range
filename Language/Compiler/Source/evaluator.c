@@ -176,6 +176,9 @@ static int evalAdopt(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *
 {
     if (!type || type->kind != RangeNodeSpecialization || value->kind == ValueNone || value->kind == ValueClosure) return EvalNormal;
     RangeNode *present = NULL, *wrapped = optionalWrapped(eval->typer,type,&present);
+    // A macro's values hold a value of a type applying it in that type's case.
+    if (!wrapped && macroUnion(type) && value->type && value->type->resolvedDeclaration != type->resolvedDeclaration
+        && (present = wrappingCase(eval->typer,type,value->type))) wrapped = memberTypeIn(eval->typer,type,present->items[0]);
     if (wrapped && !(value->kind == ValueCase && value->type && value->type->resolvedDeclaration == type->resolvedDeclaration)) {
         RangeValue *payload = evalValues(eval,1);
         *payload = *value;
@@ -700,6 +703,11 @@ static int evalBuiltin(Eval *eval, RangeNode *function, RangeValue *self, RangeV
     if (index < 0 || (size_t)index >= slots->count) return evalTrap(eval,at,"slot index is outside the @many storage");
     if (same(function->name,"read")) { *out = slots->values[index]; return EvalNormal; }
     evalOwn(eval,slots);
+    if (same(function->name,"drop")) {
+        memmove(&slots->values[index],&slots->values[index + 1],(slots->count - (size_t)index - 1) * sizeof(*slots->values));
+        slots->values[slots->count - 1] = evalZero(eval,manyElement(eval->typer,self->type,declaration->items[many]),0);
+        return EvalNormal;
+    }
     slots->values[index] = arguments[1];
     return EvalNormal;
 }
@@ -1288,11 +1296,14 @@ int evalPlain(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *out)
     }
 }
 
-/* A value where typing promoted it to the optional `type`: the present case
- * holding it, even when it is itself an optional. */
-static int evalPromote(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *at)
+/* A value of `actual` where typing promoted it to `type`: the case holding
+ * it, the optional's present case even when it is itself an optional, or a
+ * macro's case for its type. */
+static int evalPromote(Eval *eval, RangeValue *value, RangeNode *type, RangeNode *actual, RangeNode *at)
 {
-    RangeNode *present = NULL, *wrapped = optionalWrapped(eval->typer,type,&present);
+    RangeNode *present = wrappingCase(eval->typer,type,actual);
+    if (!present) return evalFail(eval,at,"this value has no case of the type it is promoted to");
+    RangeNode *wrapped = memberTypeIn(eval->typer,type,present->items[0]);
     RangeValue *payload = evalValues(eval,1);
     *payload = *value;
     int status = evalAdopt(eval,payload,wrapped,at);
@@ -1312,7 +1323,7 @@ int evalExpression(Eval *eval, EvalFrame *frame, RangeNode *expr, RangeValue *ou
     if (!status && facts->narrowed && (out->kind != ValueCase || out->node != facts->narrowed || out->count != 1))
         status = evalFail(eval,expr,"this narrowed value holds no payload");
     else if (!status && facts->narrowed) *out = out->values[0];
-    if (!status && facts->promoted) status = evalPromote(eval,out,facts->promoted,expr);
+    if (!status && facts->promoted) status = evalPromote(eval,out,facts->promoted,facts->type,expr);
     if (eval->outside && frame == eval->root) nativeRemember(eval->outside,expr,status,out);
     return status;
 }

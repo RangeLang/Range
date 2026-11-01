@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* ---- growable text ------------------------------------------------------ */
 
@@ -314,6 +315,13 @@ int rangeWriteExecutable(RangeMachine *machine, size_t entry, const char *path, 
     }
     while (image.size < signatureStart + signatureSize) put8(&image,0);
 
+    // A new file, not the old one rewritten: the kernel keeps an executed
+    // file's signature, and kills a program whose pages no longer match it.
+    if (unlink(path) && errno != ENOENT) {
+        snprintf(error,errorSize,"cannot replace %s: %s",path,strerror(errno));
+        free(image.bytes);
+        return 0;
+    }
     FILE *file = fopen(path,"wb");
     int ok = file && fwrite(image.bytes,1,image.size,file) == image.size;
     if (file && fclose(file)) ok = 0;

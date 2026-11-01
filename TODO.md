@@ -62,15 +62,49 @@ an enum with one case per alternative, because `|` is logical or. Reusing
 `||` for types was rejected. Discuss together with `?`.
 
 Constraints are being reopened as logic over types (`@comparable |
-@hashable`), and the heterogeneous-array design uses `Triangle | Circle`. In
-both, `|` in a type reads as logical or: "a value of this type or that one".
-That reverses the reason they were removed.
+@hashable`), where `|` reads as logical or: "this face or that one". That
+reverses the reason they were removed. Heterogeneous arrays do not use them:
+they hold a macro type, `Array<@fruit>` (below).
 
 ### `named:` lookup and heterogeneous collections
 `#target.members.first(named: "value")` will come back. Selecting elements
 of a collection by a shared property is central to heterogeneous collections.
 The path back is generic constraints, as the type of a type slot. See
 "Macros in place of protocols and classes" below.
+
+**Heterogeneous arrays: accepted 2026-10-31.** `Array<@fruit>`, `@fruit`
+values with `@fruit`'s face, `fruit = Apple` with its narrowing, the
+partitioned storage, `remove(at:)` and `slice(at:)` are implemented; see
+Testing/Compiler/Native/MacroValues.range and Partitioned.range. Still to do:
+
+- Selection: the narrowing that holds when `filter`'s predicate is true
+  becomes the result's element type, so `fruits.filter { fruit in fruit =
+  Apple }` is `Array<Apple>` and `names.filter { name in name.present }` is
+  `Array<String>`. Today the result stays `Array<@fruit>`; `for fruit in
+  fruits & fruit = Apple { … }` narrows already. This replaces the
+  2026-09-08 note that `filter` need not read narrowing from a predicate.
+  - Open: how `filter`'s declaration in `@collection` says it, without C
+    naming `filter`. Candidate: a parameter macro, as in
+    `function filter<Kept>(@narrows(to: Kept) let where: (Element) -> Bool): Array<Kept>`,
+    where Kept is what a true result narrows the closure's parameter to, and
+    Element when it narrows nothing.
+  - When the predicate is exactly a type test, the result can share that
+    type's block, copy-on-write. That needs a slot primitive that hands one
+    type's block to another collection's `@many` member, with Range code
+    setting its count and capacity.
+- Decided while implementing, for George to confirm: a face member whose
+  signature names the face's own type, as `=(let other: #target.name)`
+  does, is not read through a `@fruit` value, since that type differs from
+  value to value. Two `@fruit` values compare with the built-in `=`: the
+  same type, then that type's `=`.
+- Payoff: `#target.members` as `Array<@member>`, which brings back
+  `first(named:)`.
+- Open:
+  - `fruits.filter(only: Apple)` as a shorter spelling; it passes a type as
+    an argument, which Range does nowhere at run time.
+  - Whether `shape = .circle` tests an enum's case, ignoring its payload.
+  - `{ fruit in fruit = Apple }` reads oddly: a closure's `in` reads like
+    `for … in`, singular in plural.
 
 ### Macros in place of protocols and classes
 Range has neither protocols nor classes; macros cover conformance checks,
@@ -83,14 +117,8 @@ extension). What protocols and classes give that Range does not have yet:
   Element, which each target declares for itself". Generic code over
   collections writes `Array<T>`. Protocols answer this with associated types;
   Range has no design for it yet.
-- **Values of different types at run time.** This is the heterogeneous array
-  (see `named:` above). Its design is a partitioned array: one concrete buffer
-  per member type, plus one buffer of `(type, index)` references in source
-  order. It has the face of a normal array. `filter(for: Triangle)` returns
-  `Array<Triangle>`, which is that type's buffer. History: 457104e3 TODO.md
-  ("nominally partitioned multibuffer") and e0823c81
-  Development/CompilerFlow/GoalAudit.md ("Collection predicates and explicit
-  type selection", 2026-09-08).
+- **Values of different types at run time.** This is the heterogeneous
+  array, `Array<@fruit>`, accepted 2026-10-31 (see `named:` above).
 - **Shared identity.** Range does not nest values that point at each other; it
   references them by ID, as in `let parent: ID?`. No ID type exists in
   Language/Types today. The July 2026 model had
@@ -163,6 +191,18 @@ of a generic declaration would differ between its own run and its law runs.
   whose bound state outlives the call needs lifetimes of what it binds.
 - `let s: make(1)`, where `make` is a closure parameter, is not compiled
   natively ("native values of <unknown> are not implemented").
+- Values of a macro's types (`@fruit`):
+  - only top-level types applying the macro are its types; a nested one,
+    as `Basket.Fig`, is not, and a generic one is reported as not
+    implemented;
+  - a value is narrowed once, so an optional `@fruit` narrowed to its
+    `@fruit` is not narrowed again by `head = Apple`, and `@fruit?` does not
+    compare with an Apple: promotion goes one step;
+  - a face function that changes its receiver is not called through a
+    `@fruit` value: each case's arm holds a copy;
+  - `Array<@fruit>` is not compiled when a type applying `@fruit` holds
+    `@fruit` values itself, and its storage cannot shrink below the
+    elements it holds.
 
 ### Macro gaps
 - `@holding(type: Array<@nominal>)` does not parse.
@@ -178,7 +218,7 @@ of a generic declaration would differ between its own run and its law runs.
 
 ### C shortcuts to replace
 - Builtins selected by name:
-  - `resize`, `read`, `write`, `byte` and `count`;
+  - `resize`, `read`, `write`, `drop`, `byte` and `count`;
   - a scalar's generics `bits` and `signed`: a construct applying the macro
     integer literals select is a scalar, and C reads its width and
     signedness from those two generics;
@@ -187,6 +227,8 @@ of a generic declaration would differ between its own run and its law runs.
     `evalBuiltin` and `evalEffect`.
 - `@literal` patterns are registered by C while reading, before typing.
 - setjmp/longjmp in the resolver and typer.
+- Partitioned `@many` storage grows each type's block by doubling from
+  four slots, a policy C holds.
 
 ### Code generation
 - Jump tables for `switch`.

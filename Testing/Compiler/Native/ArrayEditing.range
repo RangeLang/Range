@@ -1,0 +1,65 @@
+// remove(at:) takes an element out, and the ones after it move down one
+// position; slice(at:) copies the elements at a range of positions, in order.
+macro fruit(): Construct {
+    #graph { extension #target.name { function weight(): Int { return grams } } }
+}
+@fruit construct Apple { let grams: Int }
+@fruit construct Banana { let grams: Int }
+
+function digits(let xs: Array<Int>): Int {
+    state value: 0
+    for x in xs { value: value * 10 + x }
+    return value
+}
+
+function names(let fruits: Array<@fruit>): Int {
+    // Apple is 1, Banana is 2, in order.
+    state value: 0
+    for fruit in fruits {
+        let digit: switch { fruit = Apple: 1, default: 2 }
+        value: value * 10 + digit
+    }
+    return value
+}
+
+{
+    state xs: Array<Int>()
+    for i in 1..<6 { xs.append(value: i) }
+    let copy: xs
+    switch { xs.remove(at: 1) != 2: return 1, default: {} }
+    switch { digits(xs: xs) != 1345 | xs.count != 4: return 2, default: {} }
+    switch { digits(xs: copy) != 12345: return 3, default: {} }
+    xs.remove(at: 3)
+    xs.remove(at: 0)
+    switch { digits(xs: xs) != 34: return 4, default: {} }
+    xs.append(value: 9)
+    switch { digits(xs: xs) != 349: return 5, default: {} }
+    switch { digits(xs: copy.slice(at: 1..<4)) != 234: return 6, default: {} }
+    switch { copy.slice(at: 2..<2).count != 0: return 7, default: {} }
+
+    // Elements holding blocks are released when removed, and kept by copies.
+    state lists: Array<Array<Int>>()
+    lists.append(value: copy)
+    lists.append(value: xs)
+    let kept: lists.remove(at: 0)
+    switch { digits(xs: kept) != 12345 | lists.count != 1: return 8, default: {} }
+    switch { digits(xs: lists.read(at: 0)) != 349: return 9, default: {} }
+
+    // apple, banana, apple, banana; then one more apple at the end.
+    state fruits: Array<@fruit>()
+    fruits.append(value: Apple(grams: 1))
+    fruits.append(value: Banana(grams: 2))
+    fruits.append(value: Apple(grams: 3))
+    fruits.append(value: Banana(grams: 4))
+    fruits.append(value: Apple(grams: 5))
+    switch { names(fruits: fruits) != 12121: return 10, default: {} }
+    switch { names(fruits: fruits.slice(at: 0..<5)) != 12121: return 11, default: {} }
+    let removed: fruits.remove(at: 1)
+    switch { removed.weight() != 2 | removed = Apple: return 12, default: {} }
+    switch { names(fruits: fruits) != 1121: return 13, default: {} }
+    state weights: 0
+    for fruit in fruits { weights: weights * 10 + fruit.weight() }
+    switch { weights != 1345: return 14, default: {} }
+    switch { fruits.read(at: 1).weight() != 3: return 15, default: {} }
+    return 42
+}

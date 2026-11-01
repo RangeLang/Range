@@ -79,6 +79,7 @@ struct Typer {
     struct { RangeNode *type, *at, *key; } *equalities; size_t equalityCount, equalityCapacity;
     RangeNode *instances; /* interned specializations of generic functions, in the order typing met them */
     RangeNode *faces;     /* faces of type parameters, each owned by the type parameter it stands for */
+    RangeNode *unions;    /* the enums values of macro types are, each owned by its macro */
     RangeNode *typing[64]; size_t typingCount; /* declarations whose type is being derived from their value */
     RangeNode *functionTypes;   /* interned RangeNodeFunctionType nodes */
     RangeNode *closureSite;     /* the argument being typed for a function-typed parameter */
@@ -254,6 +255,8 @@ RangeNode *operatorFunction(const RangeNode *declaration, const char *symbol, si
 int operatorName(const char *name);
 int shortCircuit(const RangeNode *function);
 RangeNode *optionalWrapped(Typer *typer, RangeNode *type, RangeNode **present);
+int macroUnion(const RangeNode *type);
+RangeNode *wrappingCase(Typer *typer, RangeNode *type, RangeNode *actual);
 int constructionInput(const RangeNode *member);
 RangeNode *declarationValue(RangeNode *key, RangeNode *node);
 int genericTemplate(const RangeNode *function);
