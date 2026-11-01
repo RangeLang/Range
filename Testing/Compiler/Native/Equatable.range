@@ -92,7 +92,9 @@ function half(let f: Fraction): Bool {
     switch { Measure(amount: half1, unit: "kg") != Measure(amount: half2, unit: "kg"): return 8, default: {} }
     switch { Measure(amount: half1, unit: "kg") = Measure(amount: half2, unit: "lb"): return 9, default: {} }
     switch { Reading.exact(half1) != .exact(half2) | Reading.exact(half1) = .unknown: return 10, default: {} }
-    switch { Parity.even != .odd: return 11, default: {} }
+    // A value in a name is compared by the enum's `=`; `.odd` would test the case.
+    let odd: Parity.odd
+    switch { Parity.even != odd | !(Parity.even != .odd): return 11, default: {} }
     switch { Plain(n: 1) = Plain(n: 2) | Plain(n: 3) != Plain(n: 3): return 12, default: {} }
     let loose: LooseFraction(numerator: 1, denominator: 2)
     switch { loose = LooseFraction(numerator: 2, denominator: 4) | loose != LooseFraction(numerator: 1, denominator: 2): return 13, default: {} }

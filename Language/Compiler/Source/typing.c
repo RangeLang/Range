@@ -46,50 +46,58 @@ RangeFacts *found(RangeNode *key, RangeNode *node)
  * RangeNodeCaseTest that runs in its place: a the subject, b the case
  * pattern. */
 
-static RangeNode *casePattern(RangeArena *arena, RangeNode *at, const char *name, RangeNode *call);
+/* The form of a case an expression writes: `.name` or `Type.name`, with or
+ * without arguments. name is NULL for any other expression; path is the type
+ * written, or NULL. */
+typedef struct { const char *name; RangeNode *call, *path; } CaseForm;
+
+static CaseForm caseForm(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context);
+
+static RangeNode *casePattern(Typer *typer, SourceScope *scope, RangeNode *at, CaseForm form, RangeNode *context);
 
 /* An argument of a case test, as the pattern it is. */
-static RangeNode *argumentPattern(RangeArena *arena, RangeNode *value)
+static RangeNode *argumentPattern(Typer *typer, SourceScope *scope, RangeNode *value, RangeNode *context)
 {
     if (value->kind == RangeNodePattern) return value;
-    if (value->kind == RangeNodeCase) return casePattern(arena,value,value->name,NULL);
-    if (value->kind == RangeNodeCall && value->a && value->a->kind == RangeNodeCase)
-        return casePattern(arena,value,value->a->name,value);
-    RangeNode *pattern = rangeNodeCreate(arena,RangeNodePattern,value->path,value->line,value->column);
+    CaseForm form = caseForm(typer,scope,value,context);
+    if (form.name) return casePattern(typer,scope,value,form,context);
+    RangeNode *pattern = rangeNodeCreate(typer->report->arena,RangeNodePattern,value->path,value->line,value->column);
     pattern->integer = RangePatternValue;
     pattern->a = value;
     return pattern;
 }
 
-static RangeNode *casePattern(RangeArena *arena, RangeNode *at, const char *name, RangeNode *call)
+static RangeNode *casePattern(Typer *typer, SourceScope *scope, RangeNode *at, CaseForm form, RangeNode *context)
 {
+    RangeArena *arena = typer->report->arena;
     RangeNode *pattern = rangeNodeCreate(arena,RangeNodePattern,at->path,at->line,at->column);
     pattern->integer = RangePatternCase;
-    pattern->name = name;
-    if (!call) return pattern;
+    pattern->name = form.name;
+    pattern->b = form.path;
+    if (!form.call) return pattern;
     pattern->flags |= RangeFlagApplication;
-    for (size_t i = 0; i < call->itemCount; ++i) {
-        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,call->items[i]->path,call->items[i]->line,call->items[i]->column);
-        argument->name = call->items[i]->name;
-        argument->a = argumentPattern(arena,call->items[i]->a);
+    for (size_t i = 0; i < form.call->itemCount; ++i) {
+        RangeNode *written = form.call->items[i];
+        RangeNode *argument = rangeNodeCreate(arena,RangeNodeArgument,written->path,written->line,written->column);
+        argument->name = written->name;
+        argument->a = argumentPattern(typer,scope,written->a,context);
         rangeNodeAppend(arena,pattern,argument);
     }
     return pattern;
 }
 
-/* The case test the member access `subject.name`, the call
- * `subject.name(…)`, or the bare `name` or `name(…)` (subject flagged
- * implicit: the receiver) is, written beside it. */
-static RangeNode *caseTest(RangeArena *arena, RangeNode *at, RangeNode *subject, const char *name, RangeNode *call)
+/* The case test of `subject` the form is, written beside the expression at
+ * `at`. */
+static RangeNode *caseTest(Typer *typer, SourceScope *scope, RangeNode *at, RangeNode *subject, CaseForm form, RangeNode *context)
 {
-    RangeNode *test = rangeNodeCreate(arena,RangeNodeCaseTest,at->path,at->line,at->column);
+    RangeNode *test = rangeNodeCreate(typer->report->arena,RangeNodeCaseTest,at->path,at->line,at->column);
     test->a = subject;
-    test->b = casePattern(arena,at,name,call);
-    test->name = name;
+    test->b = casePattern(typer,scope,at,form,context);
+    test->name = form.name;
     return test;
 }
 
-/* The receiver a bare case name tests, inside an enum's own functions. */
+/* The receiver a case test reads, inside an enum's own functions. */
 static RangeNode *receiverSubject(RangeArena *arena, RangeNode *at)
 {
     RangeNode *subject = rangeNodeCreate(arena,RangeNodeName,at->path,at->line,at->column);
@@ -2755,12 +2763,9 @@ static RangeNode *typeEither(Typer *typer, SourceScope *scope, RangeNode *expr, 
 
 static RangeNode *typeCaseTest(Typer *typer, SourceScope *scope, RangeNode *test, RangeNode *context)
 {
-    RangeNode *subject = test->a, *type;
+    RangeNode *subject = test->a;
     size_t mark = typer->narrowedCount;
-    if (subject->flags & RangeFlagImplicit) {
-        finding(typer,subject)->resolvedDeclaration = methodReceiver(typer->report,typer->function);
-        finding(typer,subject)->type = type = context;
-    } else type = typeOf(typer,scope,subject,NULL,context);
+    RangeNode *type = typeOf(typer,scope,subject,NULL,context);
     if (!type) return NULL;
     typePattern(typer,scope,test->b,type,context);
     typeSharedBindings(typer,test->b);
@@ -2856,7 +2861,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         // `where(element)` calls the closure a function-typed parameter holds.
         RangeNode *value = sourceLookup(typer->report,scope,callee->name,0);
         if (!value && receiverCase(typer,context,callee->name)) {
-            RangeNode *test = finding(typer,call)->lowered = caseTest(typer->report->arena,call,receiverSubject(typer->report->arena,callee),callee->name,call);
+            RangeNode *test = finding(typer,call)->lowered = caseTest(typer,scope,call,receiverSubject(typer->report->arena,callee),(CaseForm){callee->name,call,NULL},context);
             return typeCaseTest(typer,scope,test,context);
         }
         if (value && (value->kind == RangeNodeParameter || rangeNodeDeclaresValue(value->kind)) && isFunctionType(found(typer->key,value)->type))
@@ -2903,7 +2908,7 @@ static RangeNode *typeCall(Typer *typer, SourceScope *scope, RangeNode *call, Ra
         if (macroUnion(receiver) && callee->name) return typeFaceRead(typer,scope,callee,call,receiver,context);
         if (isEnum(receiver) && callee->name && enumCase(receiver->resolvedDeclaration,callee->name)) {
             // `phase.failed(let reason)`: whether phase holds the case, with its payload's patterns.
-            RangeNode *test = finding(typer,call)->lowered = caseTest(typer->report->arena,call,callee->a,callee->name,call);
+            RangeNode *test = finding(typer,call)->lowered = caseTest(typer,scope,call,callee->a,(CaseForm){callee->name,call,NULL},context);
             return typeCaseTest(typer,scope,test,context);
         }
         // A member with no name is one `for … in` resolved by its @iteration role.
@@ -3236,9 +3241,23 @@ static RangeNode *typeFaceRead(Typer *typer, SourceScope *scope, RangeNode *acce
     return typeSwitch(typer,scope,node,NULL,context,typer->output);
 }
 
-/* `fruit = Apple`: whether a value of a macro's values holds an Apple, the
- * case test it is lowered to, which narrows as a test of a case does;
- * `fruit != Apple` is its negation, which narrows nothing. */
+/* `=` or `!=` as the case test it is lowered to: `=` narrows as the test
+ * does; `!=` is its negation, which narrows nothing. */
+static RangeNode *typeLoweredTest(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *test, RangeNode *context)
+{
+    size_t mark = typer->narrowedCount;
+    RangeNode *result = typeCaseTest(typer,scope,test,context);
+    if (same(expr->name,"=")) { finding(typer,expr)->lowered = test; return result; }
+    typer->narrowedCount = mark;
+    RangeArena *arena = typer->report->arena;
+    RangeNode *negation = rangeNodeCreate(arena,RangeNodeUnary,expr->path,expr->line,expr->column);
+    negation->name = "!";
+    negation->a = test;
+    finding(typer,expr)->lowered = negation;
+    return finding(typer,negation)->type = typeOperator(typer,scope,negation,result,NULL,context);
+}
+
+/* `fruit = Apple`: whether a value of a macro's values holds an Apple. */
 static RangeNode *typeTypeTest(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *type, RangeNode *named, RangeNode *context)
 {
     RangeNode *values = type->resolvedDeclaration, *entry = enumCase(values,named->name);
@@ -3247,18 +3266,9 @@ static RangeNode *typeTypeTest(Typer *typer, SourceScope *scope, RangeNode *expr
         typeError(typer,expr->b,"%s does not apply @%s, so a %s value never holds one",named->name,values->owner->name,values->name);
         return NULL;
     }
-    RangeArena *arena = typer->report->arena;
-    RangeNode *test = caseTest(arena,expr,expr->a,entry->name,NULL);
+    RangeNode *test = caseTest(typer,scope,expr,expr->a,(CaseForm){entry->name,NULL,NULL},context);
     test->b->flags |= RangeFlagImplicit;
-    size_t mark = typer->narrowedCount;
-    RangeNode *result = typeCaseTest(typer,scope,test,context);
-    if (same(expr->name,"=")) { finding(typer,expr)->lowered = test; return result; }
-    typer->narrowedCount = mark;
-    RangeNode *negation = rangeNodeCreate(arena,RangeNodeUnary,expr->path,expr->line,expr->column);
-    negation->name = "!";
-    negation->a = test;
-    finding(typer,expr)->lowered = negation;
-    return finding(typer,negation)->type = typeOperator(typer,scope,negation,result,NULL,context);
+    return typeLoweredTest(typer,scope,expr,test,context);
 }
 
 /* A bare name that names a construct or an enum: the type `fruit = Apple`
@@ -3268,6 +3278,83 @@ static RangeNode *namedType(Typer *typer, SourceScope *scope, RangeNode *expr)
     if (!expr || expr->kind != RangeNodeName || expr->generics || (expr->flags & ~RangeFlagEarlier)) return NULL;
     RangeNode *declaration = nameLookup(typer->report,scope,expr);
     return declaration && (declaration->kind == RangeNodeConstruct || declaration->kind == RangeNodeEnum) ? declaration : NULL;
+}
+
+static CaseForm caseForm(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *context)
+{
+    CaseForm form = {0};
+    RangeNode *callee = expr && expr->kind == RangeNodeCall ? expr->a : expr;
+    if (!callee || (callee->kind != RangeNodeCase && callee->kind != RangeNodeMemberAccess) || !callee->name) return form;
+    if (callee->kind == RangeNodeMemberAccess) {
+        RangeNode *optional = optionalPath(typer,scope,callee->a,context);
+        RangeNode *owner = optional ? optional->resolvedDeclaration : typePath(typer->report,scope,callee->a);
+        if (!owner || owner->kind != RangeNodeEnum || !enumCase(owner,callee->name)) return form;
+        form.path = callee->a;
+    }
+    form.name = callee->name;
+    form.call = expr != callee ? expr : NULL;
+    return form;
+}
+
+/* The enum a form's written type path names, in the place of `expected`. */
+static RangeNode *caseFormType(Typer *typer, SourceScope *scope, RangeNode *path, RangeNode *expected, RangeNode *context, RangeNode *at)
+{
+    RangeNode *optional = optionalPath(typer,scope,path,context);
+    return optional ? optional : pathEnum(typer,scope,typePath(typer->report,scope,path),path,expected,context,at);
+}
+
+/* What the arguments of a case form read: CaseBinds for `let`, `_` and a
+ * form that holds one, CaseCompares for any other value. A case in an
+ * argument, itself holding nothing else, is neither: it reads as a pattern
+ * or as a value, as the rest of the form does. */
+enum { CaseBinds = 1, CaseCompares = 2 };
+
+static int caseFormReads(Typer *typer, SourceScope *scope, CaseForm form, RangeNode *context)
+{
+    int reads = 0;
+    for (size_t i = 0; form.call && i < form.call->itemCount; ++i) {
+        RangeNode *value = form.call->items[i]->a;
+        CaseForm inner = caseForm(typer,scope,value,context);
+        reads |= value->kind == RangeNodePattern ? CaseBinds : inner.name ? caseFormReads(typer,scope,inner,context) : CaseCompares;
+    }
+    return reads;
+}
+
+/* `subject = form` when the form is a case test: *tests is set, and the
+ * result is its type. A form of values only is left to be compared by `=`,
+ * and so is a case of what an optional subject holds, or of another type,
+ * which is what `=` reports. A macro's values have no cases. */
+static RangeNode *typeCaseComparison(Typer *typer, SourceScope *scope, RangeNode *expr, CaseForm form, RangeNode *left, RangeNode *context, int *tests)
+{
+    int reads = caseFormReads(typer,scope,form,context), binds = (reads & CaseBinds) != 0;
+    if (macroUnion(left) || (reads == CaseCompares)) return NULL;
+    if (left && !deferredType(typer,left) && !binds) {
+        if (form.path && caseFormType(typer,scope,form.path,left,context,expr) != left) return NULL;
+        RangeNode *held = isEnum(left) && !enumCase(left->resolvedDeclaration,form.name) ? optionalWrapped(typer,left,NULL) : NULL;
+        if (isEnum(held) && enumCase(held->resolvedDeclaration,form.name)) return NULL;
+    }
+    *tests = 1;
+    if (!left) return NULL; /* reported already */
+    return typeLoweredTest(typer,scope,expr,caseTest(typer,scope,expr,expr->a,form,context),context);
+}
+
+/* `Phase = form`, with the enum's bare name on the left: inside its own
+ * functions, the comparison of its receiver. */
+static RangeNode *typeReceiverComparison(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *named, RangeNode *context)
+{
+    if (!typer->function || !typer->function->typeName || !isEnum(context) || context->resolvedDeclaration != named) {
+        typeError(typer,expr->a,"'%s' names a type; its receiver is available only in its own functions",named->name);
+        return NULL;
+    }
+    RangeArena *arena = typer->report->arena;
+    RangeNode *comparison = rangeNodeCreate(arena,RangeNodeBinary,expr->path,expr->line,expr->column);
+    comparison->name = expr->name;
+    comparison->a = receiverSubject(arena,expr->a);
+    comparison->b = expr->b;
+    RangeNode *type = typeOf(typer,scope,comparison,NULL,context);
+    RangeNode *lowered = found(typer->key,comparison)->lowered;
+    finding(typer,expr)->lowered = lowered ? lowered : comparison;
+    return type;
 }
 
 static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *expr, RangeNode *expected, RangeNode *context)
@@ -3293,6 +3380,12 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         }
         break;
     case RangeNodeName: {
+        if (expr->flags & RangeFlagImplicit) {
+            // The receiver, inside an enum's own functions.
+            finding(typer,expr)->resolvedDeclaration = methodReceiver(typer->report,typer->function);
+            type = context;
+            break;
+        }
         RangeNode *declaration = nameLookup(typer->report,scope,expr);
         finding(typer,expr)->resolvedDeclaration = declaration;
         if (declaration && declaredLater(typer->key,scope,declaration)) {
@@ -3300,7 +3393,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             break;
         }
         if (!declaration && receiverCase(typer,context,expr->name)) {
-            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer->report->arena,expr,receiverSubject(typer->report->arena,expr),expr->name,NULL);
+            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer,scope,expr,receiverSubject(typer->report->arena,expr),(CaseForm){expr->name,NULL,NULL},context);
             type = typeCaseTest(typer,scope,test,context);
             break;
         }
@@ -3397,7 +3490,7 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         RangeNode *declaration = receiver->resolvedDeclaration;
         if (isEnum(receiver) && enumCase(declaration,expr->name)) {
             // `phase.loading`: whether phase holds the case.
-            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer->report->arena,expr,expr->a,expr->name,NULL);
+            RangeNode *test = finding(typer,expr)->lowered = caseTest(typer,scope,expr,expr->a,(CaseForm){expr->name,NULL,NULL},context);
             type = typeCaseTest(typer,scope,test,context);
             break;
         }
@@ -3469,6 +3562,9 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
         int equality = same(op,"=") || same(op,"!=");
         RangeNode *want = comparison || equality ? NULL : expected;
         RangeNode *left, *right = NULL;
+        CaseForm form = equality && !contextual(expr->a) ? caseForm(typer,scope,expr->b,context) : (CaseForm){0};
+        RangeNode *receiver = form.name ? namedType(typer,scope,expr->a) : NULL;
+        if (receiver && receiver->kind == RangeNodeEnum) { type = typeReceiverComparison(typer,scope,expr,receiver,context); break; }
         // A literal or `.case` takes the other operand's type when that side is neither.
         int rightFirst = contextual(expr->a) && !contextual(expr->b);
         if (rightFirst) {
@@ -3484,6 +3580,11 @@ static RangeNode *typeExpression(Typer *typer, SourceScope *scope, RangeNode *ex
             } else if (left) type = typeOperator(typer,scope,expr,left,right,context);
             else if (!rightFirst) (void)typeOf(typer,scope,expr->b,NULL,context);
             break;
+        }
+        if (form.name) {
+            int tests = 0;
+            type = typeCaseComparison(typer,scope,expr,form,left,context,&tests);
+            if (tests) break;
         }
         RangeNode *named = !rightFirst ? namedType(typer,scope,expr->b) : NULL;
         if (named && macroUnion(left)) { type = typeTypeTest(typer,scope,expr,left,named,context); break; }
@@ -3936,8 +4037,18 @@ static void typePattern(Typer *typer, SourceScope *scope, RangeNode *pattern, Ra
     case RangePatternCase: {
         // `.name` is always a case of the subject's type. The case `for … in`
         // writes without a name is the payload case of the @optional
-        // declaration, whose payload is the element.
+        // declaration, whose payload is the element. `Type.name` is a case
+        // of the type it writes, which must be the subject's.
         if (!type) return;
+        if (pattern->b) {
+            RangeNode *written = caseFormType(typer,scope,pattern->b,type,context,pattern);
+            if (!written) return;
+            if (written != type) {
+                char w[160]; describeType(w,sizeof(w),written);
+                typeError(typer,pattern,"'%s.%s' is a case of %s; the subject is %s",w,pattern->name,w,t);
+                return;
+            }
+        }
         RangeNode *entry = NULL;
         if (!pattern->name) {
             (void)optionalWrapped(typer,type,&entry);

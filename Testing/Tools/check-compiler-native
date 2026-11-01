@@ -77,6 +77,7 @@ run enum-methods 42 "" Testing/Compiler/Native/EnumMethods.range
 [[ "$(cat "$work_root/stdout")" == "south 15" ]] || fail "enum methods printed: $(cat "$work_root/stdout")"
 run subjects 42 "" Testing/Compiler/Native/Subjects.range
 run case-tests 42 "" Testing/Compiler/Native/CaseTests.range
+run case-comparisons 42 "" Testing/Compiler/Native/CaseComparisons.range
 run logic 42 "" Testing/Compiler/Native/Logic.range
 printf '%s\n' "touched 3" "touched 4" | cmp -s - "$work_root/stdout" || fail "logic short-circuit printed: $(cat "$work_root/stdout")"
 run equality 42 "" Testing/Compiler/Native/Equality.range
@@ -500,8 +501,11 @@ reject case-member-clash "'on' is a case of Power, so Power declares no function
 reject binding-outside "'let x' binds a name only in a switch arm's condition or a 'for' filter" \
     'function f(let o: Int?): Bool { let b: o.present(let x) return b }
 { return 0 }'
-reject binding-negated "nothing can be bound under '!'" \
-    'function f(let o: Int?): Int { switch { !o.present(let x): return 1, default: return 0 } }
+reject binding-negated "a negated test binds nothing; 'let x' is under a negation" \
+    'function f(let o: Int?): Int { switch { !(o = .present(let x)): return 1, default: return 0 } }
+{ return 0 }'
+reject binding-different "a negated test binds nothing; 'let x' is under a negation" \
+    'function f(let o: Int?): Int { switch { o != .present(let x): return 1, default: return 0 } }
 { return 0 }'
 reject binding-operand "'let x' binds a name only in a case test that '&' or '|' joins into the condition" \
     'function g(let b: Bool): Bool { return b }
@@ -586,6 +590,95 @@ reject macro-case-unreachable "this condition is already handled by earlier arms
 @both
 enum Light { case on, off }
 { return 0 }'
+
+# `subject = .case`: the right side decides what `=` does.
+phase='enum Phase { case loading, loaded(Int), failed(String) }'
+reject equality-missing "switch must be exhaustive: 'phase.loaded' is not handled; add an arm for it or a default" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase = .loading: return 1, phase = .failed: return 2 } }
+{ return 0 }"
+reject equality-value-covers-nothing "switch must be exhaustive: 'phase.loaded' is not handled; add an arm for it or a default" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase = .loading: return 1, phase = .loaded(0): return 2, phase = .failed: return 2 } }
+{ return 0 }"
+reject equality-unreachable "this condition is already handled by earlier arms" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase = .failed: return 1, phase = Phase.failed(let s): return 2, default: return 0 } }
+{ return 0 }"
+reject equality-default-unreached "'default' is never reached: the arms above match every value" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase = .loading: return 1, phase = .loaded: return 2, phase = .failed(_): return 3, default: return 4 } }
+{ return 0 }"
+reject equality-no-case "Phase has no case 'gone'" \
+    "$phase
+function f(let phase: Phase): Bool { return phase = .gone }
+{ return 0 }"
+reject equality-not-enum "'.gone' matches an enum case, but the subject is Int" \
+    'function f(let n: Int): Bool { return n = .gone }
+{ return 0 }'
+reject equality-no-payload "case 'loading' has no payload to match" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase = .loading(let x): return x, default: return 0 } }
+{ return 0 }"
+reject equality-arity "case 'loaded' has 1 payload fields; the pattern matches 2" \
+    "$phase
+function f(let phase: Phase): Int { switch { phase = .loaded(_, _): return 0, default: return 0 } }
+{ return 0 }"
+reject equality-other-type "operator '=' requires matching types; found Phase and Other" \
+    "$phase
+enum Other { case loading }
+function f(let phase: Phase): Bool { return phase = Other.loading }
+{ return 0 }"
+reject equality-other-type-bound "'Other.failed' is a case of Other; the subject is Phase" \
+    "$phase
+enum Other { case failed(String) }
+function f(let phase: Phase): Int { switch { phase = Other.failed(let s): return s.count, default: return 0 } }
+{ return 0 }"
+reject equality-binding-outside "'let x' binds a name only in a switch arm's condition or a 'for' filter" \
+    'function f(let o: Int?): Bool { let b: o = .present(let x) return b }
+{ return 0 }'
+reject equality-narrowing-shadow "'x' is already narrowed to the payload here; related: a test of an optional value for its present case narrows that value" \
+    'function f(let x: Int?): Int { switch { x = .present(let x): return x, default: return 0 } }
+{ return f(x: 1) }'
+reject equality-negation-narrows-nothing "'+' is not declared on Optional" \
+    'function f(let x: Int?): Int { switch { x != .absent: return x + 1, default: return 0 } }
+{ return f(x: 1) }'
+reject equality-macro-values "@fruit has no cases; related: 'value = Apple' tests whether a @fruit value holds Apple" \
+    'macro fruit(): Construct
+@fruit construct Apple { let weight: Int }
+function f(let v: @fruit): Bool { return v = .Apple }
+{ return 0 }'
+# The receiver is the enum's name, in the enum's own functions only.
+reject receiver-outside "'Phase' names a type; its receiver is available only in its own functions" \
+    "$phase
+function f(): Bool { return Phase = .loading }
+{ return 0 }"
+reject receiver-other-enum "'Other' names a type; its receiver is available only in its own functions" \
+    "enum Other { case loading }
+enum Phase { case loading  function f(): Bool { return Other = .loading } }
+{ return 0 }"
+reject receiver-construct "'Phase' names a type; its receiver is available only in its own functions" \
+    "$phase
+construct Holder { function f(): Bool { return Phase != Phase.loading } }
+{ return 0 }"
+reject receiver-missing "switch must be exhaustive" \
+    'enum Phase { case loading, loaded(Int)  function f(): Int { switch { Phase = .loading: return 1 } } }
+{ return 0 }'
+# At macro time a case test reads the value's case when it runs.
+run macro-case-comparisons 0 "" "$(case_file macro-case-comparisons 'macro paired(): Enum {
+    let on: #target.cases.first(where: { c in c.name = "on" })
+    let off: #target.cases.first(where: { c in c.name = "off" })
+    let both: on = .present & off != .absent
+    switch {
+        on = .present(let c) & c.name != "on": diagnostic(message: "\(#target.name) misnames on"),
+        both: warning(message: "\(#target.name) has on and off"),
+        default: diagnostic(message: "\(#target.name) needs on and off")
+    }
+}
+@paired
+enum Light { case on, off }
+{ return 0 }')"
+grep -Fq "warning[macro]: Light has on and off" "$work_root/log" || fail "a compile-time comparison of a case did not hold"
 
 # A test of a stable optional's present case, with no pattern, narrows it to
 # the payload: right of the test in its `&` chain and in the arm's body.
@@ -798,7 +891,11 @@ reject uncomparable-payload "'=' cannot compare Place: payload field '0' of case
     "$raw
 enum Place { case at(Bag), nowhere }
 function f(let p: Place): Int { switch { p.nowhere: return 0, default: return 1 } }
-{ let p: Place.nowhere switch { p = .nowhere: return 1, default: {} } return 0 }"
+{ let p: Place.nowhere let q: Place.nowhere switch { p = q: return 1, default: {} } return 0 }"
+# A case test compares nothing, so it needs no `=`.
+run case-test-compares-nothing 7 "" "$(case_file case-test-compares-nothing "$raw
+enum Place { case at(Bag), nowhere }
+{ let p: Place.nowhere switch { p = .nowhere: return 7, default: {} } return 0 }")"
 reject uncomparable-specialization "'=' cannot compare Bag: field 'items' is Raw, and field 'slots' of Raw is @many storage, which the structural '=' does not compare; in Pair<Value: Bag>, specialized at" \
     "$raw
 construct Pair<Value> { let first: Value  let second: Value  function same(): Bool { return first = second } }
@@ -836,7 +933,7 @@ run written-equality 0 "" "$(case_file written-equality 'construct Own { let n: 
 { switch { Own(n: 1) != Own(n: 2): return 1, default: {} } return 0 }')"
 run written-equality-extension 0 "" "$(case_file written-equality-extension 'enum Own { case one, two }
 extension Own { function =(let other: Own): Bool { return true } }
-{ switch { Own.one != .two: return 1, default: {} } return 0 }')"
+{ let two: Own.two switch { Own.one != two: return 1, default: {} } return 0 }')"
 # An application's arguments are a call's: labeled, typed, and known at
 # macro time, where the application is written; it cannot see its target.
 sized='macro sized(let width: Int): Construct {

@@ -1,0 +1,248 @@
+// `subject = .case` tests a case: what the right side of `=` writes decides.
+// A form with `let`, `_` or a nested case, or a bare case, is a case test: it
+// narrows, and counts for coverage and reachability. A form of values only is
+// compared by `=`, the enum's own if it writes one, and covers nothing.
+enum Phase {
+    case loading
+    case loaded(Int)
+    case failed(reason: String, code: Int)
+}
+
+enum Light { case on, off }
+
+enum Pair {
+    case pair(Light, Light)
+    case none
+}
+
+enum Nested {
+    case outer(Phase)
+    case other
+}
+
+// Every case of the subject is tested, with a guard and with a bare case that
+// ignores its payload: no default.
+function describe(let phase: Phase): Int {
+    switch {
+        phase = .loading: return 1,
+        phase = .loaded(let n) & n > 10: return n,
+        phase = .loaded(let n): return n + 100,
+        phase = .failed: return 1000
+    }
+}
+
+// The same subject with its type written on the right.
+function described(let phase: Phase): Int {
+    switch {
+        phase = Phase.loading: return 1,
+        phase = Phase.loaded(let n) & n > 10: return n,
+        phase = Phase.loaded(let n): return n + 100,
+        phase = Phase.failed(reason: let r, code: _): return r.count + 1000
+    }
+}
+
+// Two subjects; bindings flow right through `&`; both sides of `|` bind the
+// same names.
+function combine(let a: Phase, let b: Phase): Int {
+    return switch {
+        a = .loaded(let x) & b = .loaded(let y): x + y,
+        a = .loaded(let x) | b = .loaded(let x): x,
+        default: 0
+    }
+}
+
+// Inside the parentheses, `_` ignores a field and a case tests it.
+function lights(let p: Pair): Int {
+    switch {
+        p = .pair(_, Light.on): return 1,
+        p = .pair(.off, .off): return 2,
+        p = .pair(.on, Light.off): return 3,
+        p = .none: return 4
+    }
+}
+
+// A nested test binds and covers.
+function deep(let n: Nested): Int {
+    switch {
+        n = .outer(.loaded(let v)): return v,
+        n = .outer(.loading): return 1,
+        n = .outer(.failed): return 2,
+        n = .other: return 3
+    }
+}
+
+// A form of values is a value: compared by `=`, it covers nothing, so a
+// default still ends the switch, and it agrees with the value held in a name.
+function compared(let phase: Phase): Int {
+    let zero: Phase.loaded(0)
+    switch {
+        phase = .loaded(0) & phase = zero: return 1,
+        phase = Phase.loaded(1): return 2,
+        phase = .failed(reason: "slow", code: 3): return 3,
+        default: return 0
+    }
+}
+
+// An enum that writes its own `=` still has its payload-less cases tested:
+// `.a` is a case test, whatever `=` says, while a form of values calls `=`.
+enum Odd {
+    case a, b, value(Int)
+    function =(let other: Odd): Bool { return false }
+}
+
+// Optional narrowing: a stable optional is its payload to the right of the
+// test and in the arm.
+function unwrapped(let value: Int?): Int {
+    switch {
+        value = .present: return value,
+        value = .absent: return 0
+    }
+}
+
+function guarded(let o: Int?, let limit: Int): Int {
+    switch {
+        o = .present(let v) & v > limit: return 2,
+        o = Int?.present: return 1,
+        o = Int?.absent: return 0
+    }
+}
+
+// `!=` is the negation of the test, and narrows nothing.
+function other(let phase: Phase, let o: Int?): Int {
+    switch {
+        phase != .loading & phase != .failed(_, _): return 1,
+        o != .absent: return 2,
+        phase != Phase.loaded: return 3,
+        default: return 4
+    }
+}
+
+// Inside an enum's own functions the receiver is the enum's name, a stable
+// subject for coverage.
+enum Message {
+    case text(String)
+    case pair(String, String)
+    case empty
+
+    function length(): Int {
+        switch {
+            Message = .text(let s): return s.count,
+            Message = .pair(let a, let b): return a.count + b.count,
+            Message = Message.empty: return 0
+        }
+    }
+
+    function blank(): Bool { return Message = .empty }
+    function filled(): Bool { return Message != .empty }
+    function hello(): Bool { return Message = .text("hello") }
+}
+
+extension Message {
+    function wordy(): Bool {
+        switch {
+            Message = .text | Message = .pair: return true,
+            default: return false
+        }
+    }
+}
+
+// A generic enum uses its bare name.
+enum Either<Left, Right> {
+    case left(Left)
+    case right(Right)
+}
+
+extension Either {
+    function isLeft(): Bool { return Either = .left }
+    function leftOr(let fallback: Left): Left {
+        let value: switch { Either = .left(let value): value, default: { return fallback } }
+        return value
+    }
+}
+
+extension Optional {
+    function isPresent(): Bool { return Optional = .present }
+}
+
+// A value on the left stays a value: `Direction.north` makes one.
+enum Direction {
+    case north, east
+    function northIsNorth(): Bool { return Direction.north = .north }
+}
+
+{
+    let phase: Phase.loaded(5)
+    let busy: phase = .loading
+    switch { busy: return 1, default: {} }
+    switch { !(phase = .loaded): return 2, default: {} }
+    switch { describe(phase: Phase.loading) != 1 | described(phase: Phase.loading) != 1: return 3, default: {} }
+    switch { describe(phase: Phase.loaded(20)) != 20 | described(phase: Phase.loaded(20)) != 20: return 4, default: {} }
+    switch { describe(phase: Phase.loaded(2)) != 102 | described(phase: Phase.loaded(2)) != 102: return 5, default: {} }
+    switch { describe(phase: Phase.failed(reason: "slow", code: 9)) != 1000: return 6, default: {} }
+    switch { described(phase: Phase.failed(reason: "slow", code: 9)) != 1004: return 7, default: {} }
+    switch { combine(a: Phase.loaded(1), b: Phase.loaded(2)) != 3: return 8, default: {} }
+    switch { combine(a: Phase.loading, b: Phase.loaded(4)) != 4: return 9, default: {} }
+    switch { combine(a: Phase.loading, b: Phase.loading) != 0: return 10, default: {} }
+    switch { lights(p: Pair.pair(.off, .on)) != 1 | lights(p: Pair.pair(.off, .off)) != 2: return 11, default: {} }
+    switch { lights(p: Pair.pair(.on, .off)) != 3 | lights(p: Pair.none) != 4: return 12, default: {} }
+    switch { deep(n: Nested.outer(.loaded(9))) != 9 | deep(n: Nested.outer(.loading)) != 1: return 13, default: {} }
+    switch { deep(n: Nested.outer(.failed(reason: "", code: 0))) != 2 | deep(n: Nested.other) != 3: return 14, default: {} }
+    switch { compared(phase: Phase.loaded(0)) != 1 | compared(phase: Phase.loaded(1)) != 2: return 15, default: {} }
+    switch { compared(phase: Phase.failed(reason: "slow", code: 3)) != 3 | compared(phase: Phase.loading) != 0: return 16, default: {} }
+
+    let odd: Odd.a
+    switch { !(odd = .a) | odd = .b | odd = .value: return 17, default: {} }
+    let valued: Odd.value(1)
+    switch { valued = .value(1) | !(valued = .value): return 18, default: {} }
+    switch { odd = Odd.b | !(odd != .b): return 19, default: {} }
+
+    switch { unwrapped(value: 7) != 7 | unwrapped(value: .absent) != 0: return 20, default: {} }
+    switch { guarded(o: 5, limit: 3) != 2 | guarded(o: 2, limit: 3) != 1 | guarded(o: .absent, limit: 3) != 0: return 21, default: {} }
+    switch { other(phase: Phase.loaded(1), o: .absent) != 1 | other(phase: Phase.loading, o: 1) != 2: return 22, default: {} }
+    switch { other(phase: Phase.loading, o: .absent) != 3 | other(phase: Phase.loaded(1), o: .absent) != 1: return 23, default: {} }
+
+    // A for filter reads cases too, binds for the body, and narrows.
+    state messages: Array<Message>()
+    messages.append(value: Message.text("hello"))
+    messages.append(value: Message.pair("ab", "cde"))
+    messages.append(value: Message.empty)
+    messages.append(value: Message.text("x"))
+    state total: 0
+    for m in messages & m = .text(let s) & s.count > 1 { total: total + s.count }
+    switch { total != 5: return 24, default: {} }
+    state lengths: 0
+    for m in messages & m != .empty { lengths: lengths + m.length() }
+    switch { lengths != 11: return 25, default: {} }
+    switch { !Message.empty.blank() | Message.text("a").blank() | Message.empty.filled(): return 26, default: {} }
+    switch { !Message.text("hello").hello() | Message.text("a").hello(): return 27, default: {} }
+    switch { !Message.pair("a", "b").wordy() | Message.empty.wordy(): return 28, default: {} }
+
+    state names: Array<String?>()
+    names.append(value: "abc")
+    names.append(value: .absent)
+    names.append(value: "de")
+    state letters: 0
+    for name in names & name = .present { letters: letters + name.count }
+    switch { letters != 5: return 29, default: {} }
+
+    let e: Either<Int, Bool>.left(3)
+    switch { !e.isLeft() | e.leftOr(fallback: 9) != 3: return 30, default: {} }
+    let r: Either<Int, Bool>.right(true)
+    switch { r.isLeft() | r.leftOr(fallback: 9) != 9: return 31, default: {} }
+    let maybe: Int?.present(4)
+    let none: Int?.absent
+    switch { !maybe.isPresent() | none.isPresent(): return 32, default: {} }
+    switch { !Direction.east.northIsNorth(): return 33, default: {} }
+
+    // A case of what an optional holds compares with the value it is promoted to.
+    let lit: Light?.present(.on)
+    switch { !(lit = .on) | lit = Light.off: return 34, default: {} }
+
+    // A switch's value reads what its arm's test bound.
+    let doubled: switch {
+        maybe = .present(let x): switch { x > 3: x * 2, default: x },
+        maybe = .absent: 0
+    }
+    switch { doubled != 8: return 35, default: {} }
+    return 42
+}

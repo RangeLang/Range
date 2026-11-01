@@ -488,7 +488,7 @@ static RangeNode *parseArgumentPattern(RangeParser *parser)
     pattern->a = binding;
     if (parser->failed) return pattern;
     if (parser->negated)
-        parserFail(parser, &at, "nothing can be bound under '!'");
+        parserFail(parser, &at, "a negated test binds nothing; 'let %s' is under a negation", binding->name);
     else if (!parser->bindings)
         parserFail(parser, &at, "'let %s' binds a name only in a switch arm's condition or a 'for' filter", binding->name);
     else rangeNodeAppend(parser->arena, parser->bindings, binding);
@@ -897,7 +897,11 @@ static RangeNode *parseExpression(RangeParser *parser, int level)
         node->name = matched;
         node->a = left;
         parserAdvance(parser);
+        // `!=` negates what its right side tests, so that binds nothing.
+        int negation = !strcmp(matched, "!=");
+        parser->negated += negation;
         node->b = parseExpression(parser, level + 1);
+        parser->negated -= negation;
         left = node;
         if (level == RANGE_INTERVAL_LEVEL) {
             if (parserAt(parser, "..<"))
@@ -1029,6 +1033,12 @@ static void scanCondition(RangeParser *parser, RangeNode *node, int joined, Boun
             scanCondition(parser, node->b, joined, visible, made, bindings);
             return;
         }
+        if (!strcmp(node->name, "=")) {
+            // What a case form on the right binds, the test binds.
+            scanCondition(parser, node->a, 0, visible, made, bindings);
+            scanCondition(parser, node->b, joined, visible, made, bindings);
+            return;
+        }
         if (!strcmp(node->name, "|")) {
             Bound left = {0}, right = {0};
             size_t mark = visible->count;
@@ -1077,7 +1087,8 @@ static void scanCondition(RangeParser *parser, RangeNode *node, int joined, Boun
         for (size_t i = 0; i < node->itemCount && !parser->failed; ++i) {
             RangeNode *value = node->items[i]->a;
             int pattern = value && (value->kind == RangeNodePattern
-                || (value->kind == RangeNodeCall && value->a && value->a->kind == RangeNodeCase));
+                || (value->kind == RangeNodeCall && value->a && (value->a->kind == RangeNodeCase
+                    || (value->a->kind == RangeNodeMemberAccess && node->a && node->a->kind != RangeNodeName))));
             size_t mark = visible->count;
             for (size_t k = 0; k < own.count; ++k) boundAdd(visible, own.lets[k]);
             Bound inner = {0};
